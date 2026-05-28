@@ -37,7 +37,8 @@ function IsIgnorableModifierKey(const KeyCode: Integer): Boolean;
 implementation
 
 uses
-  DebugLog;
+  DebugLog,
+  uRegistrySettings;
 
 { =============================================================================== }
 
@@ -160,10 +161,14 @@ var
   isPhysicalShiftPressed, isCapsToggledActuallyOn: Boolean;
 begin
   isPhysicalShiftPressed := IsTrueShift;
-  isCapsToggledActuallyOn := IsKeyToggledOn(VK_CAPITAL);
 
-  // Effective shift state is true if (physical shift is pressed XOR caps lock is on)
-  Result := isPhysicalShiftPressed xor isCapsToggledActuallyOn;
+  if IgnoreCapsLock = 'YES' then
+    Result := isPhysicalShiftPressed
+  else
+  begin
+    isCapsToggledActuallyOn := IsKeyToggledOn(VK_CAPITAL);
+    Result := isPhysicalShiftPressed xor isCapsToggledActuallyOn;
+  end;
 end;
 
 { =============================================================================== }
@@ -182,6 +187,7 @@ begin
     SendKey_SendInput(VK_NONAME); // Hack: Unused key to try to avoid key buffering issue (deleting too much)
     Sleep(SENDKEY_DELAY_MS);      // Add a small delay to allow processing
   end;
+  Sleep(SENDKEY_DELAY_MS);        // Extra delay to ensure app processes injected keys
 end;
 
 { =============================================================================== }

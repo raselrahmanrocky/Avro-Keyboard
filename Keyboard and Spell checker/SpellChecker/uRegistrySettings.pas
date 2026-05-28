@@ -39,6 +39,8 @@ var
   IgnoreSingle:   string;
   FullSuggestion: string;
 
+  IgnoreCapsLock: string;
+
 procedure LoadSettings;
 procedure ValidateSettings;
 procedure SaveSettings;
@@ -243,6 +245,8 @@ begin
   if not((FullSuggestion = 'YES') or (FullSuggestion = 'NO')) then
     FullSuggestion := 'NO';
   {$ENDIF}
+  if not((IgnoreCapsLock = 'YES') or (IgnoreCapsLock = 'NO')) then
+    IgnoreCapsLock := 'NO';
 end;
 
 { =============================================================================== }

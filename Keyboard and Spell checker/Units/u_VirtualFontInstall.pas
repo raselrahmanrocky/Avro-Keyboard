@@ -59,6 +59,7 @@ var
 begin
   TempName := GetTempDirectory + 'tmpfntavro.tmp';
   CheckDeleteTempFile(TempName);
+  S := nil;
 
   if CreateScalableFontResource(0, // Hidden
     pchar(TempName),               // FON file

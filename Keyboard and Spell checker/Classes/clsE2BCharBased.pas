@@ -335,18 +335,27 @@ begin
 
     if OutputIsBijoy <> 'YES' then
     begin
-      if (Length(NewBanglaText) - 1) >= 1 then
-        Backspace(Length(NewBanglaText) - 1);
+      if Length(NewBanglaText) >= 1 then
+      begin
+        Backspace(Length(NewBanglaText));
+        Block := True;
+      end
+      else
+        Block := False;
     end
     else
     begin
       BijoyNewBanglaText := Bijoy.Convert(NewBanglaText);
-      if (Length(BijoyNewBanglaText) - 1) >= 1 then
-        Backspace(Length(BijoyNewBanglaText) - 1);
+      if Length(BijoyNewBanglaText) >= 1 then
+      begin
+        Backspace(Length(BijoyNewBanglaText));
+        Block := True;
+      end
+      else
+        Block := False;
     end;
 
     ResetDeadKey;
-    Block := False;
   end
   else if (Length(EnglishT) - 1) > 0 then
   begin
@@ -1385,6 +1394,7 @@ begin
   begin
     Block := False;
     BlockLast := False;
+    ResetDeadKey;
     ProcessVKeyDown := '';
     exit;
   end;

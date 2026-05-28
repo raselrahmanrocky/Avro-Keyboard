@@ -421,6 +421,30 @@ begin
           ShouldBlock := True;
           goto ExitHere;
         end;
+      end
+      else if kbdllhs.vkCode = Ord('V') then
+      begin
+        if UnicodeToggleShortcut = 'YES' then
+        begin
+          if (IsTrueShift = False) and IsControl and IsAlter then
+          begin
+            AvroMainForm1.SetBengaliUnicodeMode;
+            ShouldBlock := True;
+            goto ExitHere;
+          end;
+        end;
+      end
+      else if kbdllhs.vkCode = Ord('B') then
+      begin
+        if ANSIToggleShortcut = 'YES' then
+        begin
+          if (IsTrueShift = False) and IsControl and IsAlter then
+          begin
+            AvroMainForm1.SetBengaliANSIMode;
+            ShouldBlock := True;
+            goto ExitHere;
+          end;
+        end;
       end;
     end
 
@@ -649,6 +673,28 @@ begin
         begin
           ShouldBlock := True;
           goto ExitHere;
+        end;
+      end
+      else if kbdllhs.vkCode = Ord('V') then
+      begin
+        if UnicodeToggleShortcut = 'YES' then
+        begin
+          if (IsTrueShift = False) and IsControl and IsAlter then
+          begin
+            ShouldBlock := True;
+            goto ExitHere;
+          end;
+        end;
+      end
+      else if kbdllhs.vkCode = Ord('B') then
+      begin
+        if ANSIToggleShortcut = 'YES' then
+        begin
+          if (IsTrueShift = False) and IsControl and IsAlter then
+          begin
+            ShouldBlock := True;
+            goto ExitHere;
+          end;
         end;
       end;
     end;

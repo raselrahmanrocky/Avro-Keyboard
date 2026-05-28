@@ -86,6 +86,9 @@ var
   // Global Output settings
   OutputIsBijoy:     string;
   ShowOutputwarning: string;
+  UnicodeToggleShortcut: string;
+  ANSIToggleShortcut: string;
+  IgnoreCapsLock:    string;
 
 procedure SaveUISettings;
 procedure LoadSettings;
@@ -103,7 +106,8 @@ implementation
 uses
   uForm1,
   uTopBar,
-  WindowsVersion;
+  WindowsVersion,
+  clsUnicodeToBijoy2000;
 
 { =============================================================================== }
 
@@ -186,6 +190,11 @@ begin
   // Global Output settings
   OutputIsBijoy := UpperCase(XML.GetValue('OutputIsBijoy', 'No'));
   ShowOutputwarning := UpperCase(XML.GetValue('ShowOutputwarning', 'Yes'));
+  UnicodeToggleShortcut := UpperCase(XML.GetValue('UnicodeToggleShortcut', 'YES'));
+  ANSIToggleShortcut := UpperCase(XML.GetValue('ANSIToggleShortcut', 'YES'));
+  IgnoreCapsLock := UpperCase(XML.GetValue('IgnoreCapsLock', 'NO'));
+
+  clsUnicodeToBijoy2000.AnsiVersion := XML.GetValue('AnsiVersion', 'Default');
 
   XML.Free;
 
@@ -262,6 +271,10 @@ begin
   // Global Output settings
   XML.SetValue('OutputIsBijoy', OutputIsBijoy);
   XML.SetValue('ShowOutputwarning', ShowOutputwarning);
+  XML.SetValue('UnicodeToggleShortcut', UnicodeToggleShortcut);
+  XML.SetValue('ANSIToggleShortcut', ANSIToggleShortcut);
+  XML.SetValue('IgnoreCapsLock', IgnoreCapsLock);
+  XML.SetValue('AnsiVersion', clsUnicodeToBijoy2000.AnsiVersion);
 
   XML.SaveXMLData;
   XML.Free;
@@ -345,6 +358,10 @@ begin
     // Global Output settings
     OutputIsBijoy := UpperCase(Reg.ReadStringDef('OutputIsBijoy', 'No'));
     ShowOutputwarning := UpperCase(Reg.ReadStringDef('ShowOutputwarning', 'Yes'));
+    UnicodeToggleShortcut := UpperCase(Reg.ReadStringDef('UnicodeToggleShortcut', 'YES'));
+    ANSIToggleShortcut := UpperCase(Reg.ReadStringDef('ANSIToggleShortcut', 'YES'));
+    IgnoreCapsLock := UpperCase(Reg.ReadStringDef('IgnoreCapsLock', 'NO'));
+    clsUnicodeToBijoy2000.AnsiVersion := Reg.ReadStringDef('AnsiVersion', 'Default');
 
   end;
 
@@ -427,6 +444,10 @@ begin
     // Global Output settings
     Reg.WriteString('OutputIsBijoy', OutputIsBijoy);
     Reg.WriteString('ShowOutputwarning', ShowOutputwarning);
+    Reg.WriteString('UnicodeToggleShortcut', UnicodeToggleShortcut);
+    Reg.WriteString('ANSIToggleShortcut', ANSIToggleShortcut);
+    Reg.WriteString('IgnoreCapsLock', IgnoreCapsLock);
+    Reg.WriteString('AnsiVersion', clsUnicodeToBijoy2000.AnsiVersion);
 
   end;
 
@@ -557,6 +578,16 @@ begin
     OutputIsBijoy := 'NO';
   if not((ShowOutputwarning = 'YES') or (ShowOutputwarning = 'NO')) then
     ShowOutputwarning := 'YES';
+  if not((UnicodeToggleShortcut = 'YES') or (UnicodeToggleShortcut = 'NO')) then
+    UnicodeToggleShortcut := 'YES';
+  if not((ANSIToggleShortcut = 'YES') or (ANSIToggleShortcut = 'NO')) then
+    ANSIToggleShortcut := 'YES';
+  if not((IgnoreCapsLock = 'YES') or (IgnoreCapsLock = 'NO')) then
+    IgnoreCapsLock := 'NO';
+
+  // ANSI Mapping Version
+  if clsUnicodeToBijoy2000.AnsiVersion = '' then
+    clsUnicodeToBijoy2000.AnsiVersion := 'Default';
 end;
 
 { =============================================================================== }
