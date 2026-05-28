@@ -11,6 +11,8 @@
 
 unit KeyboardLayoutLoader;
 
+{$WARN IMPLICIT_STRING_CAST OFF}
+
 interface
 
 uses
@@ -635,6 +637,7 @@ var
   Overwrite:                                 Boolean;
 begin
   Result := False;
+  Overwrite := False;
   try
     try
       XML := TXMLDocument.create(nil);
@@ -724,4 +727,5 @@ begin
   end;
 end;
 
+{$WARN IMPLICIT_STRING_CAST ON}
 end.

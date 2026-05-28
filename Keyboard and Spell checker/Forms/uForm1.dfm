@@ -5,8 +5,8 @@ object AvroMainForm1: TAvroMainForm1
   BorderIcons = []
   BorderStyle = bsNone
   Caption = 'Avro Keyboard'
-  ClientHeight = 292
-  ClientWidth = 574
+  ClientHeight = 544
+  ClientWidth = 833
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText

@@ -31,7 +31,8 @@ uses
   clsUpdateInfoDownloader,
   DateUtils,
   System.ImageList,
-  Vcl.AppEvnts;
+  Vcl.AppEvnts,
+  ShellAPI;
 
 type
   TMenuItemExtended = class(TMenuItem)
@@ -368,6 +369,13 @@ type
       procedure KeyLayout_KeyboardModeChanged(CurrentMode: enumMode);
 
       procedure HandleThemes;
+      procedure BuildAnsiVersionMenus;
+      procedure AnsiVersionMenuClick(Sender: TObject);
+      procedure ImportAnsiMappingClick(Sender: TObject);
+      procedure ExportAnsiMappingClick(Sender: TObject);
+      procedure DeleteAnsiMappingClick(Sender: TObject);
+      procedure OpenAnsiMappingDirClick(Sender: TObject);
+      procedure IgnoreCapsLockClick(Sender: TObject);
 
       procedure WMCopyData(var Msg: TWMCopyData); message WM_COPYDATA;
     public
@@ -375,6 +383,10 @@ type
       KeyboardModeChanged: Boolean;
       KeyLayout:           TLayout;
       Updater:             TUpdateCheck;
+      AnsiVersionSubmenu1: TMenuItem;
+      AnsiVersionSubmenu2: TMenuItem;
+      IgnoreCapsLock1: TMenuItem;
+      IgnoreCapsLock2: TMenuItem;
 
       function GetMyCurrentKeyboardMode: enumMode;
       procedure ExitApp;
@@ -384,6 +396,8 @@ type
       procedure OpenHelpFile(const HelpID: Integer);
       procedure ShowOnTray;
       procedure ToggleMode;
+      procedure SetBengaliUnicodeMode;
+      procedure SetBengaliANSIMode;
       procedure TopBarDocToTop;
       function TransferKeyDown(const KeyCode: Integer; var Block: Boolean): string;
       procedure TransferKeyUp(const KeyCode: Integer; var Block: Boolean);
@@ -407,6 +421,7 @@ uses
   uAutoCorrect,
   KeyboardLayoutLoader,
   uFileFolderHandling,
+  clsUnicodeToBijoy2000,
   WindowsVersion,
   uWindowHandlers,
   uTopBar,
@@ -425,7 +440,8 @@ uses
   u_VirtualFontInstall,
   ufrmEncodingWarning,
   DebugLog,
-  WindowsDarkMode;
+  WindowsDarkMode,
+  System.UITypes;
 
 { =============================================================================== }
 
@@ -843,6 +859,30 @@ begin
       Popup_LayoutList.Items.Insert(AvroPhoneticEnglishtoBangla1.MenuIndex + 1, TempMenu3);
     end;
   end;
+
+  // Create ANSI Version submenus
+  AnsiVersionSubmenu1 := TMenuItem.Create(Popup_Tools);
+  AnsiVersionSubmenu1.Caption := 'ANSI Output Version';
+  Popup_Tools.Items.Insert(OutputasANSIAreyousure1.MenuIndex + 1, AnsiVersionSubmenu1);
+
+  AnsiVersionSubmenu2 := TMenuItem.Create(ools1);
+  AnsiVersionSubmenu2.Caption := 'ANSI Output Version';
+  ools1.Insert(OutputasANSIAreyousure2.MenuIndex + 1, AnsiVersionSubmenu2);
+
+  // Create Ignore Caps Lock toggle items
+  IgnoreCapsLock1 := TMenuItem.Create(Popup_Tools);
+  IgnoreCapsLock1.Caption := 'Ignore Caps Lock for Bangla typing';
+  IgnoreCapsLock1.AutoCheck := False;
+  IgnoreCapsLock1.Checked := (IgnoreCapsLock = 'YES');
+  IgnoreCapsLock1.OnClick := IgnoreCapsLockClick;
+  Popup_Tools.Items.Insert(AnsiVersionSubmenu1.MenuIndex + 1, IgnoreCapsLock1);
+
+  IgnoreCapsLock2 := TMenuItem.Create(ools1);
+  IgnoreCapsLock2.Caption := 'Ignore Caps Lock for Bangla typing';
+  IgnoreCapsLock2.AutoCheck := False;
+  IgnoreCapsLock2.Checked := (IgnoreCapsLock = 'YES');
+  IgnoreCapsLock2.OnClick := IgnoreCapsLockClick;
+  ools1.Insert(AnsiVersionSubmenu2.MenuIndex + 1, IgnoreCapsLock2);
 end;
 
 {$HINTS Off}
@@ -935,7 +975,7 @@ procedure TAvroMainForm1.KeyLayout_KeyboardModeChanged(CurrentMode: enumMode);
 var
   hforewnd:                                         Integer;
   ICN:                                              TIcon;
-  WindowRecord, ParenWindowRecord, NewWindowRecord: TWindowRecord;
+  WindowRecord, NewWindowRecord: TWindowRecord;
 begin
   { This is for Top Bar, when Keyboard Mode is changed,
     it removes transparency }
@@ -1555,6 +1595,15 @@ begin
     OutputasANSIAreyousure2.Checked := False;
   end;
 
+  // ANSI Mapping version
+  AnsiMappingDir := GetAvroDataDir + 'AnsiMapping\';
+  ForceDirectories(AnsiMappingDir);
+  LoadCurrentActiveMapping;
+  BuildAnsiVersionMenus;
+
+  IgnoreCapsLock1.Checked := (IgnoreCapsLock = 'YES');
+  IgnoreCapsLock2.Checked := (IgnoreCapsLock = 'YES');
+
   SaveUISettings;
 
 end;
@@ -1693,6 +1742,42 @@ end;
 procedure TAvroMainForm1.ToggleMode;
 begin
   KeyLayout.ToggleMode;
+end;
+
+{ =============================================================================== }
+
+procedure TAvroMainForm1.SetBengaliUnicodeMode;
+begin
+  if (KeyLayout.KeyboardMode = Bangla) and (OutputIsBijoy = 'NO') then
+    KeyLayout.KeyboardMode := SysDefault
+  else
+  begin
+    if KeyLayout.KeyboardMode <> Bangla then
+      KeyLayout.KeyboardMode := Bangla;
+    if OutputIsBijoy = 'YES' then
+    begin
+      OutputIsBijoy := 'NO';
+      RefreshSettings;
+    end;
+  end;
+end;
+
+{ =============================================================================== }
+
+procedure TAvroMainForm1.SetBengaliANSIMode;
+begin
+  if (KeyLayout.KeyboardMode = Bangla) and (OutputIsBijoy = 'YES') then
+    KeyLayout.KeyboardMode := SysDefault
+  else
+  begin
+    if KeyLayout.KeyboardMode <> Bangla then
+      KeyLayout.KeyboardMode := Bangla;
+    if OutputIsBijoy <> 'YES' then
+    begin
+      OutputIsBijoy := 'YES';
+      RefreshSettings;
+    end;
+  end;
 end;
 
 { =============================================================================== }
@@ -1956,6 +2041,221 @@ end;
 procedure TAvroMainForm1.wwwOmicronLabcom1Click(Sender: TObject);
 begin
   Execute_Something('https://www.omicronlab.com/go.php?id=2');
+end;
+
+{ =============================================================================== }
+
+procedure TAvroMainForm1.AnsiVersionMenuClick(Sender: TObject);
+var
+  ErrorLog: TStringList;
+begin
+  AnsiVersion := (Sender as TMenuItem).Caption;
+  if AnsiVersion = 'Default' then
+    AnsiVersion := 'Default';
+  SaveSettings;
+
+  ErrorLog := TStringList.Create;
+  try
+    LoadCurrentActiveMapping(ErrorLog);
+    if ErrorLog.Count > 0 then
+      MessageDlg('Mapping loaded with warnings/errors:'#13#10 + ErrorLog.Text, mtWarning, [mbOK], 0);
+  finally
+    ErrorLog.Free;
+  end;
+
+  BuildAnsiVersionMenus;
+end;
+
+{ =============================================================================== }
+
+procedure TAvroMainForm1.ImportAnsiMappingClick(Sender: TObject);
+var
+  OpenDialog: TOpenDialog;
+  DestPath: string;
+  ErrorLog: TStringList;
+begin
+  OpenDialog := TOpenDialog.Create(nil);
+  try
+    OpenDialog.Filter := 'ANSI Mapping JSON|*.json';
+    OpenDialog.DefaultExt := 'json';
+    if OpenDialog.Execute then
+    begin
+      ForceDirectories(AnsiMappingDir);
+      DestPath := AnsiMappingDir + ExtractFileName(OpenDialog.FileName);
+      CopyFile(PChar(OpenDialog.FileName), PChar(DestPath), False);
+      AnsiVersion := ChangeFileExt(ExtractFileName(OpenDialog.FileName), '');
+      SaveSettings;
+
+      ErrorLog := TStringList.Create;
+      try
+        LoadCurrentActiveMapping(ErrorLog);
+        if ErrorLog.Count = 0 then
+          MessageDlg('Mapping imported successfully.', mtInformation, [mbOK], 0)
+        else
+          MessageDlg('Mapping loaded with warnings/errors:'#13#10 + ErrorLog.Text, mtWarning, [mbOK], 0);
+      finally
+        ErrorLog.Free;
+      end;
+
+      BuildAnsiVersionMenus;
+    end;
+  finally
+    OpenDialog.Free;
+  end;
+end;
+
+{ =============================================================================== }
+
+procedure TAvroMainForm1.ExportAnsiMappingClick(Sender: TObject);
+var
+  SaveDialog: TSaveDialog;
+  DestPath: string;
+begin
+  SaveDialog := TSaveDialog.Create(nil);
+  try
+    SaveDialog.Filter := 'ANSI Mapping JSON|*.json';
+    SaveDialog.DefaultExt := 'json';
+    if SaveDialog.Execute then
+    begin
+      ExportAnsiMapping(SaveDialog.FileName);
+      ForceDirectories(AnsiMappingDir);
+      DestPath := AnsiMappingDir + ExtractFileName(SaveDialog.FileName);
+      CopyFile(PChar(SaveDialog.FileName), PChar(DestPath), False);
+      AnsiVersion := ChangeFileExt(ExtractFileName(SaveDialog.FileName), '');
+      SaveSettings;
+      LoadCurrentActiveMapping;
+      BuildAnsiVersionMenus;
+    end;
+  finally
+    SaveDialog.Free;
+  end;
+end;
+
+{ =============================================================================== }
+
+procedure TAvroMainForm1.OpenAnsiMappingDirClick(Sender: TObject);
+begin
+  ShellExecute(0, 'open', PChar(AnsiMappingDir), nil, nil, SW_SHOWNORMAL);
+end;
+
+{ =============================================================================== }
+
+procedure TAvroMainForm1.DeleteAnsiMappingClick(Sender: TObject);
+var
+  Name: string;
+begin
+  Name := (Sender as TMenuItem).Caption;
+  if MessageDlg('Delete mapping "' + Name + '"?', mtConfirmation, [mbYes, mbNo], 0) = mrYes then
+  begin
+    if DeleteFile(AnsiMappingDir + Name + '.json') then
+    begin
+      if AnsiVersion = Name then
+        AnsiVersion := 'Default';
+      SaveSettings;
+      LoadCurrentActiveMapping;
+      BuildAnsiVersionMenus;
+    end;
+  end;
+end;
+
+{ =============================================================================== }
+
+procedure TAvroMainForm1.IgnoreCapsLockClick(Sender: TObject);
+var
+  Item: TMenuItem;
+begin
+  Item := Sender as TMenuItem;
+  Item.Checked := not Item.Checked;
+  if Item.Checked then
+    IgnoreCapsLock := 'YES'
+  else
+    IgnoreCapsLock := 'NO';
+  IgnoreCapsLock1.Checked := Item.Checked;
+  IgnoreCapsLock2.Checked := Item.Checked;
+  SaveSettings;
+end;
+
+{ =============================================================================== }
+
+procedure TAvroMainForm1.BuildAnsiVersionMenus;
+var
+  SearchRec: TSearchRec;
+  FileTitle: string;
+  Sep: TMenuItem;
+
+  procedure AddVersionItem(ParentMenu: TMenuItem; const ACaption: string; AChecked: Boolean);
+  var
+    Item: TMenuItem;
+  begin
+    Item := TMenuItem.Create(ParentMenu);
+    Item.Caption := ACaption;
+    Item.RadioItem := True;
+    Item.OnClick := AnsiVersionMenuClick;
+    Item.Checked := AChecked;
+    ParentMenu.Add(Item);
+  end;
+
+  procedure BuildSingleMenu(AMenu: TMenuItem);
+  var
+    Item: TMenuItem;
+    DeleteMenu: TMenuItem;
+    HasFiles: Boolean;
+  begin
+    AMenu.Clear;
+    AddVersionItem(AMenu, 'Default', AnsiVersion = 'Default');
+    HasFiles := False;
+    if DirectoryExists(AnsiMappingDir) then
+    begin
+      if FindFirst(AnsiMappingDir + '*.json', faAnyFile, SearchRec) = 0 then
+      begin
+        HasFiles := True;
+        repeat
+          FileTitle := ChangeFileExt(SearchRec.Name, '');
+          AddVersionItem(AMenu, FileTitle, AnsiVersion = FileTitle);
+        until FindNext(SearchRec) <> 0;
+        FindClose(SearchRec);
+      end;
+    end;
+    Sep := TMenuItem.Create(AMenu);
+    Sep.Caption := '-';
+    AMenu.Add(Sep);
+    Item := TMenuItem.Create(AMenu);
+    Item.Caption := 'Import Mapping JSON...';
+    Item.OnClick := ImportAnsiMappingClick;
+    AMenu.Add(Item);
+    Item := TMenuItem.Create(AMenu);
+    Item.Caption := 'Export Current Mapping JSON...';
+    Item.OnClick := ExportAnsiMappingClick;
+    AMenu.Add(Item);
+    Sep := TMenuItem.Create(AMenu);
+    Sep.Caption := '-';
+    AMenu.Add(Sep);
+    Item := TMenuItem.Create(AMenu);
+    Item.Caption := 'Open Mapping Directory...';
+    Item.OnClick := OpenAnsiMappingDirClick;
+    AMenu.Add(Item);
+    if HasFiles then
+    begin
+      DeleteMenu := TMenuItem.Create(AMenu);
+      DeleteMenu.Caption := 'Delete Mapping';
+      if FindFirst(AnsiMappingDir + '*.json', faAnyFile, SearchRec) = 0 then
+      begin
+        repeat
+          FileTitle := ChangeFileExt(SearchRec.Name, '');
+          Item := TMenuItem.Create(DeleteMenu);
+          Item.Caption := FileTitle;
+          Item.OnClick := DeleteAnsiMappingClick;
+          DeleteMenu.Add(Item);
+        until FindNext(SearchRec) <> 0;
+        FindClose(SearchRec);
+      end;
+      AMenu.Add(DeleteMenu);
+    end;
+  end;
+
+begin
+  BuildSingleMenu(AnsiVersionSubmenu1);
+  BuildSingleMenu(AnsiVersionSubmenu2);
 end;
 
 { =============================================================================== }

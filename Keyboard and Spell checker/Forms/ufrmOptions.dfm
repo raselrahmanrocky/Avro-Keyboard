@@ -357,9 +357,9 @@ object frmOptions: TfrmOptions
       TabOrder = 5
       object Label20: TLabel
         Left = 27
-        Top = 290
-        Width = 607
-        Height = 21
+        Top = 335
+        Width = 570
+        Height = 42
         Margins.Left = 5
         Margins.Top = 5
         Margins.Right = 5
@@ -367,10 +367,11 @@ object frmOptions: TfrmOptions
         Caption = 
           'You can select your preferred  hotkey for toggling between Unico' +
           'de/ANSI mode in'
+        WordWrap = True
       end
       object LabelGlobalHotkeysLink: TLabel
         Left = 27
-        Top = 320
+        Top = 387
         Width = 166
         Height = 21
         Cursor = crHandPoint
@@ -435,6 +436,42 @@ object frmOptions: TfrmOptions
         Margins.Bottom = 5
         Caption = 'Show warning in ANSI mode.'
         TabOrder = 2
+      end
+      object CheckUnicodeToggleShortcut: TCheckBox
+        Left = 35
+        Top = 230
+        Width = 420
+        Height = 25
+        Margins.Left = 5
+        Margins.Top = 5
+        Margins.Right = 5
+        Margins.Bottom = 5
+        Caption = 'Enable Ctrl+Alt+V for Bengali (Unicode) mode'
+        TabOrder = 3
+      end
+      object CheckANSIToggleShortcut: TCheckBox
+        Left = 35
+        Top = 260
+        Width = 420
+        Height = 25
+        Margins.Left = 5
+        Margins.Top = 5
+        Margins.Right = 5
+        Margins.Bottom = 5
+        Caption = 'Enable Ctrl+Alt+B for Bengali (ANSI) mode'
+        TabOrder = 4
+      end
+      object chkIgnoreCapsLock: TCheckBox
+        Left = 35
+        Top = 295
+        Width = 342
+        Height = 25
+        Margins.Left = 5
+        Margins.Top = 5
+        Margins.Right = 5
+        Margins.Bottom = 5
+        Caption = 'Ignore Caps Lock for Bangla typing'
+        TabOrder = 5
       end
     end
     object KeyboardMode_Panel: TPanel

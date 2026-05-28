@@ -104,6 +104,9 @@ type
     optOutputUnicode: TRadioButton;
     optOutputANSI: TRadioButton;
     CheckWarningAnsi: TCheckBox;
+    CheckUnicodeToggleShortcut: TCheckBox;
+    CheckANSIToggleShortcut: TCheckBox;
+    chkIgnoreCapsLock: TCheckBox;
     LabelHideTimer: TTimer;
     GroupBox8: TGroupBox;
     Label16: TLabel;
@@ -781,6 +784,21 @@ begin
   else
     CheckWarningAnsi.Checked := False;
 
+  if UnicodeToggleShortcut = 'YES' then
+    CheckUnicodeToggleShortcut.Checked := True
+  else
+    CheckUnicodeToggleShortcut.Checked := False;
+
+  if ANSIToggleShortcut = 'YES' then
+    CheckANSIToggleShortcut.Checked := True
+  else
+    CheckANSIToggleShortcut.Checked := False;
+
+  if IgnoreCapsLock = 'YES' then
+    chkIgnoreCapsLock.Checked := True
+  else
+    chkIgnoreCapsLock.Checked := False;
+
 end;
 
 { =============================================================================== }
@@ -969,6 +987,21 @@ begin
     ShowOutputwarning := 'YES'
   else
     ShowOutputwarning := 'NO';
+
+  if CheckUnicodeToggleShortcut.Checked = True then
+    UnicodeToggleShortcut := 'YES'
+  else
+    UnicodeToggleShortcut := 'NO';
+
+  if CheckANSIToggleShortcut.Checked = True then
+    ANSIToggleShortcut := 'YES'
+  else
+    ANSIToggleShortcut := 'NO';
+
+  if chkIgnoreCapsLock.Checked = True then
+    IgnoreCapsLock := 'YES'
+  else
+    IgnoreCapsLock := 'NO';
 
   uRegistrySettings.SaveSettings;
 end;

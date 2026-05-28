@@ -11,6 +11,8 @@
 
 unit SkinLoader;
 
+{$WARN IMPLICIT_STRING_CAST OFF}
+
 interface
 
 uses
@@ -36,6 +38,7 @@ uses
   uTopBar,
   ufrmAboutSkinLayout,
   uWindowHandlers,
+  System.NetEncoding,
   Soap.EncdDecd,
   clsSkinLayoutConverter,
   uFileFolderHandling;
@@ -506,6 +509,7 @@ var
   Overwrite:                                            Boolean;
 begin
   Result := False;
+  Overwrite := False;
 
   try
     try
@@ -572,4 +576,5 @@ begin
 end;
 {$HINTS On}
 
+{$WARN IMPLICIT_STRING_CAST ON}
 end.
