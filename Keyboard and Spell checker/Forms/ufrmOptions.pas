@@ -242,10 +242,6 @@ procedure TfrmOptions.Button_ApplyClick(Sender: TObject);
 begin
   Self.SaveSettings;
   AvroMainForm1.RefreshSettings;
-
-  LabelStatus.Font.Color := clGreen;
-  LabelStatus.Visible := True;
-  LabelHideTimer.Enabled := True;
 end;
 
 { =============================================================================== }
