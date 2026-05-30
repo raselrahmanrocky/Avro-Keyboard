@@ -367,6 +367,7 @@ type
       procedure MenuFixedLayoutClick(Sender: TObject);
       procedure KeyLayout_KeyboardLayoutChanged(CurrentKeyboardLayout: string);
       procedure KeyLayout_KeyboardModeChanged(CurrentMode: enumMode);
+      procedure UpdateTrayIcon;
 
       procedure HandleThemes;
       procedure BuildAnsiVersionMenus;
@@ -974,7 +975,6 @@ end;
 procedure TAvroMainForm1.KeyLayout_KeyboardModeChanged(CurrentMode: enumMode);
 var
   hforewnd:                                         Integer;
-  ICN:                                              TIcon;
   WindowRecord, NewWindowRecord: TWindowRecord;
 begin
   { This is for Top Bar, when Keyboard Mode is changed,
@@ -1035,40 +1035,8 @@ begin
     end;
   end;
 
-  { Update User inteface }
-  if IsFormVisible('TopBar') = False then
-  begin
-    // now icon mode, so update system tray
-    ICN := TIcon.Create;
-    if CurrentMode = bangla then
-    begin
-      if IsWin2000 = True then
-        ImageList1.GetIcon(14, ICN)
-      else
-        ImageList1.GetIcon(20, ICN);
-
-      Tray.Hint := 'Avro Keyboard.' + #13 + 'Running Bangla Keyboard Mode.' + #13 + 'Press ' + ModeSwitchKey + ' to switch to System default.';
-    end
-    else if CurrentMode = SysDefault then
-    begin
-      if IsWin2000 = True then
-        ImageList1.GetIcon(19, ICN)
-      else
-        ImageList1.GetIcon(21, ICN);
-
-      Tray.Hint := 'Avro Keyboard.' + #13 + 'Running System default Keyboard Mode.' + #13 + 'Press ' + ModeSwitchKey + ' to switch to Bangla.';
-    end;
-    Tray.Icon := ICN;
-    ICN.Free;
-  end
-  else
-  begin
-    // Top Bar displayed, so update it
-    if CurrentMode = bangla then
-      Topbar.SetButtonModeState(State2)
-    else if CurrentMode = SysDefault then
-      Topbar.SetButtonModeState(State1);
-  end;
+  { Update user interface }
+  UpdateTrayIcon;
 
 end;
 
@@ -1604,6 +1572,7 @@ begin
   IgnoreCapsLock1.Checked := (IgnoreCapsLock = 'YES');
   IgnoreCapsLock2.Checked := (IgnoreCapsLock = 'YES');
 
+  UpdateTrayIcon;
   SaveUISettings;
 
 end;
@@ -1655,32 +1624,54 @@ begin
   LayoutViewer.Show;
 end;
 
-procedure TAvroMainForm1.ShowOnTray;
+procedure TAvroMainForm1.UpdateTrayIcon;
 var
   ICN: TIcon;
 begin
-  ICN := TIcon.Create;
-  if KeyLayout.KeyboardMode = bangla then
+  if IsFormVisible('TopBar') = False then
   begin
-    if IsWin2000 = True then
-      ImageList1.GetIcon(14, ICN)
-    else
-      ImageList1.GetIcon(20, ICN);
+    ICN := TIcon.Create;
+    if KeyLayout.KeyboardMode = bangla then
+    begin
+      if IsWin2000 = True then
+        ImageList1.GetIcon(14, ICN)
+      else
+      begin
+        if OutputIsBijoy = 'YES' then
+          ImageList1.GetIcon(30, ICN)
+        else
+          ImageList1.GetIcon(20, ICN);
+      end;
 
-    Tray.Hint := 'Avro Keyboard.' + #13 + 'Running Bangla Keyboard Mode.' + #13 + 'Press ' + ModeSwitchKey + ' to switch to System default.';
+      if OutputIsBijoy = 'YES' then
+        Tray.Hint := 'Avro Keyboard.' + #13 + 'Running Bangla Keyboard Mode (ANSI/Bijoy Output).' + #13 + 'Press ' + ModeSwitchKey + ' to switch to System default.'
+      else
+        Tray.Hint := 'Avro Keyboard.' + #13 + 'Running Bangla Keyboard Mode.' + #13 + 'Press ' + ModeSwitchKey + ' to switch to System default.';
+    end
+    else if KeyLayout.KeyboardMode = SysDefault then
+    begin
+      if IsWin2000 = True then
+        ImageList1.GetIcon(19, ICN)
+      else
+        ImageList1.GetIcon(21, ICN);
+
+      Tray.Hint := 'Avro Keyboard.' + #13 + 'Running System default Keyboard Mode.' + #13 + 'Press ' + ModeSwitchKey + ' to switch to Bangla.';
+    end;
+    Tray.Icon := ICN;
+    ICN.Free;
   end
-  else if KeyLayout.KeyboardMode = SysDefault then
+  else
   begin
-    if IsWin2000 = True then
-      ImageList1.GetIcon(19, ICN)
-    else
-      ImageList1.GetIcon(21, ICN);
-
-    Tray.Hint := 'Avro Keyboard.' + #13 + 'Running System default Keyboard Mode.' + #13 + 'Press ' + ModeSwitchKey + ' to switch to Bangla.';
+    if KeyLayout.KeyboardMode = bangla then
+      Topbar.SetButtonModeState(State2)
+    else if KeyLayout.KeyboardMode = SysDefault then
+      Topbar.SetButtonModeState(State1);
   end;
+end;
 
-  Tray.Icon := ICN;
-  ICN.Free;
+procedure TAvroMainForm1.ShowOnTray;
+begin
+  UpdateTrayIcon;
   Tray.Visible := True;
 
   if StrToInt(TrayHintShowTimes) < NumberOfVisibleHints then
@@ -1761,8 +1752,6 @@ begin
     end;
   end;
 end;
-
-{ =============================================================================== }
 
 procedure TAvroMainForm1.SetBengaliANSIMode;
 begin
