@@ -189,6 +189,7 @@ type
       procedure ButtonHelp_DrawUpOver;
       procedure ButtonMinimize_DrawUpOver;
 
+      procedure DrawAnsiTextOnBitmap(BMP: TBitmap);
       procedure WMDROPFILES(var msg: TWMDropFiles); message WM_DROPFILES;
       procedure WMDpiChanged(var Message: TWMDpi); message WM_DPICHANGED;
 
@@ -204,6 +205,11 @@ type
       BMP_ButtonModeB:      TBitmap;
       BMP_ButtonModeB_Over: TBitmap;
       BMP_ButtonModeB_Down: TBitmap;
+
+      OrigBMP_ButtonModeB:      TBitmap;
+      OrigBMP_ButtonModeB_Over: TBitmap;
+      OrigBMP_ButtonModeB_Down: TBitmap;
+      AnsiTextApplied: Boolean;
 
       BMP_ButtonLayoutDown:      TBitmap;
       BMP_ButtonLayoutDown_Over: TBitmap;
@@ -237,6 +243,7 @@ type
 
       procedure ApplySkin;
       procedure SetButtonModeState(ST: ButtonState);
+      procedure UpdateAnsiState;
       procedure InitHints;
     protected
       procedure CreateParams(var Params: TCreateParams); override;
@@ -272,10 +279,8 @@ var
   NewRect: TRect;
 begin
   NewRect := message.ScaledRect^;
-
-  // Reposition window without resizing
-  SetWindowPos(Handle, 0, NewRect.Left, NewRect.Top, Width, // Keep current width
-    Height,                                                 // Keep current height
+// Reposition window without resizing
+  SetWindowPos(Handle, 0, NewRect.Left, NewRect.Top, Width, Height,
     SWP_NOZORDER or SWP_NOACTIVATE or SWP_NOSIZE);
 end;
 
@@ -310,6 +315,10 @@ begin
   ImgButtonHelp.Picture.Bitmap.Assign(BMP_ButtonHelp);
   ImgButtonMinimize.Picture.Bitmap.Assign(BMP_ButtonMinimize);
 
+  AnsiTextApplied := False;
+  FreeAndNil(OrigBMP_ButtonModeB);
+  FreeAndNil(OrigBMP_ButtonModeB_Over);
+  FreeAndNil(OrigBMP_ButtonModeB_Down);
 end;
 
 { =============================================================================== }
@@ -329,6 +338,9 @@ begin
   BMP_ButtonModeB.Free;
   BMP_ButtonModeB_Over.Free;
   BMP_ButtonModeB_Down.Free;
+  FreeAndNil(OrigBMP_ButtonModeB);
+  FreeAndNil(OrigBMP_ButtonModeB_Over);
+  FreeAndNil(OrigBMP_ButtonModeB_Down);
 
   BMP_ButtonLayoutDown.Free;
   BMP_ButtonLayoutDown_Over.Free;
@@ -408,6 +420,10 @@ begin
   ImgMain.Left := 0;
 
   ButtonMode_State := State1;
+  AnsiTextApplied := False;
+  OrigBMP_ButtonModeB := nil;
+  OrigBMP_ButtonModeB_Over := nil;
+  OrigBMP_ButtonModeB_Down := nil;
 
   Left := StrToInt(TopBarPosX);
   TmrAppIcon.Interval := m_TimerInterval;
@@ -438,7 +454,7 @@ end;
 
 procedure TTopBar.FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
 begin
-  if (Key = VK_F4) { And (ssAlt In Shift) } then
+  if (Key = VK_F4) then
     Key := 0;
 end;
 
@@ -525,7 +541,7 @@ begin
   ButtonHelp_MouseDown := False;
   ButtonHelp_DrawState;
 
-  AvroMainForm1.Popup_Help.Popup(Left + ImgButtonHelp.Left, Top + ImgButtonHelp.Top + ImgButtonHelp.Height)
+  AvroMainForm1.Popup_Help.Popup(Left + ImgButtonHelp.Left, Top + ImgButtonHelp.Top + ImgButtonHelp.Height);
 end;
 
 { =============================================================================== }
@@ -624,9 +640,71 @@ begin
   ImgButtonMinimize.Hint := 'Minimize or exit Avro Keyboard';
 end;
 
+procedure TTopBar.DrawAnsiTextOnBitmap(BMP: TBitmap);
+var
+  Text: string;
+  X, Y: Integer;
+  R_Src, R_Dest: TRect;
+begin
+  R_Src := Rect(5, 0, 6, BMP.Height); 
+  R_Dest := Rect(6, 0, BMP.Width - 6, BMP.Height); 
+  BMP.Canvas.CopyRect(R_Dest, BMP.Canvas, R_Src);
+  Text := 'ANSI';
+  BMP.Canvas.Font.Name := 'Segoe UI'; 
+  BMP.Canvas.Font.Height := -10;
+  //BMP.Canvas.Font.Style := [fsBold];
+  BMP.Canvas.Brush.Style := bsClear;
+  X := (BMP.Width - BMP.Canvas.TextWidth(Text)) div 2;
+  Y := ((BMP.Height - BMP.Canvas.TextHeight(Text)) div 2) + 2;
+  BMP.Canvas.Font.Color := $002D2D2D;
+  BMP.Canvas.TextOut(X + 1, Y + 1, Text);
+  BMP.Canvas.Font.Color := clWhite;
+  BMP.Canvas.TextOut(X, Y, Text);
+  BMP.AlphaFormat := afIgnored;
+end;
+
+procedure TTopBar.UpdateAnsiState;
+var
+  IsAnsi: Boolean;
+begin
+  IsAnsi := (ButtonMode_State = State2) and (OutputIsBijoy = 'YES');
+  if IsAnsi = AnsiTextApplied then
+    Exit;
+  if IsAnsi then
+  begin
+    if OrigBMP_ButtonModeB = nil then
+    begin
+      OrigBMP_ButtonModeB := TBitmap.Create;
+      OrigBMP_ButtonModeB.Assign(BMP_ButtonModeB);
+      OrigBMP_ButtonModeB_Over := TBitmap.Create;
+      OrigBMP_ButtonModeB_Over.Assign(BMP_ButtonModeB_Over);
+      OrigBMP_ButtonModeB_Down := TBitmap.Create;
+      OrigBMP_ButtonModeB_Down.Assign(BMP_ButtonModeB_Down);
+    end;
+    DrawAnsiTextOnBitmap(BMP_ButtonModeB);
+    DrawAnsiTextOnBitmap(BMP_ButtonModeB_Over);
+    DrawAnsiTextOnBitmap(BMP_ButtonModeB_Down);
+    AnsiTextApplied := True;
+  end
+  else
+  begin
+    if OrigBMP_ButtonModeB <> nil then
+    begin
+      BMP_ButtonModeB.Assign(OrigBMP_ButtonModeB);
+      BMP_ButtonModeB_Over.Assign(OrigBMP_ButtonModeB_Over);
+      BMP_ButtonModeB_Down.Assign(OrigBMP_ButtonModeB_Down);
+      FreeAndNil(OrigBMP_ButtonModeB);
+      FreeAndNil(OrigBMP_ButtonModeB_Over);
+      FreeAndNil(OrigBMP_ButtonModeB_Down);
+    end;
+    AnsiTextApplied := False;
+  end;
+end;
+
 procedure TTopBar.SetButtonModeState(ST: ButtonState);
 begin
   ButtonMode_State := ST;
+  UpdateAnsiState;
   ButtonMode_DrawState;
 end;
 {$HINTS Off}
@@ -1699,8 +1777,7 @@ begin
     if (CurrentSource <> nil) and (CurrentSource.Canvas <> nil) and (CurrentSource.Handle <> 0) then
     begin
       Windows.AlphaBlend(TargetCanvas.Handle, 0, 0, TempBitmap.Width, TempBitmap.Height, CurrentSource.Canvas.Handle, 0, 0, CurrentSource.Width,
-        CurrentSource.Height, bf)
-
+        CurrentSource.Height, bf);
     end;
 
     if (ImgAppIcon.Picture.Bitmap = nil) or (ImgAppIcon.Picture.Bitmap.Width <> TempBitmap.Width) or (ImgAppIcon.Picture.Bitmap.Height <> TempBitmap.Height) or
@@ -1779,8 +1856,7 @@ begin
     if (CurrentSource <> nil) and (CurrentSource.Canvas <> nil) and (CurrentSource.Handle <> 0) then
     begin
       Windows.AlphaBlend(TargetCanvas.Handle, 0, 0, TempBitmap.Width, TempBitmap.Height, CurrentSource.Canvas.Handle, 0, 0, CurrentSource.Width,
-        CurrentSource.Height, bf)
-
+        CurrentSource.Height, bf);
     end;
 
     if (ImgButtonHelp.Picture.Bitmap = nil) or (ImgButtonHelp.Picture.Bitmap.Width <> TempBitmap.Width) or
@@ -1859,8 +1935,7 @@ begin
     if (CurrentSource <> nil) and (CurrentSource.Canvas <> nil) and (CurrentSource.Handle <> 0) then
     begin
       Windows.AlphaBlend(TargetCanvas.Handle, 0, 0, TempBitmap.Width, TempBitmap.Height, CurrentSource.Canvas.Handle, 0, 0, CurrentSource.Width,
-        CurrentSource.Height, bf)
-
+        CurrentSource.Height, bf);
     end;
 
     if (ImgButtonLayoutDown.Picture.Bitmap = nil) or (ImgButtonLayoutDown.Picture.Bitmap.Width <> TempBitmap.Width) or
@@ -1877,7 +1952,6 @@ begin
   finally
     TempBitmap.Free;
   end;
-
 end;
 
 { =============================================================================== }
@@ -1940,8 +2014,7 @@ begin
     if (CurrentSource <> nil) and (CurrentSource.Canvas <> nil) and (CurrentSource.Handle <> 0) then
     begin
       Windows.AlphaBlend(TargetCanvas.Handle, 0, 0, TempBitmap.Width, TempBitmap.Height, CurrentSource.Canvas.Handle, 0, 0, CurrentSource.Width,
-        CurrentSource.Height, bf)
-
+        CurrentSource.Height, bf);
     end;
 
     if (ImgButtonLayout.Picture.Bitmap = nil) or (ImgButtonLayout.Picture.Bitmap.Width <> TempBitmap.Width) or
@@ -2020,8 +2093,7 @@ begin
     if (CurrentSource <> nil) and (CurrentSource.Canvas <> nil) and (CurrentSource.Handle <> 0) then
     begin
       Windows.AlphaBlend(TargetCanvas.Handle, 0, 0, TempBitmap.Width, TempBitmap.Height, CurrentSource.Canvas.Handle, 0, 0, CurrentSource.Width,
-        CurrentSource.Height, bf)
-
+        CurrentSource.Height, bf);
     end;
 
     if (ImgButtonMinimize.Picture.Bitmap = nil) or (ImgButtonMinimize.Picture.Bitmap.Width <> TempBitmap.Width) or
@@ -2052,7 +2124,6 @@ var
 begin
   TempBitmap := TBitmap.Create;
   try
-
     TempBitmap.SetSize(ImgButtonMode.Width, ImgButtonMode.Height);
     TempBitmap.PixelFormat := pf32bit;
 
@@ -2198,8 +2269,7 @@ begin
     if (CurrentSource <> nil) and (CurrentSource.Canvas <> nil) and (CurrentSource.Handle <> 0) then
     begin
       Windows.AlphaBlend(TargetCanvas.Handle, 0, 0, TempBitmap.Width, TempBitmap.Height, CurrentSource.Canvas.Handle, 0, 0, CurrentSource.Width,
-        CurrentSource.Height, bf)
-
+        CurrentSource.Height, bf);
     end;
 
     if (ImgButtonMouse.Picture.Bitmap = nil) or (ImgButtonMouse.Picture.Bitmap.Width <> TempBitmap.Width) or
@@ -2278,8 +2348,7 @@ begin
     if (CurrentSource <> nil) and (CurrentSource.Canvas <> nil) and (CurrentSource.Handle <> 0) then
     begin
       Windows.AlphaBlend(TargetCanvas.Handle, 0, 0, TempBitmap.Width, TempBitmap.Height, CurrentSource.Canvas.Handle, 0, 0, CurrentSource.Width,
-        CurrentSource.Height, bf)
-
+        CurrentSource.Height, bf);
     end;
 
     if (ImgButtonTools.Picture.Bitmap = nil) or (ImgButtonTools.Picture.Bitmap.Width <> TempBitmap.Width) or
@@ -2358,8 +2427,7 @@ begin
     if (CurrentSource <> nil) and (CurrentSource.Canvas <> nil) and (CurrentSource.Handle <> 0) then
     begin
       Windows.AlphaBlend(TargetCanvas.Handle, 0, 0, TempBitmap.Width, TempBitmap.Height, CurrentSource.Canvas.Handle, 0, 0, CurrentSource.Width,
-        CurrentSource.Height, bf)
-
+        CurrentSource.Height, bf);
     end;
 
     if (ImgButtonWWW.Picture.Bitmap = nil) or (ImgButtonWWW.Picture.Bitmap.Width <> TempBitmap.Width) or
