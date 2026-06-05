@@ -71,6 +71,7 @@ begin
     ShowOutputwarning := 'NO';
 
   AvroMainForm1.RefreshSettings;
+  AvroMainForm1.SwitchLocaleToMatchMode;
   Self.Close;
 end;
 
@@ -83,6 +84,7 @@ begin
     ShowOutputwarning := 'NO';
 
   AvroMainForm1.RefreshSettings;
+  AvroMainForm1.SwitchLocaleToMatchMode;
   Self.Close;
 end;
 
