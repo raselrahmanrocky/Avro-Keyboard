@@ -355,6 +355,8 @@ type
       MyCurrentLayout:       string;
       MyCurrentKeyboardMode: enumMode;
       LastWindow:            HWND;
+      PendingANSISwitch:     Boolean;
+      PreviousModeBeforeANSISwitch: enumMode;
 
       procedure ChangeTypingStyle(const sStyle: string);
       function IgnorableWindow(const lngHWND: HWND): Boolean;
@@ -407,6 +409,8 @@ type
       procedure TrimAppMemorySize;
       procedure Initmenu;
       procedure ToggleOutputEncoding;
+      procedure ApplyPendingANSISwitchRevert;
+      procedure PendingANSISwitchClear;
     protected
       procedure CreateParams(var Params: TCreateParams); override;
   end;
@@ -1783,19 +1787,65 @@ end;
 procedure TAvroMainForm1.SetBengaliANSIMode;
 begin
   if (KeyLayout.KeyboardMode = Bangla) and (OutputIsBijoy = 'YES') then
-    KeyLayout.KeyboardMode := SysDefault
+  begin
+    { Already in Bangla+ANSI: toggle off to English. No warning needed. }
+    KeyLayout.KeyboardMode := SysDefault;
+  end
   else
   begin
+    { Switching to Bangla+ANSI. Remember the previous mode so a cancelled
+      warning can restore it (English if the user was in English mode,
+      Bangla if they were already typing Bangla in Unicode). }
+    PreviousModeBeforeANSISwitch := KeyLayout.KeyboardMode;
+
     if KeyLayout.KeyboardMode <> Bangla then
       KeyLayout.KeyboardMode := Bangla;
-    if OutputIsBijoy <> 'YES' then
+
+    if ShowOutputwarning <> 'NO' then
     begin
-      OutputIsBijoy := 'YES';
-      RefreshSettings;
+      { Show warning. The user's choice arrives asynchronously in
+        frmEncodingWarning.Button1Click / Button2Click / FormClose. }
+      PendingANSISwitch := True;
+      CheckCreateForm(TfrmEncodingWarning, frmEncodingWarning, 'frmEncodingWarning');
+      frmEncodingWarning.Show;
+    end
+    else
+    begin
+      { No warning enabled; commit to ANSI directly. }
+      if OutputIsBijoy <> 'YES' then
+      begin
+        OutputIsBijoy := 'YES';
+        RefreshSettings;
+      end;
     end;
   end;
 
   SwitchLocaleToMatchMode;
+end;
+
+{ =============================================================================== }
+
+procedure TAvroMainForm1.ApplyPendingANSISwitchRevert;
+begin
+  if not PendingANSISwitch then
+    exit;
+  PendingANSISwitch := False;
+
+  { Restore previous mode (English if user was in English, Bangla if they
+    were already typing Bangla in Unicode). Setting KeyboardMode back
+    fires KeyLayout_KeyboardModeChanged which calls SwitchLocaleToMatchMode,
+    so the Windows input locale is also re-synced. }
+  if KeyLayout.KeyboardMode <> PreviousModeBeforeANSISwitch then
+    KeyLayout.KeyboardMode := PreviousModeBeforeANSISwitch
+  else
+    SwitchLocaleToMatchMode;
+end;
+
+{ =============================================================================== }
+
+procedure TAvroMainForm1.PendingANSISwitchClear;
+begin
+  PendingANSISwitch := False;
 end;
 
 { =============================================================================== }

@@ -72,6 +72,11 @@ begin
 
   AvroMainForm1.RefreshSettings;
   AvroMainForm1.SwitchLocaleToMatchMode;
+
+  { If the user cancelled an ANSI switch initiated by a hotkey,
+    restore the previous keyboard mode. }
+  AvroMainForm1.ApplyPendingANSISwitchRevert;
+
   Self.Close;
 end;
 
@@ -83,6 +88,9 @@ begin
   else
     ShowOutputwarning := 'NO';
 
+  { Confirm the pending ANSI switch (no revert). }
+  AvroMainForm1.PendingANSISwitchClear;
+
   AvroMainForm1.RefreshSettings;
   AvroMainForm1.SwitchLocaleToMatchMode;
   Self.Close;
@@ -90,6 +98,10 @@ end;
 
 procedure TfrmEncodingWarning.FormClose(Sender: TObject; var Action: TCloseAction);
 begin
+  { If the form is closed via X / Alt-F4 while a pending ANSI switch is
+    in progress, treat it as a cancel and revert. }
+  AvroMainForm1.ApplyPendingANSISwitchRevert;
+
   Action := caFree;
   frmEncodingWarning := nil;
 end;
