@@ -132,6 +132,7 @@
         <DCCReference Include="Forms\uForm1.pas">
             <Form>AvroMainForm1</Form>
         </DCCReference>
+        <DCCReference Include="Units\uLocale.pas"/>
         <DCCReference Include="Units\BanglaChars.pas"/>
         <DCCReference Include="Forms\uTopBar.pas">
             <Form>TopBar</Form>

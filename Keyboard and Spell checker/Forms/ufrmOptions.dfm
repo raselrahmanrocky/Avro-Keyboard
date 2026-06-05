@@ -357,8 +357,8 @@ object frmOptions: TfrmOptions
       TabOrder = 5
       object Label20: TLabel
         Left = 27
-        Top = 335
-        Width = 570
+        Top = 330
+        Width = 420
         Height = 42
         Margins.Left = 5
         Margins.Top = 5
@@ -371,7 +371,7 @@ object frmOptions: TfrmOptions
       end
       object LabelGlobalHotkeysLink: TLabel
         Left = 27
-        Top = 387
+        Top = 365
         Width = 166
         Height = 21
         Cursor = crHandPoint
@@ -461,10 +461,10 @@ object frmOptions: TfrmOptions
         Caption = 'Enable Ctrl+Alt+B for Bengali (ANSI) mode'
         TabOrder = 4
       end
-      object chkIgnoreCapsLock: TCheckBox
+      object CheckIgnoreCapsLockShortcut: TCheckBox
         Left = 35
-        Top = 295
-        Width = 342
+        Top = 290
+        Width = 420
         Height = 25
         Margins.Left = 5
         Margins.Top = 5
@@ -1436,6 +1436,144 @@ object frmOptions: TfrmOptions
         Margins.Bottom = 5
         Caption = 'Automatically check for update every week (anonymous)'
         TabOrder = 4
+      end
+    end
+    object Locale_Panel: TPanel
+      Left = 8
+      Top = 3
+      Width = 640
+      Height = 480
+      Margins.Left = 5
+      Margins.Top = 5
+      Margins.Right = 5
+      Margins.Bottom = 5
+      BevelKind = bkTile
+      BevelOuter = bvNone
+      TabOrder = 6
+      object LabelLocaleHeader: TLabel
+        Left = 24
+        Top = 18
+        Width = 320
+        Height = 25
+        Margins.Left = 5
+        Margins.Top = 5
+        Margins.Right = 5
+        Margins.Bottom = 5
+        Caption = 'Input Locale / Language Settings'
+        Font.Charset = DEFAULT_CHARSET
+        Font.Color = clWindowText
+        Font.Height = -20
+        Font.Name = 'Tahoma'
+        Font.Style = [fsBold]
+        ParentFont = False
+      end
+      object CheckEnableLocaleChange: TCheckBox
+        Left = 24
+        Top = 60
+        Width = 580
+        Height = 26
+        Margins.Left = 5
+        Margins.Top = 5
+        Margins.Right = 5
+        Margins.Bottom = 5
+        Caption = 'Enable Input Locale switching when toggling between Bangla and System'
+        TabOrder = 0
+      end
+      object GroupBoxLocale: TGroupBox
+        Left = 20
+        Top = 102
+        Width = 582
+        Height = 220
+        Margins.Left = 5
+        Margins.Top = 5
+        Margins.Right = 5
+        Margins.Bottom = 5
+        Caption = 'Preffered Bangla Locale'
+        TabOrder = 1
+        object LabelPrefferedLocale: TLabel
+          Left = 30
+          Top = 35
+          Width = 180
+          Height = 21
+          Margins.Left = 5
+          Margins.Top = 5
+          Margins.Right = 5
+          Margins.Bottom = 5
+          Caption = 'Preffered Locale:'
+          Font.Charset = DEFAULT_CHARSET
+          Font.Color = clWindowText
+          Font.Height = -17
+          Font.Name = 'Tahoma'
+          Font.Style = [fsBold]
+          ParentFont = False
+        end
+        object comboPrefferedLocale: TComboBox
+          Left = 220
+          Top = 32
+          Width = 332
+          Height = 29
+          Margins.Left = 5
+          Margins.Top = 5
+          Margins.Right = 5
+          Margins.Bottom = 5
+          Style = csDropDownList
+          TabOrder = 0
+          Items.Strings = (
+            'Bangladesh'
+            'India'
+            'Assamese')
+        end
+        object LabelLocaleHint: TLabel
+          Left = 30
+          Top = 75
+          Width = 530
+          Height = 84
+          Margins.Left = 5
+          Margins.Top = 5
+          Margins.Right = 5
+          Margins.Bottom = 5
+          Caption = 
+            'Selected preffered Bangla locale will be activated for the fore' +
+            'ground window when the user switches to Bangla typing mode.'#13#10 +
+            'In ANSI mode, the foreground window is forced to English so the' +
+            ' ANSI-encoded output is not garbled.'#13#10 +
+            'Use the Install button below to register Bangla BD and Assamese' +
+            ' display names in the Windows registry (requires administrator' +
+            ' privileges).'
+          WordWrap = True
+        end
+      end
+      object ButtonInstallLocale: TButton
+        Left = 24
+        Top = 340
+        Width = 280
+        Height = 38
+        Margins.Left = 5
+        Margins.Top = 5
+        Margins.Right = 5
+        Margins.Bottom = 5
+        Caption = 'Install / Register Locales'
+        TabOrder = 2
+        OnClick = ButtonInstallLocaleClick
+      end
+      object LabelLocaleStatus: TLabel
+        Left = 24
+        Top = 388
+        Width = 600
+        Height = 200
+        AutoSize = False
+        WordWrap = True 
+        Margins.Left = 5
+        Margins.Top = 5
+        Margins.Right = 5
+        Margins.Bottom = 5
+        Caption = 'Status:'
+        Font.Charset = DEFAULT_CHARSET
+        Font.Color = clGreen
+        Font.Height = -16
+        Font.Name = 'Tahoma'
+        Font.Style = [fsBold]
+        ParentFont = False
       end
     end
   end
