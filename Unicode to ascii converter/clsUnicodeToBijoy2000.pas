@@ -1087,23 +1087,26 @@ end;
 
 function EscapeJSON(const S: string): string;
 var
-  I: Integer;
+  C: Char;
 begin
   Result := '';
-  for I := 1 to Length(S) do
+  for C in S do
   begin
-    if S[I] = '\' then
-      Result := Result + '\\'
-    else if S[I] = '"' then
-      Result := Result + '\"'
-    else if S[I] = #$09 then
-      Result := Result + '\t'
-    else if S[I] = #$0A then
-      Result := Result + '\n'
-    else if S[I] = #$0D then
-      Result := Result + '\r'
+    case C of
+      '\': Result := Result + '\\';
+      '"': Result := Result + '\"';
+      '/': Result := Result + '\/';
+      #$08: Result := Result + '\b';
+      #$09: Result := Result + '\t';
+      #$0A: Result := Result + '\n';
+      #$0C: Result := Result + '\f';
+      #$0D: Result := Result + '\r';
     else
-      Result := Result + S[I];
+      if Ord(C) < 32 then
+        Result := Result + '\u' + IntToHex(Ord(C), 4)
+      else
+        Result := Result + C;
+    end;
   end;
 end;
 
@@ -1178,10 +1181,20 @@ begin
   Result := '';
   for C in S do
   begin
-    if (Ord(C) < 32) or (Ord(C) > 126) then
-      Result := Result + '#$' + IntToHex(Ord(C), 4)
+    case C of
+      '\': Result := Result + '\\';
+      '"': Result := Result + '\"';
+      #$08: Result := Result + '\b';
+      #$09: Result := Result + '\t';
+      #$0A: Result := Result + '\n';
+      #$0C: Result := Result + '\f';
+      #$0D: Result := Result + '\r';
     else
-      Result := Result + C;
+      if (Ord(C) < 32) or (Ord(C) > 126) then
+        Result := Result + '#$' + IntToHex(Ord(C), 4)
+      else
+        Result := Result + C;
+    end;
   end;
 end;
 
@@ -2144,7 +2157,7 @@ begin
     W('  "PostReplacements": [');
     WPostReplacements;
     W('  ]');
-    W('{');
+    W('}');
     Lines.SaveToFile(Path, TEncoding.UTF8);
   finally
     Lines.Free;
