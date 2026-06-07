@@ -179,6 +179,11 @@ const
   b_Taka: Char    = #$9F3;
   ZWJ: Char       = #$200D;
   ZWNJ: Char      = #$200C;
+
+  b_StartSingleQuote: Char = #$2018; // Left Single Quotation Mark ‘
+  b_EndSingleQuote: Char   = #$2019; // Right Single Quotation Mark ’
+  b_StartDoubleQuote: Char = #$201C; // Left Double Quotation Mark “
+  b_EndDoubleQuote: Char   = #$201D; // Right Double Quotation Mark ”
   { '==============================================================
     'End Bangla Others
     '============================================================== }

@@ -122,6 +122,9 @@ var
   A_StartDoubleQuote: Char = #$D2;
   A_EndDoubleQuote: Char   = #$D3;
 
+  A_StartSingleQuote: Char = #$D4;
+  A_EndSingleQuote: Char   = #$D5;
+
   { Consonants }
   A_K: Char        = #$4B;
   A_Kh: Char       = #$4C;
@@ -832,8 +835,10 @@ begin
   if fKar <> #0 then wSTmp := fKar + wSTmp;
 
   fConvertedText := wSTmp;
-  fConvertedText := ReplaceStr(fConvertedText, string('‘'), A_StartDoubleQuote);
-  fConvertedText := ReplaceStr(fConvertedText, string('’'), A_EndDoubleQuote);
+  fConvertedText := ReplaceStr(fConvertedText, string(b_StartSingleQuote), A_StartSingleQuote);
+  fConvertedText := ReplaceStr(fConvertedText, string(b_EndSingleQuote), A_EndSingleQuote);
+  fConvertedText := ReplaceStr(fConvertedText, string(b_StartDoubleQuote), A_StartDoubleQuote);
+  fConvertedText := ReplaceStr(fConvertedText, string(b_EndDoubleQuote), A_EndDoubleQuote);
 end;
 
 { =============================================================================== }
@@ -1258,6 +1263,11 @@ begin
   A_StartDoubleQuote  := #$D2;
   A_EndDoubleQuote    := #$D3;
 
+  A_StartSingleQuote := #$D4;
+  A_EndSingleQuote   := #$D5;
+  A_StartDoubleQuote := #$D2;
+  A_EndDoubleQuote   := #$D3;
+
   { Consonants }
   A_K         := #$4B;
   A_Kh        := #$4C;
@@ -1509,6 +1519,10 @@ begin
           else if ConstName = 'A_Hasanta' then A_Hasanta := ConstValue[1]
           else if ConstName = 'A_StartDoubleQuote' then A_StartDoubleQuote := ConstValue[1]
           else if ConstName = 'A_EndDoubleQuote' then A_EndDoubleQuote := ConstValue[1]
+          else if ConstName = 'A_StartSingleQuote' then A_StartSingleQuote := ConstValue[1]
+          else if ConstName = 'A_EndSingleQuote' then A_EndSingleQuote := ConstValue[1]
+          else if ConstName = 'A_StartDoubleQuote' then A_StartDoubleQuote := ConstValue[1]
+          else if ConstName = 'A_EndDoubleQuote' then A_EndDoubleQuote := ConstValue[1]       
           else if ConstName = 'A_K' then A_K := ConstValue[1]
           else if ConstName = 'A_Kh' then A_Kh := ConstValue[1]
           else if ConstName = 'A_G' then A_G := ConstValue[1]
@@ -1953,6 +1967,10 @@ var
     W('    "A_Dari": "' + SmartEscape(string(A_Dari)) + '",');
     W('    "A_DoubleDanda": "' + SmartEscape(string(A_DoubleDanda)) + '",');
     W('    "A_Hasanta": "' + SmartEscape(string(A_Hasanta)) + '",');
+    W('    "A_StartDoubleQuote": "' + SmartEscape(string(A_StartDoubleQuote)) + '",');
+    W('    "A_EndDoubleQuote": "' + SmartEscape(string(A_EndDoubleQuote)) + '",');
+    W('    "A_StartSingleQuote": "' + SmartEscape(string(A_StartSingleQuote)) + '",');
+    W('    "A_EndSingleQuote": "' + SmartEscape(string(A_EndSingleQuote)) + '",');
     W('    "A_StartDoubleQuote": "' + SmartEscape(string(A_StartDoubleQuote)) + '",');
     W('    "A_EndDoubleQuote": "' + SmartEscape(string(A_EndDoubleQuote)) + '",');
     W('    "A_K": "' + SmartEscape(string(A_K)) + '",');
