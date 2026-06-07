@@ -2139,7 +2139,7 @@ end;
 procedure TAvroMainForm1.ImportAnsiMappingClick(Sender: TObject);
 var
   OpenDialog: TOpenDialog;
-  DestPath: string;
+  DestPath, ErrMsg: string;
   ErrorLog: TStringList;
 begin
   OpenDialog := TOpenDialog.Create(nil);
@@ -2148,9 +2148,20 @@ begin
     OpenDialog.DefaultExt := 'json';
     if OpenDialog.Execute then
     begin
+      if not ValidateAnsiMappingFile(OpenDialog.FileName, ErrMsg) then
+      begin
+        MessageDlg('ANSI mapping import failed:'#13#10#13#10 + ErrMsg, mtError, [mbOK], 0);
+        Exit;
+      end;
+
       ForceDirectories(AnsiMappingDir);
       DestPath := AnsiMappingDir + ExtractFileName(OpenDialog.FileName);
-      CopyFile(PChar(OpenDialog.FileName), PChar(DestPath), False);
+      if not CopyFile(PChar(OpenDialog.FileName), PChar(DestPath), False) then
+      begin
+        MessageDlg('Failed to copy file to the mapping directory.', mtError, [mbOK], 0);
+        Exit;
+      end;
+
       AnsiVersion := ChangeFileExt(ExtractFileName(OpenDialog.FileName), '');
       SaveSettings;
 
@@ -2177,22 +2188,20 @@ end;
 procedure TAvroMainForm1.ExportAnsiMappingClick(Sender: TObject);
 var
   SaveDialog: TSaveDialog;
-  DestPath: string;
 begin
   SaveDialog := TSaveDialog.Create(nil);
   try
     SaveDialog.Filter := 'ANSI Mapping JSON|*.json';
     SaveDialog.DefaultExt := 'json';
+    SaveDialog.Title := 'Export Current ANSI Mapping';
+    SaveDialog.FileName := AnsiVersion + '.json';
+
     if SaveDialog.Execute then
     begin
       ExportAnsiMapping(SaveDialog.FileName);
-      ForceDirectories(AnsiMappingDir);
-      DestPath := AnsiMappingDir + ExtractFileName(SaveDialog.FileName);
-      CopyFile(PChar(SaveDialog.FileName), PChar(DestPath), False);
-      AnsiVersion := ChangeFileExt(ExtractFileName(SaveDialog.FileName), '');
-      SaveSettings;
-      LoadCurrentActiveMapping;
-      BuildAnsiVersionMenus;
+      
+      MessageDlg('Current mapping successfully exported to:'#13#10 + SaveDialog.FileName, 
+                 mtInformation, [mbOK], 0);
     end;
   finally
     SaveDialog.Free;
