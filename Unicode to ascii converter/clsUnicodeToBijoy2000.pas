@@ -649,32 +649,31 @@ begin
   fConvertedText := fUniText;
 
   if (fLastUniText = b_r + b_Ukar) and (UniText = b_r) then
-  begin
     fRaUKarToggle := True;
-  end;
 
-    if (fLastUniText = b_r + b_UUKar) and (UniText = b_r) then
-  begin
+  if (fLastUniText = b_r + b_UUKar) and (UniText = b_r) then
     fRaUUKarToggle := True;
-  end;
 
-  if (Pos(' ', UniText) > 0) then
-    fRaUKarToggle := False;
-    fLastUniText := UniText;
-    fLastUniText := UniText;
-
-  fUniText := UniText;
-  fConvertedText := fUniText;
+  fLastUniText := UniText;
+  
+  // Clean start
   DeNormalize;
   
-  // Applying dynamic pre-placement fixes
+  // 1. Apply dynamic pre-placement fixes (if any)
   for I := 0 to Length(CustomPreReplacements) - 1 do
     fConvertedText := ReplaceStr(fConvertedText, CustomPreReplacements[I].Key, CustomPreReplacements[I].Value);
 
+  // 2. Rearrange Vowels and Reph
   ReArrangeKars;
-  ReplaceFullForms;
   ReArrangeReph;
+
+  // 3. Process Vowels FIRST (while consonants are still Unicode)
   ReplaceKarsVowels;
+
+  // 4. Process Conjuncts and Full Forms LATER
+  ReplaceFullForms;
+
+  // 5. Apply Glyphs, Halfs, and Consonants
   ConvertRFola_ZFola_Hasanta;
   FirstHalfForms;
   SecondHalfForms;
