@@ -20,6 +20,7 @@ type
       fUniText:       string;
       fConvertedText: string;
       fRaUKarToggle:  Boolean;
+      fRaUUKarToggle: Boolean;
       fLastUniText:   string;
       procedure ReArrangeKars;
       procedure ReArrangeReph;
@@ -39,6 +40,7 @@ type
     public
       function Convert(const UniText: string): string;
       property RaUKarToggle: Boolean read fRaUKarToggle write fRaUKarToggle;
+      property RaUUKarToggle: Boolean read fRaUUKarToggle write fRaUUKarToggle;
   end;
 
   TReplacementPair = record
@@ -57,6 +59,7 @@ procedure ResetAnsiToDefaults;
 procedure LoadAnsiMapping(const Path: string; ErrorLog: TStringList = nil);
 procedure ExportAnsiMapping(const Path: string);
 procedure LoadCurrentActiveMapping(ErrorLog: TStringList = nil);
+function ValidateAnsiMappingFile(const Path: string; out ErrorMessage: string): Boolean;
 
 implementation
 
@@ -467,18 +470,32 @@ begin
   fConvertedText := ReplaceStr(fConvertedText, string(A_RFola_2) + string(A_UKar1), string(A_UKar1) + string(A_RFola_2));
   fConvertedText := ReplaceStr(fConvertedText, string(A_RFola_2) + string(A_UUKar1), string(A_UUKar1) + string(A_RFola_2));
 
+  // Reorder Reph and all variants of U-Kar glyphs
+  fConvertedText := ReplaceStr(fConvertedText, string(A_Reph) + string(A_UKar1), string(A_UKar1) + string(A_Reph));
+  fConvertedText := ReplaceStr(fConvertedText, string(A_Reph) + string(A_UKar2), string(A_UKar2) + string(A_Reph));
+  fConvertedText := ReplaceStr(fConvertedText, string(A_Reph) + string(A_UKar3), string(A_UKar3) + string(A_Reph));
+  fConvertedText := ReplaceStr(fConvertedText, string(A_Reph) + string(A_UKar4), string(A_UKar4) + string(A_Reph));
+  // This makes the U-kar "hang" lower so it doesn't clash with the Reph.
+  fConvertedText := ReplaceStr(fConvertedText, string(A_UKar1) + string(A_Reph), string(A_UKar2) + string(A_Reph));
+
+  // Reorder Reph and all variants of UU-Kar glyphs
+  fConvertedText := ReplaceStr(fConvertedText, string(A_Reph) + string(A_UUKar1), string(A_UUKar1) + string(A_Reph));
+  fConvertedText := ReplaceStr(fConvertedText, string(A_Reph) + string(A_UUKar2), string(A_UUKar2) + string(A_Reph));
+  fConvertedText := ReplaceStr(fConvertedText, string(A_Reph) + string(A_UUKar3), string(A_UUKar3) + string(A_Reph));
+  // If UU-Kar1 and Reph are together, you might want to use UU-Kar2
+  fConvertedText := ReplaceStr(fConvertedText, string(A_UUKar1) + string(A_Reph), string(A_UUKar2) + string(A_Reph));
+
   // Applying dynamic post-processing fixes
   for I := 0 to Length(CustomPostReplacements) - 1 do
     fConvertedText := ReplaceStr(fConvertedText, CustomPostReplacements[I].Key, CustomPostReplacements[I].Value);
 
   // Warning: Hardcoded conversion
-  fConvertedText := ReplaceStr(fConvertedText, 'n�', 'n�');
-  fConvertedText := ReplaceStr(fConvertedText, 'K�', 'K�');
-  fConvertedText := ReplaceStr(fConvertedText, '�y', '�z');
   fConvertedText := ReplaceStr(fConvertedText, 'Rz', 'Ry');
-  fConvertedText := ReplaceStr(fConvertedText, 'R�', 'R~');
-  fConvertedText := ReplaceStr(fConvertedText, 'R�', 'R�');
-
+  fConvertedText := ReplaceStr(fConvertedText, 'R‚', 'R~');
+  fConvertedText := ReplaceStr(fConvertedText, 'o‚', 'o~');
+  fConvertedText := ReplaceStr(fConvertedText, 'p‚', 'p~');
+  fConvertedText := ReplaceStr(fConvertedText, 'i‚', 'i~');
+  
   // --- STRICT SANITIZATION FOR ANSI OUTPUT ---
   CleanedText := '';
   for I := 1 to Length(fConvertedText) do
@@ -616,6 +633,7 @@ begin
   if UniText = '' then
   begin
     fRaUKarToggle := False;
+    fRaUUKarToggle := False;
     fLastUniText := '';
     Result := '';
     exit;
@@ -624,6 +642,7 @@ begin
   if (Pos(' ', UniText) > 0) then
   begin
     fRaUKarToggle := False;
+    fRaUUKarToggle := False;
   end;
 
   fUniText := UniText;
@@ -632,6 +651,11 @@ begin
   if (fLastUniText = b_r + b_Ukar) and (UniText = b_r) then
   begin
     fRaUKarToggle := True;
+  end;
+
+    if (fLastUniText = b_r + b_UUKar) and (UniText = b_r) then
+  begin
+    fRaUUKarToggle := True;
   end;
 
   if (Pos(' ', UniText) > 0) then
@@ -981,7 +1005,12 @@ begin
               (MidStr(fConvertedText, I - 5, 5) = b_s + b_Hasanta + b_p + b_Hasanta + b_r)) then
             fConvertedText[I] := A_UUKar3
           else if MidStr(fConvertedText, I - 2, 1) <> b_Hasanta then
-            fConvertedText[I] := A_UUKar3
+          begin
+            if fRaUUKarToggle then
+              fConvertedText[I] := A_UUKar2
+            else
+              fConvertedText[I] := A_UUKar3;
+          end
           else
             fConvertedText[I] := A_UUKar2;
         end
@@ -2118,6 +2147,112 @@ begin
     W('{');
     Lines.SaveToFile(Path, TEncoding.UTF8);
   finally
+    Lines.Free;
+  end;
+end;
+
+{ =============================================================================== }
+
+function ValidateAnsiMappingFile(const Path: string; out ErrorMessage: string): Boolean;
+const
+  REPL_SECTIONS: array[0..2] of string = (
+    'FullFormReplacements', 'PreReplacements', 'PostReplacements');
+var
+  Lines: TStringList;
+  Root, Section, KeyVal, ValueVal: TJSONValue;
+  Arr: TJSONArray;
+  I, Idx: Integer;
+  Item: TJSONObject;
+begin
+  Result := False;
+  ErrorMessage := '';
+
+  if not FileExists(Path) then
+  begin
+    ErrorMessage := 'File does not exist.';
+    Exit;
+  end;
+
+  Lines := TStringList.Create;
+  Root := nil;
+  try
+    try
+      Lines.LoadFromFile(Path, TEncoding.UTF8);
+    except
+      on E: Exception do
+      begin
+        ErrorMessage := 'Unable to read file: ' + E.Message;
+        Exit;
+      end;
+    end;
+
+    try
+      Root := TJSONObject.ParseJSONValue(Lines.Text);
+    except
+      on E: Exception do
+      begin
+        ErrorMessage := 'Invalid JSON syntax: ' + E.Message;
+        Exit;
+      end;
+    end;
+
+    if (Root = nil) or not (Root is TJSONObject) then
+    begin
+      ErrorMessage := 'Invalid JSON root: expected an object.';
+      Exit;
+    end;
+
+    Section := TJSONObject(Root).GetValue('Constants');
+    if Section = nil then
+    begin
+      ErrorMessage := 'Missing section: Constants';
+      Exit;
+    end;
+    if not (Section is TJSONObject) then
+    begin
+      ErrorMessage := 'Invalid section: Constants must be an object.';
+      Exit;
+    end;
+
+    for I := 0 to High(REPL_SECTIONS) do
+    begin
+      Section := TJSONObject(Root).GetValue(REPL_SECTIONS[I]);
+      if Section = nil then
+      begin
+        ErrorMessage := 'Missing section: ' + REPL_SECTIONS[I];
+        Exit;
+      end;
+      if not (Section is TJSONArray) then
+      begin
+        ErrorMessage := 'Invalid section: ' + REPL_SECTIONS[I] + ' must be an array.';
+        Exit;
+      end;
+
+      Arr := TJSONArray(Section);
+      for Idx := 0 to Arr.Count - 1 do
+      begin
+        if not (Arr.Items[Idx] is TJSONObject) then
+        begin
+          ErrorMessage := 'Missing Key/Value in ' + REPL_SECTIONS[I] + ' at index ' + (Idx + 1).ToString;
+          Exit;
+        end;
+        Item := TJSONObject(Arr.Items[Idx]);
+        KeyVal := Item.GetValue('Key');
+        ValueVal := Item.GetValue('Value');
+        if (KeyVal = nil) or not (KeyVal is TJSONString) or
+           TJSONString(KeyVal).Value.IsEmpty or
+           (ValueVal = nil) or not (ValueVal is TJSONString) or
+           TJSONString(ValueVal).Value.IsEmpty then
+        begin
+          ErrorMessage := 'Missing Key/Value in ' + REPL_SECTIONS[I] + ' at index ' + (Idx + 1).ToString;
+          Exit;
+        end;
+      end;
+    end;
+
+    Result := True;
+  finally
+    Root.Free;
     Lines.Free;
   end;
 end;
