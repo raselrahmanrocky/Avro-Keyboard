@@ -48,6 +48,8 @@ type
 
 var
   CustomFullForms: array of TReplacementPair;
+  CustomPreReplacements: array of TReplacementPair;
+  CustomPostReplacements: array of TReplacementPair; 
   AnsiVersion: string = 'Default';
   AnsiMappingDir: string = '';
 
@@ -263,13 +265,13 @@ var
   A_Nn_2H_2: Char   = #$153;
   A_B_2H_4: Char    = #$178;  //
   A_T_2H: Char      = #$2014; //
-  A_T_UKar_2H: Char = #$7A; //
+  A_T_UKar_2H: Char = #$7A;   //
   A_Th_2H: Char     = #$2019; //
   A_K_2H: Char      = #$2039; //
-  A_L_2H_3: Char    = #$AC; //
+  A_L_2H_3: Char    = #$AC;   //
 
-  { TUnicodeToBijoy2000 }
-  { =============================================================================== }
+{ TUnicodeToBijoy2000 }
+{ =============================================================================== }
 
 procedure TUnicodeToBijoy2000.SecondHalfForms;
 var
@@ -363,20 +365,22 @@ begin
       fConvertedText[I] := A_D_1H_2;
   until I <= 0;
 
-  { A_N_1H_1 AND A_N_1H_2 }
+  { Elevate first-half N-forms }
   repeat
     I := Pos(b_n + b_Hasanta, fConvertedText);
     if I <= 0 then
       break;
-    if ((MidStr(fConvertedText, I + 2, 1) = b_t) or (MidStr(fConvertedText, I + 2, 1) = b_Th) or (MidStr(fConvertedText, I + 2, 1) = b_L) or
-        (MidStr(fConvertedText, I + 2, 1) = b_b) or (MidStr(fConvertedText, I + 2, 1) = A_T_R_2H) or (MidStr(fConvertedText, I + 2, 1) = A_T_UKar_2H)) then
+    if ((I + 2 <= Length(fConvertedText)) and 
+        ((fConvertedText[I + 2] = b_t) or (fConvertedText[I + 2] = b_Th) or 
+         (fConvertedText[I + 2] = b_L) or (fConvertedText[I + 2] = b_b) or 
+         (fConvertedText[I + 2] = A_T_R_2H) or (fConvertedText[I + 2] = A_T_UKar_2H))) then
       fConvertedText[I] := A_N_1H_1
-    else if (MidStr(fConvertedText, I + 2, 1) = b_m) or (MidStr(fConvertedText, I + 2, 1) = b_n) then
+    else if (I + 2 <= Length(fConvertedText)) and 
+            ((fConvertedText[I + 2] = b_m) or (fConvertedText[I + 2] = b_n)) then
       fConvertedText[I] := A_N
     else
       fConvertedText[I] := A_N_1H_2;
   until I <= 0;
-
 end;
 
 { =============================================================================== }
@@ -429,10 +433,8 @@ var
   CleanedText: string;
   C: Char;
 begin
-  // Safe string cast to avoid char concatenation error in Delphi 12
   fConvertedText := ReplaceStr(fConvertedText, string(b_Hasanta) + string(zwnj), string(A_Hasanta));
   
-  // Safe tail cleanup for Hasanta
   Len := Length(fConvertedText);
   if Len > 0 then
   begin
@@ -448,22 +450,26 @@ begin
   fConvertedText := ReplaceStr(fConvertedText, string(zwnj), '');
   fConvertedText := ReplaceStr(fConvertedText, string(A_ZFola) + string(A_Reph), string(A_Reph) + string(A_ZFola));
 
-  // 2. Swap Z-Fola (A_ZFola) and all types of U-Kar
+  // Swap Z-Fola (A_ZFola) and all types of U-Kar
   fConvertedText := ReplaceStr(fConvertedText, string(A_ZFola) + string(A_UKar1), string(A_UKar1) + string(A_ZFola));
   fConvertedText := ReplaceStr(fConvertedText, string(A_ZFola) + string(A_UKar2), string(A_UKar2) + string(A_ZFola));
   fConvertedText := ReplaceStr(fConvertedText, string(A_ZFola) + string(A_UKar3), string(A_UKar3) + string(A_ZFola));
   fConvertedText := ReplaceStr(fConvertedText, string(A_ZFola) + string(A_UKar4), string(A_UKar4) + string(A_ZFola));
 
-  // 3. Swap Z-Fola (A_ZFola) and all types of UU-Kar
+  // Swap Z-Fola (A_ZFola) and all types of UU-Kar
   fConvertedText := ReplaceStr(fConvertedText, string(A_ZFola) + string(A_UUKar1), string(A_UUKar1) + string(A_ZFola));
   fConvertedText := ReplaceStr(fConvertedText, string(A_ZFola) + string(A_UUKar2), string(A_UUKar2) + string(A_ZFola));
   fConvertedText := ReplaceStr(fConvertedText, string(A_ZFola) + string(A_UUKar3), string(A_UUKar3) + string(A_ZFola));
   
-  // 4. Swap Z-Fola (A_ZFola) and all types of Rfola
+  // Swap Z-Fola (A_ZFola) and all types of Rfola
   fConvertedText := ReplaceStr(fConvertedText, string(A_RFola_1) + string(A_UKar1), string(A_UKar1) + string(A_RFola_1));
   fConvertedText := ReplaceStr(fConvertedText, string(A_RFola_1) + string(A_UUKar1), string(A_UUKar1) + string(A_RFola_1));
   fConvertedText := ReplaceStr(fConvertedText, string(A_RFola_2) + string(A_UKar1), string(A_UKar1) + string(A_RFola_2));
   fConvertedText := ReplaceStr(fConvertedText, string(A_RFola_2) + string(A_UUKar1), string(A_UUKar1) + string(A_RFola_2));
+
+  // Applying dynamic post-processing fixes
+  for I := 0 to Length(CustomPostReplacements) - 1 do
+    fConvertedText := ReplaceStr(fConvertedText, CustomPostReplacements[I].Key, CustomPostReplacements[I].Value);
 
   // Warning: Hardcoded conversion
   fConvertedText := ReplaceStr(fConvertedText, 'n�', 'n�');
@@ -474,20 +480,12 @@ begin
   fConvertedText := ReplaceStr(fConvertedText, 'R�', 'R�');
 
   // --- STRICT SANITIZATION FOR ANSI OUTPUT ---
-  // Prevent any raw Unicode or control characters from leaking into the output string
   CleanedText := '';
   for I := 1 to Length(fConvertedText) do
   begin
     C := fConvertedText[I];
-    
-    // 1. Filter out any remaining raw Bengali Unicode block characters (0x0980 - 0x09FF)
-    if (Ord(C) >= $0980) and (Ord(C) <= $09FF) then
-      Continue;
-    
-    // 2. Filter out invisible control/formatting characters (Zero-Width Space, LRM, RLM, ZWJ, ZWNJ, BOM)
-    if ((Ord(C) >= $200B) and (Ord(C) <= $200F)) or (Ord(C) = $FEFF) then
-      Continue;
-      
+    if (Ord(C) >= $0980) and (Ord(C) <= $09FF) then Continue;
+    if ((Ord(C) >= $200B) and (Ord(C) <= $200F)) or (Ord(C) = $FEFF) then Continue;
     CleanedText := CleanedText + C;
   end;
   fConvertedText := CleanedText;
@@ -497,12 +495,9 @@ procedure TUnicodeToBijoy2000.ReplaceFullForms;
 var
   I: Integer;
 begin
-  //fConvertedText := ReplaceStr(fConvertedText, '্র্য', '');
-
   { Apply custom full form overrides }
   for I := 0 to Length(CustomFullForms) - 1 do
-  fConvertedText := ReplaceStr(fConvertedText, CustomFullForms[I].Key, CustomFullForms[I].Value);
-
+    fConvertedText := ReplaceStr(fConvertedText, CustomFullForms[I].Key, CustomFullForms[I].Value);
 
   { Replace Numbers }
   fConvertedText := ReplaceStr(fConvertedText, b_0, A_0);
@@ -615,6 +610,8 @@ end;
 { =============================================================================== }
 
 function TUnicodeToBijoy2000.Convert(const UniText: string): string;
+var
+  I: Integer;
 begin
   if UniText = '' then
   begin
@@ -645,13 +642,11 @@ begin
   fUniText := UniText;
   fConvertedText := fUniText;
   DeNormalize;
-  fConvertedText := ReplaceStr(fConvertedText, 'গ্র্য', 'MÖ¨');
-  fConvertedText := ReplaceStr(fConvertedText, 'ত্র্য', 'Î¨');
-  fConvertedText := ReplaceStr(fConvertedText, '্র্য', 'Ö¨');
-  fConvertedText := ReplaceStr(fConvertedText, 'র্ষ', 'l' + A_Reph);
-  fConvertedText := ReplaceStr(fConvertedText, 'র্য', A_Z + A_Reph);
-  fConvertedText := ReplaceStr(fConvertedText, 'ক্তু', '³z');
- 
+  
+  // Applying dynamic pre-placement fixes
+  for I := 0 to Length(CustomPreReplacements) - 1 do
+    fConvertedText := ReplaceStr(fConvertedText, CustomPreReplacements[I].Key, CustomPreReplacements[I].Value);
+
   ReArrangeKars;
   ReplaceFullForms;
   ReArrangeReph;
@@ -691,7 +686,7 @@ begin
         // MidStr(fConvertedText, I - 1, 3) := A_BH_R_2H
         fConvertedText := WideStuffString(fConvertedText, I - 1, 3, A_BH_R_2H)
       else
-        // MidStr(fConvertedText, I - 1, 3) := A_BH_R;
+        // MidStr(fConvertedText, I - 1, 3) := A_Bh_R;
         fConvertedText := WideStuffString(fConvertedText, I - 1, 3, A_Bh_R);
     end
     { K+Rofola, 2nd Half K+Rofola }
@@ -781,35 +776,34 @@ begin
         wSTmp := wCTmp + wSTmp;
       end
       else
-          begin
+      begin
         if (IsPureConsonent(wCTmp) = False) and (wCTmp <> b_Hasanta) and (wCTmp <> zwj) and (wCTmp <> zwnj) then
         begin
-            wSTmp := wCTmp + fKar + wSTmp;
-            fKar := #0;
-          end
-          else
-          begin
+          wSTmp := wCTmp + fKar + wSTmp;
+          fKar := #0;
+        end
+        else
+        begin
           if (wCTmp = b_Hasanta) or (wCTmp = zwj) or (wCTmp = zwnj) then
           begin
-              wSTmp := wCTmp + wSTmp;
+            wSTmp := wCTmp + wSTmp;
           end
           else if IsPureConsonent(wCTmp) then
+          begin
+            if (I > 1) and ((fConvertedText[I - 1] = b_Hasanta) or (fConvertedText[I - 1] = zwj) or (fConvertedText[I - 1] = zwnj)) then
+              wSTmp := wCTmp + wSTmp
+            else
             begin
-             if (I > 1) and ((fConvertedText[I - 1] = b_Hasanta) or (fConvertedText[I - 1] = zwj) or (fConvertedText[I - 1] = zwnj)) then
-                wSTmp := wCTmp + wSTmp
-              else
-              begin
-                wSTmp := fKar + wCTmp + wSTmp;
-                // Place pending kar at begining
-                fKar := #0;
-              end;
+              wSTmp := fKar + wCTmp + wSTmp;
+              // Place pending kar at begining
+              fKar := #0;
             end;
           end;
         end;
       end;
+    end;
     I := I - 1;
   until I < 1;
-
 
   if fKar <> #0 then wSTmp := fKar + wSTmp;
 
@@ -1368,6 +1362,8 @@ begin
   A_L_2H_3    := #$AC;
 
   SetLength(CustomFullForms, 0);
+  SetLength(CustomPreReplacements, 0);
+  SetLength(CustomPostReplacements, 0);
 end;
 
 { =============================================================================== }
@@ -1376,7 +1372,7 @@ procedure LoadAnsiMapping(const Path: string; ErrorLog: TStringList = nil);
 var
   JSON: TJSONObject;
   Constants: TJSONObject;
-  FullForms: TJSONArray;
+  FullForms, PreRep, PostRep: TJSONArray;
   I: Integer;
   Lines: TStringList;
   ConstName, ConstValue: string;
@@ -1644,6 +1640,47 @@ begin
         end;
       end;
     end;
+
+    SetLength(CustomPreReplacements, 0);
+    if JSON.TryGetValue<TJSONArray>('PreReplacements', PreRep) then
+    begin
+      SetLength(CustomPreReplacements, PreRep.Count);
+      for I := 0 to PreRep.Count - 1 do
+      begin
+        try
+          CustomPreReplacements[I].Key := (PreRep.Items[I] as TJSONObject).GetValue('Key').Value;
+          ConstValue := (PreRep.Items[I] as TJSONObject).GetValue('Value').Value;
+          CustomPreReplacements[I].Value := ProcessHexAndUnicode(ConstValue);
+        except
+          on E: Exception do
+          begin
+            if Assigned(ErrorLog) then
+              ErrorLog.Add('Error in PreReplacements item ' + IntToStr(I + 1) + ': ' + E.Message);
+          end;
+        end;
+      end;
+    end;
+
+    SetLength(CustomPostReplacements, 0);
+    if JSON.TryGetValue<TJSONArray>('PostReplacements', PostRep) then
+    begin
+      SetLength(CustomPostReplacements, PostRep.Count);
+      for I := 0 to PostRep.Count - 1 do
+      begin
+        try
+          CustomPostReplacements[I].Key := (PostRep.Items[I] as TJSONObject).GetValue('Key').Value;
+          ConstValue := (PostRep.Items[I] as TJSONObject).GetValue('Value').Value;
+          CustomPostReplacements[I].Value := ProcessHexAndUnicode(ConstValue);
+        except
+          on E: Exception do
+          begin
+            if Assigned(ErrorLog) then
+              ErrorLog.Add('Error in PostReplacements item ' + IntToStr(I + 1) + ': ' + E.Message);
+          end;
+        end;
+      end;
+    end;
+
   finally
     Lines.Free;
     if JSON <> nil then JSON.Free;
@@ -1974,7 +2011,7 @@ var
     W('    "A_S_Tt": "' + SmartEscape(string(A_S_Tt)) + '",');
     W('    "A_S_N": "' + SmartEscape(string(A_S_N)) + '",');
     W('    "A_S_Ph": "' + SmartEscape(string(A_S_Ph)) + '",');
-    W('    "A_H_UKar": "' + SmartEscape(string(A_H_UKar)) + '",');
+    W('    "A_H_UKar" : "' + SmartEscape(string(A_H_UKar)) + '",');
     W('    "A_H_RRIKar": "' + SmartEscape(string(A_H_RRIKar)) + '",');
     W('    "A_H_N": "' + SmartEscape(string(A_H_N)) + '",');
     W('    "A_H_M": "' + SmartEscape(string(A_H_M)) + '",');
@@ -2032,6 +2069,36 @@ var
       W(GetDefaultFullFormsJSON);
   end;
 
+  procedure WPreReplacements;
+  var
+    I: Integer;
+  begin
+    if Length(CustomPreReplacements) > 0 then
+    begin
+      for I := 0 to Length(CustomPreReplacements) - 1 do
+      begin
+        W('    {"Key": "' + EscapeJSON(CustomPreReplacements[I].Key) + '", "Value": "' + SmartEscape(CustomPreReplacements[I].Value) + '"}');
+        if I < Length(CustomPreReplacements) - 1 then
+          Lines[Lines.Count - 1] := Lines[Lines.Count - 1] + ',';
+      end;
+    end;
+  end;
+
+  procedure WPostReplacements;
+  var
+    I: Integer;
+  begin
+    if Length(CustomPostReplacements) > 0 then
+    begin
+      for I := 0 to Length(CustomPostReplacements) - 1 do
+      begin
+        W('    {"Key": "' + EscapeJSON(CustomPostReplacements[I].Key) + '", "Value": "' + SmartEscape(CustomPostReplacements[I].Value) + '"}');
+        if I < Length(CustomPostReplacements) - 1 then
+          Lines[Lines.Count - 1] := Lines[Lines.Count - 1] + ',';
+      end;
+    end;
+  end;
+
 begin
   Lines := TStringList.Create;
   try
@@ -2039,10 +2106,16 @@ begin
     W('  "Constants": {');
     WConstants;
     W('  },');
+    W('  "PreReplacements": [');
+    WPreReplacements;
+    W('  ],');
     W('  "FullFormReplacements": [');
     WFullForms;
+    W('  ],');
+    W('  "PostReplacements": [');
+    WPostReplacements;
     W('  ]');
-    W('}');
+    W('{');
     Lines.SaveToFile(Path, TEncoding.UTF8);
   finally
     Lines.Free;
