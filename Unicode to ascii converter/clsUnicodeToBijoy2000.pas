@@ -72,7 +72,7 @@ uses
 
 { Bijoy2000 Font Map Constants }
 var
-  { Numbers }
+   { Numbers }
   A_0: Char = #$30;
   A_1: Char = #$31;
   A_2: Char = #$32;
@@ -268,10 +268,10 @@ var
   A_Nn_2H_2: Char   = #$153;
   A_B_2H_4: Char    = #$178;  //
   A_T_2H: Char      = #$2014; //
-  A_T_UKar_2H: Char = #$7A;   //
+  A_T_UKar_2H: Char = #$2018; //
   A_Th_2H: Char     = #$2019; //
   A_K_2H: Char      = #$2039; //
-  A_L_2H_3: Char    = #$AC;   //
+  A_L_2H_3: Char    = #$2212; //
 
 { TUnicodeToBijoy2000 }
 { =============================================================================== }
@@ -758,6 +758,7 @@ begin
   fConvertedText := ReplaceStr(fConvertedText, b_dd + b_Nukta, b_rr);
   fConvertedText := ReplaceStr(fConvertedText, b_ddh + b_Nukta, b_rrh);
   fConvertedText := ReplaceStr(fConvertedText, b_Hasanta + b_Hasanta, b_Hasanta);
+  fConvertedText := ReplaceStr(fConvertedText, b_Hasanta + b_z + b_Hasanta + b_r, b_Hasanta + b_r + b_Hasanta + b_z);
 end;
 
 { =============================================================================== }
@@ -848,6 +849,12 @@ var
   begin
     Result := False;
     if I + 1 >= Length(fConvertedText) then exit;
+    
+// To avoid reph: if the character right before 'ra' is a hasanta (b_Hasanta)
+// then it is not a reph, but rather a ra-phala of the previous letter (e.g., mrya, krya)
+    if (I > 1) and (fConvertedText[I - 1] = b_Hasanta) then
+      Exit;
+
     if (fConvertedText[I] = b_r) and (fConvertedText[I + 1] = b_Hasanta) then
     begin
       if (I + 2 <= Length(fConvertedText)) and 
@@ -1201,206 +1208,206 @@ end;
 
 procedure ResetAnsiToDefaults;
 begin
-  { Numbers }
-  A_0 := #$30;
-  A_1 := #$31;
-  A_2 := #$32;
-  A_3 := #$33;
-  A_4 := #$34;
-  A_5 := #$35;
-  A_6 := #$36;
-  A_7 := #$37;
-  A_8 := #$38;
-  A_9 := #$39;
+   { Numbers }
+  A_0  := #$30;
+  A_1  := #$31;
+  A_2  := #$32;
+  A_3  := #$33;
+  A_4  := #$34;
+  A_5  := #$35;
+  A_6  := #$36;
+  A_7  := #$37;
+  A_8  := #$38;
+  A_9  := #$39;
 
   { Vowels and Kars }
-  A_A       := #$41;
-  A_AA      := #$41#$76;
-  A_AAKar   := #$76;
-  A_I       := #$42;
-  A_IKar    := #$77;
-  A_II      := #$43;
-  A_IIKar   := #$78;
-  A_U       := #$44;
-  A_UKar2   := #$79;
-  A_UKar1   := #$7A;
-  A_UKar3   := #$AD;
-  A_UKar4   := #$E6;
-  A_UU      := #$45;
-  A_UUKar2  := #$7E;
-  A_UUKar1  := #$201A;
-  A_UUKar3  := #$192;
-  A_RRI     := #$46;
-  A_RRIKar1 := #$201E;
-  A_RRIKar2 := #$2026;
-  A_E       := #$47;
-  A_EKar1   := #$2020;
-  A_EKar2   := #$2021;
-  A_OI      := #$48;
-  A_OIKar1  := #$2C6;
-  A_OIKar2  := #$2030;
-  A_O       := #$49;
-  A_OU      := #$4A;
-  A_OUKar   := #$160;
+  A_A        := #$41;
+  A_AA       := #$41#$76;
+  A_AAKar    := #$76;
+  A_I        := #$42;
+  A_IKar     := #$77;
+  A_II       := #$43;
+  A_IIKar    := #$78;
+  A_U        := #$44;
+  A_UKar2    := #$79;
+  A_UKar1    := #$7A;
+  A_UKar3    := #$2013;
+  A_UKar4    := #$201C;
+  A_UU       := #$45;
+  A_UUKar2   := #$7E;
+  A_UUKar1   := #$201A;
+  A_UUKar3   := #$192;
+  A_RRI      := #$46;
+  A_RRIKar1  := #$201E;
+  A_RRIKar2  := #$2026;
+  A_E        := #$47;
+  A_EKar1    := #$2020;
+  A_EKar2    := #$2021;
+  A_OI       := #$48;
+  A_OIKar1   := #$2C6;
+  A_OIKar2   := #$2030;
+  A_O        := #$49;
+  A_OU       := #$4A;
+  A_OUKar    := #$160;
 
   { Symbols }
-  A_Taka             := #$24;
-  A_Dari             := #$7C;
-  A_DoubleDanda      := #$5C;
-  A_Hasanta          := #$26;
-  A_StartDoubleQuote := #$D2;
-  A_EndDoubleQuote   := #$D3;
+  A_Taka              := #$24;
+  A_Dari              := #$7C;
+  A_DoubleDanda       := #$5C;
+  A_Hasanta           := #$26;
+  A_StartDoubleQuote  := #$D2;
+  A_EndDoubleQuote    := #$D3;
 
   { Consonants }
-  A_K        := #$4B;
-  A_Kh       := #$4C;
-  A_G        := #$4D;
-  A_Gh       := #$4E;
-  A_NGA      := #$4F;
-  A_C        := #$50;
-  A_Ch       := #$51;
-  A_J        := #$52;
-  A_Jh       := #$53;
-  A_NYA      := #$54;
-  A_Tt       := #$55;
-  A_Tth      := #$56;
-  A_Dd       := #$57;
-  A_Ddh      := #$58;
-  A_Nn       := #$59;
-  A_T        := #$5A;
-  A_Th       := #$5F;
-  A_D        := #$60;
-  A_Dh       := #$61;
-  A_N        := #$62;
-  A_P        := #$63;
-  A_Ph       := #$64;
-  A_B        := #$65;
-  A_Bh       := #$66;
-  A_M        := #$67;
-  A_Z        := #$68;
-  A_R        := #$69;
-  A_L        := #$6A;
-  A_Sh       := #$6B;
-  A_SS       := #$6C;
-  A_S        := #$6D;
-  A_H        := #$6E;
-  A_RR       := #$6F;
-  A_RRH      := #$70;
-  A_Y        := #$71;
-  A_Khandata := #$72;
-  A_Anushar  := #$73;
-  A_Bisharga := #$74;
-  A_Chandra  := #$75;
+  A_K         := #$4B;
+  A_Kh        := #$4C;
+  A_G         := #$4D;
+  A_Gh        := #$4E;
+  A_NGA       := #$4F;
+  A_C         := #$50;
+  A_Ch        := #$51;
+  A_J         := #$52;
+  A_Jh        := #$53;
+  A_NYA       := #$54;
+  A_Tt        := #$55;
+  A_Tth       := #$56;
+  A_Dd        := #$57;
+  A_Ddh       := #$58;
+  A_Nn        := #$59;
+  A_T         := #$5A;
+  A_Th        := #$5F;
+  A_D         := #$60;
+  A_Dh        := #$61;
+  A_N         := #$62;
+  A_P         := #$63;
+  A_Ph        := #$64;
+  A_B         := #$65;
+  A_Bh        := #$66;
+  A_M         := #$67;
+  A_Z         := #$68;
+  A_R         := #$69;
+  A_L         := #$6A;
+  A_Sh        := #$6B;
+  A_SS        := #$6C;
+  A_S         := #$6D;
+  A_H         := #$6E;
+  A_RR        := #$6F;
+  A_RRH       := #$70;
+  A_Y         := #$71;
+  A_Khandata  := #$72;
+  A_Anushar   := #$73;
+  A_Bisharga  := #$74;
+  A_Chandra   := #$75;
 
   { Full Forms }
-  A_K_K      := #$B0;
-  A_K_Tt     := #$B1;
-  A_K_Ss_M   := #$B2;
-  A_K_T      := #$B3;
-  A_K_M      := #$B4;
-  A_K_R      := #$B5;
-  A_K_Ss     := #$B6;
-  A_K_S      := #$B7;
-  A_G_Ukar   := #$B8;
-  A_G_G      := #$B9;
-  A_G_D      := #$BA;
-  A_G_Dh     := #$BB;
-  A_NGA_K    := #$BC;
-  A_NGA_G    := #$BD;
-  A_J_J      := #$BE;
-  A_J_Jh     := #$C0;
-  A_J_NYA    := #$C1;
-  A_NYA_C    := #$C2;
-  A_NYA_CH   := #$C3;
-  A_NYA_J    := #$C4;
-  A_NYA_Jh   := #$C5;
-  A_Tt_Tt    := #$C6;
-  A_Dd_Dd    := #$C7;
-  A_Nn_Tt    := #$C8;
-  A_Nn_Tth   := #$C9;
-  A_NN_Dd    := #$CA;
-  A_T_T      := #$CB;
-  A_T_Th     := #$CC;
-  A_T_M      := #$CD;
-  A_T_R      := #$CE;
-  A_D_D      := #$CF;
-  A_D_Dh     := #$D7;
-  A_D_B      := #$D8;
-  A_D_M      := #$D9;
-  A_N_Tth    := #$DA;
-  A_N_Dd     := #$DB;
-  A_N_Dh     := #$DC;
-  A_N_S      := #$DD;
-  A_P_Tt     := #$DE;
-  A_P_T      := #$DF;
-  A_P_P      := #$E0;
-  A_P_S      := #$E1;
-  A_B_J      := #$E2;
-  A_B_D      := #$E3;
-  A_B_Dh     := #$E4;
-  A_Bh_R     := #$E5;
-  A_M_N      := #$E6;
-  A_M_Ph     := #$E7;
-  A_L_K      := #$E9;
-  A_L_G      := #$EA;
-  A_L_Tt     := #$EB;
-  A_L_Dd     := #$EC;
-  A_L_P      := #$ED;
-  A_L_Ph     := #$EE;
-  A_Sh_UKar  := #$EF;
-  A_Sh_C     := #$F0;
-  A_Sh_Ch    := #$F1;
-  A_Ss_Nn    := #$F2;
-  A_Ss_Tt    := #$F3;
-  A_Ss_Tth   := #$F4;
-  A_Ss_Ph    := #$F5;
-  A_S_Kh     := #$F6;
-  A_S_Tt     := #$F7;
-  A_S_N      := #$F8;
-  A_S_Ph     := #$F9;
-  A_H_UKar   := #$FB;
-  A_H_RRIKar := #$FC;
-  A_H_N      := #$FD;
-  A_H_M      := #$FE;
-  A_Rr_G     := #$FF;
+  A_K_K       := #$B0;
+  A_K_Tt      := #$B1;
+  A_K_Ss_M    := #$B2;
+  A_K_T       := #$B3;
+  A_K_M       := #$B4;
+  A_K_R       := #$B5;
+  A_K_Ss      := #$B6;
+  A_K_S       := #$B7;
+  A_G_Ukar    := #$B8;
+  A_G_G       := #$B9;
+  A_G_D       := #$BA;
+  A_G_Dh      := #$BB;
+  A_NGA_K     := #$BC;
+  A_NGA_G     := #$BD;
+  A_J_J       := #$BE;
+  A_J_Jh      := #$C0;
+  A_J_NYA     := #$C1;
+  A_NYA_C     := #$C2;
+  A_NYA_CH    := #$C3;
+  A_NYA_J     := #$C4;
+  A_NYA_Jh    := #$C5;
+  A_Tt_Tt     := #$C6;
+  A_Dd_Dd     := #$C7;
+  A_Nn_Tt     := #$C8;
+  A_Nn_Tth    := #$C9;
+  A_NN_Dd     := #$CA;
+  A_T_T       := #$CB;
+  A_T_Th      := #$CC;
+  A_T_M       := #$CD;
+  A_T_R       := #$CE;
+  A_D_D       := #$CF;
+  A_D_Dh      := #$D7;
+  A_D_B       := #$D8;
+  A_D_M       := #$D9;
+  A_N_Tth     := #$DA;
+  A_N_Dd      := #$DB;
+  A_N_Dh      := #$DC;
+  A_N_S       := #$DD;
+  A_P_Tt      := #$DE;
+  A_P_T       := #$DF;
+  A_P_P       := #$E0;
+  A_P_S       := #$E1;
+  A_B_J       := #$E2;
+  A_B_D       := #$E3;
+  A_B_Dh      := #$E4;
+  A_Bh_R      := #$E5;
+  A_M_N       := #$E6;
+  A_M_Ph      := #$E7;
+  A_L_K       := #$E9;
+  A_L_G       := #$EA;
+  A_L_Tt      := #$EB;
+  A_L_Dd      := #$EC;
+  A_L_P       := #$ED;
+  A_L_Ph      := #$EE;
+  A_Sh_UKar   := #$EF;
+  A_Sh_C      := #$F0;
+  A_Sh_Ch     := #$F1;
+  A_Ss_Nn     := #$F2;
+  A_Ss_Tt     := #$F3;
+  A_Ss_Tth    := #$F4;
+  A_Ss_Ph     := #$F5;
+  A_S_Kh      := #$F6;
+  A_S_Tt      := #$F7;
+  A_S_N       := #$F8;
+  A_S_Ph      := #$F9;
+  A_H_UKar    := #$FB;
+  A_H_RRIKar  := #$FC;
+  A_H_N       := #$FD;
+  A_H_M       := #$FE;
+  A_Rr_G      := #$FF;
 
   { First Half forms }
-  A_Reph   := #$A9;
-  A_M_1H   := #$A4;
-  A_Ss_1H  := #$AE;
-  A_S_1H_1 := #$AF;
-  A_N_1H_1 := #$161;
-  A_S_1H_2 := #$2C9;
-  A_D_1H_1 := #$2DC;
-  A_C_1H   := #$201D;
-  A_NGA_1H := #$2022;
-  A_N_1H_2 := #$203A;
-  A_D_1H_2 := #$2122;
+  A_Reph    := #$A9;
+  A_M_1H    := #$A4;
+  A_Ss_1H   := #$AE;
+  A_S_1H_1  := #$AF;
+  A_N_1H_1  := #$161;
+  A_S_1H_2  := #$2C9; // -----------Not used
+  A_D_1H_1  := #$2DC;
+  A_C_1H    := #$201D;
+  A_NGA_1H  := #$2022;
+  A_N_1H_2  := #$203A;
+  A_D_1H_2  := #$2122;
 
   { Second Half forms }
-  A_B_2H_1    := #$5E;
-  A_B_2H_2    := #$A1;
-  A_BH_2H     := #$A2;
-  A_BH_R_2H   := #$A3;
-  A_M_2H_1    := #$A5;
-  A_B_2H_3    := #$A6;
-  A_M_2H_2    := #$A7;
-  A_ZFola     := #$A8;
-  A_RFola_1   := #$AA;
-  A_RFola_2   := #$AB;
-  A_L_2H_1    := #$AC;
-  A_L_2H_2    := #$AD;
-  A_T_R_2H    := #$BF;
-  A_RFola_3   := #$D6;
-  A_Nn_2H_1   := #$E8;
-  A_K_R_2H    := #$152;
-  A_Nn_2H_2   := #$153;
-  A_B_2H_4    := #$178;
-  A_T_2H      := #$2014;
-  A_T_UKar_2H := #$7A;
-  A_Th_2H     := #$2019;
-  A_K_2H      := #$2039;
-  A_L_2H_3    := #$AC;
+  A_B_2H_1     := #$5E; //
+  A_B_2H_2     := #$A1; //
+  A_BH_2H      := #$A2; //
+  A_BH_R_2H    := #$A3; //
+  A_M_2H_1     := #$A5; //
+  A_B_2H_3     := #$A6; //
+  A_M_2H_2     := #$A7; //
+  A_ZFola      := #$A8; //
+  A_RFola_1    := #$AA; //
+  A_RFola_2    := #$AB; //
+  A_L_2H_1     := #$AC; //
+  A_L_2H_2     := #$AD; // <--- Not used
+  A_T_R_2H     := #$BF; //
+  A_RFola_3    := #$D6; //
+  A_Nn_2H_1    := #$E8;
+  A_K_R_2H     := #$152; //
+  A_Nn_2H_2    := #$153;
+  A_B_2H_4     := #$178;  //
+  A_T_2H       := #$2014; //
+  A_T_UKar_2H  := #$2018; //
+  A_Th_2H      := #$2019; //
+  A_K_2H       := #$2039; //
+  A_L_2H_3     := #$2212; //
 
   SetLength(CustomFullForms, 0);
   SetLength(CustomPreReplacements, 0);
