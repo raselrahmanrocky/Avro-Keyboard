@@ -83,7 +83,8 @@ uses
   Strutils,
   BanglaChars,
   System.JSON,
-  System.SysUtils;
+  System.SysUtils,
+  System.Generics.Defaults;
 
 { Bijoy2000 Font Map Constants }
 var
@@ -807,7 +808,6 @@ begin
   fConvertedText := ReplaceStr(fConvertedText, b_Nn + b_Hasanta + b_dd, A_NN_Dd);
   fConvertedText := ReplaceStr(fConvertedText, b_t + b_Hasanta + b_t, A_T_T);
   fConvertedText := ReplaceStr(fConvertedText, b_t + b_Hasanta + b_Th, A_T_Th);
-  fConvertedText := ReplaceStr(fConvertedText, b_t + b_Hasanta + b_m, A_T_M);
   fConvertedText := ReplaceStr(fConvertedText, b_d + b_Hasanta + b_d, A_D_D);
   fConvertedText := ReplaceStr(fConvertedText, b_d + b_Hasanta + b_dh, A_D_Dh);
   fConvertedText := ReplaceStr(fConvertedText, b_d + b_Hasanta + b_b, A_D_B);
@@ -856,7 +856,18 @@ function TUnicodeToBijoy2000.BaseLineRightCharacter(const wC: string): Boolean;
 begin
   Result := False;
   if (wC = b_kh) or (wC = b_g) or (wC = b_gh) or (wC = b_Nn) or (wC = b_Th) or (wC = b_d) or (wC = b_dh) or (wC = b_n) or (wC = b_p) or (wC = b_b) or
-    (wC = b_m) or (wC = b_z) or (wC = b_r) or (wC = b_L) or (wC = b_sh) or (wC = b_ss) or (wC = b_s) or (wC = b_h) or (wC = b_y) then
+    (wC = b_m) or (wC = b_z) or (wC = b_r) or (wC = b_L) or (wC = b_sh) or (wC = b_ss) or (wC = b_s) or (wC = b_h) or (wC = b_y) or
+    // Also support ANSI conjunct characters that end with baseline-right consonants
+    (wC = string(A_K_Ss_M)) or (wC = string(A_K_M)) or (wC = string(A_K_Ss)) or (wC = string(A_K_S)) or
+    (wC = string(A_G_G)) or (wC = string(A_G_D)) or (wC = string(A_G_Dh)) or (wC = string(A_NGA_G)) or
+    (wC = string(A_T_Th)) or (wC = string(A_T_M)) or
+    (wC = string(A_D_D)) or (wC = string(A_D_Dh)) or (wC = string(A_D_B)) or (wC = string(A_D_M)) or
+    (wC = string(A_N_Tth)) or (wC = string(A_N_Dh)) or (wC = string(A_N_S)) or
+    (wC = string(A_P_P)) or (wC = string(A_P_S)) or
+    (wC = string(A_B_D)) or (wC = string(A_B_Dh)) or (wC = string(A_Bh_R)) or (wC = string(A_M_N)) or
+    (wC = string(A_L_G)) or (wC = string(A_L_P)) or
+    (wC = string(A_Ss_Nn)) or (wC = string(A_S_Kh)) or (wC = string(A_S_N)) or
+    (wC = string(A_H_N)) or (wC = string(A_H_M)) or (wC = string(A_Rr_G)) then
     Result := True;
 
 end;
@@ -913,11 +924,11 @@ begin
   ReArrangeKars;
   ReArrangeReph;
 
-  // 3. Process Vowels FIRST (while consonants are still Unicode)
-  ReplaceKarsVowels;
-
-  // 4. Process Conjuncts and Full Forms LATER
+  // 3. Process Conjuncts and Full Forms FIRST
   ReplaceFullForms;
+
+  // 4. Process Vowels LATER
+  ReplaceKarsVowels;
 
   // 5. Apply Glyphs, Halfs, and Consonants
   ConvertRFola_ZFola_Hasanta;
@@ -934,6 +945,7 @@ end;
 procedure TUnicodeToBijoy2000.ConvertRFola_ZFola_Hasanta;
 var
   I: Integer;
+  PrevC: string;
 begin
   // Convert Z-Fola
   fConvertedText := ReplaceStr(fConvertedText, b_Hasanta + b_z, A_ZFola);
@@ -944,12 +956,15 @@ begin
     I := Pos(b_Hasanta + b_r, fConvertedText);
     if I <= 0 then
       break;
+
+    PrevC := MidStr(fConvertedText, I - 1, 1);
+
     { P/G + RoFola }
-    if ((MidStr(fConvertedText, I - 1, 1) = b_p) or (MidStr(fConvertedText, I - 1, 1) = b_g)) then
-      // MidStr(fConvertedText, I, 2) := A_RFola_3
+    if (PrevC = b_p) or (PrevC = b_g) then
+    // MidStr(fConvertedText, I, 2) := A_RFola_3
       fConvertedText := WideStuffString(fConvertedText, I, 2, A_RFola_3)
       { V+Rofola, 2nd Half V+Rofola }
-    else if MidStr(fConvertedText, I - 1, 1) = b_Bh then
+    else if PrevC = b_Bh then
     begin
       if MidStr(fConvertedText, I - 2, 1) = b_Hasanta then
         // MidStr(fConvertedText, I - 1, 3) := A_BH_R_2H
@@ -959,7 +974,7 @@ begin
         fConvertedText := WideStuffString(fConvertedText, I - 1, 3, A_Bh_R);
     end
     { K+Rofola, 2nd Half K+Rofola }
-    else if MidStr(fConvertedText, I - 1, 1) = b_K then
+    else if PrevC = b_K then
     begin
       if MidStr(fConvertedText, I - 2, 1) = b_Hasanta then
         // MidStr(fConvertedText, I - 1, 3) := A_K_R_2H
@@ -969,11 +984,11 @@ begin
         fConvertedText := WideStuffString(fConvertedText, I - 1, 3, A_K_R);
     end
     { T+Rofola, 2nd Half T+Rofola }
-    else if MidStr(fConvertedText, I - 1, 1) = b_t then
+    else if PrevC = b_t then
     begin
       if MidStr(fConvertedText, I - 2, 1) = b_Hasanta then
       begin
-        // MidStr(fConvertedText, I - 1, 3) := A_T_R_2H
+      // MidStr(fConvertedText, I - 1, 3) := A_T_R_2H
         if (MidStr(fConvertedText, I - 3, 1) = b_K) or (MidStr(fConvertedText, I - 3, 1) = b_t) then
           fConvertedText := WideStuffString(fConvertedText, I, 2, A_RFola_2)
         else
@@ -983,9 +998,13 @@ begin
         // MidStr(fConvertedText, I - 1, 3) := A_T_R;
         fConvertedText := WideStuffString(fConvertedText, I - 1, 3, A_T_R);
     end
+    else if (PrevC = A_K_T) or (PrevC = A_T_T) or (PrevC = A_P_T) then
+    begin
+      fConvertedText := WideStuffString(fConvertedText, I, 2, A_RFola_2);
+    end
     else
     begin
-      if MidStr(fConvertedText, I - 1, 1) = b_ph then
+      if PrevC = b_ph then
         // MidStr(fConvertedText, I, 2) := A_RFola_2
         fConvertedText := WideStuffString(fConvertedText, I, 2, A_RFola_2)
       else
@@ -1667,6 +1686,13 @@ begin
         SetLength(CustomFullForms, TempList.Count);
         for I := 0 to TempList.Count - 1 do
           CustomFullForms[I] := TempList[I];
+
+        TArray.Sort<TReplacementPair>(CustomFullForms, TComparer<TReplacementPair>.Construct(
+          function(const L, R: TReplacementPair): Integer
+          begin
+            Result := R.Key.Length - L.Key.Length;
+          end
+        ));
       finally
         TempList.Free;
       end;
@@ -1689,6 +1715,13 @@ begin
           end;
         end;
       end;
+
+      TArray.Sort<TReplacementPair>(CustomPreReplacements, TComparer<TReplacementPair>.Construct(
+        function(const L, R: TReplacementPair): Integer
+        begin
+          Result := R.Key.Length - L.Key.Length;
+        end
+      ));
     end;
 
     // PostReplacements
@@ -1708,6 +1741,13 @@ begin
           end;
         end;
       end;
+
+      TArray.Sort<TReplacementPair>(CustomPostReplacements, TComparer<TReplacementPair>.Construct(
+        function(const L, R: TReplacementPair): Integer
+        begin
+          Result := R.Key.Length - L.Key.Length;
+        end
+      ));
     end;
 
     if JSONModified then
@@ -1739,7 +1779,7 @@ var
   Item: TJSONObject;
   Rec: TAnsiVarRec;
   Val: string;
-begin
+  begin
   Arr := TJSONArray.Create;
   
   for Rec in AnsiRegistry do
@@ -1752,16 +1792,16 @@ begin
       else
         Val := PString(Rec.Ptr)^;
         
-      Item := TJSONObject.Create;
+    Item := TJSONObject.Create;
       Item.AddPair('Key', SmartEscape(Rec.BengaliChar));
       Item.AddPair('Value', SmartEscape(Val));
       Item.AddPair('Comment', Rec.BengaliChar);
-      Arr.Add(Item);
+    Arr.Add(Item);
       
       Break;
     end;
   end;
-  
+
   Result := Arr;
 end;
 
