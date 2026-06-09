@@ -1482,6 +1482,24 @@ end;
 { =============================================================================== }
 
 procedure LoadAnsiMapping(const Path: string; ErrorLog: TStringList = nil);
+
+  function CleanBengaliChar(const S: string): string;
+  var
+    SpaceIdx, ParenIdx, DashIdx: Integer;
+  begin
+    Result := S;
+    SpaceIdx := Pos(' ', Result);
+    if SpaceIdx > 0 then
+      Result := Copy(Result, 1, SpaceIdx - 1);
+    ParenIdx := Pos('(', Result);
+    if ParenIdx > 0 then
+      Result := Copy(Result, 1, ParenIdx - 1);
+    DashIdx := Pos('-', Result);
+    if DashIdx > 0 then
+      Result := Copy(Result, 1, DashIdx - 1);
+    Result := Trim(Result);
+  end;
+
 var
   JSON: TJSONObject;
   ConstantsRoot, CategoryObj: TJSONObject;
@@ -1496,8 +1514,10 @@ var
   TempList: TList<TReplacementPair>;
   Pair: TReplacementPair;
   KeyStr, ValueStr: string;
+  JSONModified: Boolean;
 begin
   ResetAnsiToDefaults;
+  JSONModified := False;
 
   if not FileExists(Path) then
   begin
@@ -1530,8 +1550,13 @@ begin
     end;
 
     for Rec in AnsiRegistry do
+    begin
       if Rec.BengaliChar <> '' then
+      begin
+        KnownConstants.AddOrSetValue(CleanBengaliChar(Rec.BengaliChar), True);
         KnownConstants.AddOrSetValue(Rec.BengaliChar, True);
+      end;
+    end;
 
     if JSON.TryGetValue<TJSONObject>('Constants', ConstantsRoot) then
     begin
@@ -1602,14 +1627,29 @@ begin
     begin
       TempList := TList<TReplacementPair>.Create;
       try
+
+        for I := FullForms.Count - 1 downto 0 do
+        begin
+          try
+            KeyStr := ProcessHexAndUnicode((FullForms.Items[I] as TJSONObject).GetValue('Key').Value);
+            
+            if KnownConstants.ContainsKey(KeyStr) then
+            begin
+
+              FullForms.Remove(I).Free;
+              JSONModified := True;
+            end;
+          except
+
+          end;
+        end;
+
+
         for I := 0 to FullForms.Count - 1 do
         begin
           try
             KeyStr := ProcessHexAndUnicode((FullForms.Items[I] as TJSONObject).GetValue('Key').Value);
             ValueStr := ProcessHexAndUnicode((FullForms.Items[I] as TJSONObject).GetValue('Value').Value);
-
-            if KnownConstants.ContainsKey(KeyStr) then
-              Continue;
 
             Pair.Key := KeyStr;
             Pair.Value := ValueStr;
@@ -1666,6 +1706,21 @@ begin
         end;
       end;
     end;
+
+    if JSONModified then
+    begin
+      try
+        Lines.Text := JSON.Format(2);
+        Lines.SaveToFile(Path, TEncoding.UTF8);
+      except
+        on E: Exception do
+        begin
+          if Assigned(ErrorLog) then
+            ErrorLog.Add('Error saving cleaned JSON file: ' + E.Message);
+        end;
+      end;
+    end;
+
   finally
     KnownConstants.Free;
     JSON.Free;
@@ -1679,15 +1734,34 @@ function GetDefaultFullFormsJSONArr: TJSONArray;
 var
   Arr: TJSONArray;
   Item: TJSONObject;
+  Rec: TAnsiVarRec;
+  Val: string;
 begin
   Arr := TJSONArray.Create;
-  Item := TJSONObject.Create;
-  Item.AddPair('Key', SmartEscape('ক্ব'));
-  Item.AddPair('Value', SmartEscape('K¡'));
-  Item.AddPair('Comment', 'ক্ব');
+  
+  for Rec in AnsiRegistry do
+  begin
+    if (Rec.Category = 'FullForms') and (Rec.BengaliChar <> '') then
+    begin
+
+      if Rec.VarType = avChar then
+        Val := string(PChar(Rec.Ptr)^)
+      else
+        Val := PString(Rec.Ptr)^;
+        
+      Item := TJSONObject.Create;
+      Item.AddPair('Key', SmartEscape(Rec.BengaliChar));
+      Item.AddPair('Value', SmartEscape(Val));
+      Item.AddPair('Comment', Rec.BengaliChar);
+      Arr.Add(Item);
+      
+      Break;
+    end;
+  end;
   
   Result := Arr;
 end;
+
 { =============================================================================== }
 
 procedure ExportAnsiMapping(const Path: string);
