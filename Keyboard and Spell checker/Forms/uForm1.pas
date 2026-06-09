@@ -2115,23 +2115,50 @@ end;
 
 procedure TAvroMainForm1.AnsiVersionMenuClick(Sender: TObject);
 var
-  ErrorLog: TStringList;
+  ClickedItem, PrevCheckedItem: TMenuItem;
+  I: Integer;
+  SelectedVersion, ErrorMsg: string;
 begin
-  AnsiVersion := (Sender as TMenuItem).Caption;
-  if AnsiVersion = 'Default' then
-    AnsiVersion := 'Default';
-  SaveSettings;
+  if not (Sender is TMenuItem) then Exit;
+  ClickedItem := TMenuItem(Sender);
 
-  ErrorLog := TStringList.Create;
-  try
-    LoadCurrentActiveMapping(ErrorLog);
-    if ErrorLog.Count > 0 then
-      MessageDlg('Mapping loaded with warnings/errors:'#13#10 + ErrorLog.Text, mtWarning, [mbOK], 0);
-  finally
-    ErrorLog.Free;
+  PrevCheckedItem := nil;
+  if ClickedItem.Parent <> nil then
+  begin
+    for I := 0 to ClickedItem.Parent.Count - 1 do
+    begin
+      if ClickedItem.Parent.Items[I].Checked then
+      begin
+        PrevCheckedItem := ClickedItem.Parent.Items[I];
+        Break;
+      end;
+    end;
   end;
 
-  BuildAnsiVersionMenus;
+  SelectedVersion := ClickedItem.Caption;
+  SelectedVersion := StringReplace(SelectedVersion, '&', '', [rfReplaceAll]);
+
+  if not TrySetAnsiVersion(SelectedVersion, ErrorMsg) then
+  begin
+    if PrevCheckedItem <> nil then
+      PrevCheckedItem.Checked := True;
+    ClickedItem.Checked := False;
+
+    Application.MessageBox(
+      PChar('Could not load the selected ANSI mapping.' + sLineBreak +
+            'Please check your mapping file.' + sLineBreak + sLineBreak +
+            'Error: ' + ErrorMsg),
+      'ANSI Mapping Error',
+      MB_ICONWARNING or MB_OK
+    );
+  end
+  else
+  begin
+    if PrevCheckedItem <> nil then
+      PrevCheckedItem.Checked := False;
+    ClickedItem.Checked := True;
+    BuildAnsiVersionMenus;
+  end;
 end;
 
 { =============================================================================== }
@@ -2266,7 +2293,7 @@ var
   begin
     Item := TMenuItem.Create(ParentMenu);
     Item.Caption := ACaption;
-    Item.RadioItem := True;
+    Item.RadioItem := False;
     Item.OnClick := AnsiVersionMenuClick;
     Item.Checked := AChecked;
     ParentMenu.Add(Item);

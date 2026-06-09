@@ -75,6 +75,7 @@ procedure LoadAnsiMapping(const Path: string; ErrorLog: TStringList = nil);
 procedure ExportAnsiMapping(const Path: string);
 procedure LoadCurrentActiveMapping(ErrorLog: TStringList = nil);
 function ValidateAnsiMappingFile(const Path: string; out ErrorMessage: string): Boolean;
+function TrySetAnsiVersion(const NewVersion: string; out ErrorMessage: string): Boolean;
 
 implementation
 
@@ -1671,14 +1672,15 @@ begin
       end;
     end;
 
+    // PreReplacements 
     if JSON.TryGetValue<TJSONArray>('PreReplacements', PreRep) then
     begin
       SetLength(CustomPreReplacements, PreRep.Count);
       for I := 0 to PreRep.Count - 1 do
       begin
         try
-          CustomPreReplacements[I].Key := (PreRep.Items[I] as TJSONObject).GetValue('Key').Value;
-          CustomPreReplacements[I].Value := (PreRep.Items[I] as TJSONObject).GetValue('Value').Value;
+          CustomPreReplacements[I].Key := ProcessHexAndUnicode((PreRep.Items[I] as TJSONObject).GetValue('Key').Value);
+          CustomPreReplacements[I].Value := ProcessHexAndUnicode((PreRep.Items[I] as TJSONObject).GetValue('Value').Value);
         except
           on E: Exception do
           begin
@@ -1689,14 +1691,15 @@ begin
       end;
     end;
 
+    // PostReplacements
     if JSON.TryGetValue<TJSONArray>('PostReplacements', PostRep) then
     begin
       SetLength(CustomPostReplacements, PostRep.Count);
       for I := 0 to PostRep.Count - 1 do
       begin
         try
-          CustomPostReplacements[I].Key := (PostRep.Items[I] as TJSONObject).GetValue('Key').Value;
-          CustomPostReplacements[I].Value := (PostRep.Items[I] as TJSONObject).GetValue('Value').Value;
+          CustomPostReplacements[I].Key := ProcessHexAndUnicode((PostRep.Items[I] as TJSONObject).GetValue('Key').Value);
+          CustomPostReplacements[I].Value := ProcessHexAndUnicode((PostRep.Items[I] as TJSONObject).GetValue('Value').Value);
         except
           on E: Exception do
           begin
@@ -1766,7 +1769,7 @@ end;
 
 procedure ExportAnsiMapping(const Path: string);
 var
-  Root, CatObj, CategoryObj, ItemObj: TJSONObject;
+  Root, CategoryObj, ItemObj: TJSONObject;
   ConstantsRoot: TJSONObject;
   FFArr, PreArr, PostArr: TJSONArray;
   Lines: TStringList;
@@ -1881,8 +1884,14 @@ begin
     end;
 
     try
-      Root := TJSONObject.ParseJSONValue(Lines.Text);
+      Root := TJSONObject.ParseJSONValue(Lines.Text, False, True);
     except
+      on E: EJSONParseException do
+      begin
+        ErrorMessage := Format('Syntax Error -> Line: %d, Column: %d (Path: %s). Details: %s', 
+          [E.Line, E.Position, E.Path, E.Message]);
+        Exit;
+      end;
       on E: Exception do
       begin
         ErrorMessage := 'Invalid JSON syntax: ' + E.Message;
@@ -1963,6 +1972,40 @@ end;
 
 { =============================================================================== }
 
+function TrySetAnsiVersion(const NewVersion: string; out ErrorMessage: string): Boolean;
+var
+  FilePath: string;
+begin
+  Result := False;
+  ErrorMessage := '';
+
+  if NewVersion = 'Default' then
+  begin
+    AnsiVersion := 'Default';
+    ResetAnsiToDefaults;
+    Result := True;
+    Exit;
+  end;
+
+  if AnsiMappingDir = '' then
+  begin
+    ErrorMessage := 'ANSI Mapping directory is not set.';
+    Exit;
+  end;
+
+  FilePath := AnsiMappingDir + NewVersion + '.json';
+
+  if not ValidateAnsiMappingFile(FilePath, ErrorMessage) then
+  begin
+    Exit;
+  end;
+
+  AnsiVersion := NewVersion;
+  LoadAnsiMapping(FilePath);
+  Result := True;
+end;
+
+{ =============================================================================== }
 
 initialization
   InitializeAnsiRegistry;
