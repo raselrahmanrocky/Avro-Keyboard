@@ -12,7 +12,8 @@ unit clsUnicodeToBijoy2000;
 interface
 
 uses
-  System.Classes;
+  System.Classes,
+  System.Generics.Collections;
 
 type
   TUnicodeToBijoy2000 = class
@@ -48,12 +49,26 @@ type
     Value: string;
   end;
 
+  TAnsiVarType = (avChar, avString);
+
+  TAnsiVarRec = record
+    Name: string;
+    Category: string;
+    VarType: TAnsiVarType;
+    Ptr: Pointer;
+    DefaultVal: string;
+    BengaliChar: string;
+  end;
+
 var
   CustomFullForms: array of TReplacementPair;
   CustomPreReplacements: array of TReplacementPair;
   CustomPostReplacements: array of TReplacementPair; 
   AnsiVersion: string = 'Default';
   AnsiMappingDir: string = '';
+  AnsiRegistry: TList<TAnsiVarRec>;
+  AnsiRegistryMap: TDictionary<string, TAnsiVarRec>;
+
 
 procedure ResetAnsiToDefaults;
 procedure LoadAnsiMapping(const Path: string; ErrorLog: TStringList = nil);
@@ -67,8 +82,7 @@ uses
   Strutils,
   BanglaChars,
   System.JSON,
-  System.SysUtils,
-  System.Generics.Collections;
+  System.SysUtils;
 
 { Bijoy2000 Font Map Constants }
 var
@@ -276,6 +290,235 @@ var
   A_K_2H: Char      = #$2039; //
   A_L_2H_3: Char    = #$2212; //
 
+
+{ ============================================================================= }
+{ Registry Initialization }
+{ ============================================================================= }
+
+procedure InitializeAnsiRegistry;
+
+  procedure RegVar(const AName, ACategory: string; AVarType: TAnsiVarType;
+    APtr: Pointer; const ADefaultVal, ABengali: string);
+  var
+    Rec: TAnsiVarRec;
+  begin
+    Rec.Name := AName;
+    Rec.Category := ACategory;
+    Rec.VarType := AVarType;
+    Rec.Ptr := APtr;
+    Rec.DefaultVal := ADefaultVal;
+    Rec.BengaliChar := ABengali;
+    AnsiRegistry.Add(Rec);
+    AnsiRegistryMap.AddOrSetValue(AName, Rec);
+  end;
+
+begin
+  AnsiRegistry := TList<TAnsiVarRec>.Create;
+  AnsiRegistryMap := TDictionary<string, TAnsiVarRec>.Create;
+
+  // Numbers
+  RegVar('A_0', 'Numbers', avChar, @A_0, '#$30', '০');
+  RegVar('A_1', 'Numbers', avChar, @A_1, '#$31', '১');
+  RegVar('A_2', 'Numbers', avChar, @A_2, '#$32', '২');
+  RegVar('A_3', 'Numbers', avChar, @A_3, '#$33', '৩');
+  RegVar('A_4', 'Numbers', avChar, @A_4, '#$34', '৪');
+  RegVar('A_5', 'Numbers', avChar, @A_5, '#$35', '৫');
+  RegVar('A_6', 'Numbers', avChar, @A_6, '#$36', '৬');
+  RegVar('A_7', 'Numbers', avChar, @A_7, '#$37', '৭');
+  RegVar('A_8', 'Numbers', avChar, @A_8, '#$38', '৮');
+  RegVar('A_9', 'Numbers', avChar, @A_9, '#$39', '৯');
+
+  // VowelsAndKars
+  RegVar('A_A', 'VowelsAndKars', avChar, @A_A, '#$41', 'অ');
+  RegVar('A_AA', 'VowelsAndKars', avString, @A_AA, '#$41#$76', 'আ');
+  RegVar('A_AAKar', 'VowelsAndKars', avChar, @A_AAKar, '#$76', 'া (আ-কার)');
+  RegVar('A_I', 'VowelsAndKars', avChar, @A_I, '#$42', 'ই');
+  RegVar('A_IKar', 'VowelsAndKars', avChar, @A_IKar, '#$77', 'ি (ই-কার)');
+  RegVar('A_II', 'VowelsAndKars', avChar, @A_II, '#$43', 'ঈ');
+  RegVar('A_IIKar', 'VowelsAndKars', avChar, @A_IIKar, '#$78', 'ী (ঈ-কার)');
+  RegVar('A_U', 'VowelsAndKars', avChar, @A_U, '#$44', 'উ');
+  RegVar('A_UKar2', 'VowelsAndKars', avChar, @A_UKar2, '#$79', 'ু (উ-কার ২ - ঝুলন্ত)');
+  RegVar('A_UKar1', 'VowelsAndKars', avChar, @A_UKar1, '#$7A', 'ু (উ-কার ১ - সাধারণ)');
+  RegVar('A_UKar3', 'VowelsAndKars', avChar, @A_UKar3, '#$2013', 'ু (উ-কার ৩ - ড়ু/ঢ়ু)');
+  RegVar('A_UKar4', 'VowelsAndKars', avChar, @A_UKar4, '#$201C', 'ু (উ-কার ৪ - রু)');
+  RegVar('A_UU', 'VowelsAndKars', avChar, @A_UU, '#$45', 'ঊ');
+  RegVar('A_UUKar2', 'VowelsAndKars', avChar, @A_UUKar2, '#$7E', 'ূ (ঊ-কার ২ - ঝুলন্ত)');
+  RegVar('A_UUKar1', 'VowelsAndKars', avChar, @A_UUKar1, '#$201A', 'ূ (ঊ-কার ১ - সাধারণ)');
+  RegVar('A_UUKar3', 'VowelsAndKars', avChar, @A_UUKar3, '#$192', 'ূ (ঊ-কার ৩ - রূ)');
+  RegVar('A_RRI', 'VowelsAndKars', avChar, @A_RRI, '#$46', 'ঋ');
+  RegVar('A_RRIKar1', 'VowelsAndKars', avChar, @A_RRIKar1, '#$201E', 'ৃ (ঋ-কার ১)');
+  RegVar('A_RRIKar2', 'VowelsAndKars', avChar, @A_RRIKar2, '#$2026', 'ৃ (ঋ-কার ২)');
+  RegVar('A_E', 'VowelsAndKars', avChar, @A_E, '#$47', 'এ');
+  RegVar('A_EKar1', 'VowelsAndKars', avChar, @A_EKar1, '#$2020', 'ে (এ-কার ১ - সাধারণ)');
+  RegVar('A_EKar2', 'VowelsAndKars', avChar, @A_EKar2, '#$2021', 'ে (এ-কার ২ - ঝুলন্ত)');
+  RegVar('A_OI', 'VowelsAndKars', avChar, @A_OI, '#$48', 'ঐ');
+  RegVar('A_OIKar1', 'VowelsAndKars', avChar, @A_OIKar1, '#$2C6', 'ৈ (ঐ-কার ১ - সাধারণ)');
+  RegVar('A_OIKar2', 'VowelsAndKars', avChar, @A_OIKar2, '#$2030', 'ৈ (ঐ-কার ২ - ঝুলন্ত)');
+  RegVar('A_O', 'VowelsAndKars', avChar, @A_O, '#$49', 'ও');
+  RegVar('A_OU', 'VowelsAndKars', avChar, @A_OU, '#$4A', 'ঔ');
+  RegVar('A_OUKar', 'VowelsAndKars', avChar, @A_OUKar, '#$160', 'ৌ (ঔ-কার)');
+
+  // Symbols
+  RegVar('A_Taka', 'Symbols', avChar, @A_Taka, '#$24', '৳ (টাকা)');
+  RegVar('A_Dari', 'Symbols', avChar, @A_Dari, '#$7C', '। (দাঁড়ি)');
+  RegVar('A_DoubleDanda', 'Symbols', avChar, @A_DoubleDanda, '#$5C', '॥ (দ্বিত্ব দাঁড়ি)');
+  RegVar('A_Hasanta', 'Symbols', avChar, @A_Hasanta, '#$26', '্ (হসন্ত)');
+  RegVar('A_StartDoubleQuote', 'Symbols', avChar, @A_StartDoubleQuote, '#$D2', '" (উদ্ধৃতি শুরু)');
+  RegVar('A_EndDoubleQuote', 'Symbols', avChar, @A_EndDoubleQuote, '#$D3', '" (উদ্ধৃতি শেষ)');
+  RegVar('A_StartSingleQuote', 'Symbols', avChar, @A_StartSingleQuote, '#$D4', ''' (একক উদ্ধৃতি শুরু)');
+  RegVar('A_EndSingleQuote', 'Symbols', avChar, @A_EndSingleQuote, '#$D5', ''' (একক উদ্ধৃতি শেষ)');
+
+  // Consonants
+  RegVar('A_K', 'Consonants', avChar, @A_K, '#$4B', 'ক');
+  RegVar('A_Kh', 'Consonants', avChar, @A_Kh, '#$4C', 'খ');
+  RegVar('A_G', 'Consonants', avChar, @A_G, '#$4D', 'গ');
+  RegVar('A_Gh', 'Consonants', avChar, @A_Gh, '#$4E', 'ঘ');
+  RegVar('A_NGA', 'Consonants', avChar, @A_NGA, '#$4F', 'ঙ');
+  RegVar('A_C', 'Consonants', avChar, @A_C, '#$50', 'চ');
+  RegVar('A_Ch', 'Consonants', avChar, @A_Ch, '#$51', 'ছ');
+  RegVar('A_J', 'Consonants', avChar, @A_J, '#$52', 'জ');
+  RegVar('A_Jh', 'Consonants', avChar, @A_Jh, '#$53', 'ঝ');
+  RegVar('A_NYA', 'Consonants', avChar, @A_NYA, '#$54', 'ঞ');
+  RegVar('A_Tt', 'Consonants', avChar, @A_Tt, '#$55', 'ট');
+  RegVar('A_Tth', 'Consonants', avChar, @A_Tth, '#$56', 'ঠ');
+  RegVar('A_Dd', 'Consonants', avChar, @A_Dd, '#$57', 'ড');
+  RegVar('A_Ddh', 'Consonants', avChar, @A_Ddh, '#$58', 'ঢ');
+  RegVar('A_Nn', 'Consonants', avChar, @A_Nn, '#$59', 'ণ');
+  RegVar('A_T', 'Consonants', avChar, @A_T, '#$5A', 'ত');
+  RegVar('A_Th', 'Consonants', avChar, @A_Th, '#$5F', 'থ');
+  RegVar('A_D', 'Consonants', avChar, @A_D, '#$60', 'দ');
+  RegVar('A_Dh', 'Consonants', avChar, @A_Dh, '#$61', 'ধ');
+  RegVar('A_N', 'Consonants', avChar, @A_N, '#$62', 'ন');
+  RegVar('A_P', 'Consonants', avChar, @A_P, '#$63', 'প');
+  RegVar('A_Ph', 'Consonants', avChar, @A_Ph, '#$64', 'ফ');
+  RegVar('A_B', 'Consonants', avChar, @A_B, '#$65', 'ব');
+  RegVar('A_Bh', 'Consonants', avChar, @A_Bh, '#$66', 'ভ');
+  RegVar('A_M', 'Consonants', avChar, @A_M, '#$67', 'ম');
+  RegVar('A_Z', 'Consonants', avChar, @A_Z, '#$68', 'য');
+  RegVar('A_R', 'Consonants', avChar, @A_R, '#$69', 'র');
+  RegVar('A_L', 'Consonants', avChar, @A_L, '#$6A', 'ল');
+  RegVar('A_Sh', 'Consonants', avChar, @A_Sh, '#$6B', 'শ');
+  RegVar('A_SS', 'Consonants', avChar, @A_SS, '#$6C', 'ষ');
+  RegVar('A_S', 'Consonants', avChar, @A_S, '#$6D', 'স');
+  RegVar('A_H', 'Consonants', avChar, @A_H, '#$6E', 'হ');
+  RegVar('A_RR', 'Consonants', avChar, @A_RR, '#$6F', 'ড়');
+  RegVar('A_RRH', 'Consonants', avChar, @A_RRH, '#$70', 'ঢ়');
+  RegVar('A_Y', 'Consonants', avChar, @A_Y, '#$71', 'য়');
+  RegVar('A_Khandata', 'Consonants', avChar, @A_Khandata, '#$72', 'ৎ');
+  RegVar('A_Anushar', 'Consonants', avChar, @A_Anushar, '#$73', 'ং');
+  RegVar('A_Bisharga', 'Consonants', avChar, @A_Bisharga, '#$74', 'ঃ');
+  RegVar('A_Chandra', 'Consonants', avChar, @A_Chandra, '#$75', 'ঁ');
+
+  // FullForms
+  RegVar('A_K_K', 'FullForms', avChar, @A_K_K, '#$B0', 'ক্ক');
+  RegVar('A_K_Tt', 'FullForms', avChar, @A_K_Tt, '#$B1', 'ক্ট');
+  RegVar('A_K_Ss_M', 'FullForms', avChar, @A_K_Ss_M, '#$B2', 'ক্স্ম');
+  RegVar('A_K_T', 'FullForms', avChar, @A_K_T, '#$B3', 'ক্ত');
+  RegVar('A_K_M', 'FullForms', avChar, @A_K_M, '#$B4', 'ক্ম');
+  RegVar('A_K_R', 'FullForms', avChar, @A_K_R, '#$B5', 'ক্র');
+  RegVar('A_K_Ss', 'FullForms', avChar, @A_K_Ss, '#$B6', 'ক্ষ');
+  RegVar('A_K_S', 'FullForms', avChar, @A_K_S, '#$B7', 'ক্স');
+  RegVar('A_G_Ukar', 'FullForms', avChar, @A_G_Ukar, '#$B8', 'গু');
+  RegVar('A_G_G', 'FullForms', avChar, @A_G_G, '#$B9', 'গ্গ');
+  RegVar('A_G_D', 'FullForms', avChar, @A_G_D, '#$BA', 'গ্দ');
+  RegVar('A_G_Dh', 'FullForms', avChar, @A_G_Dh, '#$BB', 'গ্ধ');
+  RegVar('A_NGA_K', 'FullForms', avChar, @A_NGA_K, '#$BC', 'ঙ্ক');
+  RegVar('A_NGA_G', 'FullForms', avChar, @A_NGA_G, '#$BD', 'ঙ্গ');
+  RegVar('A_J_J', 'FullForms', avChar, @A_J_J, '#$BE', 'জ্জ');
+  RegVar('A_J_Jh', 'FullForms', avChar, @A_J_Jh, '#$C0', 'জ্ঝ');
+  RegVar('A_J_NYA', 'FullForms', avChar, @A_J_NYA, '#$C1', 'জ্ঞ');
+  RegVar('A_NYA_C', 'FullForms', avChar, @A_NYA_C, '#$C2', 'ঞ্চ');
+  RegVar('A_NYA_CH', 'FullForms', avChar, @A_NYA_CH, '#$C3', 'ঞ্ছ');
+  RegVar('A_NYA_J', 'FullForms', avChar, @A_NYA_J, '#$C4', 'ঞ্জ');
+  RegVar('A_NYA_Jh', 'FullForms', avChar, @A_NYA_Jh, '#$C5', 'ঞ্ঝ');
+  RegVar('A_Tt_Tt', 'FullForms', avChar, @A_Tt_Tt, '#$C6', 'ট্ট');
+  RegVar('A_Dd_Dd', 'FullForms', avChar, @A_Dd_Dd, '#$C7', 'ড্ড');
+  RegVar('A_Nn_Tt', 'FullForms', avChar, @A_Nn_Tt, '#$C8', 'ণ্ট');
+  RegVar('A_Nn_Tth', 'FullForms', avChar, @A_Nn_Tth, '#$C9', 'ণ্ঠ');
+  RegVar('A_NN_Dd', 'FullForms', avChar, @A_NN_Dd, '#$CA', 'ণ্ড');
+  RegVar('A_T_T', 'FullForms', avChar, @A_T_T, '#$CB', 'ত্ত');
+  RegVar('A_T_Th', 'FullForms', avChar, @A_T_Th, '#$CC', 'ত্থ');
+  RegVar('A_T_M', 'FullForms', avChar, @A_T_M, '#$CD', 'ত্ম');
+  RegVar('A_T_R', 'FullForms', avChar, @A_T_R, '#$CE', 'ত্র');
+  RegVar('A_D_D', 'FullForms', avChar, @A_D_D, '#$CF', 'দ্দ');
+  RegVar('A_D_Dh', 'FullForms', avChar, @A_D_Dh, '#$D7', 'দ্ধ');
+  RegVar('A_D_B', 'FullForms', avChar, @A_D_B, '#$D8', 'দ্ব');
+  RegVar('A_D_M', 'FullForms', avChar, @A_D_M, '#$D9', 'দ্ম');
+  RegVar('A_N_Tth', 'FullForms', avChar, @A_N_Tth, '#$DA', 'ন্থ');
+  RegVar('A_N_Dd', 'FullForms', avChar, @A_N_Dd, '#$DB', 'ন্ড');
+  RegVar('A_N_Dh', 'FullForms', avChar, @A_N_Dh, '#$DC', 'ন্ধ');
+  RegVar('A_N_S', 'FullForms', avChar, @A_N_S, '#$DD', 'ন্স');
+  RegVar('A_P_Tt', 'FullForms', avChar, @A_P_Tt, '#$DE', 'প্ট');
+  RegVar('A_P_T', 'FullForms', avChar, @A_P_T, '#$DF', 'প্ত');
+  RegVar('A_P_P', 'FullForms', avChar, @A_P_P, '#$E0', 'প্প');
+  RegVar('A_P_S', 'FullForms', avChar, @A_P_S, '#$E1', 'প্স');
+  RegVar('A_B_J', 'FullForms', avChar, @A_B_J, '#$E2', 'ব্জ');
+  RegVar('A_B_D', 'FullForms', avChar, @A_B_D, '#$E3', 'ব্দ');
+  RegVar('A_B_Dh', 'FullForms', avChar, @A_B_Dh, '#$E4', 'ব্ধ');
+  RegVar('A_Bh_R', 'FullForms', avChar, @A_Bh_R, '#$E5', 'ভ্র');
+  RegVar('A_M_N', 'FullForms', avChar, @A_M_N, '#$E6', 'ম্ন');
+  RegVar('A_M_Ph', 'FullForms', avChar, @A_M_Ph, '#$E7', 'ম্ফ');
+  RegVar('A_L_K', 'FullForms', avChar, @A_L_K, '#$E9', 'ল্ক');
+  RegVar('A_L_G', 'FullForms', avChar, @A_L_G, '#$EA', 'ল্গ');
+  RegVar('A_L_Tt', 'FullForms', avChar, @A_L_Tt, '#$EB', 'ল্ট');
+  RegVar('A_L_Dd', 'FullForms', avChar, @A_L_Dd, '#$EC', 'ল্ড');
+  RegVar('A_L_P', 'FullForms', avChar, @A_L_P, '#$ED', 'ল্প');
+  RegVar('A_L_Ph', 'FullForms', avChar, @A_L_Ph, '#$EE', 'ল্ফ');
+  RegVar('A_Sh_UKar', 'FullForms', avChar, @A_Sh_UKar, '#$EF', 'শু');
+  RegVar('A_Sh_C', 'FullForms', avChar, @A_Sh_C, '#$F0', 'শ্চ');
+  RegVar('A_Sh_Ch', 'FullForms', avChar, @A_Sh_Ch, '#$F1', 'শ্ছ');
+  RegVar('A_Ss_Nn', 'FullForms', avChar, @A_Ss_Nn, '#$F2', 'ষ্ণ');
+  RegVar('A_Ss_Tt', 'FullForms', avChar, @A_Ss_Tt, '#$F3', 'ষ্ট');
+  RegVar('A_Ss_Tth', 'FullForms', avChar, @A_Ss_Tth, '#$F4', 'ষ্ঠ');
+  RegVar('A_Ss_Ph', 'FullForms', avChar, @A_Ss_Ph, '#$F5', 'স্ফ');
+  RegVar('A_S_Kh', 'FullForms', avChar, @A_S_Kh, '#$F6', 'স্খ');
+  RegVar('A_S_Tt', 'FullForms', avChar, @A_S_Tt, '#$F7', 'স্ট');
+  RegVar('A_S_N', 'FullForms', avChar, @A_S_N, '#$F8', 'স্ন');
+  RegVar('A_S_Ph', 'FullForms', avChar, @A_S_Ph, '#$F9', 'স্ফ');
+  RegVar('A_H_UKar', 'FullForms', avChar, @A_H_UKar, '#$FB', 'হু');
+  RegVar('A_H_RRIKar', 'FullForms', avChar, @A_H_RRIKar, '#$FC', 'হৃ');
+  RegVar('A_H_N', 'FullForms', avChar, @A_H_N, '#$FD', 'হ্ন');
+  RegVar('A_H_M', 'FullForms', avChar, @A_H_M, '#$FE', 'হ্ম');
+  RegVar('A_Rr_G', 'FullForms', avChar, @A_Rr_G, '#$FF', 'র্গ');
+
+  // FirstHalfForms
+  RegVar('A_Reph', 'FirstHalfForms', avChar, @A_Reph, '#$A9', '্র (র-এর রেফ)');
+  RegVar('A_M_1H', 'FirstHalfForms', avChar, @A_M_1H, '#$A4', 'ম-এর প্রথম খন্ড');
+  RegVar('A_Ss_1H', 'FirstHalfForms', avChar, @A_Ss_1H, '#$AE', 'ষ-এর প্রথম খন্ড');
+  RegVar('A_S_1H_1', 'FirstHalfForms', avChar, @A_S_1H_1, '#$AF', 'স-এর প্রথম খন্ড ১');
+  RegVar('A_N_1H_1', 'FirstHalfForms', avChar, @A_N_1H_1, '#$161', 'ন-এর প্রথম খন্ড ১');
+  RegVar('A_S_1H_2', 'FirstHalfForms', avChar, @A_S_1H_2, '#$2C9', 'স-এর প্রথম খন্ড ২');
+  RegVar('A_D_1H_1', 'FirstHalfForms', avChar, @A_D_1H_1, '#$2DC', 'দ-এর প্রথম খন্ড ১');
+  RegVar('A_C_1H', 'FirstHalfForms', avChar, @A_C_1H, '#$201D', 'চ-এর প্রথম খন্ড');
+  RegVar('A_NGA_1H', 'FirstHalfForms', avChar, @A_NGA_1H, '#$2022', 'ঙ-এর প্রথম খন্ড');
+  RegVar('A_N_1H_2', 'FirstHalfForms', avChar, @A_N_1H_2, '#$203A', 'ন-এর প্রথম খন্ড ২');
+  RegVar('A_D_1H_2', 'FirstHalfForms', avChar, @A_D_1H_2, '#$2122', 'দ-এর প্রথম খন্ড ২');
+
+  // SecondHalfForms
+  RegVar('A_B_2H_1', 'SecondHalfForms', avChar, @A_B_2H_1, '#$5E', 'ব-এর দ্বিতীয় খন্ড ১');
+  RegVar('A_B_2H_2', 'SecondHalfForms', avChar, @A_B_2H_2, '#$A1', 'ব-এর দ্বিতীয় খন্ড ২');
+  RegVar('A_BH_2H', 'SecondHalfForms', avChar, @A_BH_2H, '#$A2', 'ভ-এর দ্বিতীয় খন্ড');
+  RegVar('A_BH_R_2H', 'SecondHalfForms', avChar, @A_BH_R_2H, '#$A3', 'ভ্র-এর দ্বিতীয় খন্ড');
+  RegVar('A_M_2H_1', 'SecondHalfForms', avChar, @A_M_2H_1, '#$A5', 'ম-এর দ্বিতীয় খন্ড ১');
+  RegVar('A_B_2H_3', 'SecondHalfForms', avChar, @A_B_2H_3, '#$A6', 'ব-এর দ্বিতীয় খন্ড ৩');
+  RegVar('A_M_2H_2', 'SecondHalfForms', avChar, @A_M_2H_2, '#$A7', 'ম-এর দ্বিতীয় খন্ড ২');
+  RegVar('A_ZFola', 'SecondHalfForms', avChar, @A_ZFola, '#$A8', 'য-ফলা');
+  RegVar('A_RFola_1', 'SecondHalfForms', avChar, @A_RFola_1, '#$AA', 'র-ফলা ১');
+  RegVar('A_RFola_2', 'SecondHalfForms', avChar, @A_RFola_2, '#$AB', 'র-ফলা ২');
+  RegVar('A_L_2H_1', 'SecondHalfForms', avChar, @A_L_2H_1, '#$AC', 'ল-এর দ্বিতীয় খন্ড ১');
+  RegVar('A_L_2H_2', 'SecondHalfForms', avChar, @A_L_2H_2, '#$AD', 'ল-এর দ্বিতীয় খন্ড ২');
+  RegVar('A_T_R_2H', 'SecondHalfForms', avChar, @A_T_R_2H, '#$BF', 'ত্র-এর দ্বিতীয় খন্ড');
+  RegVar('A_RFola_3', 'SecondHalfForms', avChar, @A_RFola_3, '#$D6', 'র-ফলা ৩');
+  RegVar('A_Nn_2H_1', 'SecondHalfForms', avChar, @A_Nn_2H_1, '#$E8', 'ণ-এর দ্বিতীয় খন্ড ১');
+  RegVar('A_K_R_2H', 'SecondHalfForms', avChar, @A_K_R_2H, '#$152', 'ক্র-এর দ্বিতীয় খন্ড');
+  RegVar('A_Nn_2H_2', 'SecondHalfForms', avChar, @A_Nn_2H_2, '#$153', 'ণ-এর দ্বিতীয় খন্ড ২');
+  RegVar('A_B_2H_4', 'SecondHalfForms', avChar, @A_B_2H_4, '#$178', 'ব-এর দ্বিতীয় খন্ড ৪');
+  RegVar('A_T_2H', 'SecondHalfForms', avChar, @A_T_2H, '#$2014', 'ত-এর দ্বিতীয় খন্ড');
+  RegVar('A_T_UKar_2H', 'SecondHalfForms', avChar, @A_T_UKar_2H, '#$2018', 'তু-এর দ্বিতীয় খন্ড');
+  RegVar('A_Th_2H', 'SecondHalfForms', avChar, @A_Th_2H, '#$2019', 'থ-এর দ্বিতীয় খন্ড');
+  RegVar('A_K_2H', 'SecondHalfForms', avChar, @A_K_2H, '#$2039', 'ক-এর দ্বিতীয় খন্ড');
+  RegVar('A_L_2H_3', 'SecondHalfForms', avChar, @A_L_2H_3, '#$2212', 'ল-এর দ্বিতীয় খন্ড ৩');
+end;
 { TUnicodeToBijoy2000 }
 { =============================================================================== }
 
@@ -488,10 +731,6 @@ begin
   // If UU-Kar1 and Reph are together, you might want to use UU-Kar2
   fConvertedText := ReplaceStr(fConvertedText, string(A_UUKar1) + string(A_Reph), string(A_UUKar2) + string(A_Reph));
 
-  // Applying dynamic post-processing fixes
-  for I := 0 to Length(CustomPostReplacements) - 1 do
-    fConvertedText := ReplaceStr(fConvertedText, CustomPostReplacements[I].Key, CustomPostReplacements[I].Value);
-
   // Warning: Hardcoded conversion
   fConvertedText := ReplaceStr(fConvertedText, 'Rz', 'Ry');
   fConvertedText := ReplaceStr(fConvertedText, 'R‚', 'R~');
@@ -509,16 +748,16 @@ begin
     CleanedText := CleanedText + C;
   end;
   fConvertedText := CleanedText;
+
+  // Applying dynamic post-processing fixes (LAST)
+  for I := 0 to Length(CustomPostReplacements) - 1 do
+    fConvertedText := ReplaceStr(fConvertedText, CustomPostReplacements[I].Key, CustomPostReplacements[I].Value);
 end;
 
 procedure TUnicodeToBijoy2000.ReplaceFullForms;
 var
   I: Integer;
 begin
-  { Apply custom full form overrides }
-  for I := 0 to Length(CustomFullForms) - 1 do
-    fConvertedText := ReplaceStr(fConvertedText, CustomFullForms[I].Key, CustomFullForms[I].Value);
-
   { Replace Numbers }
   fConvertedText := ReplaceStr(fConvertedText, b_0, A_0);
   fConvertedText := ReplaceStr(fConvertedText, b_1, A_1);
@@ -605,6 +844,9 @@ begin
   fConvertedText := ReplaceStr(fConvertedText, b_h + b_Hasanta + b_m, A_H_M);
   fConvertedText := ReplaceStr(fConvertedText, b_rr + b_Hasanta + b_g, A_Rr_G);
 
+  { Apply custom full form overrides AFTER hardcoded patterns }
+  for I := 0 to Length(CustomFullForms) - 1 do
+    fConvertedText := ReplaceStr(fConvertedText, CustomFullForms[I].Key, CustomFullForms[I].Value);
 end;
 
 { =============================================================================== }
@@ -1191,233 +1433,24 @@ var
 begin
   Result := '';
   for C in S do
-  begin
-    case C of
-      '\': Result := Result + '\\';
-      '"': Result := Result + '\"';
-      #$08: Result := Result + '\b';
-      #$09: Result := Result + '\t';
-      #$0A: Result := Result + '\n';
-      #$0C: Result := Result + '\f';
-      #$0D: Result := Result + '\r';
-    else
-      if (Ord(C) < 32) or (Ord(C) > 126) then
-        Result := Result + '#$' + IntToHex(Ord(C), 4)
-      else
-        Result := Result + C;
-    end;
-  end;
+    Result := Result + '#$' + IntToHex(Ord(C), 4);
 end;
 
 { =============================================================================== }
 
 procedure ResetAnsiToDefaults;
+var
+  Rec: TAnsiVarRec;
+  Resolved: string;
 begin
-   { Numbers }
-  A_0  := #$30;
-  A_1  := #$31;
-  A_2  := #$32;
-  A_3  := #$33;
-  A_4  := #$34;
-  A_5  := #$35;
-  A_6  := #$36;
-  A_7  := #$37;
-  A_8  := #$38;
-  A_9  := #$39;
-
-  { Vowels and Kars }
-  A_A        := #$41;
-  A_AA       := #$41#$76;
-  A_AAKar    := #$76;
-  A_I        := #$42;
-  A_IKar     := #$77;
-  A_II       := #$43;
-  A_IIKar    := #$78;
-  A_U        := #$44;
-  A_UKar2    := #$79;
-  A_UKar1    := #$7A;
-  A_UKar3    := #$2013;
-  A_UKar4    := #$201C;
-  A_UU       := #$45;
-  A_UUKar2   := #$7E;
-  A_UUKar1   := #$201A;
-  A_UUKar3   := #$192;
-  A_RRI      := #$46;
-  A_RRIKar1  := #$201E;
-  A_RRIKar2  := #$2026;
-  A_E        := #$47;
-  A_EKar1    := #$2020;
-  A_EKar2    := #$2021;
-  A_OI       := #$48;
-  A_OIKar1   := #$2C6;
-  A_OIKar2   := #$2030;
-  A_O        := #$49;
-  A_OU       := #$4A;
-  A_OUKar    := #$160;
-
-  { Symbols }
-  A_Taka              := #$24;
-  A_Dari              := #$7C;
-  A_DoubleDanda       := #$5C;
-  A_Hasanta           := #$26;
-  A_StartDoubleQuote  := #$D2;
-  A_EndDoubleQuote    := #$D3;
-
-  A_StartSingleQuote := #$D4;
-  A_EndSingleQuote   := #$D5;
-  A_StartDoubleQuote := #$D2;
-  A_EndDoubleQuote   := #$D3;
-
-  { Consonants }
-  A_K         := #$4B;
-  A_Kh        := #$4C;
-  A_G         := #$4D;
-  A_Gh        := #$4E;
-  A_NGA       := #$4F;
-  A_C         := #$50;
-  A_Ch        := #$51;
-  A_J         := #$52;
-  A_Jh        := #$53;
-  A_NYA       := #$54;
-  A_Tt        := #$55;
-  A_Tth       := #$56;
-  A_Dd        := #$57;
-  A_Ddh       := #$58;
-  A_Nn        := #$59;
-  A_T         := #$5A;
-  A_Th        := #$5F;
-  A_D         := #$60;
-  A_Dh        := #$61;
-  A_N         := #$62;
-  A_P         := #$63;
-  A_Ph        := #$64;
-  A_B         := #$65;
-  A_Bh        := #$66;
-  A_M         := #$67;
-  A_Z         := #$68;
-  A_R         := #$69;
-  A_L         := #$6A;
-  A_Sh        := #$6B;
-  A_SS        := #$6C;
-  A_S         := #$6D;
-  A_H         := #$6E;
-  A_RR        := #$6F;
-  A_RRH       := #$70;
-  A_Y         := #$71;
-  A_Khandata  := #$72;
-  A_Anushar   := #$73;
-  A_Bisharga  := #$74;
-  A_Chandra   := #$75;
-
-  { Full Forms }
-  A_K_K       := #$B0;
-  A_K_Tt      := #$B1;
-  A_K_Ss_M    := #$B2;
-  A_K_T       := #$B3;
-  A_K_M       := #$B4;
-  A_K_R       := #$B5;
-  A_K_Ss      := #$B6;
-  A_K_S       := #$B7;
-  A_G_Ukar    := #$B8;
-  A_G_G       := #$B9;
-  A_G_D       := #$BA;
-  A_G_Dh      := #$BB;
-  A_NGA_K     := #$BC;
-  A_NGA_G     := #$BD;
-  A_J_J       := #$BE;
-  A_J_Jh      := #$C0;
-  A_J_NYA     := #$C1;
-  A_NYA_C     := #$C2;
-  A_NYA_CH    := #$C3;
-  A_NYA_J     := #$C4;
-  A_NYA_Jh    := #$C5;
-  A_Tt_Tt     := #$C6;
-  A_Dd_Dd     := #$C7;
-  A_Nn_Tt     := #$C8;
-  A_Nn_Tth    := #$C9;
-  A_NN_Dd     := #$CA;
-  A_T_T       := #$CB;
-  A_T_Th      := #$CC;
-  A_T_M       := #$CD;
-  A_T_R       := #$CE;
-  A_D_D       := #$CF;
-  A_D_Dh      := #$D7;
-  A_D_B       := #$D8;
-  A_D_M       := #$D9;
-  A_N_Tth     := #$DA;
-  A_N_Dd      := #$DB;
-  A_N_Dh      := #$DC;
-  A_N_S       := #$DD;
-  A_P_Tt      := #$DE;
-  A_P_T       := #$DF;
-  A_P_P       := #$E0;
-  A_P_S       := #$E1;
-  A_B_J       := #$E2;
-  A_B_D       := #$E3;
-  A_B_Dh      := #$E4;
-  A_Bh_R      := #$E5;
-  A_M_N       := #$E6;
-  A_M_Ph      := #$E7;
-  A_L_K       := #$E9;
-  A_L_G       := #$EA;
-  A_L_Tt      := #$EB;
-  A_L_Dd      := #$EC;
-  A_L_P       := #$ED;
-  A_L_Ph      := #$EE;
-  A_Sh_UKar   := #$EF;
-  A_Sh_C      := #$F0;
-  A_Sh_Ch     := #$F1;
-  A_Ss_Nn     := #$F2;
-  A_Ss_Tt     := #$F3;
-  A_Ss_Tth    := #$F4;
-  A_Ss_Ph     := #$F5;
-  A_S_Kh      := #$F6;
-  A_S_Tt      := #$F7;
-  A_S_N       := #$F8;
-  A_S_Ph      := #$F9;
-  A_H_UKar    := #$FB;
-  A_H_RRIKar  := #$FC;
-  A_H_N       := #$FD;
-  A_H_M       := #$FE;
-  A_Rr_G      := #$FF;
-
-  { First Half forms }
-  A_Reph    := #$A9;
-  A_M_1H    := #$A4;
-  A_Ss_1H   := #$AE;
-  A_S_1H_1  := #$AF;
-  A_N_1H_1  := #$161;
-  A_S_1H_2  := #$2C9; // -----------Not used
-  A_D_1H_1  := #$2DC;
-  A_C_1H    := #$201D;
-  A_NGA_1H  := #$2022;
-  A_N_1H_2  := #$203A;
-  A_D_1H_2  := #$2122;
-
-  { Second Half forms }
-  A_B_2H_1     := #$5E; //
-  A_B_2H_2     := #$A1; //
-  A_BH_2H      := #$A2; //
-  A_BH_R_2H    := #$A3; //
-  A_M_2H_1     := #$A5; //
-  A_B_2H_3     := #$A6; //
-  A_M_2H_2     := #$A7; //
-  A_ZFola      := #$A8; //
-  A_RFola_1    := #$AA; //
-  A_RFola_2    := #$AB; //
-  A_L_2H_1     := #$AC; //
-  A_L_2H_2     := #$AD; // <--- Not used
-  A_T_R_2H     := #$BF; //
-  A_RFola_3    := #$D6; //
-  A_Nn_2H_1    := #$E8;
-  A_K_R_2H     := #$152; //
-  A_Nn_2H_2    := #$153;
-  A_B_2H_4     := #$178;  //
-  A_T_2H       := #$2014; //
-  A_T_UKar_2H  := #$2018; //
-  A_Th_2H      := #$2019; //
-  A_K_2H       := #$2039; //
-  A_L_2H_3     := #$2212; //
+  for Rec in AnsiRegistry do
+  begin
+    Resolved := ProcessHexAndUnicode(Rec.DefaultVal);
+    if Rec.VarType = avChar then
+      PChar(Rec.Ptr)^ := Resolved[1]
+    else
+      PString(Rec.Ptr)^ := Resolved;
+  end;
 
   SetLength(CustomFullForms, 0);
   SetLength(CustomPreReplacements, 0);
@@ -1429,11 +1462,14 @@ end;
 procedure LoadAnsiMapping(const Path: string; ErrorLog: TStringList = nil);
 var
   JSON: TJSONObject;
-  Constants: TJSONObject;
+  ConstantsRoot, CategoryObj: TJSONObject;
   FullForms, PreRep, PostRep: TJSONArray;
-  I: Integer;
+  I, J: Integer;
   Lines: TStringList;
   ConstName, ConstValue: string;
+  ConstItemVal: TJSONValue;
+  Rec: TAnsiVarRec;
+  IsNested: Boolean;
 begin
   ResetAnsiToDefaults;
 
@@ -1466,217 +1502,71 @@ begin
       Exit;
     end;
 
-    if JSON.TryGetValue<TJSONObject>('Constants', Constants) then
+    if JSON.TryGetValue<TJSONObject>('Constants', ConstantsRoot) then
     begin
-      for I := 0 to Constants.Count - 1 do
-      begin
-        try
-          ConstName := Constants.Pairs[I].JsonString.Value;
-          ConstValue := Constants.Pairs[I].JsonValue.Value;
-          ConstValue := ProcessHexAndUnicode(ConstValue);
+      IsNested := (ConstantsRoot.Count > 0) and (ConstantsRoot.Pairs[0].JsonValue is TJSONObject);
 
-          if ConstName = 'A_0' then A_0 := ConstValue[1]
-          else if ConstName = 'A_1' then A_1 := ConstValue[1]
-          else if ConstName = 'A_2' then A_2 := ConstValue[1]
-          else if ConstName = 'A_3' then A_3 := ConstValue[1]
-          else if ConstName = 'A_4' then A_4 := ConstValue[1]
-          else if ConstName = 'A_5' then A_5 := ConstValue[1]
-          else if ConstName = 'A_6' then A_6 := ConstValue[1]
-          else if ConstName = 'A_7' then A_7 := ConstValue[1]
-          else if ConstName = 'A_8' then A_8 := ConstValue[1]
-          else if ConstName = 'A_9' then A_9 := ConstValue[1]
-          else if ConstName = 'A_A' then A_A := ConstValue[1]
-          else if ConstName = 'A_AA' then A_AA := ConstValue
-          else if ConstName = 'A_AAKar' then A_AAKar := ConstValue[1]
-          else if ConstName = 'A_I' then A_I := ConstValue[1]
-          else if ConstName = 'A_IKar' then A_IKar := ConstValue[1]
-          else if ConstName = 'A_II' then A_II := ConstValue[1]
-          else if ConstName = 'A_IIKar' then A_IIKar := ConstValue[1]
-          else if ConstName = 'A_U' then A_U := ConstValue[1]
-          else if ConstName = 'A_UKar1' then A_UKar1 := ConstValue[1]
-          else if ConstName = 'A_UKar2' then A_UKar2 := ConstValue[1]
-          else if ConstName = 'A_UKar3' then A_UKar3 := ConstValue[1]
-          else if ConstName = 'A_UKar4' then A_UKar4 := ConstValue[1]
-          else if ConstName = 'A_UU' then A_UU := ConstValue[1]
-          else if ConstName = 'A_UUKar1' then A_UUKar1 := ConstValue[1]
-          else if ConstName = 'A_UUKar2' then A_UUKar2 := ConstValue[1]
-          else if ConstName = 'A_UUKar3' then A_UUKar3 := ConstValue[1]
-          else if ConstName = 'A_RRI' then A_RRI := ConstValue[1]
-          else if ConstName = 'A_RRIKar1' then A_RRIKar1 := ConstValue[1]
-          else if ConstName = 'A_RRIKar2' then A_RRIKar2 := ConstValue[1]
-          else if ConstName = 'A_E' then A_E := ConstValue[1]
-          else if ConstName = 'A_EKar1' then A_EKar1 := ConstValue[1]
-          else if ConstName = 'A_EKar2' then A_EKar2 := ConstValue[1]
-          else if ConstName = 'A_OI' then A_OI := ConstValue[1]
-          else if ConstName = 'A_OIKar1' then A_OIKar1 := ConstValue[1]
-          else if ConstName = 'A_OIKar2' then A_OIKar2 := ConstValue[1]
-          else if ConstName = 'A_O' then A_O := ConstValue[1]
-          else if ConstName = 'A_OU' then A_OU := ConstValue[1]
-          else if ConstName = 'A_OUKar' then A_OUKar := ConstValue[1]
-          else if ConstName = 'A_Taka' then A_Taka := ConstValue[1]
-          else if ConstName = 'A_Dari' then A_Dari := ConstValue[1]
-          else if ConstName = 'A_DoubleDanda' then A_DoubleDanda := ConstValue[1]
-          else if ConstName = 'A_Hasanta' then A_Hasanta := ConstValue[1]
-          else if ConstName = 'A_StartDoubleQuote' then A_StartDoubleQuote := ConstValue[1]
-          else if ConstName = 'A_EndDoubleQuote' then A_EndDoubleQuote := ConstValue[1]
-          else if ConstName = 'A_StartSingleQuote' then A_StartSingleQuote := ConstValue[1]
-          else if ConstName = 'A_EndSingleQuote' then A_EndSingleQuote := ConstValue[1]
-          else if ConstName = 'A_StartDoubleQuote' then A_StartDoubleQuote := ConstValue[1]
-          else if ConstName = 'A_EndDoubleQuote' then A_EndDoubleQuote := ConstValue[1]       
-          else if ConstName = 'A_K' then A_K := ConstValue[1]
-          else if ConstName = 'A_Kh' then A_Kh := ConstValue[1]
-          else if ConstName = 'A_G' then A_G := ConstValue[1]
-          else if ConstName = 'A_Gh' then A_Gh := ConstValue[1]
-          else if ConstName = 'A_NGA' then A_NGA := ConstValue[1]
-          else if ConstName = 'A_C' then A_C := ConstValue[1]
-          else if ConstName = 'A_Ch' then A_Ch := ConstValue[1]
-          else if ConstName = 'A_J' then A_J := ConstValue[1]
-          else if ConstName = 'A_Jh' then A_Jh := ConstValue[1]
-          else if ConstName = 'A_NYA' then A_NYA := ConstValue[1]
-          else if ConstName = 'A_Tt' then A_Tt := ConstValue[1]
-          else if ConstName = 'A_Tth' then A_Tth := ConstValue[1]
-          else if ConstName = 'A_Dd' then A_Dd := ConstValue[1]
-          else if ConstName = 'A_Ddh' then A_Ddh := ConstValue[1]
-          else if ConstName = 'A_Nn' then A_Nn := ConstValue[1]
-          else if ConstName = 'A_T' then A_T := ConstValue[1]
-          else if ConstName = 'A_Th' then A_Th := ConstValue[1]
-          else if ConstName = 'A_D' then A_D := ConstValue[1]
-          else if ConstName = 'A_Dh' then A_Dh := ConstValue[1]
-          else if ConstName = 'A_N' then A_N := ConstValue[1]
-          else if ConstName = 'A_P' then A_P := ConstValue[1]
-          else if ConstName = 'A_Ph' then A_Ph := ConstValue[1]
-          else if ConstName = 'A_B' then A_B := ConstValue[1]
-          else if ConstName = 'A_Bh' then A_Bh := ConstValue[1]
-          else if ConstName = 'A_M' then A_M := ConstValue[1]
-          else if ConstName = 'A_Z' then A_Z := ConstValue[1]
-          else if ConstName = 'A_R' then A_R := ConstValue[1]
-          else if ConstName = 'A_L' then A_L := ConstValue[1]
-          else if ConstName = 'A_Sh' then A_Sh := ConstValue[1]
-          else if ConstName = 'A_SS' then A_SS := ConstValue[1]
-          else if ConstName = 'A_S' then A_S := ConstValue[1]
-          else if ConstName = 'A_H' then A_H := ConstValue[1]
-          else if ConstName = 'A_RR' then A_RR := ConstValue[1]
-          else if ConstName = 'A_RRH' then A_RRH := ConstValue[1]
-          else if ConstName = 'A_Y' then A_Y := ConstValue[1]
-          else if ConstName = 'A_Khandata' then A_Khandata := ConstValue[1]
-          else if ConstName = 'A_Anushar' then A_Anushar := ConstValue[1]
-          else if ConstName = 'A_Bisharga' then A_Bisharga := ConstValue[1]
-          else if ConstName = 'A_Chandra' then A_Chandra := ConstValue[1]
-          else if ConstName = 'A_K_K' then A_K_K := ConstValue[1]
-          else if ConstName = 'A_K_Tt' then A_K_Tt := ConstValue[1]
-          else if ConstName = 'A_K_Ss_M' then A_K_Ss_M := ConstValue[1]
-          else if ConstName = 'A_K_T' then A_K_T := ConstValue[1]
-          else if ConstName = 'A_K_M' then A_K_M := ConstValue[1]
-          else if ConstName = 'A_K_R' then A_K_R := ConstValue[1]
-          else if ConstName = 'A_K_Ss' then A_K_Ss := ConstValue[1]
-          else if ConstName = 'A_K_S' then A_K_S := ConstValue[1]
-          else if ConstName = 'A_G_Ukar' then A_G_Ukar := ConstValue[1]
-          else if ConstName = 'A_G_G' then A_G_G := ConstValue[1]
-          else if ConstName = 'A_G_D' then A_G_D := ConstValue[1]
-          else if ConstName = 'A_G_Dh' then A_G_Dh := ConstValue[1]
-          else if ConstName = 'A_NGA_K' then A_NGA_K := ConstValue[1]
-          else if ConstName = 'A_NGA_G' then A_NGA_G := ConstValue[1]
-          else if ConstName = 'A_J_J' then A_J_J := ConstValue[1]
-          else if ConstName = 'A_J_Jh' then A_J_Jh := ConstValue[1]
-          else if ConstName = 'A_J_NYA' then A_J_NYA := ConstValue[1]
-          else if ConstName = 'A_NYA_C' then A_NYA_C := ConstValue[1]
-          else if ConstName = 'A_NYA_CH' then A_NYA_CH := ConstValue[1]
-          else if ConstName = 'A_NYA_J' then A_NYA_J := ConstValue[1]
-          else if ConstName = 'A_NYA_Jh' then A_NYA_Jh := ConstValue[1]
-          else if ConstName = 'A_Tt_Tt' then A_Tt_Tt := ConstValue[1]
-          else if ConstName = 'A_Dd_Dd' then A_Dd_Dd := ConstValue[1]
-          else if ConstName = 'A_Nn_Tt' then A_Nn_Tt := ConstValue[1]
-          else if ConstName = 'A_Nn_Tth' then A_Nn_Tth := ConstValue[1]
-          else if ConstName = 'A_NN_Dd' then A_NN_Dd := ConstValue[1]
-          else if ConstName = 'A_T_T' then A_T_T := ConstValue[1]
-          else if ConstName = 'A_T_Th' then A_T_Th := ConstValue[1]
-          else if ConstName = 'A_T_M' then A_T_M := ConstValue[1]
-          else if ConstName = 'A_T_R' then A_T_R := ConstValue[1]
-          else if ConstName = 'A_D_D' then A_D_D := ConstValue[1]
-          else if ConstName = 'A_D_Dh' then A_D_Dh := ConstValue[1]
-          else if ConstName = 'A_D_B' then A_D_B := ConstValue[1]
-          else if ConstName = 'A_D_M' then A_D_M := ConstValue[1]
-          else if ConstName = 'A_N_Tth' then A_N_Tth := ConstValue[1]
-          else if ConstName = 'A_N_Dd' then A_N_Dd := ConstValue[1]
-          else if ConstName = 'A_N_Dh' then A_N_Dh := ConstValue[1]
-          else if ConstName = 'A_N_S' then A_N_S := ConstValue[1]
-          else if ConstName = 'A_P_Tt' then A_P_Tt := ConstValue[1]
-          else if ConstName = 'A_P_T' then A_P_T := ConstValue[1]
-          else if ConstName = 'A_P_P' then A_P_P := ConstValue[1]
-          else if ConstName = 'A_P_S' then A_P_S := ConstValue[1]
-          else if ConstName = 'A_B_J' then A_B_J := ConstValue[1]
-          else if ConstName = 'A_B_D' then A_B_D := ConstValue[1]
-          else if ConstName = 'A_B_Dh' then A_B_Dh := ConstValue[1]
-          else if ConstName = 'A_Bh_R' then A_Bh_R := ConstValue[1]
-          else if ConstName = 'A_M_N' then A_M_N := ConstValue[1]
-          else if ConstName = 'A_M_Ph' then A_M_Ph := ConstValue[1]
-          else if ConstName = 'A_L_K' then A_L_K := ConstValue[1]
-          else if ConstName = 'A_L_G' then A_L_G := ConstValue[1]
-          else if ConstName = 'A_L_Tt' then A_L_Tt := ConstValue[1]
-          else if ConstName = 'A_L_Dd' then A_L_Dd := ConstValue[1]
-          else if ConstName = 'A_L_P' then A_L_P := ConstValue[1]
-          else if ConstName = 'A_L_Ph' then A_L_Ph := ConstValue[1]
-          else if ConstName = 'A_Sh_UKar' then A_Sh_UKar := ConstValue[1]
-          else if ConstName = 'A_Sh_C' then A_Sh_C := ConstValue[1]
-          else if ConstName = 'A_Sh_Ch' then A_Sh_Ch := ConstValue[1]
-          else if ConstName = 'A_Ss_Nn' then A_Ss_Nn := ConstValue[1]
-          else if ConstName = 'A_Ss_Tt' then A_Ss_Tt := ConstValue[1]
-          else if ConstName = 'A_Ss_Tth' then A_Ss_Tth := ConstValue[1]
-          else if ConstName = 'A_Ss_Ph' then A_Ss_Ph := ConstValue[1]
-          else if ConstName = 'A_S_Kh' then A_S_Kh := ConstValue[1]
-          else if ConstName = 'A_S_Tt' then A_S_Tt := ConstValue[1]
-          else if ConstName = 'A_S_N' then A_S_N := ConstValue[1]
-          else if ConstName = 'A_S_Ph' then A_S_Ph := ConstValue[1]
-          else if ConstName = 'A_H_UKar' then A_H_UKar := ConstValue[1]
-          else if ConstName = 'A_H_RRIKar' then A_H_RRIKar := ConstValue[1]
-          else if ConstName = 'A_H_N' then A_H_N := ConstValue[1]
-          else if ConstName = 'A_H_M' then A_H_M := ConstValue[1]
-          else if ConstName = 'A_Rr_G' then A_Rr_G := ConstValue[1]
-          else if ConstName = 'A_Reph' then A_Reph := ConstValue[1]
-          else if ConstName = 'A_M_1H' then A_M_1H := ConstValue[1]
-          else if ConstName = 'A_Ss_1H' then A_Ss_1H := ConstValue[1]
-          else if ConstName = 'A_S_1H_1' then A_S_1H_1 := ConstValue[1]
-          else if ConstName = 'A_N_1H_1' then A_N_1H_1 := ConstValue[1]
-          else if ConstName = 'A_S_1H_2' then A_S_1H_2 := ConstValue[1]
-          else if ConstName = 'A_D_1H_1' then A_D_1H_1 := ConstValue[1]
-          else if ConstName = 'A_C_1H' then A_C_1H := ConstValue[1]
-          else if ConstName = 'A_NGA_1H' then A_NGA_1H := ConstValue[1]
-          else if ConstName = 'A_N_1H_2' then A_N_1H_2 := ConstValue[1]
-          else if ConstName = 'A_D_1H_2' then A_D_1H_2 := ConstValue[1]
-          else if ConstName = 'A_B_2H_1' then A_B_2H_1 := ConstValue[1]
-          else if ConstName = 'A_B_2H_2' then A_B_2H_2 := ConstValue[1]
-          else if ConstName = 'A_BH_2H' then A_BH_2H := ConstValue[1]
-          else if ConstName = 'A_BH_R_2H' then A_BH_R_2H := ConstValue[1]
-          else if ConstName = 'A_M_2H_1' then A_M_2H_1 := ConstValue[1]
-          else if ConstName = 'A_B_2H_3' then A_B_2H_3 := ConstValue[1]
-          else if ConstName = 'A_M_2H_2' then A_M_2H_2 := ConstValue[1]
-          else if ConstName = 'A_ZFola' then A_ZFola := ConstValue[1]
-          else if ConstName = 'A_RFola_1' then A_RFola_1 := ConstValue[1]
-          else if ConstName = 'A_RFola_2' then A_RFola_2 := ConstValue[1]
-          else if ConstName = 'A_L_2H_1' then A_L_2H_1 := ConstValue[1]
-          else if ConstName = 'A_L_2H_2' then A_L_2H_2 := ConstValue[1]
-          else if ConstName = 'A_T_R_2H' then A_T_R_2H := ConstValue[1]
-          else if ConstName = 'A_RFola_3' then A_RFola_3 := ConstValue[1]
-          else if ConstName = 'A_Nn_2H_1' then A_Nn_2H_1 := ConstValue[1]
-          else if ConstName = 'A_K_R_2H' then A_K_R_2H := ConstValue[1]
-          else if ConstName = 'A_Nn_2H_2' then A_Nn_2H_2 := ConstValue[1]
-          else if ConstName = 'A_B_2H_4' then A_B_2H_4 := ConstValue[1]
-          else if ConstName = 'A_T_2H' then A_T_2H := ConstValue[1]
-          else if ConstName = 'A_T_UKar_2H' then A_T_UKar_2H := ConstValue[1]
-          else if ConstName = 'A_Th_2H' then A_Th_2H := ConstValue[1]
-          else if ConstName = 'A_K_2H' then A_K_2H := ConstValue[1]
-          else if ConstName = 'A_L_2H_3' then A_L_2H_3 := ConstValue[1];
-        except
-          on E: Exception do
+      if IsNested then
+      begin
+        for I := 0 to ConstantsRoot.Count - 1 do
+        begin
+          if not (ConstantsRoot.Pairs[I].JsonValue is TJSONObject) then Continue;
+          CategoryObj := TJSONObject(ConstantsRoot.Pairs[I].JsonValue);
+          for J := 0 to CategoryObj.Count - 1 do
           begin
-            if Assigned(ErrorLog) then
-              ErrorLog.Add('Error in constant [' + ConstName + ']: ' + E.Message);
+            try
+              ConstName := CategoryObj.Pairs[J].JsonString.Value;
+              ConstItemVal := CategoryObj.Pairs[J].JsonValue;
+              if ConstItemVal is TJSONObject then
+                ConstValue := ProcessHexAndUnicode(TJSONObject(ConstItemVal).GetValue('Value').Value)
+              else
+                ConstValue := ProcessHexAndUnicode(ConstItemVal.Value);
+              if ConstValue = '' then Continue;
+
+              if AnsiRegistryMap.TryGetValue(ConstName, Rec) then
+              begin
+                if Rec.VarType = avChar then
+                  PChar(Rec.Ptr)^ := ConstValue[1]
+                else
+                  PString(Rec.Ptr)^ := ConstValue;
+              end;
+            except
+              on E: Exception do
+              begin
+                if Assigned(ErrorLog) then
+                  ErrorLog.Add('Error in constant [' + ConstName + ']: ' + E.Message);
+              end;
+            end;
+          end;
+        end;
+      end
+      else
+      begin
+        for I := 0 to ConstantsRoot.Count - 1 do
+        begin
+          try
+            ConstName := ConstantsRoot.Pairs[I].JsonString.Value;
+            ConstValue := ProcessHexAndUnicode(ConstantsRoot.Pairs[I].JsonValue.Value);
+            if ConstValue = '' then Continue;
+
+            if AnsiRegistryMap.TryGetValue(ConstName, Rec) then
+            begin
+              if Rec.VarType = avChar then
+                PChar(Rec.Ptr)^ := ConstValue[1]
+              else
+                PString(Rec.Ptr)^ := ConstValue;
+            end;
+          except
+            on E: Exception do
+            begin
+              if Assigned(ErrorLog) then
+                ErrorLog.Add('Error in constant [' + ConstName + ']: ' + E.Message);
+            end;
           end;
         end;
       end;
     end;
 
-    SetLength(CustomFullForms, 0);
     if JSON.TryGetValue<TJSONArray>('FullFormReplacements', FullForms) then
     begin
       SetLength(CustomFullForms, FullForms.Count);
@@ -1684,26 +1574,17 @@ begin
       begin
         try
           CustomFullForms[I].Key := (FullForms.Items[I] as TJSONObject).GetValue('Key').Value;
-          ConstValue := (FullForms.Items[I] as TJSONObject).GetValue('Value').Value;
-
-          if not ValidateHexFormat(ConstValue) then
-          begin
-            if Assigned(ErrorLog) then
-              ErrorLog.Add('Warning: Invalid Hex format in Key [' + CustomFullForms[I].Key + ']. Value: ' + ConstValue);
-          end;
-
-          CustomFullForms[I].Value := ProcessHexAndUnicode(ConstValue);
+          CustomFullForms[I].Value := (FullForms.Items[I] as TJSONObject).GetValue('Value').Value;
         except
           on E: Exception do
           begin
             if Assigned(ErrorLog) then
-              ErrorLog.Add('Error in FullForm item ' + IntToStr(I + 1) + ': ' + E.Message);
+              ErrorLog.Add('Error in FullFormReplacements [' + IntToStr(I) + ']: ' + E.Message);
           end;
         end;
       end;
     end;
 
-    SetLength(CustomPreReplacements, 0);
     if JSON.TryGetValue<TJSONArray>('PreReplacements', PreRep) then
     begin
       SetLength(CustomPreReplacements, PreRep.Count);
@@ -1711,19 +1592,17 @@ begin
       begin
         try
           CustomPreReplacements[I].Key := (PreRep.Items[I] as TJSONObject).GetValue('Key').Value;
-          ConstValue := (PreRep.Items[I] as TJSONObject).GetValue('Value').Value;
-          CustomPreReplacements[I].Value := ProcessHexAndUnicode(ConstValue);
+          CustomPreReplacements[I].Value := (PreRep.Items[I] as TJSONObject).GetValue('Value').Value;
         except
           on E: Exception do
           begin
             if Assigned(ErrorLog) then
-              ErrorLog.Add('Error in PreReplacements item ' + IntToStr(I + 1) + ': ' + E.Message);
+              ErrorLog.Add('Error in PreReplacements [' + IntToStr(I) + ']: ' + E.Message);
           end;
         end;
       end;
     end;
 
-    SetLength(CustomPostReplacements, 0);
     if JSON.TryGetValue<TJSONArray>('PostReplacements', PostRep) then
     begin
       SetLength(CustomPostReplacements, PostRep.Count);
@@ -1731,459 +1610,909 @@ begin
       begin
         try
           CustomPostReplacements[I].Key := (PostRep.Items[I] as TJSONObject).GetValue('Key').Value;
-          ConstValue := (PostRep.Items[I] as TJSONObject).GetValue('Value').Value;
-          CustomPostReplacements[I].Value := ProcessHexAndUnicode(ConstValue);
+          CustomPostReplacements[I].Value := (PostRep.Items[I] as TJSONObject).GetValue('Value').Value;
         except
           on E: Exception do
           begin
             if Assigned(ErrorLog) then
-              ErrorLog.Add('Error in PostReplacements item ' + IntToStr(I + 1) + ': ' + E.Message);
+              ErrorLog.Add('Error in PostReplacements [' + IntToStr(I) + ']: ' + E.Message);
           end;
         end;
       end;
     end;
-
   finally
+    JSON.Free;
     Lines.Free;
-    if JSON <> nil then JSON.Free;
   end;
 end;
 
 { =============================================================================== }
 
-function GetDefaultFullFormsJSON: string;
+function GetDefaultFullFormsJSONArr: TJSONArray;
+var
+  Arr: TJSONArray;
+  Item: TJSONObject;
 begin
-  Result :=
-    '    {"Key": "ক্ক", "Value": "°"},' + sLineBreak +
-    '    {"Key": "ক্ট", "Value": "±"},' + sLineBreak +
-    '    {"Key": "ক্ত", "Value": "³"},' + sLineBreak +
-    '    {"Key": "ক্ব", "Value": "K¡"},' + sLineBreak +
-    '    {"Key": "ক্র", "Value": "µ"},' + sLineBreak +
-    '    {"Key": "ক্ল", "Value": "K¬"},' + sLineBreak +
-    '    {"Key": "ক্ষ", "Value": "¶"},' + sLineBreak +
-    '    {"Key": "ক্স", "Value": "·"},' + sLineBreak +
-    '    {"Key": "গ্ধ", "Value": "»"},' + sLineBreak +
-    '    {"Key": "গ্ন", "Value": "Mœ"},' + sLineBreak +
-    '    {"Key": "গ্ম", "Value": "M¥"},' + sLineBreak +
-    '    {"Key": "গ্র", "Value": "MÖ"},' + sLineBreak +
-    '    {"Key": "গ্ল", "Value": "Mø"},' + sLineBreak +
-    '    {"Key": "ঙ্ক", "Value": "¼"},' + sLineBreak +
-    '    {"Key": "ঙ্খ", "Value": "•L"},' + sLineBreak +
-    '    {"Key": "ঙ্গ", "Value": "½"},' + sLineBreak +
-    '    {"Key": "ঙ্ঘ", "Value": "•N"},' + sLineBreak +
-    '    {"Key": "চ্চ", "Value": "”P"},' + sLineBreak +
-    '    {"Key": "চ্ছ", "Value": "”Q"},' + sLineBreak +
-    '    {"Key": "জ্জ", "Value": "¾"},' + sLineBreak +
-    '    {"Key": "জ্ঝ", "Value": "À"},' + sLineBreak +
-    '    {"Key": "জ্ঞ", "Value": "Á"},' + sLineBreak +
-    '    {"Key": "জ্ব", "Value": "R¡"},' + sLineBreak +
-    '    {"Key": "জ্র", "Value": "Rª"},' + sLineBreak +
-    '    {"Key": "ঞ্চ", "Value": "Â"},' + sLineBreak +
-    '    {"Key": "ঞ্ছ", "Value": "Ã"},' + sLineBreak +
-    '    {"Key": "ঞ্জ", "Value": "Ä"},' + sLineBreak +
-    '    {"Key": "ঞ্ঝ", "Value": "Å"},' + sLineBreak +
-    '    {"Key": "ট্ট", "Value": "Æ"},' + sLineBreak +
-    '    {"Key": "ট্ব", "Value": "U¡"},' + sLineBreak +
-    '    {"Key": "ট্ম", "Value": "U¥"},' + sLineBreak +
-    '    {"Key": "ট্র", "Value": "Uª"},' + sLineBreak +
-    '    {"Key": "ড্ড", "Value": "Ç"},' + sLineBreak +
-    '    {"Key": "ড্র", "Value": "Wª"},' + sLineBreak +
-    '    {"Key": "ঢ্র", "Value": "Xª"},' + sLineBreak +
-    '    {"Key": "ণ্ট", "Value": "È"},' + sLineBreak +
-    '    {"Key": "ণ্ঠ", "Value": "É"},' + sLineBreak +
-    '    {"Key": "ণ্ড", "Value": "Ð"},' + sLineBreak +
-    '    {"Key": "ণ্ণ", "Value": "Yœ"},' + sLineBreak +
-    '    {"Key": "ণ্ব", "Value": "Y¦"},' + sLineBreak +
-    '    {"Key": "ত্ত", "Value": "Ë"},' + sLineBreak +
-    '    {"Key": "ত্থ", "Value": "Ì"},' + sLineBreak +
-    '    {"Key": "থ্ব", "Value": "_¡"},' + sLineBreak +
-    '    {"Key": "ত্ন", "Value": "Zœ"},' + sLineBreak +
-    '    {"Key": "ত্ম", "Value": "Z¥"},' + sLineBreak +
-    '    {"Key": "ত্র", "Value": "Î"},' + sLineBreak +
-    '    {"Key": "দ্দ", "Value": "Ï"},' + sLineBreak +
-    '    {"Key": "দ্ধ", "Value": "×"},' + sLineBreak +
-    '    {"Key": "দ্ব", "Value": "Ø"},' + sLineBreak +
-    '    {"Key": "দ্ভ", "Value": "™¢"},' + sLineBreak +
-    '    {"Key": "দ্ম", "Value": "Ù"},' + sLineBreak +
-    '    {"Key": "দ্র", "Value": "`ª"},' + sLineBreak +
-    '    {"Key": "ধ্ব", "Value": "aŸ"},' + sLineBreak +
-    '    {"Key": "ধ্ম", "Value": "a¥"},' + sLineBreak +
-    '    {"Key": "ন্ত", "Value": "šÍ"},' + sLineBreak +
-    '    {"Key": "ন্থ", "Value": "š’"},' + sLineBreak +
-    '    {"Key": "ন্দ", "Value": "›`"},' + sLineBreak +
-    '    {"Key": "ন্ধ", "Value": "Ü"},' + sLineBreak +
-    '    {"Key": "ন্ন", "Value": "bœ"},' + sLineBreak +
-    '    {"Key": "ন্ম", "Value": "b¥"},' + sLineBreak +
-    '    {"Key": "প্ট", "Value": "Þ"},' + sLineBreak +
-    '    {"Key": "প্ত", "Value": "ß"},' + sLineBreak +
-    '    {"Key": "প্প", "Value": "à"},' + sLineBreak +
-    '    {"Key": "প্র", "Value": "cÖ"},' + sLineBreak +
-    '    {"Key": "প্ল", "Value": "cø"},' + sLineBreak +
-    '    {"Key": "প্স", "Value": "á"},' + sLineBreak +
-    '    {"Key": "ব্জ", "Value": "â"},' + sLineBreak +
-    '    {"Key": "ব্দ", "Value": "ã"},' + sLineBreak +
-    '    {"Key": "ব্ধ", "Value": "ä"},' + sLineBreak +
-    '    {"Key": "ব্ব", "Value": "eŸ"},' + sLineBreak +
-    '    {"Key": "ব্র", "Value": "eª"},' + sLineBreak +
-    '    {"Key": "ব্ল", "Value": "eø"},' + sLineBreak +
-    '    {"Key": "ভ্র", "Value": "å"},' + sLineBreak +
-    '    {"Key": "ম্ন", "Value": "gœ"},' + sLineBreak +
-    '    {"Key": "ম্ফ", "Value": "ç"},' + sLineBreak +
-    '    {"Key": "ম্ব", "Value": "¤^"},' + sLineBreak +
-    '    {"Key": "ম্ভ", "Value": "¤¢"},' + sLineBreak +
-    '    {"Key": "ম্ম", "Value": "¤§"},' + sLineBreak +
-    '    {"Key": "ম্র", "Value": "gª"},' + sLineBreak +
-    '    {"Key": "ল্ক", "Value": "é"},' + sLineBreak +
-    '    {"Key": "ল্গ", "Value": "ê"},' + sLineBreak +
-    '    {"Key": "ল্ট", "Value": "ë"},' + sLineBreak +
-    '    {"Key": "ল্ড", "Value": "ì"},' + sLineBreak +
-    '    {"Key": "ল্প", "Value": "í"},' + sLineBreak +
-    '    {"Key": "ল্ব", "Value": "j¦"},' + sLineBreak +
-    '    {"Key": "ল্ম", "Value": "j¥"},' + sLineBreak +
-    '    {"Key": "ল্ল", "Value": "jø"},' + sLineBreak +
-    '    {"Key": "শ্চ", "Value": "ð"},' + sLineBreak +
-    '    {"Key": "শ্ন", "Value": "kœ"},' + sLineBreak +
-    '    {"Key": "শ্ব", "Value": "k¦"},' + sLineBreak +
-    '    {"Key": "শ্ম", "Value": "k¥"},' + sLineBreak +
-    '    {"Key": "শ্ল", "Value": "kø"},' + sLineBreak +
-    '    {"Key": "ষ্ক", "Value": "®‹"},' + sLineBreak +
-    '    {"Key": "ষ্ট", "Value": "ó"},' + sLineBreak +
-    '    {"Key": "ষ্ঠ", "Value": "ô"},' + sLineBreak +
-    '    {"Key": "ষ্ণ", "Value": "ò"},' + sLineBreak +
-    '    {"Key": "ষ্প", "Value": "®ú"},' + sLineBreak +
-    '    {"Key": "ষ্ফ", "Value": "õ"},' + sLineBreak +
-    '    {"Key": "ষ্ম", "Value": "®§"},' + sLineBreak +
-    '    {"Key": "স্ক", "Value": "¯‹"},' + sLineBreak +
-    '    {"Key": "স্খ", "Value": "ö"},' + sLineBreak +
-    '    {"Key": "স্ট", "Value": "÷"},' + sLineBreak +
-    '    {"Key": "স্ত", "Value": "¯Í"},' + sLineBreak +
-    '    {"Key": "স্থ", "Value": "¯’"},' + sLineBreak +
-    '    {"Key": "স্ন", "Value": "mœ"},' + sLineBreak +
-    '    {"Key": "স্প", "Value": "¯ú"},' + sLineBreak +
-    '    {"Key": "স্ফ", "Value": "ù"},' + sLineBreak +
-    '    {"Key": "স্ব", "Value": "¯^"},' + sLineBreak +
-    '    {"Key": "স্ম", "Value": "¯§"},' + sLineBreak +
-    '    {"Key": "স্ল", "Value": "¯ø"},' + sLineBreak +
-    '    {"Key": "হ্ণ", "Value": "nè"},' + sLineBreak +
-    '    {"Key": "হ্ন", "Value": "ý"},' + sLineBreak +
-    '    {"Key": "হ্ম", "Value": "þ"},' + sLineBreak +
-    '    {"Key": "হ্ল", "Value": "n¬"},' + sLineBreak +
-    '    {"Key": "হৃ", "Value": "ü"},' + sLineBreak +
-    '    {"Key": "গু", "Value": "¸"},' + sLineBreak +
-    '    {"Key": "শু", "Value": "ï"},' + sLineBreak +
-    '    {"Key": "ক্ট্র", "Value": "³ª"},' + sLineBreak +
-    '    {"Key": "ক্ন", "Value": "Kè"},' + sLineBreak +
-    '    {"Key": "ক্ষ্ণ", "Value": "òœ"},' + sLineBreak +
-    '    {"Key": "ক্ষ্ম", "Value": "²"},' + sLineBreak +
-    '    {"Key": "ক্ষ্র", "Value": "ÿ«"},' + sLineBreak +
-    '    {"Key": "গ্ব", "Value": "M¦"},' + sLineBreak +
-    '    {"Key": "গ্র্য", "Value": "MÖ¨"},' + sLineBreak +
-    '    {"Key": "য়ু", "Value": "qy"},' + sLineBreak +
-    '    {"Key": "ঘ্ন", "Value": "Nœ"},' + sLineBreak +
-    '    {"Key": "ঘ্র", "Value": "Nª"},' + sLineBreak +
-    '    {"Key": "ঙ্গু", "Value": "½y"},' + sLineBreak +
-    '    {"Key": "জ্জ্ব", "Value": "¾¡"},' + sLineBreak +
-    '    {"Key": "ত্ত্ব", "Value": "Ë¡"},' + sLineBreak +
-    '    {"Key": "ত্রু", "Value": "Îæ"},' + sLineBreak +
-    '    {"Key": "দ্রু", "Value": "`ªæ"},' + sLineBreak +
-    '    {"Key": "ভ্রু", "Value": "åæ"},' + sLineBreak +
-    '    {"Key": "শ্রু", "Value": "kÖæ"},' + sLineBreak +
-    '    {"Key": "য়ূ", "Value": "q~"},' + sLineBreak +
-    '    {"Key": "ম্প", "Value": "¤ú"},' + sLineBreak +
-    '    {"Key": "ক্য", "Value": "K¨"},' + sLineBreak +
-    '    {"Key": "ল্যু", "Value": "j¨y"},' + sLineBreak +
-    '    {"Key": "ক্লু", "Value": "K¬z"},' + sLineBreak +
-    '    {"Key": "ত্র্য", "Value": "Î¨"},' + sLineBreak +
-    '    {"Key": "স্থ্য", "Value": "¯’¨"},' + sLineBreak +
-    '    {"Key": "দ্য", "Value": "`¨"},' + sLineBreak +
-    '    {"Key": "ভ্য", "Value": "f¨"},' + sLineBreak +
-    '    {"Key": "ল্য", "Value": "j¨"},' + sLineBreak +
-    '    {"Key": "দ্যু", "Value": "`y¨"},' + sLineBreak +
-    '    {"Key": "ম্য", "Value": "g¨"},' + sLineBreak +
-    '    {"Key": "ন্য", "Value": "b¨"},' + sLineBreak +
-    '    {"Key": "ণ্য", "Value": "Y¨"},' + sLineBreak +
-    '    {"Key": "ব্যু", "Value": "ey¨"},' + sLineBreak +
-    '    {"Key": "ত্ব", "Value": "Z¡"},' + sLineBreak +
-    '    {"Key": "হ্ব", "Value": "nŸ"},' + sLineBreak +
-    '    {"Key": "গ্নু", "Value": "Mœy"},' + sLineBreak +
-    '    {"Key": "ম্প্ল", "Value": "¤úø"},' + sLineBreak +
-    '    {"Key": "স্প্ল", "Value": "¯úø"},' + sLineBreak +
-    '    {"Key": "চ্ব", "Value": "P¦"},' + sLineBreak +
-    '    {"Key": "ড়্গ", "Value": "—M"}';
+  Arr := TJSONArray.Create;
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ক্ক'));
+  Item.AddPair('Value', SmartEscape('°'));
+  Item.AddPair('Comment', 'ক্ক');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ক্ট'));
+  Item.AddPair('Value', SmartEscape('±'));
+  Item.AddPair('Comment', 'ক্ট');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ক্ত'));
+  Item.AddPair('Value', SmartEscape('³'));
+  Item.AddPair('Comment', 'ক্ত');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ক্ব'));
+  Item.AddPair('Value', SmartEscape('K¡'));
+  Item.AddPair('Comment', 'ক্ব');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ক্র'));
+  Item.AddPair('Value', SmartEscape('µ'));
+  Item.AddPair('Comment', 'ক্র');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ক্ল'));
+  Item.AddPair('Value', SmartEscape('K¬'));
+  Item.AddPair('Comment', 'ক্ল');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ক্ষ'));
+  Item.AddPair('Value', SmartEscape('¶'));
+  Item.AddPair('Comment', 'ক্ষ');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ক্স'));
+  Item.AddPair('Value', SmartEscape('·'));
+  Item.AddPair('Comment', 'ক্স');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('গ্ধ'));
+  Item.AddPair('Value', SmartEscape('»'));
+  Item.AddPair('Comment', 'গ্ধ');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('গ্ন'));
+  Item.AddPair('Value', SmartEscape('Mœ'));
+  Item.AddPair('Comment', 'গ্ন');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('গ্ম'));
+  Item.AddPair('Value', SmartEscape('M¥'));
+  Item.AddPair('Comment', 'গ্ম');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('গ্র'));
+  Item.AddPair('Value', SmartEscape('MÖ'));
+  Item.AddPair('Comment', 'গ্র');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('গ্ল'));
+  Item.AddPair('Value', SmartEscape('Mø'));
+  Item.AddPair('Comment', 'গ্ল');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ঙ্ক'));
+  Item.AddPair('Value', SmartEscape('¼'));
+  Item.AddPair('Comment', 'ঙ্ক');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ঙ্খ'));
+  Item.AddPair('Value', SmartEscape('•L'));
+  Item.AddPair('Comment', 'ঙ্খ');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ঙ্গ'));
+  Item.AddPair('Value', SmartEscape('½'));
+  Item.AddPair('Comment', 'ঙ্গ');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ঙ্ঘ'));
+  Item.AddPair('Value', SmartEscape('•N'));
+  Item.AddPair('Comment', 'ঙ্ঘ');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('চ্চ'));
+  Item.AddPair('Value', SmartEscape('”P'));
+  Item.AddPair('Comment', 'চ্চ');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('চ্ছ'));
+  Item.AddPair('Value', SmartEscape('”Q'));
+  Item.AddPair('Comment', 'চ্ছ');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('জ্জ'));
+  Item.AddPair('Value', SmartEscape('¾'));
+  Item.AddPair('Comment', 'জ্জ');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('জ্ঝ'));
+  Item.AddPair('Value', SmartEscape('À'));
+  Item.AddPair('Comment', 'জ্ঝ');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('জ্ঞ'));
+  Item.AddPair('Value', SmartEscape('Á'));
+  Item.AddPair('Comment', 'জ্ঞ');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('জ্ব'));
+  Item.AddPair('Value', SmartEscape('R¡'));
+  Item.AddPair('Comment', 'জ্ব');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('জ্র'));
+  Item.AddPair('Value', SmartEscape('Rª'));
+  Item.AddPair('Comment', 'জ্র');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ঞ্চ'));
+  Item.AddPair('Value', SmartEscape('Â'));
+  Item.AddPair('Comment', 'ঞ্চ');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ঞ্ছ'));
+  Item.AddPair('Value', SmartEscape('Ã'));
+  Item.AddPair('Comment', 'ঞ্ছ');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ঞ্জ'));
+  Item.AddPair('Value', SmartEscape('Ä'));
+  Item.AddPair('Comment', 'ঞ্জ');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ঞ্ঝ'));
+  Item.AddPair('Value', SmartEscape('Å'));
+  Item.AddPair('Comment', 'ঞ্ঝ');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ট্ট'));
+  Item.AddPair('Value', SmartEscape('Æ'));
+  Item.AddPair('Comment', 'ট্ট');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ট্ব'));
+  Item.AddPair('Value', SmartEscape('U¡'));
+  Item.AddPair('Comment', 'ট্ব');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ট্ম'));
+  Item.AddPair('Value', SmartEscape('U¥'));
+  Item.AddPair('Comment', 'ট্ম');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ট্র'));
+  Item.AddPair('Value', SmartEscape('Uª'));
+  Item.AddPair('Comment', 'ট্র');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ড্ড'));
+  Item.AddPair('Value', SmartEscape('Ç'));
+  Item.AddPair('Comment', 'ড্ড');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ড্র'));
+  Item.AddPair('Value', SmartEscape('Wª'));
+  Item.AddPair('Comment', 'ড্র');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ঢ্র'));
+  Item.AddPair('Value', SmartEscape('Xª'));
+  Item.AddPair('Comment', 'ঢ্র');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ণ্ট'));
+  Item.AddPair('Value', SmartEscape('È'));
+  Item.AddPair('Comment', 'ণ্ট');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ণ্ঠ'));
+  Item.AddPair('Value', SmartEscape('É'));
+  Item.AddPair('Comment', 'ণ্ঠ');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ণ্ড'));
+  Item.AddPair('Value', SmartEscape('Ð'));
+  Item.AddPair('Comment', 'ণ্ড');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ণ্ণ'));
+  Item.AddPair('Value', SmartEscape('Yœ'));
+  Item.AddPair('Comment', 'ণ্ণ');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ণ্ব'));
+  Item.AddPair('Value', SmartEscape('Y¦'));
+  Item.AddPair('Comment', 'ণ্ব');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ত্ত'));
+  Item.AddPair('Value', SmartEscape('Ë'));
+  Item.AddPair('Comment', 'ত্ত');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ত্থ'));
+  Item.AddPair('Value', SmartEscape('Ì'));
+  Item.AddPair('Comment', 'ত্থ');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('থ্ব'));
+  Item.AddPair('Value', SmartEscape('_¡'));
+  Item.AddPair('Comment', 'থ্ব');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ত্ন'));
+  Item.AddPair('Value', SmartEscape('Zœ'));
+  Item.AddPair('Comment', 'ত্ন');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ত্ম'));
+  Item.AddPair('Value', SmartEscape('Z¥'));
+  Item.AddPair('Comment', 'ত্ম');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ত্র'));
+  Item.AddPair('Value', SmartEscape('Î'));
+  Item.AddPair('Comment', 'ত্র');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('দ্দ'));
+  Item.AddPair('Value', SmartEscape('Ï'));
+  Item.AddPair('Comment', 'দ্দ');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('দ্ধ'));
+  Item.AddPair('Value', SmartEscape('×'));
+  Item.AddPair('Comment', 'দ্ধ');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('দ্ব'));
+  Item.AddPair('Value', SmartEscape('Ø'));
+  Item.AddPair('Comment', 'দ্ব');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('দ্ভ'));
+  Item.AddPair('Value', SmartEscape('™¢'));
+  Item.AddPair('Comment', 'দ্ভ');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('দ্ম'));
+  Item.AddPair('Value', SmartEscape('Ù'));
+  Item.AddPair('Comment', 'দ্ম');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('দ্র'));
+  Item.AddPair('Value', SmartEscape('`ª'));
+  Item.AddPair('Comment', 'দ্র');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ধ্ব'));
+  Item.AddPair('Value', SmartEscape('aŸ'));
+  Item.AddPair('Comment', 'ধ্ব');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ধ্ম'));
+  Item.AddPair('Value', SmartEscape('a¥'));
+  Item.AddPair('Comment', 'ধ্ম');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ন্ত'));
+  Item.AddPair('Value', SmartEscape('šÍ'));
+  Item.AddPair('Comment', 'ন্ত');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ন্থ'));
+  Item.AddPair('Value', SmartEscape('š’'));
+  Item.AddPair('Comment', 'ন্থ');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ন্দ'));
+  Item.AddPair('Value', SmartEscape('›`'));
+  Item.AddPair('Comment', 'ন্দ');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ন্ধ'));
+  Item.AddPair('Value', SmartEscape('Ü'));
+  Item.AddPair('Comment', 'ন্ধ');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ন্ন'));
+  Item.AddPair('Value', SmartEscape('bœ'));
+  Item.AddPair('Comment', 'ন্ন');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ন্ম'));
+  Item.AddPair('Value', SmartEscape('b¥'));
+  Item.AddPair('Comment', 'ন্ম');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('প্ট'));
+  Item.AddPair('Value', SmartEscape('Þ'));
+  Item.AddPair('Comment', 'প্ট');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('প্ত'));
+  Item.AddPair('Value', SmartEscape('ß'));
+  Item.AddPair('Comment', 'প্ত');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('প্প'));
+  Item.AddPair('Value', SmartEscape('à'));
+  Item.AddPair('Comment', 'প্প');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('প্র'));
+  Item.AddPair('Value', SmartEscape('cÖ'));
+  Item.AddPair('Comment', 'প্র');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('প্ল'));
+  Item.AddPair('Value', SmartEscape('cø'));
+  Item.AddPair('Comment', 'প্ল');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('প্স'));
+  Item.AddPair('Value', SmartEscape('á'));
+  Item.AddPair('Comment', 'প্স');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ব্জ'));
+  Item.AddPair('Value', SmartEscape('â'));
+  Item.AddPair('Comment', 'ব্জ');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ব্দ'));
+  Item.AddPair('Value', SmartEscape('ã'));
+  Item.AddPair('Comment', 'ব্দ');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ব্ধ'));
+  Item.AddPair('Value', SmartEscape('ä'));
+  Item.AddPair('Comment', 'ব্ধ');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ব্ব'));
+  Item.AddPair('Value', SmartEscape('eŸ'));
+  Item.AddPair('Comment', 'ব্ব');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ব্র'));
+  Item.AddPair('Value', SmartEscape('eª'));
+  Item.AddPair('Comment', 'ব্র');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ব্ল'));
+  Item.AddPair('Value', SmartEscape('eø'));
+  Item.AddPair('Comment', 'ব্ল');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ভ্র'));
+  Item.AddPair('Value', SmartEscape('å'));
+  Item.AddPair('Comment', 'ভ্র');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ম্ন'));
+  Item.AddPair('Value', SmartEscape('gœ'));
+  Item.AddPair('Comment', 'ম্ন');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ম্ফ'));
+  Item.AddPair('Value', SmartEscape('ç'));
+  Item.AddPair('Comment', 'ম্ফ');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ম্ব'));
+  Item.AddPair('Value', SmartEscape('¤^'));
+  Item.AddPair('Comment', 'ম্ব');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ম্ভ'));
+  Item.AddPair('Value', SmartEscape('¤¢'));
+  Item.AddPair('Comment', 'ম্ভ');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ম্ম'));
+  Item.AddPair('Value', SmartEscape('¤§'));
+  Item.AddPair('Comment', 'ম্ম');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ম্র'));
+  Item.AddPair('Value', SmartEscape('gª'));
+  Item.AddPair('Comment', 'ম্র');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ল্ক'));
+  Item.AddPair('Value', SmartEscape('é'));
+  Item.AddPair('Comment', 'ল্ক');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ল্গ'));
+  Item.AddPair('Value', SmartEscape('ê'));
+  Item.AddPair('Comment', 'ল্গ');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ল্ট'));
+  Item.AddPair('Value', SmartEscape('ë'));
+  Item.AddPair('Comment', 'ল্ট');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ল্ড'));
+  Item.AddPair('Value', SmartEscape('ì'));
+  Item.AddPair('Comment', 'ল্ড');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ল্প'));
+  Item.AddPair('Value', SmartEscape('í'));
+  Item.AddPair('Comment', 'ল্প');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ল্ব'));
+  Item.AddPair('Value', SmartEscape('j¦'));
+  Item.AddPair('Comment', 'ল্ব');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ল্ম'));
+  Item.AddPair('Value', SmartEscape('j¥'));
+  Item.AddPair('Comment', 'ল্ম');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ল্ল'));
+  Item.AddPair('Value', SmartEscape('jø'));
+  Item.AddPair('Comment', 'ল্ল');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('শ্চ'));
+  Item.AddPair('Value', SmartEscape('ð'));
+  Item.AddPair('Comment', 'শ্চ');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('শ্ন'));
+  Item.AddPair('Value', SmartEscape('kœ'));
+  Item.AddPair('Comment', 'শ্ন');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('শ্ব'));
+  Item.AddPair('Value', SmartEscape('k¦'));
+  Item.AddPair('Comment', 'শ্ব');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('শ্ম'));
+  Item.AddPair('Value', SmartEscape('k¥'));
+  Item.AddPair('Comment', 'শ্ম');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('শ্ল'));
+  Item.AddPair('Value', SmartEscape('kø'));
+  Item.AddPair('Comment', 'শ্ল');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ষ্ক'));
+  Item.AddPair('Value', SmartEscape('®‹'));
+  Item.AddPair('Comment', 'ষ্ক');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ষ্ট'));
+  Item.AddPair('Value', SmartEscape('ó'));
+  Item.AddPair('Comment', 'ষ্ট');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ষ্ঠ'));
+  Item.AddPair('Value', SmartEscape('ô'));
+  Item.AddPair('Comment', 'ষ্ঠ');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ষ্ণ'));
+  Item.AddPair('Value', SmartEscape('ò'));
+  Item.AddPair('Comment', 'ষ্ণ');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ষ্প'));
+  Item.AddPair('Value', SmartEscape('®ú'));
+  Item.AddPair('Comment', 'ষ্প');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ষ্ফ'));
+  Item.AddPair('Value', SmartEscape('õ'));
+  Item.AddPair('Comment', 'ষ্ফ');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ষ্ম'));
+  Item.AddPair('Value', SmartEscape('®§'));
+  Item.AddPair('Comment', 'ষ্ম');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('স্ক'));
+  Item.AddPair('Value', SmartEscape('¯‹'));
+  Item.AddPair('Comment', 'স্ক');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('স্খ'));
+  Item.AddPair('Value', SmartEscape('ö'));
+  Item.AddPair('Comment', 'স্খ');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('স্ট'));
+  Item.AddPair('Value', SmartEscape('÷'));
+  Item.AddPair('Comment', 'স্ট');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('স্ত'));
+  Item.AddPair('Value', SmartEscape('¯Í'));
+  Item.AddPair('Comment', 'স্ত');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('স্থ'));
+  Item.AddPair('Value', SmartEscape('¯’'));
+  Item.AddPair('Comment', 'স্থ');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('স্ন'));
+  Item.AddPair('Value', SmartEscape('mœ'));
+  Item.AddPair('Comment', 'স্ন');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('স্প'));
+  Item.AddPair('Value', SmartEscape('¯ú'));
+  Item.AddPair('Comment', 'স্প');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('স্ফ'));
+  Item.AddPair('Value', SmartEscape('ù'));
+  Item.AddPair('Comment', 'স্ফ');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('স্ব'));
+  Item.AddPair('Value', SmartEscape('¯^'));
+  Item.AddPair('Comment', 'স্ব');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('স্ম'));
+  Item.AddPair('Value', SmartEscape('¯§'));
+  Item.AddPair('Comment', 'স্ম');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('স্ল'));
+  Item.AddPair('Value', SmartEscape('¯ø'));
+  Item.AddPair('Comment', 'স্ল');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('হ্ণ'));
+  Item.AddPair('Value', SmartEscape('nè'));
+  Item.AddPair('Comment', 'হ্ণ');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('হ্ন'));
+  Item.AddPair('Value', SmartEscape('ý'));
+  Item.AddPair('Comment', 'হ্ন');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('হ্ম'));
+  Item.AddPair('Value', SmartEscape('þ'));
+  Item.AddPair('Comment', 'হ্ম');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('হ্ল'));
+  Item.AddPair('Value', SmartEscape('n¬'));
+  Item.AddPair('Comment', 'হ্ল');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('হৃ'));
+  Item.AddPair('Value', SmartEscape('ü'));
+  Item.AddPair('Comment', 'হৃ');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('গু'));
+  Item.AddPair('Value', SmartEscape('¸'));
+  Item.AddPair('Comment', 'গু');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('শু'));
+  Item.AddPair('Value', SmartEscape('ï'));
+  Item.AddPair('Comment', 'শু');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ক্ট্র'));
+  Item.AddPair('Value', SmartEscape('³ª'));
+  Item.AddPair('Comment', 'ক্ট্র');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ক্ন'));
+  Item.AddPair('Value', SmartEscape('Kè'));
+  Item.AddPair('Comment', 'ক্ন');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ক্ষ্ণ'));
+  Item.AddPair('Value', SmartEscape('òœ'));
+  Item.AddPair('Comment', 'ক্ষ্ণ');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ক্ষ্ম'));
+  Item.AddPair('Value', SmartEscape('²'));
+  Item.AddPair('Comment', 'ক্ষ্ম');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ক্ষ্র'));
+  Item.AddPair('Value', SmartEscape('ÿ«'));
+  Item.AddPair('Comment', 'ক্ষ্র');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('গ্ব'));
+  Item.AddPair('Value', SmartEscape('M¦'));
+  Item.AddPair('Comment', 'গ্ব');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('গ্র্য'));
+  Item.AddPair('Value', SmartEscape('MÖ¨'));
+  Item.AddPair('Comment', 'গ্র্য');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('য়ু'));
+  Item.AddPair('Value', SmartEscape('qy'));
+  Item.AddPair('Comment', 'য়ু');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ঘ্ন'));
+  Item.AddPair('Value', SmartEscape('Nœ'));
+  Item.AddPair('Comment', 'ঘ্ন');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ঘ্র'));
+  Item.AddPair('Value', SmartEscape('Nª'));
+  Item.AddPair('Comment', 'ঘ্র');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ঙ্গু'));
+  Item.AddPair('Value', SmartEscape('½y'));
+  Item.AddPair('Comment', 'ঙ্গু');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('জ্জ্ব'));
+  Item.AddPair('Value', SmartEscape('¾¡'));
+  Item.AddPair('Comment', 'জ্জ্ব');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ত্ত্ব'));
+  Item.AddPair('Value', SmartEscape('Ë¡'));
+  Item.AddPair('Comment', 'ত্ত্ব');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ত্রু'));
+  Item.AddPair('Value', SmartEscape('Îæ'));
+  Item.AddPair('Comment', 'ত্রু');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('দ্রু'));
+  Item.AddPair('Value', SmartEscape('`ªæ'));
+  Item.AddPair('Comment', 'দ্রু');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ভ্রু'));
+  Item.AddPair('Value', SmartEscape('åæ'));
+  Item.AddPair('Comment', 'ভ্রু');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('শ্রু'));
+  Item.AddPair('Value', SmartEscape('kÖæ'));
+  Item.AddPair('Comment', 'শ্রু');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('য়ূ'));
+  Item.AddPair('Value', SmartEscape('q~'));
+  Item.AddPair('Comment', 'য়ূ');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ম্প'));
+  Item.AddPair('Value', SmartEscape('¤ú'));
+  Item.AddPair('Comment', 'ম্প');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ক্য'));
+  Item.AddPair('Value', SmartEscape('K¨'));
+  Item.AddPair('Comment', 'ক্য');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ল্যু'));
+  Item.AddPair('Value', SmartEscape('j¨y'));
+  Item.AddPair('Comment', 'ল্যু');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ক্লু'));
+  Item.AddPair('Value', SmartEscape('K¬z'));
+  Item.AddPair('Comment', 'ক্লু');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ত্র্য'));
+  Item.AddPair('Value', SmartEscape('Î¨'));
+  Item.AddPair('Comment', 'ত্র্য');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('স্থ্য'));
+  Item.AddPair('Value', SmartEscape('¯’¨'));
+  Item.AddPair('Comment', 'স্থ্য');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('দ্য'));
+  Item.AddPair('Value', SmartEscape('`¨'));
+  Item.AddPair('Comment', 'দ্য');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ভ্য'));
+  Item.AddPair('Value', SmartEscape('f¨'));
+  Item.AddPair('Comment', 'ভ্য');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ল্য'));
+  Item.AddPair('Value', SmartEscape('j¨'));
+  Item.AddPair('Comment', 'ল্য');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('দ্যু'));
+  Item.AddPair('Value', SmartEscape('`y¨'));
+  Item.AddPair('Comment', 'দ্যু');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ম্য'));
+  Item.AddPair('Value', SmartEscape('g¨'));
+  Item.AddPair('Comment', 'ম্য');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ন্য'));
+  Item.AddPair('Value', SmartEscape('b¨'));
+  Item.AddPair('Comment', 'ন্য');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ণ্য'));
+  Item.AddPair('Value', SmartEscape('Y¨'));
+  Item.AddPair('Comment', 'ণ্য');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ব্যু'));
+  Item.AddPair('Value', SmartEscape('ey¨'));
+  Item.AddPair('Comment', 'ব্যু');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ত্ব'));
+  Item.AddPair('Value', SmartEscape('Z¡'));
+  Item.AddPair('Comment', 'ত্ব');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('হ্ব'));
+  Item.AddPair('Value', SmartEscape('nŸ'));
+  Item.AddPair('Comment', 'হ্ব');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('গ্নু'));
+  Item.AddPair('Value', SmartEscape('Mœy'));
+  Item.AddPair('Comment', 'গ্নু');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ম্প্ল'));
+  Item.AddPair('Value', SmartEscape('¤úø'));
+  Item.AddPair('Comment', 'ম্প্ল');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('স্প্ল'));
+  Item.AddPair('Value', SmartEscape('¯úø'));
+  Item.AddPair('Comment', 'স্প্ল');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('চ্ব'));
+  Item.AddPair('Value', SmartEscape('P¦'));
+  Item.AddPair('Comment', 'চ্ব');
+  Arr.Add(Item);
+  Item := TJSONObject.Create;
+  Item.AddPair('Key', SmartEscape('ড়্গ'));
+  Item.AddPair('Value', SmartEscape('—M'));
+  Item.AddPair('Comment', 'ড়্গ');
+  Arr.Add(Item);
+  Result := Arr;
 end;
-
 { =============================================================================== }
 
 procedure ExportAnsiMapping(const Path: string);
 var
+  Root, CatObj, CategoryObj, ItemObj: TJSONObject;
+  ConstantsRoot: TJSONObject;
+  FFArr, PreArr, PostArr: TJSONArray;
   Lines: TStringList;
+  I: Integer;
+  Val: string;
+  Rec: TAnsiVarRec;
+  KnownFF: TDictionary<string, Boolean>;
+  FFKeyStr: string;
+begin
+  Lines := TStringList.Create;
+  Root := TJSONObject.Create;
+  try
+    ConstantsRoot := TJSONObject.Create;
+    Root.AddPair('Constants', ConstantsRoot);
 
-  procedure W(const S: string);
-  begin
-    Lines.Add(S);
-  end;
+    for Rec in AnsiRegistry do
+    begin
+      if not ConstantsRoot.TryGetValue<TJSONObject>(Rec.Category, CategoryObj) then
+      begin
+        CategoryObj := TJSONObject.Create;
+        ConstantsRoot.AddPair(Rec.Category, CategoryObj);
+      end;
 
-  procedure WConstants;
-  begin
-    W('    "A_0": "' + SmartEscape(string(A_0)) + '",');
-    W('    "A_1": "' + SmartEscape(string(A_1)) + '",');
-    W('    "A_2": "' + SmartEscape(string(A_2)) + '",');
-    W('    "A_3": "' + SmartEscape(string(A_3)) + '",');
-    W('    "A_4": "' + SmartEscape(string(A_4)) + '",');
-    W('    "A_5": "' + SmartEscape(string(A_5)) + '",');
-    W('    "A_6": "' + SmartEscape(string(A_6)) + '",');
-    W('    "A_7": "' + SmartEscape(string(A_7)) + '",');
-    W('    "A_8": "' + SmartEscape(string(A_8)) + '",');
-    W('    "A_9": "' + SmartEscape(string(A_9)) + '",');
-    W('    "A_A": "' + SmartEscape(string(A_A)) + '",');
-    W('    "A_AA": "' + SmartEscape(A_AA) + '",');
-    W('    "A_AAKar": "' + SmartEscape(string(A_AAKar)) + '",');
-    W('    "A_I": "' + SmartEscape(string(A_I)) + '",');
-    W('    "A_IKar": "' + SmartEscape(string(A_IKar)) + '",');
-    W('    "A_II": "' + SmartEscape(string(A_II)) + '",');
-    W('    "A_IIKar": "' + SmartEscape(string(A_IIKar)) + '",');
-    W('    "A_U": "' + SmartEscape(string(A_U)) + '",');
-    W('    "A_UKar1": "' + SmartEscape(string(A_UKar1)) + '",');
-    W('    "A_UKar2": "' + SmartEscape(string(A_UKar2)) + '",');
-    W('    "A_UKar3": "' + SmartEscape(string(A_UKar3)) + '",');
-    W('    "A_UKar4": "' + SmartEscape(string(A_UKar4)) + '",');
-    W('    "A_UU": "' + SmartEscape(string(A_UU)) + '",');
-    W('    "A_UUKar1": "' + SmartEscape(string(A_UUKar1)) + '",');
-    W('    "A_UUKar2": "' + SmartEscape(string(A_UUKar2)) + '",');
-    W('    "A_UUKar3": "' + SmartEscape(string(A_UUKar3)) + '",');
-    W('    "A_RRI": "' + SmartEscape(string(A_RRI)) + '",');
-    W('    "A_RRIKar1": "' + SmartEscape(string(A_RRIKar1)) + '",');
-    W('    "A_RRIKar2": "' + SmartEscape(string(A_RRIKar2)) + '",');
-    W('    "A_E": "' + SmartEscape(string(A_E)) + '",');
-    W('    "A_EKar1": "' + SmartEscape(string(A_EKar1)) + '",');
-    W('    "A_EKar2": "' + SmartEscape(string(A_EKar2)) + '",');
-    W('    "A_OI": "' + SmartEscape(string(A_OI)) + '",');
-    W('    "A_OIKar1": "' + SmartEscape(string(A_OIKar1)) + '",');
-    W('    "A_OIKar2": "' + SmartEscape(string(A_OIKar2)) + '",');
-    W('    "A_O": "' + SmartEscape(string(A_O)) + '",');
-    W('    "A_OU": "' + SmartEscape(string(A_OU)) + '",');
-    W('    "A_OUKar": "' + SmartEscape(string(A_OUKar)) + '",');
-    W('    "A_Taka": "' + SmartEscape(string(A_Taka)) + '",');
-    W('    "A_Dari": "' + SmartEscape(string(A_Dari)) + '",');
-    W('    "A_DoubleDanda": "' + SmartEscape(string(A_DoubleDanda)) + '",');
-    W('    "A_Hasanta": "' + SmartEscape(string(A_Hasanta)) + '",');
-    W('    "A_StartDoubleQuote": "' + SmartEscape(string(A_StartDoubleQuote)) + '",');
-    W('    "A_EndDoubleQuote": "' + SmartEscape(string(A_EndDoubleQuote)) + '",');
-    W('    "A_StartSingleQuote": "' + SmartEscape(string(A_StartSingleQuote)) + '",');
-    W('    "A_EndSingleQuote": "' + SmartEscape(string(A_EndSingleQuote)) + '",');
-    W('    "A_StartDoubleQuote": "' + SmartEscape(string(A_StartDoubleQuote)) + '",');
-    W('    "A_EndDoubleQuote": "' + SmartEscape(string(A_EndDoubleQuote)) + '",');
-    W('    "A_K": "' + SmartEscape(string(A_K)) + '",');
-    W('    "A_Kh": "' + SmartEscape(string(A_Kh)) + '",');
-    W('    "A_G": "' + SmartEscape(string(A_G)) + '",');
-    W('    "A_Gh": "' + SmartEscape(string(A_Gh)) + '",');
-    W('    "A_NGA": "' + SmartEscape(string(A_NGA)) + '",');
-    W('    "A_C": "' + SmartEscape(string(A_C)) + '",');
-    W('    "A_Ch": "' + SmartEscape(string(A_Ch)) + '",');
-    W('    "A_J": "' + SmartEscape(string(A_J)) + '",');
-    W('    "A_Jh": "' + SmartEscape(string(A_Jh)) + '",');
-    W('    "A_NYA": "' + SmartEscape(string(A_NYA)) + '",');
-    W('    "A_Tt": "' + SmartEscape(string(A_Tt)) + '",');
-    W('    "A_Tth": "' + SmartEscape(string(A_Tth)) + '",');
-    W('    "A_Dd": "' + SmartEscape(string(A_Dd)) + '",');
-    W('    "A_Ddh": "' + SmartEscape(string(A_Ddh)) + '",');
-    W('    "A_Nn": "' + SmartEscape(string(A_Nn)) + '",');
-    W('    "A_T": "' + SmartEscape(string(A_T)) + '",');
-    W('    "A_Th": "' + SmartEscape(string(A_Th)) + '",');
-    W('    "A_D": "' + SmartEscape(string(A_D)) + '",');
-    W('    "A_Dh": "' + SmartEscape(string(A_Dh)) + '",');
-    W('    "A_N": "' + SmartEscape(string(A_N)) + '",');
-    W('    "A_P": "' + SmartEscape(string(A_P)) + '",');
-    W('    "A_Ph": "' + SmartEscape(string(A_Ph)) + '",');
-    W('    "A_B": "' + SmartEscape(string(A_B)) + '",');
-    W('    "A_Bh": "' + SmartEscape(string(A_Bh)) + '",');
-    W('    "A_M": "' + SmartEscape(string(A_M)) + '",');
-    W('    "A_Z": "' + SmartEscape(string(A_Z)) + '",');
-    W('    "A_R": "' + SmartEscape(string(A_R)) + '",');
-    W('    "A_L": "' + SmartEscape(string(A_L)) + '",');
-    W('    "A_Sh": "' + SmartEscape(string(A_Sh)) + '",');
-    W('    "A_SS": "' + SmartEscape(string(A_SS)) + '",');
-    W('    "A_S": "' + SmartEscape(string(A_S)) + '",');
-    W('    "A_H": "' + SmartEscape(string(A_H)) + '",');
-    W('    "A_RR": "' + SmartEscape(string(A_RR)) + '",');
-    W('    "A_RRH": "' + SmartEscape(string(A_RRH)) + '",');
-    W('    "A_Y": "' + SmartEscape(string(A_Y)) + '",');
-    W('    "A_Khandata": "' + SmartEscape(string(A_Khandata)) + '",');
-    W('    "A_Anushar": "' + SmartEscape(string(A_Anushar)) + '",');
-    W('    "A_Bisharga": "' + SmartEscape(string(A_Bisharga)) + '",');
-    W('    "A_Chandra": "' + SmartEscape(string(A_Chandra)) + '",');
-    W('    "A_K_K": "' + SmartEscape(string(A_K_K)) + '",');
-    W('    "A_K_Tt": "' + SmartEscape(string(A_K_Tt)) + '",');
-    W('    "A_K_Ss_M": "' + SmartEscape(string(A_K_Ss_M)) + '",');
-    W('    "A_K_T": "' + SmartEscape(string(A_K_T)) + '",');
-    W('    "A_K_M": "' + SmartEscape(string(A_K_M)) + '",');
-    W('    "A_K_R": "' + SmartEscape(string(A_K_R)) + '",');
-    W('    "A_K_Ss": "' + SmartEscape(string(A_K_Ss)) + '",');
-    W('    "A_K_S": "' + SmartEscape(string(A_K_S)) + '",');
-    W('    "A_G_Ukar": "' + SmartEscape(string(A_G_Ukar)) + '",');
-    W('    "A_G_G": "' + SmartEscape(string(A_G_G)) + '",');
-    W('    "A_G_D": "' + SmartEscape(string(A_G_D)) + '",');
-    W('    "A_G_Dh": "' + SmartEscape(string(A_G_Dh)) + '",');
-    W('    "A_NGA_K": "' + SmartEscape(string(A_NGA_K)) + '",');
-    W('    "A_NGA_G": "' + SmartEscape(string(A_NGA_G)) + '",');
-    W('    "A_J_J": "' + SmartEscape(string(A_J_J)) + '",');
-    W('    "A_J_Jh": "' + SmartEscape(string(A_J_Jh)) + '",');
-    W('    "A_J_NYA": "' + SmartEscape(string(A_J_NYA)) + '",');
-    W('    "A_NYA_C": "' + SmartEscape(string(A_NYA_C)) + '",');
-    W('    "A_NYA_CH": "' + SmartEscape(string(A_NYA_CH)) + '",');
-    W('    "A_NYA_J": "' + SmartEscape(string(A_NYA_J)) + '",');
-    W('    "A_NYA_Jh": "' + SmartEscape(string(A_NYA_Jh)) + '",');
-    W('    "A_Tt_Tt": "' + SmartEscape(string(A_Tt_Tt)) + '",');
-    W('    "A_Dd_Dd": "' + SmartEscape(string(A_Dd_Dd)) + '",');
-    W('    "A_Nn_Tt": "' + SmartEscape(string(A_Nn_Tt)) + '",');
-    W('    "A_Nn_Tth": "' + SmartEscape(string(A_Nn_Tth)) + '",');
-    W('    "A_NN_Dd": "' + SmartEscape(string(A_NN_Dd)) + '",');
-    W('    "A_T_T": "' + SmartEscape(string(A_T_T)) + '",');
-    W('    "A_T_Th": "' + SmartEscape(string(A_T_Th)) + '",');
-    W('    "A_T_M": "' + SmartEscape(string(A_T_M)) + '",');
-    W('    "A_T_R": "' + SmartEscape(string(A_T_R)) + '",');
-    W('    "A_D_D": "' + SmartEscape(string(A_D_D)) + '",');
-    W('    "A_D_Dh": "' + SmartEscape(string(A_D_Dh)) + '",');
-    W('    "A_D_B": "' + SmartEscape(string(A_D_B)) + '",');
-    W('    "A_D_M": "' + SmartEscape(string(A_D_M)) + '",');
-    W('    "A_N_Tth": "' + SmartEscape(string(A_N_Tth)) + '",');
-    W('    "A_N_Dd": "' + SmartEscape(string(A_N_Dd)) + '",');
-    W('    "A_N_Dh": "' + SmartEscape(string(A_N_Dh)) + '",');
-    W('    "A_N_S": "' + SmartEscape(string(A_N_S)) + '",');
-    W('    "A_P_Tt": "' + SmartEscape(string(A_P_Tt)) + '",');
-    W('    "A_P_T": "' + SmartEscape(string(A_P_T)) + '",');
-    W('    "A_P_P": "' + SmartEscape(string(A_P_P)) + '",');
-    W('    "A_P_S": "' + SmartEscape(string(A_P_S)) + '",');
-    W('    "A_B_J": "' + SmartEscape(string(A_B_J)) + '",');
-    W('    "A_B_D": "' + SmartEscape(string(A_B_D)) + '",');
-    W('    "A_B_Dh": "' + SmartEscape(string(A_B_Dh)) + '",');
-    W('    "A_Bh_R": "' + SmartEscape(string(A_Bh_R)) + '",');
-    W('    "A_M_N": "' + SmartEscape(string(A_M_N)) + '",');
-    W('    "A_M_Ph": "' + SmartEscape(string(A_M_Ph)) + '",');
-    W('    "A_L_K": "' + SmartEscape(string(A_L_K)) + '",');
-    W('    "A_L_G": "' + SmartEscape(string(A_L_G)) + '",');
-    W('    "A_L_Tt": "' + SmartEscape(string(A_L_Tt)) + '",');
-    W('    "A_L_Dd": "' + SmartEscape(string(A_L_Dd)) + '",');
-    W('    "A_L_P": "' + SmartEscape(string(A_L_P)) + '",');
-    W('    "A_L_Ph": "' + SmartEscape(string(A_L_Ph)) + '",');
-    W('    "A_Sh_UKar": "' + SmartEscape(string(A_Sh_UKar)) + '",');
-    W('    "A_Sh_C": "' + SmartEscape(string(A_Sh_C)) + '",');
-    W('    "A_Sh_Ch": "' + SmartEscape(string(A_Sh_Ch)) + '",');
-    W('    "A_Ss_Nn": "' + SmartEscape(string(A_Ss_Nn)) + '",');
-    W('    "A_Ss_Tt": "' + SmartEscape(string(A_Ss_Tt)) + '",');
-    W('    "A_Ss_Tth": "' + SmartEscape(string(A_Ss_Tth)) + '",');
-    W('    "A_Ss_Ph": "' + SmartEscape(string(A_Ss_Ph)) + '",');
-    W('    "A_S_Kh": "' + SmartEscape(string(A_S_Kh)) + '",');
-    W('    "A_S_Tt": "' + SmartEscape(string(A_S_Tt)) + '",');
-    W('    "A_S_N": "' + SmartEscape(string(A_S_N)) + '",');
-    W('    "A_S_Ph": "' + SmartEscape(string(A_S_Ph)) + '",');
-    W('    "A_H_UKar" : "' + SmartEscape(string(A_H_UKar)) + '",');
-    W('    "A_H_RRIKar": "' + SmartEscape(string(A_H_RRIKar)) + '",');
-    W('    "A_H_N": "' + SmartEscape(string(A_H_N)) + '",');
-    W('    "A_H_M": "' + SmartEscape(string(A_H_M)) + '",');
-    W('    "A_Rr_G": "' + SmartEscape(string(A_Rr_G)) + '",');
-    W('    "A_Reph": "' + SmartEscape(string(A_Reph)) + '",');
-    W('    "A_M_1H": "' + SmartEscape(string(A_M_1H)) + '",');
-    W('    "A_Ss_1H": "' + SmartEscape(string(A_Ss_1H)) + '",');
-    W('    "A_S_1H_1": "' + SmartEscape(string(A_S_1H_1)) + '",');
-    W('    "A_N_1H_1": "' + SmartEscape(string(A_N_1H_1)) + '",');
-    W('    "A_S_1H_2": "' + SmartEscape(string(A_S_1H_2)) + '",');
-    W('    "A_D_1H_1": "' + SmartEscape(string(A_D_1H_1)) + '",');
-    W('    "A_C_1H": "' + SmartEscape(string(A_C_1H)) + '",');
-    W('    "A_NGA_1H": "' + SmartEscape(string(A_NGA_1H)) + '",');
-    W('    "A_N_1H_2": "' + SmartEscape(string(A_N_1H_2)) + '",');
-    W('    "A_D_1H_2": "' + SmartEscape(string(A_D_1H_2)) + '",');
-    W('    "A_B_2H_1": "' + SmartEscape(string(A_B_2H_1)) + '",');
-    W('    "A_B_2H_2": "' + SmartEscape(string(A_B_2H_2)) + '",');
-    W('    "A_BH_2H": "' + SmartEscape(string(A_BH_2H)) + '",');
-    W('    "A_BH_R_2H": "' + SmartEscape(string(A_BH_R_2H)) + '",');
-    W('    "A_M_2H_1": "' + SmartEscape(string(A_M_2H_1)) + '",');
-    W('    "A_B_2H_3": "' + SmartEscape(string(A_B_2H_3)) + '",');
-    W('    "A_M_2H_2": "' + SmartEscape(string(A_M_2H_2)) + '",');
-    W('    "A_ZFola": "' + SmartEscape(string(A_ZFola)) + '",');
-    W('    "A_RFola_1": "' + SmartEscape(string(A_RFola_1)) + '",');
-    W('    "A_RFola_2": "' + SmartEscape(string(A_RFola_2)) + '",');
-    W('    "A_L_2H_1": "' + SmartEscape(string(A_L_2H_1)) + '",');
-    W('    "A_L_2H_2": "' + SmartEscape(string(A_L_2H_2)) + '",');
-    W('    "A_T_R_2H": "' + SmartEscape(string(A_T_R_2H)) + '",');
-    W('    "A_RFola_3": "' + SmartEscape(string(A_RFola_3)) + '",');
-    W('    "A_Nn_2H_1": "' + SmartEscape(string(A_Nn_2H_1)) + '",');
-    W('    "A_K_R_2H": "' + SmartEscape(string(A_K_R_2H)) + '",');
-    W('    "A_Nn_2H_2": "' + SmartEscape(string(A_Nn_2H_2)) + '",');
-    W('    "A_B_2H_4": "' + SmartEscape(string(A_B_2H_4)) + '",');
-    W('    "A_T_2H": "' + SmartEscape(string(A_T_2H)) + '",');
-    W('    "A_T_UKar_2H": "' + SmartEscape(string(A_T_UKar_2H)) + '",');
-    W('    "A_Th_2H": "' + SmartEscape(string(A_Th_2H)) + '",');
-    W('    "A_K_2H": "' + SmartEscape(string(A_K_2H)) + '",');
-    W('    "A_L_2H_3": "' + SmartEscape(string(A_L_2H_3)) + '"');
-  end;
+      if Rec.VarType = avChar then
+        Val := string(PChar(Rec.Ptr)^)
+      else
+        Val := PString(Rec.Ptr)^;
 
-  procedure WFullForms;
-  var
-    I: Integer;
-  begin
+      ItemObj := TJSONObject.Create;
+      ItemObj.AddPair('Value', SmartEscape(Val));
+      ItemObj.AddPair('Comment', Rec.BengaliChar);
+      CategoryObj.AddPair(Rec.Name, ItemObj);
+    end;
+
     if Length(CustomFullForms) > 0 then
     begin
-      for I := 0 to Length(CustomFullForms) - 1 do
+      FFArr := TJSONArray.Create;
+      for I := 0 to High(CustomFullForms) do
       begin
-        W('    {"Key": "' + EscapeJSON(CustomFullForms[I].Key) + '", "Value": "' + SmartEscape(CustomFullForms[I].Value) + '"}');
-        if I < Length(CustomFullForms) - 1 then
-          Lines[Lines.Count - 1] := Lines[Lines.Count - 1] + ',';
+        ItemObj := TJSONObject.Create;
+        ItemObj.AddPair('Key', SmartEscape(CustomFullForms[I].Key));
+        ItemObj.AddPair('Value', SmartEscape(CustomFullForms[I].Value));
+        ItemObj.AddPair('Comment', CustomFullForms[I].Key);
+        FFArr.Add(ItemObj);
       end;
     end
     else
-      W(GetDefaultFullFormsJSON);
-  end;
-
-  procedure WPreReplacements;
-  var
-    I: Integer;
-  begin
-    if Length(CustomPreReplacements) > 0 then
     begin
-      for I := 0 to Length(CustomPreReplacements) - 1 do
-      begin
-        W('    {"Key": "' + EscapeJSON(CustomPreReplacements[I].Key) + '", "Value": "' + SmartEscape(CustomPreReplacements[I].Value) + '"}');
-        if I < Length(CustomPreReplacements) - 1 then
-          Lines[Lines.Count - 1] := Lines[Lines.Count - 1] + ',';
+      FFArr := GetDefaultFullFormsJSONArr;
+      KnownFF := TDictionary<string, Boolean>.Create;
+      try
+        for Rec in AnsiRegistry do
+          if Rec.Category = 'FullForms' then
+            KnownFF.AddOrSetValue(Rec.BengaliChar, True);
+        for I := FFArr.Count - 1 downto 0 do
+        begin
+          FFKeyStr := (FFArr.Items[I] as TJSONObject).GetValue('Comment').Value;
+          if KnownFF.ContainsKey(FFKeyStr) then
+            FFArr.Remove(I);
+        end;
+      finally
+        KnownFF.Free;
       end;
     end;
-  end;
+    Root.AddPair('FullFormReplacements', FFArr);
 
-  procedure WPostReplacements;
-  var
-    I: Integer;
-  begin
-    if Length(CustomPostReplacements) > 0 then
+    PreArr := TJSONArray.Create;
+    for I := 0 to High(CustomPreReplacements) do
     begin
-      for I := 0 to Length(CustomPostReplacements) - 1 do
-      begin
-        W('    {"Key": "' + EscapeJSON(CustomPostReplacements[I].Key) + '", "Value": "' + SmartEscape(CustomPostReplacements[I].Value) + '"}');
-        if I < Length(CustomPostReplacements) - 1 then
-          Lines[Lines.Count - 1] := Lines[Lines.Count - 1] + ',';
-      end;
+      ItemObj := TJSONObject.Create;
+      ItemObj.AddPair('Key', SmartEscape(CustomPreReplacements[I].Key));
+      ItemObj.AddPair('Value', SmartEscape(CustomPreReplacements[I].Value));
+      ItemObj.AddPair('Comment', CustomPreReplacements[I].Key);
+      PreArr.Add(ItemObj);
     end;
-  end;
+    Root.AddPair('PreReplacements', PreArr);
 
-begin
-  Lines := TStringList.Create;
-  try
-    W('{');
-    W('  "Constants": {');
-    WConstants;
-    W('  },');
-    W('  "PreReplacements": [');
-    WPreReplacements;
-    W('  ],');
-    W('  "FullFormReplacements": [');
-    WFullForms;
-    W('  ],');
-    W('  "PostReplacements": [');
-    WPostReplacements;
-    W('  ]');
-    W('}');
+    PostArr := TJSONArray.Create;
+    for I := 0 to High(CustomPostReplacements) do
+    begin
+      ItemObj := TJSONObject.Create;
+      ItemObj.AddPair('Key', SmartEscape(CustomPostReplacements[I].Key));
+      ItemObj.AddPair('Value', SmartEscape(CustomPostReplacements[I].Value));
+      ItemObj.AddPair('Comment', CustomPostReplacements[I].Key);
+      PostArr.Add(ItemObj);
+    end;
+    Root.AddPair('PostReplacements', PostArr);
+
+    Lines.Text := Root.Format(2);
     Lines.SaveToFile(Path, TEncoding.UTF8);
   finally
+    Root.Free;
     Lines.Free;
   end;
 end;
@@ -2305,5 +2634,13 @@ begin
 end;
 
 { =============================================================================== }
+
+
+initialization
+  InitializeAnsiRegistry;
+
+finalization
+  AnsiRegistry.Free;
+  AnsiRegistryMap.Free;
 
 end.
