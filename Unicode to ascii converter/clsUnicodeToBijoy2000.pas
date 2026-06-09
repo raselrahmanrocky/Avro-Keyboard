@@ -1470,6 +1470,10 @@ var
   ConstItemVal: TJSONValue;
   Rec: TAnsiVarRec;
   IsNested: Boolean;
+  KnownConstants: TDictionary<string, Boolean>;
+  TempList: TList<TReplacementPair>;
+  Pair: TReplacementPair;
+  KeyStr, ValueStr: string;
 begin
   ResetAnsiToDefaults;
 
@@ -1482,6 +1486,7 @@ begin
 
   JSON := nil;
   Lines := TStringList.Create;
+  KnownConstants := TDictionary<string, Boolean>.Create;
   try
     try
       Lines.LoadFromFile(Path, TEncoding.UTF8);
@@ -1501,6 +1506,10 @@ begin
         ErrorLog.Add('Critical: Failed to parse JSON file.');
       Exit;
     end;
+
+    for Rec in AnsiRegistry do
+      if Rec.BengaliChar <> '' then
+        KnownConstants.AddOrSetValue(Rec.BengaliChar, True);
 
     if JSON.TryGetValue<TJSONObject>('Constants', ConstantsRoot) then
     begin
@@ -1569,19 +1578,34 @@ begin
 
     if JSON.TryGetValue<TJSONArray>('FullFormReplacements', FullForms) then
     begin
-      SetLength(CustomFullForms, FullForms.Count);
-      for I := 0 to FullForms.Count - 1 do
-      begin
-        try
-          CustomFullForms[I].Key := (FullForms.Items[I] as TJSONObject).GetValue('Key').Value;
-          CustomFullForms[I].Value := (FullForms.Items[I] as TJSONObject).GetValue('Value').Value;
-        except
-          on E: Exception do
-          begin
-            if Assigned(ErrorLog) then
-              ErrorLog.Add('Error in FullFormReplacements [' + IntToStr(I) + ']: ' + E.Message);
+      TempList := TList<TReplacementPair>.Create;
+      try
+        for I := 0 to FullForms.Count - 1 do
+        begin
+          try
+            KeyStr := ProcessHexAndUnicode((FullForms.Items[I] as TJSONObject).GetValue('Key').Value);
+            ValueStr := ProcessHexAndUnicode((FullForms.Items[I] as TJSONObject).GetValue('Value').Value);
+
+            if KnownConstants.ContainsKey(KeyStr) then
+              Continue;
+
+            Pair.Key := KeyStr;
+            Pair.Value := ValueStr;
+            TempList.Add(Pair);
+          except
+            on E: Exception do
+            begin
+              if Assigned(ErrorLog) then
+                ErrorLog.Add('Error in FullFormReplacements [' + IntToStr(I) + ']: ' + E.Message);
+            end;
           end;
         end;
+
+        SetLength(CustomFullForms, TempList.Count);
+        for I := 0 to TempList.Count - 1 do
+          CustomFullForms[I] := TempList[I];
+      finally
+        TempList.Free;
       end;
     end;
 
@@ -1621,6 +1645,7 @@ begin
       end;
     end;
   finally
+    KnownConstants.Free;
     JSON.Free;
     Lines.Free;
   end;
@@ -1635,49 +1660,14 @@ var
 begin
   Arr := TJSONArray.Create;
   Item := TJSONObject.Create;
-  Item.AddPair('Key', SmartEscape('ক্ক'));
-  Item.AddPair('Value', SmartEscape('°'));
-  Item.AddPair('Comment', 'ক্ক');
-  Arr.Add(Item);
-  Item := TJSONObject.Create;
-  Item.AddPair('Key', SmartEscape('ক্ট'));
-  Item.AddPair('Value', SmartEscape('±'));
-  Item.AddPair('Comment', 'ক্ট');
-  Arr.Add(Item);
-  Item := TJSONObject.Create;
-  Item.AddPair('Key', SmartEscape('ক্ত'));
-  Item.AddPair('Value', SmartEscape('³'));
-  Item.AddPair('Comment', 'ক্ত');
-  Arr.Add(Item);
-  Item := TJSONObject.Create;
   Item.AddPair('Key', SmartEscape('ক্ব'));
   Item.AddPair('Value', SmartEscape('K¡'));
   Item.AddPair('Comment', 'ক্ব');
   Arr.Add(Item);
   Item := TJSONObject.Create;
-  Item.AddPair('Key', SmartEscape('ক্র'));
-  Item.AddPair('Value', SmartEscape('µ'));
-  Item.AddPair('Comment', 'ক্র');
-  Arr.Add(Item);
-  Item := TJSONObject.Create;
   Item.AddPair('Key', SmartEscape('ক্ল'));
   Item.AddPair('Value', SmartEscape('K¬'));
   Item.AddPair('Comment', 'ক্ল');
-  Arr.Add(Item);
-  Item := TJSONObject.Create;
-  Item.AddPair('Key', SmartEscape('ক্ষ'));
-  Item.AddPair('Value', SmartEscape('¶'));
-  Item.AddPair('Comment', 'ক্ষ');
-  Arr.Add(Item);
-  Item := TJSONObject.Create;
-  Item.AddPair('Key', SmartEscape('ক্স'));
-  Item.AddPair('Value', SmartEscape('·'));
-  Item.AddPair('Comment', 'ক্স');
-  Arr.Add(Item);
-  Item := TJSONObject.Create;
-  Item.AddPair('Key', SmartEscape('গ্ধ'));
-  Item.AddPair('Value', SmartEscape('»'));
-  Item.AddPair('Comment', 'গ্ধ');
   Arr.Add(Item);
   Item := TJSONObject.Create;
   Item.AddPair('Key', SmartEscape('গ্ন'));
@@ -1700,19 +1690,9 @@ begin
   Item.AddPair('Comment', 'গ্ল');
   Arr.Add(Item);
   Item := TJSONObject.Create;
-  Item.AddPair('Key', SmartEscape('ঙ্ক'));
-  Item.AddPair('Value', SmartEscape('¼'));
-  Item.AddPair('Comment', 'ঙ্ক');
-  Arr.Add(Item);
-  Item := TJSONObject.Create;
   Item.AddPair('Key', SmartEscape('ঙ্খ'));
   Item.AddPair('Value', SmartEscape('•L'));
   Item.AddPair('Comment', 'ঙ্খ');
-  Arr.Add(Item);
-  Item := TJSONObject.Create;
-  Item.AddPair('Key', SmartEscape('ঙ্গ'));
-  Item.AddPair('Value', SmartEscape('½'));
-  Item.AddPair('Comment', 'ঙ্গ');
   Arr.Add(Item);
   Item := TJSONObject.Create;
   Item.AddPair('Key', SmartEscape('ঙ্ঘ'));
@@ -1730,21 +1710,6 @@ begin
   Item.AddPair('Comment', 'চ্ছ');
   Arr.Add(Item);
   Item := TJSONObject.Create;
-  Item.AddPair('Key', SmartEscape('জ্জ'));
-  Item.AddPair('Value', SmartEscape('¾'));
-  Item.AddPair('Comment', 'জ্জ');
-  Arr.Add(Item);
-  Item := TJSONObject.Create;
-  Item.AddPair('Key', SmartEscape('জ্ঝ'));
-  Item.AddPair('Value', SmartEscape('À'));
-  Item.AddPair('Comment', 'জ্ঝ');
-  Arr.Add(Item);
-  Item := TJSONObject.Create;
-  Item.AddPair('Key', SmartEscape('জ্ঞ'));
-  Item.AddPair('Value', SmartEscape('Á'));
-  Item.AddPair('Comment', 'জ্ঞ');
-  Arr.Add(Item);
-  Item := TJSONObject.Create;
   Item.AddPair('Key', SmartEscape('জ্ব'));
   Item.AddPair('Value', SmartEscape('R¡'));
   Item.AddPair('Comment', 'জ্ব');
@@ -1753,31 +1718,6 @@ begin
   Item.AddPair('Key', SmartEscape('জ্র'));
   Item.AddPair('Value', SmartEscape('Rª'));
   Item.AddPair('Comment', 'জ্র');
-  Arr.Add(Item);
-  Item := TJSONObject.Create;
-  Item.AddPair('Key', SmartEscape('ঞ্চ'));
-  Item.AddPair('Value', SmartEscape('Â'));
-  Item.AddPair('Comment', 'ঞ্চ');
-  Arr.Add(Item);
-  Item := TJSONObject.Create;
-  Item.AddPair('Key', SmartEscape('ঞ্ছ'));
-  Item.AddPair('Value', SmartEscape('Ã'));
-  Item.AddPair('Comment', 'ঞ্ছ');
-  Arr.Add(Item);
-  Item := TJSONObject.Create;
-  Item.AddPair('Key', SmartEscape('ঞ্জ'));
-  Item.AddPair('Value', SmartEscape('Ä'));
-  Item.AddPair('Comment', 'ঞ্জ');
-  Arr.Add(Item);
-  Item := TJSONObject.Create;
-  Item.AddPair('Key', SmartEscape('ঞ্ঝ'));
-  Item.AddPair('Value', SmartEscape('Å'));
-  Item.AddPair('Comment', 'ঞ্ঝ');
-  Arr.Add(Item);
-  Item := TJSONObject.Create;
-  Item.AddPair('Key', SmartEscape('ট্ট'));
-  Item.AddPair('Value', SmartEscape('Æ'));
-  Item.AddPair('Comment', 'ট্ট');
   Arr.Add(Item);
   Item := TJSONObject.Create;
   Item.AddPair('Key', SmartEscape('ট্ব'));
@@ -1795,11 +1735,6 @@ begin
   Item.AddPair('Comment', 'ট্র');
   Arr.Add(Item);
   Item := TJSONObject.Create;
-  Item.AddPair('Key', SmartEscape('ড্ড'));
-  Item.AddPair('Value', SmartEscape('Ç'));
-  Item.AddPair('Comment', 'ড্ড');
-  Arr.Add(Item);
-  Item := TJSONObject.Create;
   Item.AddPair('Key', SmartEscape('ড্র'));
   Item.AddPair('Value', SmartEscape('Wª'));
   Item.AddPair('Comment', 'ড্র');
@@ -1808,21 +1743,6 @@ begin
   Item.AddPair('Key', SmartEscape('ঢ্র'));
   Item.AddPair('Value', SmartEscape('Xª'));
   Item.AddPair('Comment', 'ঢ্র');
-  Arr.Add(Item);
-  Item := TJSONObject.Create;
-  Item.AddPair('Key', SmartEscape('ণ্ট'));
-  Item.AddPair('Value', SmartEscape('È'));
-  Item.AddPair('Comment', 'ণ্ট');
-  Arr.Add(Item);
-  Item := TJSONObject.Create;
-  Item.AddPair('Key', SmartEscape('ণ্ঠ'));
-  Item.AddPair('Value', SmartEscape('É'));
-  Item.AddPair('Comment', 'ণ্ঠ');
-  Arr.Add(Item);
-  Item := TJSONObject.Create;
-  Item.AddPair('Key', SmartEscape('ণ্ড'));
-  Item.AddPair('Value', SmartEscape('Ð'));
-  Item.AddPair('Comment', 'ণ্ড');
   Arr.Add(Item);
   Item := TJSONObject.Create;
   Item.AddPair('Key', SmartEscape('ণ্ণ'));
@@ -1835,16 +1755,6 @@ begin
   Item.AddPair('Comment', 'ণ্ব');
   Arr.Add(Item);
   Item := TJSONObject.Create;
-  Item.AddPair('Key', SmartEscape('ত্ত'));
-  Item.AddPair('Value', SmartEscape('Ë'));
-  Item.AddPair('Comment', 'ত্ত');
-  Arr.Add(Item);
-  Item := TJSONObject.Create;
-  Item.AddPair('Key', SmartEscape('ত্থ'));
-  Item.AddPair('Value', SmartEscape('Ì'));
-  Item.AddPair('Comment', 'ত্থ');
-  Arr.Add(Item);
-  Item := TJSONObject.Create;
   Item.AddPair('Key', SmartEscape('থ্ব'));
   Item.AddPair('Value', SmartEscape('_¡'));
   Item.AddPair('Comment', 'থ্ব');
@@ -1855,39 +1765,9 @@ begin
   Item.AddPair('Comment', 'ত্ন');
   Arr.Add(Item);
   Item := TJSONObject.Create;
-  Item.AddPair('Key', SmartEscape('ত্ম'));
-  Item.AddPair('Value', SmartEscape('Z¥'));
-  Item.AddPair('Comment', 'ত্ম');
-  Arr.Add(Item);
-  Item := TJSONObject.Create;
-  Item.AddPair('Key', SmartEscape('ত্র'));
-  Item.AddPair('Value', SmartEscape('Î'));
-  Item.AddPair('Comment', 'ত্র');
-  Arr.Add(Item);
-  Item := TJSONObject.Create;
-  Item.AddPair('Key', SmartEscape('দ্দ'));
-  Item.AddPair('Value', SmartEscape('Ï'));
-  Item.AddPair('Comment', 'দ্দ');
-  Arr.Add(Item);
-  Item := TJSONObject.Create;
-  Item.AddPair('Key', SmartEscape('দ্ধ'));
-  Item.AddPair('Value', SmartEscape('×'));
-  Item.AddPair('Comment', 'দ্ধ');
-  Arr.Add(Item);
-  Item := TJSONObject.Create;
-  Item.AddPair('Key', SmartEscape('দ্ব'));
-  Item.AddPair('Value', SmartEscape('Ø'));
-  Item.AddPair('Comment', 'দ্ব');
-  Arr.Add(Item);
-  Item := TJSONObject.Create;
   Item.AddPair('Key', SmartEscape('দ্ভ'));
   Item.AddPair('Value', SmartEscape('™¢'));
   Item.AddPair('Comment', 'দ্ভ');
-  Arr.Add(Item);
-  Item := TJSONObject.Create;
-  Item.AddPair('Key', SmartEscape('দ্ম'));
-  Item.AddPair('Value', SmartEscape('Ù'));
-  Item.AddPair('Comment', 'দ্ম');
   Arr.Add(Item);
   Item := TJSONObject.Create;
   Item.AddPair('Key', SmartEscape('দ্র'));
@@ -1910,19 +1790,9 @@ begin
   Item.AddPair('Comment', 'ন্ত');
   Arr.Add(Item);
   Item := TJSONObject.Create;
-  Item.AddPair('Key', SmartEscape('ন্থ'));
-  Item.AddPair('Value', SmartEscape('š’'));
-  Item.AddPair('Comment', 'ন্থ');
-  Arr.Add(Item);
-  Item := TJSONObject.Create;
   Item.AddPair('Key', SmartEscape('ন্দ'));
   Item.AddPair('Value', SmartEscape('›`'));
   Item.AddPair('Comment', 'ন্দ');
-  Arr.Add(Item);
-  Item := TJSONObject.Create;
-  Item.AddPair('Key', SmartEscape('ন্ধ'));
-  Item.AddPair('Value', SmartEscape('Ü'));
-  Item.AddPair('Comment', 'ন্ধ');
   Arr.Add(Item);
   Item := TJSONObject.Create;
   Item.AddPair('Key', SmartEscape('ন্ন'));
@@ -1935,21 +1805,6 @@ begin
   Item.AddPair('Comment', 'ন্ম');
   Arr.Add(Item);
   Item := TJSONObject.Create;
-  Item.AddPair('Key', SmartEscape('প্ট'));
-  Item.AddPair('Value', SmartEscape('Þ'));
-  Item.AddPair('Comment', 'প্ট');
-  Arr.Add(Item);
-  Item := TJSONObject.Create;
-  Item.AddPair('Key', SmartEscape('প্ত'));
-  Item.AddPair('Value', SmartEscape('ß'));
-  Item.AddPair('Comment', 'প্ত');
-  Arr.Add(Item);
-  Item := TJSONObject.Create;
-  Item.AddPair('Key', SmartEscape('প্প'));
-  Item.AddPair('Value', SmartEscape('à'));
-  Item.AddPair('Comment', 'প্প');
-  Arr.Add(Item);
-  Item := TJSONObject.Create;
   Item.AddPair('Key', SmartEscape('প্র'));
   Item.AddPair('Value', SmartEscape('cÖ'));
   Item.AddPair('Comment', 'প্র');
@@ -1958,26 +1813,6 @@ begin
   Item.AddPair('Key', SmartEscape('প্ল'));
   Item.AddPair('Value', SmartEscape('cø'));
   Item.AddPair('Comment', 'প্ল');
-  Arr.Add(Item);
-  Item := TJSONObject.Create;
-  Item.AddPair('Key', SmartEscape('প্স'));
-  Item.AddPair('Value', SmartEscape('á'));
-  Item.AddPair('Comment', 'প্স');
-  Arr.Add(Item);
-  Item := TJSONObject.Create;
-  Item.AddPair('Key', SmartEscape('ব্জ'));
-  Item.AddPair('Value', SmartEscape('â'));
-  Item.AddPair('Comment', 'ব্জ');
-  Arr.Add(Item);
-  Item := TJSONObject.Create;
-  Item.AddPair('Key', SmartEscape('ব্দ'));
-  Item.AddPair('Value', SmartEscape('ã'));
-  Item.AddPair('Comment', 'ব্দ');
-  Arr.Add(Item);
-  Item := TJSONObject.Create;
-  Item.AddPair('Key', SmartEscape('ব্ধ'));
-  Item.AddPair('Value', SmartEscape('ä'));
-  Item.AddPair('Comment', 'ব্ধ');
   Arr.Add(Item);
   Item := TJSONObject.Create;
   Item.AddPair('Key', SmartEscape('ব্ব'));
@@ -1993,21 +1828,6 @@ begin
   Item.AddPair('Key', SmartEscape('ব্ল'));
   Item.AddPair('Value', SmartEscape('eø'));
   Item.AddPair('Comment', 'ব্ল');
-  Arr.Add(Item);
-  Item := TJSONObject.Create;
-  Item.AddPair('Key', SmartEscape('ভ্র'));
-  Item.AddPair('Value', SmartEscape('å'));
-  Item.AddPair('Comment', 'ভ্র');
-  Arr.Add(Item);
-  Item := TJSONObject.Create;
-  Item.AddPair('Key', SmartEscape('ম্ন'));
-  Item.AddPair('Value', SmartEscape('gœ'));
-  Item.AddPair('Comment', 'ম্ন');
-  Arr.Add(Item);
-  Item := TJSONObject.Create;
-  Item.AddPair('Key', SmartEscape('ম্ফ'));
-  Item.AddPair('Value', SmartEscape('ç'));
-  Item.AddPair('Comment', 'ম্ফ');
   Arr.Add(Item);
   Item := TJSONObject.Create;
   Item.AddPair('Key', SmartEscape('ম্ব'));
@@ -2030,31 +1850,6 @@ begin
   Item.AddPair('Comment', 'ম্র');
   Arr.Add(Item);
   Item := TJSONObject.Create;
-  Item.AddPair('Key', SmartEscape('ল্ক'));
-  Item.AddPair('Value', SmartEscape('é'));
-  Item.AddPair('Comment', 'ল্ক');
-  Arr.Add(Item);
-  Item := TJSONObject.Create;
-  Item.AddPair('Key', SmartEscape('ল্গ'));
-  Item.AddPair('Value', SmartEscape('ê'));
-  Item.AddPair('Comment', 'ল্গ');
-  Arr.Add(Item);
-  Item := TJSONObject.Create;
-  Item.AddPair('Key', SmartEscape('ল্ট'));
-  Item.AddPair('Value', SmartEscape('ë'));
-  Item.AddPair('Comment', 'ল্ট');
-  Arr.Add(Item);
-  Item := TJSONObject.Create;
-  Item.AddPair('Key', SmartEscape('ল্ড'));
-  Item.AddPair('Value', SmartEscape('ì'));
-  Item.AddPair('Comment', 'ল্ড');
-  Arr.Add(Item);
-  Item := TJSONObject.Create;
-  Item.AddPair('Key', SmartEscape('ল্প'));
-  Item.AddPair('Value', SmartEscape('í'));
-  Item.AddPair('Comment', 'ল্প');
-  Arr.Add(Item);
-  Item := TJSONObject.Create;
   Item.AddPair('Key', SmartEscape('ল্ব'));
   Item.AddPair('Value', SmartEscape('j¦'));
   Item.AddPair('Comment', 'ল্ব');
@@ -2068,11 +1863,6 @@ begin
   Item.AddPair('Key', SmartEscape('ল্ল'));
   Item.AddPair('Value', SmartEscape('jø'));
   Item.AddPair('Comment', 'ল্ল');
-  Arr.Add(Item);
-  Item := TJSONObject.Create;
-  Item.AddPair('Key', SmartEscape('শ্চ'));
-  Item.AddPair('Value', SmartEscape('ð'));
-  Item.AddPair('Comment', 'শ্চ');
   Arr.Add(Item);
   Item := TJSONObject.Create;
   Item.AddPair('Key', SmartEscape('শ্ন'));
@@ -2100,21 +1890,6 @@ begin
   Item.AddPair('Comment', 'ষ্ক');
   Arr.Add(Item);
   Item := TJSONObject.Create;
-  Item.AddPair('Key', SmartEscape('ষ্ট'));
-  Item.AddPair('Value', SmartEscape('ó'));
-  Item.AddPair('Comment', 'ষ্ট');
-  Arr.Add(Item);
-  Item := TJSONObject.Create;
-  Item.AddPair('Key', SmartEscape('ষ্ঠ'));
-  Item.AddPair('Value', SmartEscape('ô'));
-  Item.AddPair('Comment', 'ষ্ঠ');
-  Arr.Add(Item);
-  Item := TJSONObject.Create;
-  Item.AddPair('Key', SmartEscape('ষ্ণ'));
-  Item.AddPair('Value', SmartEscape('ò'));
-  Item.AddPair('Comment', 'ষ্ণ');
-  Arr.Add(Item);
-  Item := TJSONObject.Create;
   Item.AddPair('Key', SmartEscape('ষ্প'));
   Item.AddPair('Value', SmartEscape('®ú'));
   Item.AddPair('Comment', 'ষ্প');
@@ -2135,16 +1910,6 @@ begin
   Item.AddPair('Comment', 'স্ক');
   Arr.Add(Item);
   Item := TJSONObject.Create;
-  Item.AddPair('Key', SmartEscape('স্খ'));
-  Item.AddPair('Value', SmartEscape('ö'));
-  Item.AddPair('Comment', 'স্খ');
-  Arr.Add(Item);
-  Item := TJSONObject.Create;
-  Item.AddPair('Key', SmartEscape('স্ট'));
-  Item.AddPair('Value', SmartEscape('÷'));
-  Item.AddPair('Comment', 'স্ট');
-  Arr.Add(Item);
-  Item := TJSONObject.Create;
   Item.AddPair('Key', SmartEscape('স্ত'));
   Item.AddPair('Value', SmartEscape('¯Í'));
   Item.AddPair('Comment', 'স্ত');
@@ -2155,19 +1920,9 @@ begin
   Item.AddPair('Comment', 'স্থ');
   Arr.Add(Item);
   Item := TJSONObject.Create;
-  Item.AddPair('Key', SmartEscape('স্ন'));
-  Item.AddPair('Value', SmartEscape('mœ'));
-  Item.AddPair('Comment', 'স্ন');
-  Arr.Add(Item);
-  Item := TJSONObject.Create;
   Item.AddPair('Key', SmartEscape('স্প'));
   Item.AddPair('Value', SmartEscape('¯ú'));
   Item.AddPair('Comment', 'স্প');
-  Arr.Add(Item);
-  Item := TJSONObject.Create;
-  Item.AddPair('Key', SmartEscape('স্ফ'));
-  Item.AddPair('Value', SmartEscape('ù'));
-  Item.AddPair('Comment', 'স্ফ');
   Arr.Add(Item);
   Item := TJSONObject.Create;
   Item.AddPair('Key', SmartEscape('স্ব'));
@@ -2190,34 +1945,9 @@ begin
   Item.AddPair('Comment', 'হ্ণ');
   Arr.Add(Item);
   Item := TJSONObject.Create;
-  Item.AddPair('Key', SmartEscape('হ্ন'));
-  Item.AddPair('Value', SmartEscape('ý'));
-  Item.AddPair('Comment', 'হ্ন');
-  Arr.Add(Item);
-  Item := TJSONObject.Create;
-  Item.AddPair('Key', SmartEscape('হ্ম'));
-  Item.AddPair('Value', SmartEscape('þ'));
-  Item.AddPair('Comment', 'হ্ম');
-  Arr.Add(Item);
-  Item := TJSONObject.Create;
   Item.AddPair('Key', SmartEscape('হ্ল'));
   Item.AddPair('Value', SmartEscape('n¬'));
   Item.AddPair('Comment', 'হ্ল');
-  Arr.Add(Item);
-  Item := TJSONObject.Create;
-  Item.AddPair('Key', SmartEscape('হৃ'));
-  Item.AddPair('Value', SmartEscape('ü'));
-  Item.AddPair('Comment', 'হৃ');
-  Arr.Add(Item);
-  Item := TJSONObject.Create;
-  Item.AddPair('Key', SmartEscape('গু'));
-  Item.AddPair('Value', SmartEscape('¸'));
-  Item.AddPair('Comment', 'গু');
-  Arr.Add(Item);
-  Item := TJSONObject.Create;
-  Item.AddPair('Key', SmartEscape('শু'));
-  Item.AddPair('Value', SmartEscape('ï'));
-  Item.AddPair('Comment', 'শু');
   Arr.Add(Item);
   Item := TJSONObject.Create;
   Item.AddPair('Key', SmartEscape('ক্ট্র'));
@@ -2427,8 +2157,6 @@ var
   I: Integer;
   Val: string;
   Rec: TAnsiVarRec;
-  KnownFF: TDictionary<string, Boolean>;
-  FFKeyStr: string;
 begin
   Lines := TStringList.Create;
   Root := TJSONObject.Create;
@@ -2468,23 +2196,7 @@ begin
       end;
     end
     else
-    begin
       FFArr := GetDefaultFullFormsJSONArr;
-      KnownFF := TDictionary<string, Boolean>.Create;
-      try
-        for Rec in AnsiRegistry do
-          if Rec.Category = 'FullForms' then
-            KnownFF.AddOrSetValue(Rec.BengaliChar, True);
-        for I := FFArr.Count - 1 downto 0 do
-        begin
-          FFKeyStr := (FFArr.Items[I] as TJSONObject).GetValue('Comment').Value;
-          if KnownFF.ContainsKey(FFKeyStr) then
-            FFArr.Remove(I);
-        end;
-      finally
-        KnownFF.Free;
-      end;
-    end;
     Root.AddPair('FullFormReplacements', FFArr);
 
     PreArr := TJSONArray.Create;
