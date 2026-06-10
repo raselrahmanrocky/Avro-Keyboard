@@ -357,6 +357,7 @@ type
       LastWindow:            HWND;
       PendingANSISwitch:     Boolean;
       PreviousModeBeforeANSISwitch: enumMode;
+      FActiveMappingLastWriteTime: TDateTime;
 
       procedure ChangeTypingStyle(const sStyle: string);
       function IgnorableWindow(const lngHWND: HWND): Boolean;
@@ -429,6 +430,7 @@ uses
   KeyboardLayoutLoader,
   uFileFolderHandling,
   clsUnicodeToBijoy2000,
+  System.IOUtils,
   WindowsVersion,
   uWindowHandlers,
   uTopBar,
@@ -1152,6 +1154,17 @@ begin
     frmSplash := TfrmSplash.Create(Application);
     frmSplash.Show;
   end;
+
+  // --- Record initial JSON file write time for auto-refresh ---
+  if (AnsiVersion <> 'Default') and (AnsiMappingDir <> '') then
+  begin
+    if TFile.Exists(AnsiMappingDir + AnsiVersion + '.json') then
+      FActiveMappingLastWriteTime := TFile.GetLastWriteTime(AnsiMappingDir + AnsiVersion + '.json')
+    else
+      FActiveMappingLastWriteTime := 0;
+  end
+  else
+    FActiveMappingLastWriteTime := 0;
 
 end;
 
@@ -1995,6 +2008,20 @@ var
   WindoRecord: TWindowRecord;
   hforewnd:    HWND;
 begin
+
+  // --- Auto-refresh: check if JSON mapping file changed externally ---
+  if (AnsiVersion <> 'Default') and (AnsiMappingDir <> '') then
+  begin
+    if TFile.Exists(AnsiMappingDir + AnsiVersion + '.json') then
+    begin
+      if TFile.GetLastWriteTime(AnsiMappingDir + AnsiVersion + '.json') <> FActiveMappingLastWriteTime then
+      begin
+        FActiveMappingLastWriteTime := TFile.GetLastWriteTime(AnsiMappingDir + AnsiVersion + '.json');
+        LoadCurrentActiveMapping;
+        Log('ANSI Mapping Auto-Refreshed: ' + AnsiVersion);
+      end;
+    end;
+  end;
 
   hforewnd := GetForegroundWindow;
   if hforewnd = 0 then
