@@ -802,6 +802,7 @@ end;
 function TUnicodeToBijoy2000.Convert(const UniText: string): string;
 var
   I: Integer;
+  HasTrailingHasanta: Boolean;
 begin
   if UniText = '' then
   begin
@@ -832,7 +833,7 @@ begin
   // Clean start
   DeNormalize;
   
-  // 1. Apply dynamic pre-placement fixes (if any)
+  // 1. Apply dynamic pre-placement fixes
   for I := 0 to Length(CustomPreReplacements) - 1 do
     fConvertedText := ReplaceStr(fConvertedText, CustomPreReplacements[I].Key, CustomPreReplacements[I].Value);
 
@@ -848,7 +849,25 @@ begin
 
   // 5. Apply Glyphs, Halfs, and Consonants
   ConvertRFola_ZFola_Hasanta;
+  
+  { ==========================================================
+    (Flicker-Free Half Form Protection)
+    ========================================================== }
+  HasTrailingHasanta := False;
+  if (Length(fConvertedText) > 0) and 
+     (fConvertedText[Length(fConvertedText)] = b_Hasanta) then
+  begin
+    HasTrailingHasanta := True;
+    Delete(fConvertedText, Length(fConvertedText), 1);
+  end;
+  { =========================================================== }
   FirstHalfForms;
+  { =========================================================== }
+  if HasTrailingHasanta then
+  begin
+    fConvertedText := fConvertedText + b_Hasanta;
+  end;
+  { =========================================================== }
   SecondHalfForms;
   Consonants;
   FinalTouch;
