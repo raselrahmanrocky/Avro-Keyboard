@@ -68,6 +68,8 @@ var
   AnsiMappingDir: string = '';
   AnsiRegistry: TList<TAnsiVarRec>;
   AnsiRegistryMap: TDictionary<string, TAnsiVarRec>;
+  ActiveReplacements: array of TReplacementPair;
+  AnsiOverrides: TDictionary<string, string>;
 
 
 procedure ResetAnsiToDefaults;
@@ -760,94 +762,8 @@ procedure TUnicodeToBijoy2000.ReplaceFullForms;
 var
   I: Integer;
 begin
-  { Replace Numbers }
-  fConvertedText := ReplaceStr(fConvertedText, b_0, A_0);
-  fConvertedText := ReplaceStr(fConvertedText, b_1, A_1);
-  fConvertedText := ReplaceStr(fConvertedText, b_2, A_2);
-  fConvertedText := ReplaceStr(fConvertedText, b_3, A_3);
-  fConvertedText := ReplaceStr(fConvertedText, b_4, A_4);
-  fConvertedText := ReplaceStr(fConvertedText, b_5, A_5);
-  fConvertedText := ReplaceStr(fConvertedText, b_6, A_6);
-  fConvertedText := ReplaceStr(fConvertedText, b_7, A_7);
-  fConvertedText := ReplaceStr(fConvertedText, b_8, A_8);
-  fConvertedText := ReplaceStr(fConvertedText, b_9, A_9);
-
-  { Replace Symbols }
-  fConvertedText := ReplaceStr(fConvertedText, b_Taka, A_Taka);
-  fConvertedText := ReplaceStr(fConvertedText, b_Dari, A_Dari);
-  fConvertedText := ReplaceStr(fConvertedText, string(#$965), A_DoubleDanda);
-
-  { Replace Other Full Forms }
-  fConvertedText := ReplaceStr(fConvertedText, b_Khandatta, A_Khandata);
-  fConvertedText := ReplaceStr(fConvertedText, b_Anushar, A_Anushar);
-  fConvertedText := ReplaceStr(fConvertedText, b_Bisharga, A_Bisharga);
-  fConvertedText := ReplaceStr(fConvertedText, b_Chandra, A_Chandra);
-  fConvertedText := ReplaceStr(fConvertedText, b_K + b_Hasanta + b_K, A_K_K);
-  fConvertedText := ReplaceStr(fConvertedText, b_K + b_Hasanta + b_tt, A_K_Tt);
-  fConvertedText := ReplaceStr(fConvertedText, b_K + b_Hasanta + b_ss + b_Hasanta + b_m, A_K_Ss_M);
-  fConvertedText := ReplaceStr(fConvertedText, b_K + b_Hasanta + b_t, A_K_T);
-  fConvertedText := ReplaceStr(fConvertedText, b_K + b_Hasanta + b_m, A_K_M);
-  fConvertedText := ReplaceStr(fConvertedText, b_K + b_Hasanta + b_ss, A_K_Ss);
-  fConvertedText := ReplaceStr(fConvertedText, b_K + b_Hasanta + b_s, A_K_S);
-  fConvertedText := ReplaceStr(fConvertedText, b_g + b_Hasanta + b_g, A_G_G);
-  fConvertedText := ReplaceStr(fConvertedText, b_g + b_Hasanta + b_d, A_G_D);
-  fConvertedText := ReplaceStr(fConvertedText, b_g + b_Hasanta + b_dh, A_G_Dh);
-  fConvertedText := ReplaceStr(fConvertedText, b_NGA + b_Hasanta + b_K, A_NGA_K);
-  fConvertedText := ReplaceStr(fConvertedText, b_NGA + b_Hasanta + b_g, A_NGA_G);
-  fConvertedText := ReplaceStr(fConvertedText, b_j + b_Hasanta + b_j, A_J_J);
-  fConvertedText := ReplaceStr(fConvertedText, b_j + b_Hasanta + b_jh, A_J_Jh);
-  fConvertedText := ReplaceStr(fConvertedText, b_j + b_Hasanta + b_nya, A_J_NYA);
-  fConvertedText := ReplaceStr(fConvertedText, b_nya + b_Hasanta + b_C, A_NYA_C);
-  fConvertedText := ReplaceStr(fConvertedText, b_nya + b_Hasanta + b_ch, A_NYA_CH);
-  fConvertedText := ReplaceStr(fConvertedText, b_nya + b_Hasanta + b_j, A_NYA_J);
-  fConvertedText := ReplaceStr(fConvertedText, b_nya + b_Hasanta + b_jh, A_NYA_Jh);
-  fConvertedText := ReplaceStr(fConvertedText, b_tt + b_Hasanta + b_tt, A_Tt_Tt);
-  fConvertedText := ReplaceStr(fConvertedText, b_dd + b_Hasanta + b_dd, A_Dd_Dd);
-  fConvertedText := ReplaceStr(fConvertedText, b_Nn + b_Hasanta + b_tt, A_Nn_Tt);
-  fConvertedText := ReplaceStr(fConvertedText, b_Nn + b_Hasanta + b_tth, A_Nn_Tth);
-  fConvertedText := ReplaceStr(fConvertedText, b_Nn + b_Hasanta + b_dd, A_NN_Dd);
-  fConvertedText := ReplaceStr(fConvertedText, b_t + b_Hasanta + b_t, A_T_T);
-  fConvertedText := ReplaceStr(fConvertedText, b_t + b_Hasanta + b_Th, A_T_Th);
-  fConvertedText := ReplaceStr(fConvertedText, b_d + b_Hasanta + b_d, A_D_D);
-  fConvertedText := ReplaceStr(fConvertedText, b_d + b_Hasanta + b_dh, A_D_Dh);
-  fConvertedText := ReplaceStr(fConvertedText, b_d + b_Hasanta + b_b, A_D_B);
-  fConvertedText := ReplaceStr(fConvertedText, b_d + b_Hasanta + b_m, A_D_M);
-  fConvertedText := ReplaceStr(fConvertedText, b_n + b_Hasanta + b_tth, A_N_Tth);
-  fConvertedText := ReplaceStr(fConvertedText, b_n + b_Hasanta + b_dd, A_N_Dd);
-  fConvertedText := ReplaceStr(fConvertedText, b_n + b_Hasanta + b_dh, A_N_Dh);
-  fConvertedText := ReplaceStr(fConvertedText, b_n + b_Hasanta + b_s, A_N_S);
-  fConvertedText := ReplaceStr(fConvertedText, b_p + b_Hasanta + b_tt, A_P_Tt);
-  fConvertedText := ReplaceStr(fConvertedText, b_p + b_Hasanta + b_t, A_P_T);
-  fConvertedText := ReplaceStr(fConvertedText, b_p + b_Hasanta + b_p, A_P_P);
-  fConvertedText := ReplaceStr(fConvertedText, b_p + b_Hasanta + b_s, A_P_S);
-  fConvertedText := ReplaceStr(fConvertedText, b_b + b_Hasanta + b_j, A_B_J);
-  fConvertedText := ReplaceStr(fConvertedText, b_b + b_Hasanta + b_d, A_B_D);
-  fConvertedText := ReplaceStr(fConvertedText, b_b + b_Hasanta + b_dh, A_B_Dh);
-  fConvertedText := ReplaceStr(fConvertedText, b_m + b_Hasanta + b_n, A_M_N);
-  fConvertedText := ReplaceStr(fConvertedText, b_m + b_Hasanta + b_ph, A_M_Ph);
-  fConvertedText := ReplaceStr(fConvertedText, b_L + b_Hasanta + b_K, A_L_K);
-  fConvertedText := ReplaceStr(fConvertedText, b_L + b_Hasanta + b_g, A_L_G);
-  fConvertedText := ReplaceStr(fConvertedText, b_L + b_Hasanta + b_tt, A_L_Tt);
-  fConvertedText := ReplaceStr(fConvertedText, b_L + b_Hasanta + b_dd, A_L_Dd);
-  fConvertedText := ReplaceStr(fConvertedText, b_L + b_Hasanta + b_p, A_L_P);
-  fConvertedText := ReplaceStr(fConvertedText, b_L + b_Hasanta + b_ph, A_L_Ph);
-  fConvertedText := ReplaceStr(fConvertedText, b_sh + b_Hasanta + b_C, A_Sh_C);
-  fConvertedText := ReplaceStr(fConvertedText, b_sh + b_Hasanta + b_ch, A_Sh_Ch);
-  fConvertedText := ReplaceStr(fConvertedText, b_ss + b_Hasanta + b_Nn, A_Ss_Nn);
-  fConvertedText := ReplaceStr(fConvertedText, b_ss + b_Hasanta + b_tt, A_Ss_Tt);
-  fConvertedText := ReplaceStr(fConvertedText, b_ss + b_Hasanta + b_tth, A_Ss_Tth);
-  fConvertedText := ReplaceStr(fConvertedText, b_ss + b_Hasanta + b_ph, A_Ss_Ph);
-  fConvertedText := ReplaceStr(fConvertedText, b_s + b_Hasanta + b_kh, A_S_Kh);
-  fConvertedText := ReplaceStr(fConvertedText, b_s + b_Hasanta + b_tt, A_S_Tt);
-  fConvertedText := ReplaceStr(fConvertedText, b_s + b_Hasanta + b_n, A_S_N);
-  fConvertedText := ReplaceStr(fConvertedText, b_s + b_Hasanta + b_ph, A_S_Ph);
-  fConvertedText := ReplaceStr(fConvertedText, b_h + b_Hasanta + b_n, A_H_N);
-  fConvertedText := ReplaceStr(fConvertedText, b_h + b_Hasanta + b_m, A_H_M);
-  fConvertedText := ReplaceStr(fConvertedText, b_rr + b_Hasanta + b_g, A_Rr_G);
-
-  { Apply custom full form overrides AFTER hardcoded patterns }
-  for I := 0 to Length(CustomFullForms) - 1 do
-    fConvertedText := ReplaceStr(fConvertedText, CustomFullForms[I].Key, CustomFullForms[I].Value);
+  for I := 0 to Length(ActiveReplacements) - 1 do
+    fConvertedText := ReplaceStr(fConvertedText, ActiveReplacements[I].Key, ActiveReplacements[I].Value);
 end;
 
 { =============================================================================== }
@@ -1068,8 +984,13 @@ begin
       begin
         if (IsPureConsonent(wCTmp) = False) and (wCTmp <> b_Hasanta) and (wCTmp <> zwj) and (wCTmp <> zwnj) then
         begin
-          wSTmp := wCTmp + fKar + wSTmp;
-          fKar := #0;
+          if fKar <> #0 then
+          begin
+            wSTmp := wCTmp + fKar + wSTmp;
+            fKar := #0;
+          end
+          else
+            wSTmp := wCTmp + wSTmp;
         end
         else
         begin
@@ -1083,9 +1004,14 @@ begin
               wSTmp := wCTmp + wSTmp
             else
             begin
-              wSTmp := fKar + wCTmp + wSTmp;
-              // Place pending kar at begining
-              fKar := #0;
+              if fKar <> #0 then
+              begin
+                wSTmp := fKar + wCTmp + wSTmp;
+                // Place pending kar at begining
+                fKar := #0;
+              end
+              else
+                wSTmp := wCTmp + wSTmp;
             end;
           end;
         end;
@@ -1480,6 +1406,123 @@ end;
 
 { =============================================================================== }
 
+function CleanBengaliChar(const S: string): string;
+var
+  SpaceIdx, ParenIdx, DashIdx: Integer;
+begin
+  Result := S;
+  SpaceIdx := Pos(' ', Result);
+  if SpaceIdx > 0 then
+    Result := Copy(Result, 1, SpaceIdx - 1);
+  ParenIdx := Pos('(', Result);
+  if ParenIdx > 0 then
+    Result := Copy(Result, 1, ParenIdx - 1);
+  DashIdx := Pos('-', Result);
+  if DashIdx > 0 then
+    Result := Copy(Result, 1, DashIdx - 1);
+  Result := Trim(Result);
+end;
+
+{ =============================================================================== }
+
+procedure PrepareActiveReplacements;
+var
+  I: Integer;
+  UniqueMap: TDictionary<string, string>;
+  Rec: TAnsiVarRec;
+  Key: string;
+  Val: string;
+  ExcludedNames: TDictionary<string, Boolean>;
+begin
+  ExcludedNames := TDictionary<string, Boolean>.Create;
+  UniqueMap := TDictionary<string, string>.Create;
+  try
+    ExcludedNames.Add('A_G_Ukar', True);
+    ExcludedNames.Add('A_Sh_UKar', True);
+    ExcludedNames.Add('A_H_UKar', True);
+    ExcludedNames.Add('A_H_RRIKar', True);
+    ExcludedNames.Add('A_K_R', True);
+    ExcludedNames.Add('A_T_M', True);
+    ExcludedNames.Add('A_T_R', True);
+    ExcludedNames.Add('A_Bh_R', True);
+    ExcludedNames.Add('A_M_N', True);
+
+    // 1. Load default mappings from AnsiRegistry
+    for Rec in AnsiRegistry do
+    begin
+      if Rec.BengaliChar = '' then
+        Continue;
+
+      if Rec.Category = 'Numbers' then
+      begin
+        // All numbers are included
+      end
+      else if Rec.Category = 'Symbols' then
+      begin
+        if (Rec.Name <> 'A_Taka') and (Rec.Name <> 'A_Dari') and (Rec.Name <> 'A_DoubleDanda') then
+          Continue;
+      end
+      else if Rec.Category = 'Consonants' then
+      begin
+        if (Rec.Name <> 'A_Khandata') and (Rec.Name <> 'A_Anushar') and
+           (Rec.Name <> 'A_Bisharga') and (Rec.Name <> 'A_Chandra') then
+          Continue;
+      end
+      else if Rec.Category = 'FullForms' then
+      begin
+        if ExcludedNames.ContainsKey(Rec.Name) then
+          Continue;
+      end
+      else
+        Continue;
+
+      Key := CleanBengaliChar(Rec.BengaliChar);
+      if Key = '' then
+        Continue;
+
+      if not AnsiOverrides.TryGetValue(Rec.Name, Val) then
+      begin
+        if Rec.VarType = avChar then
+          Val := string(PChar(Rec.Ptr)^)
+        else
+          Val := PString(Rec.Ptr)^;
+      end;
+
+      if Val = '' then
+        Continue;
+
+      UniqueMap.AddOrSetValue(Key, Val);
+    end;
+
+    // 2. Merge custom full-form overrides (same Key overwrites default value)
+    for I := 0 to Length(CustomFullForms) - 1 do
+      UniqueMap.AddOrSetValue(CustomFullForms[I].Key, CustomFullForms[I].Value);
+
+    // 3. Populate ActiveReplacements from the deduplicated map
+    SetLength(ActiveReplacements, UniqueMap.Count);
+    I := 0;
+    for Key in UniqueMap.Keys do
+    begin
+      ActiveReplacements[I].Key := Key;
+      ActiveReplacements[I].Value := UniqueMap.Items[Key];
+      Inc(I);
+    end;
+
+    // 4. Sort by key length descending (Longest Match First)
+    TArray.Sort<TReplacementPair>(ActiveReplacements, TComparer<TReplacementPair>.Construct(
+      function(const L, R: TReplacementPair): Integer
+      begin
+        Result := R.Key.Length - L.Key.Length;
+      end
+    ));
+  finally
+    UniqueMap.Free;
+    ExcludedNames.Free;
+  end;
+end;
+
+{ =============================================================================== }
+
 procedure ResetAnsiToDefaults;
 var
   Rec: TAnsiVarRec;
@@ -1494,32 +1537,16 @@ begin
       PString(Rec.Ptr)^ := Resolved;
   end;
 
+  AnsiOverrides.Clear;
   SetLength(CustomFullForms, 0);
   SetLength(CustomPreReplacements, 0);
   SetLength(CustomPostReplacements, 0);
+  PrepareActiveReplacements;
 end;
 
 { =============================================================================== }
 
 procedure LoadAnsiMapping(const Path: string; ErrorLog: TStringList = nil);
-
-  function CleanBengaliChar(const S: string): string;
-  var
-    SpaceIdx, ParenIdx, DashIdx: Integer;
-  begin
-    Result := S;
-    SpaceIdx := Pos(' ', Result);
-    if SpaceIdx > 0 then
-      Result := Copy(Result, 1, SpaceIdx - 1);
-    ParenIdx := Pos('(', Result);
-    if ParenIdx > 0 then
-      Result := Copy(Result, 1, ParenIdx - 1);
-    DashIdx := Pos('-', Result);
-    if DashIdx > 0 then
-      Result := Copy(Result, 1, DashIdx - 1);
-    Result := Trim(Result);
-  end;
-
 var
   JSON: TJSONObject;
   ConstantsRoot, CategoryObj: TJSONObject;
@@ -1602,7 +1629,12 @@ begin
               if AnsiRegistryMap.TryGetValue(ConstName, Rec) then
               begin
                 if Rec.VarType = avChar then
-                  PChar(Rec.Ptr)^ := ConstValue[1]
+                begin
+                  if Length(ConstValue) = 1 then
+                    PChar(Rec.Ptr)^ := ConstValue[1]
+                  else
+                    AnsiOverrides.AddOrSetValue(ConstName, ConstValue);
+                end
                 else
                   PString(Rec.Ptr)^ := ConstValue;
               end;
@@ -1628,7 +1660,12 @@ begin
             if AnsiRegistryMap.TryGetValue(ConstName, Rec) then
             begin
               if Rec.VarType = avChar then
-                PChar(Rec.Ptr)^ := ConstValue[1]
+              begin
+                if Length(ConstValue) = 1 then
+                  PChar(Rec.Ptr)^ := ConstValue[1]
+                else
+                  AnsiOverrides.AddOrSetValue(ConstName, ConstValue);
+              end
               else
                 PString(Rec.Ptr)^ := ConstValue;
             end;
@@ -1763,6 +1800,8 @@ begin
         end;
       end;
     end;
+
+    PrepareActiveReplacements;
 
   finally
     KnownConstants.Free;
@@ -2049,9 +2088,12 @@ end;
 
 initialization
   InitializeAnsiRegistry;
+  AnsiOverrides := TDictionary<string, string>.Create;
+  PrepareActiveReplacements;
 
 finalization
   AnsiRegistry.Free;
   AnsiRegistryMap.Free;
+  AnsiOverrides.Free;
 
 end.
