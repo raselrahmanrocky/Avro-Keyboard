@@ -693,7 +693,13 @@ begin
   begin
     if string(b_Hasanta) <> '' then
     begin
-      if fConvertedText[Len] = string(b_Hasanta)[1] then
+      if (Len >= 2) and (fConvertedText[Len] = string(b_Hasanta)[1])
+         and (fConvertedText[Len - 1] = string(b_Hasanta)[1]) then
+      begin
+        fConvertedText[Len] := A_Hasanta;
+        fConvertedText[Len - 1] := A_Hasanta;
+      end
+      else if fConvertedText[Len] = string(b_Hasanta)[1] then
         fConvertedText[Len] := A_Hasanta;
     end;
   end;
@@ -957,7 +963,8 @@ begin
   fConvertedText := ReplaceStr(fUniText, b_z + b_Nukta, b_y);
   fConvertedText := ReplaceStr(fConvertedText, b_dd + b_Nukta, b_rr);
   fConvertedText := ReplaceStr(fConvertedText, b_ddh + b_Nukta, b_rrh);
-  fConvertedText := ReplaceStr(fConvertedText, b_Hasanta + b_Hasanta, b_Hasanta);
+  while Pos(b_Hasanta + b_Hasanta + b_Hasanta, fConvertedText) > 0 do
+    fConvertedText := ReplaceStr(fConvertedText, b_Hasanta + b_Hasanta + b_Hasanta, b_Hasanta + b_Hasanta);
   fConvertedText := ReplaceStr(fConvertedText, b_Hasanta + b_z + b_Hasanta + b_r, b_Hasanta + b_r + b_Hasanta + b_z);
 end;
 
