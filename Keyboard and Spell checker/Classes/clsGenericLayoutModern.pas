@@ -155,7 +155,7 @@ end;
 
 procedure TGenericLayoutModern.DoBackspace(var Block: Boolean);
 var
-  BijoyNewBanglaText: string;
+  BijoyNewBanglaText, SavedChar: string;
 begin
 
   if (Length(PrevBanglaT) - 1) <= 0 then
@@ -188,7 +188,18 @@ begin
   else
   begin
     Block := True;
-    InternalBackspace;
+    if (Length(PrevBanglaT) >= 3)
+      and (PrevBanglaT[Length(PrevBanglaT) - 2] = b_R)
+      and (PrevBanglaT[Length(PrevBanglaT) - 1] = b_Hasanta)
+      and IsPureConsonent(PrevBanglaT[Length(PrevBanglaT)]) then
+    begin
+      SavedChar := PrevBanglaT[Length(PrevBanglaT)];
+      InternalBackspace(3);
+      NewBanglaText := NewBanglaText + SavedChar;
+      SetLastChar(SavedChar);
+    end
+    else
+      InternalBackspace;
     // ParseAndSendNow;
   end;
 end;
