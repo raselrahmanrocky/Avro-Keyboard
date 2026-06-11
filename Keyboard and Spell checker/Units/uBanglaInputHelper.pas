@@ -12,17 +12,15 @@ unit uBanglaInputHelper;
 
 interface
 
-function HandleConsecutiveHasanta(var Text: string; var SelStart: Integer; NewChar: Char; IsUnicode: Boolean): Boolean;
+function ShouldBlockHasanta(const CurrentText: string; SelStart: Integer; NewChar: Char; IsUnicode: Boolean): Boolean;
 
 implementation
 
-function HandleConsecutiveHasanta(var Text: string; var SelStart: Integer; NewChar: Char; IsUnicode: Boolean): Boolean;
+function ShouldBlockHasanta(const CurrentText: string; SelStart: Integer; NewChar: Char; IsUnicode: Boolean): Boolean;
 var
   HasantaChar: Char;
-  ZWNJ: Char;
 begin
   Result := False;
-  ZWNJ := #$200C;
 
   if IsUnicode then
     HasantaChar := #$09CD
@@ -31,21 +29,10 @@ begin
 
   if NewChar = HasantaChar then
   begin
-    if SelStart >= 1 then
+    if SelStart >= 2 then
     begin
-      if Text[SelStart] = HasantaChar then
-      begin
-        if IsUnicode then
-        begin
-          Insert(ZWNJ, Text, SelStart + 1);
-          SelStart := SelStart + 1;
-          Result := True;
-        end
-        else
-        begin
-          Result := True;
-        end;
-      end;
+      if (CurrentText[SelStart] = HasantaChar) and (CurrentText[SelStart - 1] = HasantaChar) then
+        Result := True;
     end;
   end;
 end;

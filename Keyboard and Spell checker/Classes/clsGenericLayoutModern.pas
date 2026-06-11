@@ -437,6 +437,13 @@ begin
         DeadKey := False;
     end;
 
+    if (CharForKey = b_Hasanta) and (LastChar = ZWNJ) and (LastChars[2] = b_Hasanta) then
+    begin
+      MyProcessVKeyDown := '';
+      Block := True;
+      Exit;
+    end;
+
     if LastChar = b_Hasanta then
     begin
       if CharForKey = b_AAkar then
