@@ -313,6 +313,13 @@ begin
   begin
     CharForKey := GetCharForKey(KeyCode, var_IsLogicalShift, var_IsTrueShift, var_IsAltGr);
 
+    if (CharForKey = b_Hasanta) and (LastChar = ZWNJ) and (LastChars[2] = b_Hasanta) then
+    begin
+      MyProcessVKeyDown := '';
+      Block := True;
+      Exit;
+    end;
+
     if LastChar = b_Hasanta then
     begin
 
