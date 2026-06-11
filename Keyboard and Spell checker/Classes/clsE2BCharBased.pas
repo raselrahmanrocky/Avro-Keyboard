@@ -328,6 +328,7 @@ end;
 procedure TE2BCharBased.DoBackspace(var Block: boolean);
 var
   BijoyNewBanglaText: string;
+  SavedConsonant:     string;
 begin
 
   if (Length(EnglishT) - 1) <= 0 then
@@ -360,6 +361,18 @@ begin
   else if (Length(EnglishT) - 1) > 0 then
   begin
     Block := True;
+    if (Length(PrevBanglaT) >= 3)
+      and (PrevBanglaT[Length(PrevBanglaT) - 2] = b_R)
+      and (PrevBanglaT[Length(PrevBanglaT) - 1] = b_Hasanta)
+      and IsPureConsonent(PrevBanglaT[Length(PrevBanglaT)]) then
+    begin
+      SavedConsonant := PrevBanglaT[Length(PrevBanglaT)];
+      Backspace(3);
+      SendKey_Char(SavedConsonant);
+      PrevBanglaT := LeftStr(PrevBanglaT, Length(PrevBanglaT) - 3) + SavedConsonant;
+      NewBanglaText := PrevBanglaT;
+      Exit;
+    end;
     EnglishT := LeftStr(EnglishT, Length(EnglishT) - 1);
     ParseAndSend;
   end;
