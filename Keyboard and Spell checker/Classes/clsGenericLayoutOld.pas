@@ -31,6 +31,7 @@ type
       DetermineZWNJ_ZWJ:          string;
       LastChars:                  array [1 .. TrackL] of string;
       PrevBanglaT, NewBanglaText: string;
+      CommittedBanglaT:          string;
 
       // Kar Variables for Full Old Style Typing
       EKarActive, IKarActive, OIKarActive: Boolean;
@@ -124,6 +125,8 @@ procedure TGenericLayoutOld.DoBackspace(var Block: Boolean);
 var
   BijoyNewBanglaText: string;
   SavedChar:          string;
+  L:                  Integer;
+  SavedCommitted:     string;
 begin
   if (Length(PrevBanglaT) - 1) <= 0 then
   begin
@@ -134,6 +137,25 @@ begin
       begin
         Backspace(Length(NewBanglaText));
         Block := True;
+      end
+      else if CommittedBanglaT <> '' then
+      begin
+        L := Length(CommittedBanglaT);
+        if (L >= 3)
+          and (CommittedBanglaT[L - 2] = b_R)
+          and (CommittedBanglaT[L - 1] = b_Hasanta)
+          and IsPureConsonent(CommittedBanglaT[L]) then
+        begin
+          SavedChar := CommittedBanglaT[L];
+          SendInputBatch_BackspaceAndChar(3, SavedChar);
+          CommittedBanglaT := LeftStr(CommittedBanglaT, L - 3) + SavedChar;
+          Block := True;
+          Exit;
+        end;
+        SendInputBatch_Backspace(1);
+        CommittedBanglaT := LeftStr(CommittedBanglaT, L - 1);
+        Block := True;
+        Exit;
       end
       else
         Block := False;
@@ -150,7 +172,9 @@ begin
         Block := False;
     end;
 
+    SavedCommitted := CommittedBanglaT;
     ResetDeadKey;
+    CommittedBanglaT := SavedCommitted;
   end
   else
   begin
@@ -161,8 +185,9 @@ begin
       and IsPureConsonent(PrevBanglaT[Length(PrevBanglaT)]) then
     begin
       SavedChar := PrevBanglaT[Length(PrevBanglaT)];
-      InternalBackspace(3);
-      NewBanglaText := NewBanglaText + SavedChar;
+      SendInputBatch_BackspaceAndChar(3, SavedChar);
+      PrevBanglaT := LeftStr(PrevBanglaT, Length(PrevBanglaT) - 3) + SavedChar;
+      NewBanglaText := PrevBanglaT;
       SetLastChar(SavedChar);
     end
     else
@@ -527,6 +552,7 @@ begin
       VK_RETURN:
         begin
           Block := False;
+          CommittedBanglaT := CommittedBanglaT + PrevBanglaT + ' ';
           ResetLastChar;
           MyProcessVKeyDown := '';
           Exit;
@@ -534,6 +560,9 @@ begin
       VK_SPACE:
         begin
           Block := False;
+          CommittedBanglaT := CommittedBanglaT + PrevBanglaT + ' ';
+          if Length(CommittedBanglaT) > 500 then
+            Delete(CommittedBanglaT, 1, Length(CommittedBanglaT) - 500);
           ResetLastChar;
           MyProcessVKeyDown := '';
           Exit;
@@ -541,6 +570,7 @@ begin
       VK_TAB:
         begin
           Block := False;
+          CommittedBanglaT := '';
           ResetLastChar;
           MyProcessVKeyDown := '';
           Exit;
@@ -575,6 +605,7 @@ begin
             end
             else if CharForKey = '' then
             begin
+              CommittedBanglaT := '';
               ResetLastChar;
               Block := False;
               MyProcessVKeyDown := '';
@@ -597,6 +628,7 @@ begin
             end
             else if CharForKey = '' then
             begin
+              CommittedBanglaT := '';
               ResetLastChar;
               Block := False;
               MyProcessVKeyDown := '';
@@ -619,6 +651,7 @@ begin
             end
             else if CharForKey = '' then
             begin
+              CommittedBanglaT := '';
               ResetLastChar;
               Block := False;
               MyProcessVKeyDown := '';
@@ -686,6 +719,7 @@ begin
             end
             else if CharForKey = '' then
             begin
+              CommittedBanglaT := '';
               ResetLastChar;
               Block := False;
               MyProcessVKeyDown := '';
@@ -894,6 +928,7 @@ end;
 
 procedure TGenericLayoutOld.ResetDeadKey;
 begin
+  CommittedBanglaT := '';
   ResetLastChar;
 end;
 

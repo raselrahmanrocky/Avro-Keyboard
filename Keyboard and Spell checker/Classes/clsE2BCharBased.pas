@@ -46,6 +46,7 @@ type
       BlockLast:                 boolean;
       WStringList:               TStringList;
       NewBanglaText:             string;
+      CommittedBanglaT:          string;
       FAutoCorrect:              boolean;
       CandidateDict:             TDictionary<string, string>;
       ManuallySelectedCandidate: boolean;
@@ -329,6 +330,8 @@ procedure TE2BCharBased.DoBackspace(var Block: boolean);
 var
   BijoyNewBanglaText: string;
   SavedConsonant:     string;
+  L:                  Integer;
+  SavedCommitted:     string;
 begin
 
   if (Length(EnglishT) - 1) <= 0 then
@@ -340,6 +343,25 @@ begin
       begin
         Backspace(Length(NewBanglaText));
         Block := True;
+      end
+      else if CommittedBanglaT <> '' then
+      begin
+        L := Length(CommittedBanglaT);
+        if (L >= 3)
+          and (CommittedBanglaT[L - 2] = b_R)
+          and (CommittedBanglaT[L - 1] = b_Hasanta)
+          and IsPureConsonent(CommittedBanglaT[L]) then
+        begin
+          SavedConsonant := CommittedBanglaT[L];
+          SendInputBatch_BackspaceAndChar(3, SavedConsonant);
+          CommittedBanglaT := LeftStr(CommittedBanglaT, L - 3) + SavedConsonant;
+          Block := True;
+          Exit;
+        end;
+        SendInputBatch_Backspace(1);
+        CommittedBanglaT := LeftStr(CommittedBanglaT, L - 1);
+        Block := True;
+        Exit;
       end
       else
         Block := False;
@@ -356,7 +378,9 @@ begin
         Block := False;
     end;
 
+    SavedCommitted := CommittedBanglaT;
     ResetDeadKey;
+    CommittedBanglaT := SavedCommitted;
   end
   else if (Length(EnglishT) - 1) > 0 then
   begin
@@ -367,10 +391,10 @@ begin
       and IsPureConsonent(PrevBanglaT[Length(PrevBanglaT)]) then
     begin
       SavedConsonant := PrevBanglaT[Length(PrevBanglaT)];
-      Backspace(3);
-      SendKey_Char(SavedConsonant);
+      SendInputBatch_BackspaceAndChar(3, SavedConsonant);
       PrevBanglaT := LeftStr(PrevBanglaT, Length(PrevBanglaT) - 3) + SavedConsonant;
       NewBanglaText := PrevBanglaT;
+      EnglishT := LeftStr(EnglishT, Length(EnglishT) - 1);
       Exit;
     end;
     EnglishT := LeftStr(EnglishT, Length(EnglishT) - 1);
@@ -1383,6 +1407,7 @@ end;
 
 procedure TE2BCharBased.ProcessEnter(var Block: boolean);
 begin
+  CommittedBanglaT := CommittedBanglaT + NewBanglaText + ' ';
   ResetDeadKey;
   Block := False;
 end;
@@ -1391,6 +1416,12 @@ end;
 
 procedure TE2BCharBased.ProcessSpace(var Block: boolean);
 begin
+  if OutputIsBijoy <> 'YES' then
+  begin
+    CommittedBanglaT := CommittedBanglaT + NewBanglaText + ' ';
+    if Length(CommittedBanglaT) > 500 then
+      Delete(CommittedBanglaT, 1, Length(CommittedBanglaT) - 500);
+  end;
   ResetDeadKey;
   Block := False;
 end;
@@ -1510,6 +1541,7 @@ procedure TE2BCharBased.ResetDeadKey;
 var
   I: Integer;
 begin
+  CommittedBanglaT := '';
   PrevBanglaT := '';
   EnglishT := '';
   BlockLast := False;
