@@ -156,9 +156,10 @@ end;
 
 procedure TGenericLayoutModern.DoBackspace(var Block: Boolean);
 var
-  BijoyNewBanglaText, SavedChar: string;
-  L:                             Integer;
-  SavedCommitted:                string;
+  BijoyNewBanglaText: string;
+  SavedChar:          string;
+  L:                  Integer;
+  SavedCommitted:     string;
 begin
 
   if (Length(PrevBanglaT) - 1) <= 0 then
@@ -180,12 +181,13 @@ begin
           and IsPureConsonent(CommittedBanglaT[L]) then
         begin
           SavedChar := CommittedBanglaT[L];
-          SendInputBatch_BackspaceAndChar(3, SavedChar);
+          Backspace(3);
+          SendKey_Char(SavedChar);
           CommittedBanglaT := LeftStr(CommittedBanglaT, L - 3) + SavedChar;
           Block := True;
           Exit;
         end;
-        SendInputBatch_Backspace(1);
+        Backspace(1);
         CommittedBanglaT := LeftStr(CommittedBanglaT, L - 1);
         Block := True;
         Exit;
@@ -218,7 +220,16 @@ begin
       and IsPureConsonent(PrevBanglaT[Length(PrevBanglaT)]) then
     begin
       SavedChar := PrevBanglaT[Length(PrevBanglaT)];
-      SendInputBatch_BackspaceAndChar(3, SavedChar);
+      if OutputIsBijoy = 'YES' then
+      begin
+        Backspace(Length(Bijoy.Convert(MidStr(PrevBanglaT, Length(PrevBanglaT) - 2, 3))));
+        SendKey_Char(Bijoy.Convert(SavedChar));
+      end
+      else
+      begin
+        Backspace(3);
+        SendKey_Char(SavedChar);
+      end;
       PrevBanglaT := LeftStr(PrevBanglaT, Length(PrevBanglaT) - 3) + SavedChar;
       NewBanglaText := PrevBanglaT;
       SetLastChar(SavedChar);
@@ -462,13 +473,6 @@ begin
         DeadKey := False;
     end;
 
-    if (CharForKey = b_Hasanta) and (LastChar = ZWNJ) and (LastChars[2] = b_Hasanta) then
-    begin
-      MyProcessVKeyDown := '';
-      Block := True;
-      Exit;
-    end;
-
     if LastChar = b_Hasanta then
     begin
       if CharForKey = b_AAkar then
@@ -574,7 +578,6 @@ begin
         begin
           Block := False;
           DeadKey := True;
-          CommittedBanglaT := '';
           ResetLastChar;
           MyProcessVKeyDown := '';
           Exit;
@@ -596,7 +599,6 @@ begin
           begin
             DeadKey := False;
             Block := False;
-            CommittedBanglaT := '';
             MyProcessVKeyDown := '';
             ResetLastChar;
             Exit;
@@ -800,7 +802,6 @@ end;
 
 procedure TGenericLayoutModern.ResetDeadKey;
 begin
-  CommittedBanglaT := '';
   DeadKey := False;
   ResetLastChar;
 end;

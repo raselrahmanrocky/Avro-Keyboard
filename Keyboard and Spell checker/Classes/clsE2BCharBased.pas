@@ -43,10 +43,10 @@ type
       Bijoy:                     TUnicodeToBijoy2000;
       EnglishT:                  string;
       PrevBanglaT:               string;
+      CommittedBanglaT:          string;
       BlockLast:                 boolean;
       WStringList:               TStringList;
       NewBanglaText:             string;
-      CommittedBanglaT:          string;
       FAutoCorrect:              boolean;
       CandidateDict:             TDictionary<string, string>;
       ManuallySelectedCandidate: boolean;
@@ -353,12 +353,13 @@ begin
           and IsPureConsonent(CommittedBanglaT[L]) then
         begin
           SavedConsonant := CommittedBanglaT[L];
-          SendInputBatch_BackspaceAndChar(3, SavedConsonant);
+          Backspace(3);
+          SendKey_Char(SavedConsonant);
           CommittedBanglaT := LeftStr(CommittedBanglaT, L - 3) + SavedConsonant;
           Block := True;
           Exit;
         end;
-        SendInputBatch_Backspace(1);
+        Backspace(1);
         CommittedBanglaT := LeftStr(CommittedBanglaT, L - 1);
         Block := True;
         Exit;
@@ -385,19 +386,27 @@ begin
   else if (Length(EnglishT) - 1) > 0 then
   begin
     Block := True;
+    EnglishT := LeftStr(EnglishT, Length(EnglishT) - 1);
     if (Length(PrevBanglaT) >= 3)
       and (PrevBanglaT[Length(PrevBanglaT) - 2] = b_R)
       and (PrevBanglaT[Length(PrevBanglaT) - 1] = b_Hasanta)
       and IsPureConsonent(PrevBanglaT[Length(PrevBanglaT)]) then
     begin
       SavedConsonant := PrevBanglaT[Length(PrevBanglaT)];
-      SendInputBatch_BackspaceAndChar(3, SavedConsonant);
+      if OutputIsBijoy = 'YES' then
+      begin
+        Backspace(Length(Bijoy.Convert(MidStr(PrevBanglaT, Length(PrevBanglaT) - 2, 3))));
+        SendKey_Char(Bijoy.Convert(SavedConsonant));
+      end
+      else
+      begin
+        Backspace(3) ;
+        SendKey_Char(SavedConsonant);
+      end;
       PrevBanglaT := LeftStr(PrevBanglaT, Length(PrevBanglaT) - 3) + SavedConsonant;
       NewBanglaText := PrevBanglaT;
-      EnglishT := LeftStr(EnglishT, Length(EnglishT) - 1);
       Exit;
     end;
-    EnglishT := LeftStr(EnglishT, Length(EnglishT) - 1);
     ParseAndSend;
   end;
 
@@ -1541,7 +1550,6 @@ procedure TE2BCharBased.ResetDeadKey;
 var
   I: Integer;
 begin
-  CommittedBanglaT := '';
   PrevBanglaT := '';
   EnglishT := '';
   BlockLast := False;

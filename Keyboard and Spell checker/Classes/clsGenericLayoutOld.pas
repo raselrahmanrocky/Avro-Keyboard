@@ -147,12 +147,13 @@ begin
           and IsPureConsonent(CommittedBanglaT[L]) then
         begin
           SavedChar := CommittedBanglaT[L];
-          SendInputBatch_BackspaceAndChar(3, SavedChar);
+          Backspace(3);
+          SendKey_Char(SavedChar);
           CommittedBanglaT := LeftStr(CommittedBanglaT, L - 3) + SavedChar;
           Block := True;
           Exit;
         end;
-        SendInputBatch_Backspace(1);
+        Backspace(1);
         CommittedBanglaT := LeftStr(CommittedBanglaT, L - 1);
         Block := True;
         Exit;
@@ -185,7 +186,16 @@ begin
       and IsPureConsonent(PrevBanglaT[Length(PrevBanglaT)]) then
     begin
       SavedChar := PrevBanglaT[Length(PrevBanglaT)];
-      SendInputBatch_BackspaceAndChar(3, SavedChar);
+      if OutputIsBijoy = 'YES' then
+      begin
+        Backspace(Length(Bijoy.Convert(MidStr(PrevBanglaT, Length(PrevBanglaT) - 2, 3))));
+        SendKey_Char(Bijoy.Convert(SavedChar));
+      end
+      else
+      begin
+        Backspace(3);
+        SendKey_Char(SavedChar);
+      end;
       PrevBanglaT := LeftStr(PrevBanglaT, Length(PrevBanglaT) - 3) + SavedChar;
       NewBanglaText := PrevBanglaT;
       SetLastChar(SavedChar);
@@ -337,13 +347,6 @@ begin
   else if AvroMainForm1.GetMyCurrentKeyboardMode = bangla then
   begin
     CharForKey := GetCharForKey(KeyCode, var_IsLogicalShift, var_IsTrueShift, var_IsAltGr);
-
-    if (CharForKey = b_Hasanta) and (LastChar = ZWNJ) and (LastChars[2] = b_Hasanta) then
-    begin
-      MyProcessVKeyDown := '';
-      Block := True;
-      Exit;
-    end;
 
     if LastChar = b_Hasanta then
     begin
@@ -570,7 +573,6 @@ begin
       VK_TAB:
         begin
           Block := False;
-          CommittedBanglaT := '';
           ResetLastChar;
           MyProcessVKeyDown := '';
           Exit;
@@ -605,7 +607,6 @@ begin
             end
             else if CharForKey = '' then
             begin
-              CommittedBanglaT := '';
               ResetLastChar;
               Block := False;
               MyProcessVKeyDown := '';
@@ -628,7 +629,6 @@ begin
             end
             else if CharForKey = '' then
             begin
-              CommittedBanglaT := '';
               ResetLastChar;
               Block := False;
               MyProcessVKeyDown := '';
@@ -651,7 +651,6 @@ begin
             end
             else if CharForKey = '' then
             begin
-              CommittedBanglaT := '';
               ResetLastChar;
               Block := False;
               MyProcessVKeyDown := '';
@@ -719,7 +718,6 @@ begin
             end
             else if CharForKey = '' then
             begin
-              CommittedBanglaT := '';
               ResetLastChar;
               Block := False;
               MyProcessVKeyDown := '';
@@ -928,7 +926,6 @@ end;
 
 procedure TGenericLayoutOld.ResetDeadKey;
 begin
-  CommittedBanglaT := '';
   ResetLastChar;
 end;
 
