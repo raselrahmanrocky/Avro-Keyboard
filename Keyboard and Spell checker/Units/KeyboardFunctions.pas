@@ -21,6 +21,8 @@ procedure SendKey_SendInput(const bKey: Integer);
 procedure SendInput_UP(const bKey: Integer);
 procedure SendInput_Down(const bKey: Integer);
 procedure SendKey_Basic(const Unikey: Integer);
+procedure SendInputBatch_BackspaceAndChar(KeyRepeat: Integer; const CharToSend: string);
+procedure SendInputBatch_Backspace(KeyRepeat: Integer);
 function IsLogicalShift: Boolean;
 function IsTrueShift: Boolean;
 function IsOnlyShift: Boolean;
@@ -185,9 +187,7 @@ begin
   begin
     SendKey_SendInput(VK_Back);
     SendKey_SendInput(VK_NONAME); // Hack: Unused key to try to avoid key buffering issue (deleting too much)
-    Sleep(SENDKEY_DELAY_MS);      // Add a small delay to allow processing
   end;
-  Sleep(SENDKEY_DELAY_MS);        // Extra delay to ensure app processes injected keys
 end;
 
 { =============================================================================== }
@@ -278,6 +278,140 @@ begin
   end;
 
   SendInput(2, KInput[0], SizeOf(KInput[0]));
+end;
+
+{ =============================================================================== }
+
+procedure SendInputBatch_BackspaceAndChar(KeyRepeat: Integer; const CharToSend: string);
+var
+  Inputs: array of TInput;
+  TotalEvents, Index, I: Integer;
+  J: Integer;
+begin
+  TotalEvents := (KeyRepeat * 4) + (Length(CharToSend) * 4);
+  SetLength(Inputs, TotalEvents);
+  Index := 0;
+
+  for I := 1 to KeyRepeat do
+  begin
+    Inputs[Index].Itype := INPUT_KEYBOARD;
+    Inputs[Index].ki.wVk := VK_Back;
+    Inputs[Index].ki.wScan := MapVirtualKey(VK_Back, 0);
+    Inputs[Index].ki.dwFlags := 0;
+    Inputs[Index].ki.time := 0;
+    Inputs[Index].ki.dwExtraInfo := 0;
+    Inc(Index);
+
+    Inputs[Index].Itype := INPUT_KEYBOARD;
+    Inputs[Index].ki.wVk := VK_Back;
+    Inputs[Index].ki.wScan := MapVirtualKey(VK_Back, 0);
+    Inputs[Index].ki.dwFlags := KEYEVENTF_KEYUP;
+    Inputs[Index].ki.time := 0;
+    Inputs[Index].ki.dwExtraInfo := 0;
+    Inc(Index);
+
+    Inputs[Index].Itype := INPUT_KEYBOARD;
+    Inputs[Index].ki.wVk := VK_NONAME;
+    Inputs[Index].ki.wScan := MapVirtualKey(VK_NONAME, 0);
+    Inputs[Index].ki.dwFlags := 0;
+    Inputs[Index].ki.time := 0;
+    Inputs[Index].ki.dwExtraInfo := 0;
+    Inc(Index);
+
+    Inputs[Index].Itype := INPUT_KEYBOARD;
+    Inputs[Index].ki.wVk := VK_NONAME;
+    Inputs[Index].ki.wScan := MapVirtualKey(VK_NONAME, 0);
+    Inputs[Index].ki.dwFlags := KEYEVENTF_KEYUP;
+    Inputs[Index].ki.time := 0;
+    Inputs[Index].ki.dwExtraInfo := 0;
+    Inc(Index);
+  end;
+
+  for J := 1 to Length(CharToSend) do
+  begin
+    Inputs[Index].Itype := INPUT_KEYBOARD;
+    Inputs[Index].ki.wVk := 0;
+    Inputs[Index].ki.wScan := Ord(CharToSend[J]);
+    Inputs[Index].ki.dwFlags := KEYEVENTF_UNICODE;
+    Inputs[Index].ki.time := 0;
+    Inputs[Index].ki.dwExtraInfo := 0;
+    Inc(Index);
+
+    Inputs[Index].Itype := INPUT_KEYBOARD;
+    Inputs[Index].ki.wVk := 0;
+    Inputs[Index].ki.wScan := Ord(CharToSend[J]);
+    Inputs[Index].ki.dwFlags := KEYEVENTF_UNICODE or KEYEVENTF_KEYUP;
+    Inputs[Index].ki.time := 0;
+    Inputs[Index].ki.dwExtraInfo := 0;
+    Inc(Index);
+
+    Inputs[Index].Itype := INPUT_KEYBOARD;
+    Inputs[Index].ki.wVk := VK_NONAME;
+    Inputs[Index].ki.wScan := MapVirtualKey(VK_NONAME, 0);
+    Inputs[Index].ki.dwFlags := 0;
+    Inputs[Index].ki.time := 0;
+    Inputs[Index].ki.dwExtraInfo := 0;
+    Inc(Index);
+
+    Inputs[Index].Itype := INPUT_KEYBOARD;
+    Inputs[Index].ki.wVk := VK_NONAME;
+    Inputs[Index].ki.wScan := MapVirtualKey(VK_NONAME, 0);
+    Inputs[Index].ki.dwFlags := KEYEVENTF_KEYUP;
+    Inputs[Index].ki.time := 0;
+    Inputs[Index].ki.dwExtraInfo := 0;
+    Inc(Index);
+  end;
+
+  SendInput(TotalEvents, Inputs[0], SizeOf(Inputs[0]));
+end;
+
+{ =============================================================================== }
+
+procedure SendInputBatch_Backspace(KeyRepeat: Integer);
+var
+  Inputs: array of TInput;
+  TotalEvents, Index, I: Integer;
+begin
+  TotalEvents := KeyRepeat * 4;
+  SetLength(Inputs, TotalEvents);
+  Index := 0;
+
+  for I := 1 to KeyRepeat do
+  begin
+    Inputs[Index].Itype := INPUT_KEYBOARD;
+    Inputs[Index].ki.wVk := VK_Back;
+    Inputs[Index].ki.wScan := MapVirtualKey(VK_Back, 0);
+    Inputs[Index].ki.dwFlags := 0;
+    Inputs[Index].ki.time := 0;
+    Inputs[Index].ki.dwExtraInfo := 0;
+    Inc(Index);
+
+    Inputs[Index].Itype := INPUT_KEYBOARD;
+    Inputs[Index].ki.wVk := VK_Back;
+    Inputs[Index].ki.wScan := MapVirtualKey(VK_Back, 0);
+    Inputs[Index].ki.dwFlags := KEYEVENTF_KEYUP;
+    Inputs[Index].ki.time := 0;
+    Inputs[Index].ki.dwExtraInfo := 0;
+    Inc(Index);
+
+    Inputs[Index].Itype := INPUT_KEYBOARD;
+    Inputs[Index].ki.wVk := VK_NONAME;
+    Inputs[Index].ki.wScan := MapVirtualKey(VK_NONAME, 0);
+    Inputs[Index].ki.dwFlags := 0;
+    Inputs[Index].ki.time := 0;
+    Inputs[Index].ki.dwExtraInfo := 0;
+    Inc(Index);
+
+    Inputs[Index].Itype := INPUT_KEYBOARD;
+    Inputs[Index].ki.wVk := VK_NONAME;
+    Inputs[Index].ki.wScan := MapVirtualKey(VK_NONAME, 0);
+    Inputs[Index].ki.dwFlags := KEYEVENTF_KEYUP;
+    Inputs[Index].ki.time := 0;
+    Inputs[Index].ki.dwExtraInfo := 0;
+    Inc(Index);
+  end;
+
+  SendInput(TotalEvents, Inputs[0], SizeOf(Inputs[0]));
 end;
 
 end.
