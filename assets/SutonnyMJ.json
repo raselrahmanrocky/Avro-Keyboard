@@ -1,0 +1,783 @@
+﻿{
+  "Constants": {
+    "Numbers": {
+      "A_0": {
+        "Value": "#$0030",
+        "Comment": "০"
+      },
+      "A_1": {
+        "Value": "#$0031",
+        "Comment": "১"
+      },
+      "A_2": {
+        "Value": "#$0032",
+        "Comment": "২"
+      },
+      "A_3": {
+        "Value": "#$0033",
+        "Comment": "৩"
+      },
+      "A_4": {
+        "Value": "#$0034",
+        "Comment": "৪"
+      },
+      "A_5": {
+        "Value": "#$0035",
+        "Comment": "৫"
+      },
+      "A_6": {
+        "Value": "#$0036",
+        "Comment": "৬"
+      },
+      "A_7": {
+        "Value": "#$0037",
+        "Comment": "৭"
+      },
+      "A_8": {
+        "Value": "#$0038",
+        "Comment": "৮"
+      },
+      "A_9": {
+        "Value": "#$0039",
+        "Comment": "৯"
+      }
+    },
+    "VowelsAndKars": {
+      "A_A": {
+        "Value": "#$0041",
+        "Comment": "অ"
+      },
+      "A_AA": {
+        "Value": "#$0041#$0076",
+        "Comment": "আ"
+      },
+      "A_AAKar": {
+        "Value": "#$0076",
+        "Comment": "া (আ-কার)"
+      },
+      "A_I": {
+        "Value": "#$0042",
+        "Comment": "ই"
+      },
+      "A_IKar": {
+        "Value": "#$0077",
+        "Comment": "ি (ই-কার)"
+      },
+      "A_II": {
+        "Value": "#$0043",
+        "Comment": "ঈ"
+      },
+      "A_IIKar": {
+        "Value": "#$0078",
+        "Comment": "ী (ঈ-কার)"
+      },
+      "A_U": {
+        "Value": "#$0044",
+        "Comment": "উ"
+      },
+      "A_UKar2": {
+        "Value": "#$0079",
+        "Comment": "ু (উ-কার ২ - ঝুলন্ত)"
+      },
+      "A_UKar1": {
+        "Value": "#$007A",
+        "Comment": "ু (উ-কার ১ - সাধারণ)"
+      },
+      "A_UKar3": {
+        "Value": "#$2013",
+        "Comment": "ু (উ-কার ৩ - ড়ু\/ঢ়ু)"
+      },
+      "A_UKar4": {
+        "Value": "#$E6",
+        "Comment": "ু (উ-কার ৪ - রু)"
+      },
+      "A_UU": {
+        "Value": "#$0045",
+        "Comment": "ঊ"
+      },
+      "A_UUKar2": {
+        "Value": "#$007E",
+        "Comment": "ূ (ঊ-কার ২ - ঝুলন্ত)"
+      },
+      "A_UUKar1": {
+        "Value": "#$201A",
+        "Comment": "ূ (ঊ-কার ১ - সাধারণ)"
+      },
+      "A_UUKar3": {
+        "Value": "#$0192",
+        "Comment": "ূ (ঊ-কার ৩ - রূ)"
+      },
+      "A_RRI": {
+        "Value": "#$0046",
+        "Comment": "ঋ"
+      },
+      "A_RRIKar1": {
+        "Value": "#$201E",
+        "Comment": "ৃ (ঋ-কার ১)"
+      },
+      "A_RRIKar2": {
+        "Value": "#$2026",
+        "Comment": "ৃ (ঋ-কার ২)"
+      },
+      "A_E": {
+        "Value": "#$0047",
+        "Comment": "এ"
+      },
+      "A_EKar1": {
+        "Value": "#$2020",
+        "Comment": "ে (এ-কার ১ - সাধারণ)"
+      },
+      "A_EKar2": {
+        "Value": "#$2021",
+        "Comment": "ে (এ-কার ২ - ঝুলন্ত)"
+      },
+      "A_OI": {
+        "Value": "#$0048",
+        "Comment": "ঐ"
+      },
+      "A_OIKar1": {
+        "Value": "#$02C6",
+        "Comment": "ৈ (ঐ-কার ১ - সাধারণ)"
+      },
+      "A_OIKar2": {
+        "Value": "#$2030",
+        "Comment": "ৈ (ঐ-কার ২ - ঝুলন্ত)"
+      },
+      "A_O": {
+        "Value": "#$0049",
+        "Comment": "ও"
+      },
+      "A_OU": {
+        "Value": "#$004A",
+        "Comment": "ঔ"
+      },
+      "A_OUKar": {
+        "Value": "#$0160",
+        "Comment": "ৌ (ঔ-কার)"
+      }
+    },
+    "Symbols": {
+      "A_Taka": {
+        "Value": "#$0024",
+        "Comment": "৳ (টাকা)"
+      },
+      "A_Dari": {
+        "Value": "#$007C",
+        "Comment": "। (দাঁড়ি)"
+      },
+      "A_DoubleDanda": {
+        "Value": "#$005C",
+        "Comment": "॥ (দ্বিত্ব দাঁড়ি)"
+      },
+      "A_Hasanta": {
+        "Value": "#$0026",
+        "Comment": "্ (হসন্ত)"
+      },
+      "A_StartDoubleQuote": {
+        "Value": "#$00D2",
+        "Comment": "\" (উদ্ধৃতি শুরু)"
+      },
+      "A_EndDoubleQuote": {
+        "Value": "#$00D3",
+        "Comment": "\" (উদ্ধৃতি শেষ)"
+      },
+      "A_StartSingleQuote": {
+        "Value": "#$00D4",
+        "Comment": "' (একক উদ্ধৃতি শুরু)"
+      },
+      "A_EndSingleQuote": {
+        "Value": "#$00D5",
+        "Comment": "' (একক উদ্ধৃতি শেষ)"
+      }
+    },
+    "Consonants": {
+      "A_K": {
+        "Value": "#$004B",
+        "Comment": "ক"
+      },
+      "A_Kh": {
+        "Value": "#$004C",
+        "Comment": "খ"
+      },
+      "A_G": {
+        "Value": "#$004D",
+        "Comment": "গ"
+      },
+      "A_Gh": {
+        "Value": "#$004E",
+        "Comment": "ঘ"
+      },
+      "A_NGA": {
+        "Value": "#$004F",
+        "Comment": "ঙ"
+      },
+      "A_C": {
+        "Value": "#$0050",
+        "Comment": "চ"
+      },
+      "A_Ch": {
+        "Value": "#$0051",
+        "Comment": "ছ"
+      },
+      "A_J": {
+        "Value": "#$0052",
+        "Comment": "জ"
+      },
+      "A_Jh": {
+        "Value": "#$0053",
+        "Comment": "ঝ"
+      },
+      "A_NYA": {
+        "Value": "#$0054",
+        "Comment": "ঞ"
+      },
+      "A_Tt": {
+        "Value": "#$0055",
+        "Comment": "ট"
+      },
+      "A_Tth": {
+        "Value": "#$0056",
+        "Comment": "ঠ"
+      },
+      "A_Dd": {
+        "Value": "#$0057",
+        "Comment": "ড"
+      },
+      "A_Ddh": {
+        "Value": "#$0058",
+        "Comment": "ঢ"
+      },
+      "A_Nn": {
+        "Value": "#$0059",
+        "Comment": "ণ"
+      },
+      "A_T": {
+        "Value": "#$005A",
+        "Comment": "ত"
+      },
+      "A_Th": {
+        "Value": "#$005F",
+        "Comment": "থ"
+      },
+      "A_D": {
+        "Value": "#$0060",
+        "Comment": "দ"
+      },
+      "A_Dh": {
+        "Value": "#$0061",
+        "Comment": "ধ"
+      },
+      "A_N": {
+        "Value": "#$0062",
+        "Comment": "ন"
+      },
+      "A_P": {
+        "Value": "#$0063",
+        "Comment": "প"
+      },
+      "A_Ph": {
+        "Value": "#$0064",
+        "Comment": "ফ"
+      },
+      "A_B": {
+        "Value": "#$0065",
+        "Comment": "ব"
+      },
+      "A_Bh": {
+        "Value": "#$0066",
+        "Comment": "ভ"
+      },
+      "A_M": {
+        "Value": "#$0067",
+        "Comment": "ম"
+      },
+      "A_Z": {
+        "Value": "#$0068",
+        "Comment": "য"
+      },
+      "A_R": {
+        "Value": "#$0069",
+        "Comment": "র"
+      },
+      "A_L": {
+        "Value": "#$006A",
+        "Comment": "ল"
+      },
+      "A_Sh": {
+        "Value": "#$006B",
+        "Comment": "শ"
+      },
+      "A_SS": {
+        "Value": "#$006C",
+        "Comment": "ষ"
+      },
+      "A_S": {
+        "Value": "#$006D",
+        "Comment": "স"
+      },
+      "A_H": {
+        "Value": "#$006E",
+        "Comment": "হ"
+      },
+      "A_RR": {
+        "Value": "#$006F",
+        "Comment": "ড়"
+      },
+      "A_RRH": {
+        "Value": "#$0070",
+        "Comment": "ঢ়"
+      },
+      "A_Y": {
+        "Value": "#$0071",
+        "Comment": "য়"
+      },
+      "A_Khandata": {
+        "Value": "#$0072",
+        "Comment": "ৎ"
+      },
+      "A_Anushar": {
+        "Value": "#$0073",
+        "Comment": "ং"
+      },
+      "A_Bisharga": {
+        "Value": "#$0074",
+        "Comment": "ঃ"
+      },
+      "A_Chandra": {
+        "Value": "#$0075",
+        "Comment": "ঁ"
+      }
+    },
+    "FullForms": {
+      "A_K_K": {
+        "Value": "#$00B0",
+        "Comment": "ক্ক"
+      },
+      "A_K_Tt": {
+        "Value": "#$00B1",
+        "Comment": "ক্ট"
+      },
+      "A_K_Ss_M": {
+        "Value": "#$00B2",
+        "Comment": "ক্স্ম"
+      },
+      "A_K_T": {
+        "Value": "#$00B3",
+        "Comment": "ক্ত"
+      },
+      "A_K_M": {
+        "Value": "#$00B4",
+        "Comment": "ক্ম"
+      },
+      "A_K_R": {
+        "Value": "#$00B5",
+        "Comment": "ক্র"
+      },
+      "A_K_Ss": {
+        "Value": "#$00B6",
+        "Comment": "ক্ষ"
+      },
+      "A_K_S": {
+        "Value": "#$00B7",
+        "Comment": "ক্স"
+      },
+      "A_G_Ukar": {
+        "Value": "#$00B8",
+        "Comment": "গু"
+      },
+      "A_G_G": {
+        "Value": "#$00B9",
+        "Comment": "গ্গ"
+      },
+      "A_G_D": {
+        "Value": "#$00BA",
+        "Comment": "গ্দ"
+      },
+      "A_G_Dh": {
+        "Value": "#$00BB",
+        "Comment": "গ্ধ"
+      },
+      "A_NGA_K": {
+        "Value": "#$00BC",
+        "Comment": "ঙ্ক"
+      },
+      "A_NGA_G": {
+        "Value": "#$00BD",
+        "Comment": "ঙ্গ"
+      },
+      "A_J_J": {
+        "Value": "#$00BE",
+        "Comment": "জ্জ"
+      },
+      "A_J_Jh": {
+        "Value": "#$00C0",
+        "Comment": "জ্ঝ"
+      },
+      "A_J_NYA": {
+        "Value": "#$00C1",
+        "Comment": "জ্ঞ"
+      },
+      "A_NYA_C": {
+        "Value": "#$00C2",
+        "Comment": "ঞ্চ"
+      },
+      "A_NYA_CH": {
+        "Value": "#$00C3",
+        "Comment": "ঞ্ছ"
+      },
+      "A_NYA_J": {
+        "Value": "#$00C4",
+        "Comment": "ঞ্জ"
+      },
+      "A_NYA_Jh": {
+        "Value": "#$00C5",
+        "Comment": "ঞ্ঝ"
+      },
+      "A_Tt_Tt": {
+        "Value": "#$00C6",
+        "Comment": "ট্ট"
+      },
+      "A_Dd_Dd": {
+        "Value": "#$00C7",
+        "Comment": "ড্ড"
+      },
+      "A_Nn_Tt": {
+        "Value": "#$00C8",
+        "Comment": "ণ্ট"
+      },
+      "A_Nn_Tth": {
+        "Value": "#$00C9",
+        "Comment": "ণ্ঠ"
+      },
+      "A_NN_Dd": {
+        "Value": "#$00CA",
+        "Comment": "ণ্ড"
+      },
+      "A_T_T": {
+        "Value": "#$00CB",
+        "Comment": "ত্ত"
+      },
+      "A_T_Th": {
+        "Value": "#$00CC",
+        "Comment": "ত্থ"
+      },
+      "A_T_M": {
+        "Value": "#$00CD",
+        "Comment": "ত্ম"
+      },
+      "A_T_R": {
+        "Value": "#$00CE",
+        "Comment": "ত্র"
+      },
+      "A_D_D": {
+        "Value": "#$00CF",
+        "Comment": "দ্দ"
+      },
+      "A_D_Dh": {
+        "Value": "#$00D7",
+        "Comment": "দ্ধ"
+      },
+      "A_D_B": {
+        "Value": "#$00D8",
+        "Comment": "দ্ব"
+      },
+      "A_D_M": {
+        "Value": "#$00D9",
+        "Comment": "দ্ম"
+      },
+      "A_N_Tth": {
+        "Value": "#$00DA",
+        "Comment": "ন্থ"
+      },
+      "A_N_Dd": {
+        "Value": "#$00DB",
+        "Comment": "ন্ড"
+      },
+      "A_N_Dh": {
+        "Value": "#$00DC",
+        "Comment": "ন্ধ"
+      },
+      "A_N_S": {
+        "Value": "#$00DD",
+        "Comment": "ন্স"
+      },
+      "A_P_Tt": {
+        "Value": "#$00DE",
+        "Comment": "প্ট"
+      },
+      "A_P_T": {
+        "Value": "#$00DF",
+        "Comment": "প্ত"
+      },
+      "A_P_P": {
+        "Value": "#$00E0",
+        "Comment": "প্প"
+      },
+      "A_P_S": {
+        "Value": "#$00E1",
+        "Comment": "প্স"
+      },
+      "A_B_J": {
+        "Value": "#$00E2",
+        "Comment": "ব্জ"
+      },
+      "A_B_D": {
+        "Value": "#$00E3",
+        "Comment": "ব্দ"
+      },
+      "A_B_Dh": {
+        "Value": "#$00E4",
+        "Comment": "ব্ধ"
+      },
+      "A_Bh_R": {
+        "Value": "#$00E5",
+        "Comment": "ভ্র"
+      },
+      "A_M_N": {
+        "Value": "#$00A4#$0153",
+        "Comment": "ম্ন"
+      },
+      "A_M_Ph": {
+        "Value": "#$00E7",
+        "Comment": "ম্ফ"
+      },
+      "A_L_K": {
+        "Value": "#$00E9",
+        "Comment": "ল্ক"
+      },
+      "A_L_G": {
+        "Value": "#$00EA",
+        "Comment": "ল্গ"
+      },
+      "A_L_Tt": {
+        "Value": "#$00EB",
+        "Comment": "ল্ট"
+      },
+      "A_L_Dd": {
+        "Value": "#$00EC",
+        "Comment": "ল্ড"
+      },
+      "A_L_P": {
+        "Value": "#$00ED",
+        "Comment": "ল্প"
+      },
+      "A_L_Ph": {
+        "Value": "#$00EE",
+        "Comment": "ল্ফ"
+      },
+      "A_Sh_UKar": {
+        "Value": "#$00EF",
+        "Comment": "শু"
+      },
+      "A_Sh_C": {
+        "Value": "#$00F0",
+        "Comment": "শ্চ"
+      },
+      "A_Sh_Ch": {
+        "Value": "#$00F1",
+        "Comment": "শ্ছ"
+      },
+      "A_Ss_Nn": {
+        "Value": "#$00F2",
+        "Comment": "ষ্ণ"
+      },
+      "A_Ss_Tt": {
+        "Value": "#$00F3",
+        "Comment": "ষ্ট"
+      },
+      "A_Ss_Tth": {
+        "Value": "#$00F4",
+        "Comment": "ষ্ঠ"
+      },
+      "A_Ss_Ph": {
+        "Value": "#$00F5",
+        "Comment": "স্ফ"
+      },
+      "A_S_Kh": {
+        "Value": "#$00F6",
+        "Comment": "স্খ"
+      },
+      "A_S_Tt": {
+        "Value": "#$00F7",
+        "Comment": "স্ট"
+      },
+      "A_S_N": {
+        "Value": "#$00F8",
+        "Comment": "স্ন"
+      },
+      "A_S_Ph": {
+        "Value": "#$00F9",
+        "Comment": "স্ফ"
+      },
+      "A_H_UKar": {
+        "Value": "#$00FB",
+        "Comment": "হু"
+      },
+      "A_H_RRIKar": {
+        "Value": "#$00FC",
+        "Comment": "হৃ"
+      },
+      "A_H_N": {
+        "Value": "#$00FD",
+        "Comment": "হ্ন"
+      },
+      "A_H_M": {
+        "Value": "#$00FE",
+        "Comment": "হ্ম"
+      },
+      "A_Rr_G": {
+        "Value": "#$00FF",
+        "Comment": "র্গ"
+      }
+    },
+    "FirstHalfForms": {
+      "A_Reph": {
+        "Value": "#$00A9",
+        "Comment": "্র (র-এর রেফ)"
+      },
+      "A_M_1H": {
+        "Value": "#$00A4",
+        "Comment": "ম-এর প্রথম খন্ড"
+      },
+      "A_Ss_1H": {
+        "Value": "#$00AE",
+        "Comment": "ষ-এর প্রথম খন্ড"
+      },
+      "A_S_1H_1": {
+        "Value": "#$00AF",
+        "Comment": "স-এর প্রথম খন্ড ১"
+      },
+      "A_N_1H_1": {
+        "Value": "#$0161",
+        "Comment": "ন-এর প্রথম খন্ড ১"
+      },
+      "A_S_1H_2": {
+        "Value": "#$02C9",
+        "Comment": "স-এর প্রথম খন্ড ২"
+      },
+      "A_D_1H_1": {
+        "Value": "#$02DC",
+        "Comment": "দ-এর প্রথম খন্ড ১"
+      },
+      "A_C_1H": {
+        "Value": "#$201D",
+        "Comment": "চ-এর প্রথম খন্ড"
+      },
+      "A_NGA_1H": {
+        "Value": "#$2022",
+        "Comment": "ঙ-এর প্রথম খন্ড"
+      },
+      "A_N_1H_2": {
+        "Value": "#$0153",
+        "Comment": "ন-এর প্রথম খন্ড ২"
+      },
+      "A_D_1H_2": {
+        "Value": "#$2122",
+        "Comment": "দ-এর প্রথম খন্ড ২"
+      }
+    },
+    "SecondHalfForms": {
+      "A_B_2H_1": {
+        "Value": "#$005E",
+        "Comment": "ব-এর দ্বিতীয় খন্ড ১"
+      },
+      "A_B_2H_2": {
+        "Value": "#$00A1",
+        "Comment": "ব-এর দ্বিতীয় খন্ড ২"
+      },
+      "A_BH_2H": {
+        "Value": "#$00A2",
+        "Comment": "ভ-এর দ্বিতীয় খন্ড"
+      },
+      "A_BH_R_2H": {
+        "Value": "#$00A3",
+        "Comment": "ভ্র-এর দ্বিতীয় খন্ড"
+      },
+      "A_M_2H_1": {
+        "Value": "#$00A5",
+        "Comment": "ম-এর দ্বিতীয় খন্ড ১"
+      },
+      "A_B_2H_3": {
+        "Value": "#$00A6",
+        "Comment": "ব-এর দ্বিতীয় খন্ড ৩"
+      },
+      "A_M_2H_2": {
+        "Value": "#$00A7",
+        "Comment": "ম-এর দ্বিতীয় খন্ড ২"
+      },
+      "A_ZFola": {
+        "Value": "#$00A8",
+        "Comment": "য-ফলা"
+      },
+      "A_RFola_1": {
+        "Value": "#$00AA",
+        "Comment": "র-ফলা ১"
+      },
+      "A_RFola_2": {
+        "Value": "#$00AB",
+        "Comment": "র-ফলা ২"
+      },
+      "A_L_2H_1": {
+        "Value": "#$00AC",
+        "Comment": "ল-এর দ্বিতীয় খন্ড ১"
+      },
+      "A_L_2H_2": {
+        "Value": "#$00AC",
+        "Comment": "ল-এর দ্বিতীয় খন্ড ২"
+      },
+      "A_T_R_2H": {
+        "Value": "#$00BF",
+        "Comment": "ত্র-এর দ্বিতীয় খন্ড"
+      },
+      "A_RFola_3": {
+        "Value": "#$00D6",
+        "Comment": "র-ফলা ৩"
+      },
+      "A_Nn_2H_1": {
+        "Value": "#$00E8",
+        "Comment": "ণ-এর দ্বিতীয় খন্ড ১"
+      },
+      "A_K_R_2H": {
+        "Value": "#$0152",
+        "Comment": "ক্র-এর দ্বিতীয় খন্ড"
+      },
+      "A_Nn_2H_2": {
+        "Value": "#$0153",
+        "Comment": "ণ-এর দ্বিতীয় খন্ড ২"
+      },
+      "A_B_2H_4": {
+        "Value": "#$0178",
+        "Comment": "ব-এর দ্বিতীয় খন্ড ৪"
+      },
+      "A_T_2H": {
+        "Value": "#$CD",
+        "Comment": "ত-এর দ্বিতীয় খন্ড"
+      },
+      "A_T_UKar_2H": {
+        "Value": "#$2018",
+        "Comment": "তু-এর দ্বিতীয় খন্ড"
+      },
+      "A_Th_2H": {
+        "Value": "#$2019",
+        "Comment": "থ-এর দ্বিতীয় খন্ড"
+      },
+      "A_K_2H": {
+        "Value": "#$2039",
+        "Comment": "ক-এর দ্বিতীয় খন্ড"
+      },
+      "A_L_2H_3": {
+        "Value": "#$F8",
+        "Comment": "ল-এর দ্বিতীয় খন্ড ৩"
+      }
+    }
+  },
+  "FullFormReplacements": [],
+  "PreReplacements": [
+    {
+      "Key": "#$09CD#$0964",
+      "Value": "#$5C",
+      "Comment": "্। থেকে সরাসরি ব্যাকস্ল্যাশ"
+    }
+  ],
+  "PostReplacements": []
+}
