@@ -544,6 +544,12 @@ begin
         MyProcessVKeyDown := b_Hasanta;
         Exit;
       end
+      else if LastChar = ZWNJ then
+      begin
+        Block := True;
+        MyProcessVKeyDown := '';
+        Exit;
+      end
       else
       begin
         MyProcessVKeyDown := b_Hasanta;

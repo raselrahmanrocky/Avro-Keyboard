@@ -616,6 +616,22 @@ begin
               Exit;
             end;
           end
+          else if CharForKey = b_Hasanta then
+          begin
+            if LastChar = ZWNJ then
+            begin
+              Block := True;
+              DeadKey := False;
+              MyProcessVKeyDown := '';
+              Exit;
+            end
+            else
+            begin
+              DeadKey := False;
+              MyProcessVKeyDown := b_Hasanta;
+              Exit;
+            end;
+          end
           else
           begin
             if IsDeadKeyChar(CharForKey) then
