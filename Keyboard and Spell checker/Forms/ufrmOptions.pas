@@ -128,6 +128,10 @@ type
     comboFunctionKeys_SpellerLauncher: TComboBox;
     Label20: TLabel;
     LabelGlobalHotkeysLink: TLabel;
+    GroupBox10: TGroupBox;
+    Label21: TLabel;
+    comboFunctionKeys_AnsiVersion: TComboBox;
+    CheckShowAnsiSwitchNotification: TCheckBox;
     procedure FormCreate(Sender: TObject);
     procedure CategoryTreeClick(Sender: TObject);
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
@@ -496,7 +500,41 @@ begin
 
   CategoryTree.Items.Add(nil, 'Locale/Language');
 
-  // Load Settings
+  // =======================================================
+  // ANSI Version Switcher Hotkey UI (runtime-created)
+  GroupBox10 := TGroupBox.Create(KeyboardMode_Panel);
+  GroupBox10.Parent := KeyboardMode_Panel;
+  GroupBox10.Top := GroupBox9.Top + GroupBox9.Height + 8;
+  GroupBox10.Left := GroupBox4.Left;
+  GroupBox10.Width := GroupBox4.Width;
+  GroupBox10.Height := 52;
+  GroupBox10.Caption := 'ANSI Version Switcher';
+
+  Label21 := TLabel.Create(GroupBox10);
+  Label21.Parent := GroupBox10;
+  Label21.Left := 12;
+  Label21.Top := 22;
+  Label21.Caption := 'Ctrl + Shift';
+
+  comboFunctionKeys_AnsiVersion := TComboBox.Create(GroupBox10);
+  comboFunctionKeys_AnsiVersion.Parent := GroupBox10;
+  comboFunctionKeys_AnsiVersion.Left := 70;
+  comboFunctionKeys_AnsiVersion.Top := 19;
+  comboFunctionKeys_AnsiVersion.Width := 60;
+  comboFunctionKeys_AnsiVersion.Style := csDropDownList;
+  comboFunctionKeys_AnsiVersion.Items.AddStrings(['F1','F2','F3','F4','F5','F6','F7','F8','F9','F10','F11','F12']);
+
+  CheckShowAnsiSwitchNotification := TCheckBox.Create(GroupBox10);
+  CheckShowAnsiSwitchNotification.Parent := GroupBox10;
+  CheckShowAnsiSwitchNotification.Left := 140;
+  CheckShowAnsiSwitchNotification.Top := 20;
+  CheckShowAnsiSwitchNotification.Caption := 'Show notification on switch';
+  CheckShowAnsiSwitchNotification.Width := 200;
+
+  if (GroupBox10.Top + GroupBox10.Height + 10) > KeyboardMode_Panel.Height then
+    KeyboardMode_Panel.Height := GroupBox10.Top + GroupBox10.Height + 10;
+
+  // Load Settings (AFTER controls are created)
   Self.LoadSettings;
 end;
 
@@ -635,6 +673,8 @@ begin
   comboFunctionKeys.ItemIndex := GetListIndex(comboFunctionKeys.Items, ModeSwitchKey);
   comboFunctionKeys_OutputMode.ItemIndex := GetListIndex(comboFunctionKeys_OutputMode.Items, ToggleOutputModeKey);
   comboFunctionKeys_SpellerLauncher.ItemIndex := GetListIndex(comboFunctionKeys_SpellerLauncher.Items, SpellerLauncherKey);
+  comboFunctionKeys_AnsiVersion.ItemIndex := GetListIndex(comboFunctionKeys_AnsiVersion.Items, AnsiVersionSwitchKey);
+  CheckShowAnsiSwitchNotification.Checked := (ShowAnsiSwitchNotification = 'YES');
 
   // =========================================================
   // Avro Phonetic Options
@@ -895,6 +935,11 @@ begin
   ModeSwitchKey := uppercase(comboFunctionKeys.Items[comboFunctionKeys.ItemIndex]);
   ToggleOutputModeKey := uppercase(comboFunctionKeys_OutputMode.Items[comboFunctionKeys_OutputMode.ItemIndex]);
   SpellerLauncherKey := uppercase(comboFunctionKeys_SpellerLauncher.Items[comboFunctionKeys_SpellerLauncher.ItemIndex]);
+  AnsiVersionSwitchKey := uppercase(comboFunctionKeys_AnsiVersion.Items[comboFunctionKeys_AnsiVersion.ItemIndex]);
+  if CheckShowAnsiSwitchNotification.Checked then
+    ShowAnsiSwitchNotification := 'YES'
+  else
+    ShowAnsiSwitchNotification := 'NO';
 
   // =========================================================
   // Avro Phonetic Options
