@@ -49,9 +49,11 @@ var
   AvroUpdateLastCheck: TDateTime;
 
   // Hotkey settings
-  ModeSwitchKey:       string;
-  ToggleOutputModeKey: string;
-  SpellerLauncherKey:  string;
+  ModeSwitchKey:          string;
+  ToggleOutputModeKey:    string;
+  SpellerLauncherKey:     string;
+  AnsiVersionSwitchKey:   string;
+  ShowAnsiSwitchNotification: string;
 
   // Avro Mouse Settings
   AvroMousePosX:             string;
@@ -158,6 +160,8 @@ begin
   ModeSwitchKey := UpperCase(XML.GetValue('ModeSwitchKey', 'F12'));
   ToggleOutputModeKey := UpperCase(XML.GetValue('ToggleOutputModeKey', 'F12'));
   SpellerLauncherKey := UpperCase(XML.GetValue('SpellerLauncherKey', 'F7'));
+  AnsiVersionSwitchKey := UpperCase(XML.GetValue('AnsiVersionSwitchKey', 'F12'));
+  ShowAnsiSwitchNotification := UpperCase(XML.GetValue('ShowAnsiSwitchNotification', 'YES'));
 
   // Avro Mouse Settings
   AvroMousePosX := UpperCase(XML.GetValue('AvroMousePosX', '0'));
@@ -240,6 +244,8 @@ begin
   XML.SetValue('ModeSwitchKey', ModeSwitchKey);
   XML.SetValue('ToggleOutputModeKey', ToggleOutputModeKey);
   XML.SetValue('SpellerLauncherKey', SpellerLauncherKey);
+  XML.SetValue('AnsiVersionSwitchKey', AnsiVersionSwitchKey);
+  XML.SetValue('ShowAnsiSwitchNotification', ShowAnsiSwitchNotification);
 
   // Avro Mouse Settings
   XML.SetValue('AvroMousePosX', AvroMousePosX);
@@ -330,6 +336,8 @@ begin
     ModeSwitchKey := UpperCase(Reg.ReadStringDef('ModeSwitchKey', 'F12'));
     ToggleOutputModeKey := UpperCase(Reg.ReadStringDef('ToggleOutputModeKey', 'F12'));
     SpellerLauncherKey := UpperCase(Reg.ReadStringDef('SpellerLauncherKey', 'F7'));
+    AnsiVersionSwitchKey := UpperCase(Reg.ReadStringDef('AnsiVersionSwitchKey', 'F12'));
+    ShowAnsiSwitchNotification := UpperCase(Reg.ReadStringDef('ShowAnsiSwitchNotification', 'YES'));
 
     // Avro Mouse Settings
     AvroMousePosX := UpperCase(Reg.ReadStringDef('AvroMousePosX', '0'));
@@ -418,6 +426,8 @@ begin
     Reg.WriteString('ModeSwitchKey', ModeSwitchKey);
     Reg.WriteString('ToggleOutputModeKey', ToggleOutputModeKey);
     Reg.WriteString('SpellerLauncherKey', SpellerLauncherKey);
+    Reg.WriteString('AnsiVersionSwitchKey', AnsiVersionSwitchKey);
+    Reg.WriteString('ShowAnsiSwitchNotification', ShowAnsiSwitchNotification);
 
     // Avro Mouse Settings
     Reg.WriteString('AvroMousePosX', AvroMousePosX);
@@ -539,6 +549,13 @@ begin
       or (SpellerLauncherKey = 'F6') or (SpellerLauncherKey = 'F7') or (SpellerLauncherKey = 'F8') or (SpellerLauncherKey = 'F9') or
       (SpellerLauncherKey = 'F10') or (SpellerLauncherKey = 'F11') or (SpellerLauncherKey = 'F12')) then
     SpellerLauncherKey := 'F12';
+  if not((AnsiVersionSwitchKey = 'F1') or (AnsiVersionSwitchKey = 'F2') or (AnsiVersionSwitchKey = 'F3') or (AnsiVersionSwitchKey = 'F4') or
+      (AnsiVersionSwitchKey = 'F5') or (AnsiVersionSwitchKey = 'F6') or (AnsiVersionSwitchKey = 'F7') or (AnsiVersionSwitchKey = 'F8') or
+      (AnsiVersionSwitchKey = 'F9') or (AnsiVersionSwitchKey = 'F10') or (AnsiVersionSwitchKey = 'F11') or (AnsiVersionSwitchKey = 'F12')) then
+    AnsiVersionSwitchKey := 'F12';
+  if not((ShowAnsiSwitchNotification = 'YES') or (ShowAnsiSwitchNotification = 'NO')) then
+    ShowAnsiSwitchNotification := 'YES';
+
 
   // Avro Mouse Settings
   if not(StrToInt(AvroMousePosX) > 0) then

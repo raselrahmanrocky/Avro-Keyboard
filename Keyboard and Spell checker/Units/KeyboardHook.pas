@@ -181,6 +181,12 @@ begin
           ShouldBlock := True;
           goto ExitHere;
         end;
+        if (AnsiVersionSwitchKey = 'F1') and IsControl and IsTrueShift and (IsAlter = False) then
+        begin
+          AvroMainForm1.ToggleAnsiVersionPicker;
+          ShouldBlock := True;
+          goto ExitHere;
+        end;
       end
       else if kbdllhs.vkCode = VK_F2 then
       begin
@@ -199,6 +205,12 @@ begin
         if (SpellerLauncherKey = 'F2') and (IsTrueShift = False) and IsControl and (IsAlter = False) then
         begin
           AvroMainForm1.Spellcheck1Click(nil);
+          ShouldBlock := True;
+          goto ExitHere;
+        end;
+        if (AnsiVersionSwitchKey = 'F2') and IsControl and IsTrueShift and (IsAlter = False) then
+        begin
+          AvroMainForm1.ToggleAnsiVersionPicker;
           ShouldBlock := True;
           goto ExitHere;
         end;
@@ -223,6 +235,12 @@ begin
           ShouldBlock := True;
           goto ExitHere;
         end;
+        if (AnsiVersionSwitchKey = 'F3') and IsControl and IsTrueShift and (IsAlter = False) then
+        begin
+          AvroMainForm1.ToggleAnsiVersionPicker;
+          ShouldBlock := True;
+          goto ExitHere;
+        end;
       end
       else if kbdllhs.vkCode = VK_F4 then
       begin
@@ -241,6 +259,12 @@ begin
         if (SpellerLauncherKey = 'F4') and (IsTrueShift = False) and IsControl and (IsAlter = False) then
         begin
           AvroMainForm1.Spellcheck1Click(nil);
+          ShouldBlock := True;
+          goto ExitHere;
+        end;
+        if (AnsiVersionSwitchKey = 'F4') and IsControl and IsTrueShift and (IsAlter = False) then
+        begin
+          AvroMainForm1.ToggleAnsiVersionPicker;
           ShouldBlock := True;
           goto ExitHere;
         end;
@@ -265,6 +289,12 @@ begin
           ShouldBlock := True;
           goto ExitHere;
         end;
+        if (AnsiVersionSwitchKey = 'F5') and IsControl and IsTrueShift and (IsAlter = False) then
+        begin
+          AvroMainForm1.ToggleAnsiVersionPicker;
+          ShouldBlock := True;
+          goto ExitHere;
+        end;
       end
       else if kbdllhs.vkCode = VK_F6 then
       begin
@@ -283,6 +313,12 @@ begin
         if (SpellerLauncherKey = 'F6') and (IsTrueShift = False) and IsControl and (IsAlter = False) then
         begin
           AvroMainForm1.Spellcheck1Click(nil);
+          ShouldBlock := True;
+          goto ExitHere;
+        end;
+        if (AnsiVersionSwitchKey = 'F6') and IsControl and IsTrueShift and (IsAlter = False) then
+        begin
+          AvroMainForm1.ToggleAnsiVersionPicker;
           ShouldBlock := True;
           goto ExitHere;
         end;
@@ -307,6 +343,12 @@ begin
           ShouldBlock := True;
           goto ExitHere;
         end;
+        if (AnsiVersionSwitchKey = 'F7') and IsControl and IsTrueShift and (IsAlter = False) then
+        begin
+          AvroMainForm1.ToggleAnsiVersionPicker;
+          ShouldBlock := True;
+          goto ExitHere;
+        end;
       end
       else if kbdllhs.vkCode = VK_F8 then
       begin
@@ -325,6 +367,12 @@ begin
         if (SpellerLauncherKey = 'F8') and (IsTrueShift = False) and IsControl and (IsAlter = False) then
         begin
           AvroMainForm1.Spellcheck1Click(nil);
+          ShouldBlock := True;
+          goto ExitHere;
+        end;
+        if (AnsiVersionSwitchKey = 'F8') and IsControl and IsTrueShift and (IsAlter = False) then
+        begin
+          AvroMainForm1.ToggleAnsiVersionPicker;
           ShouldBlock := True;
           goto ExitHere;
         end;
@@ -349,6 +397,12 @@ begin
           ShouldBlock := True;
           goto ExitHere;
         end;
+        if (AnsiVersionSwitchKey = 'F9') and IsControl and IsTrueShift and (IsAlter = False) then
+        begin
+          AvroMainForm1.ToggleAnsiVersionPicker;
+          ShouldBlock := True;
+          goto ExitHere;
+        end;
       end
       else if kbdllhs.vkCode = VK_F10 then
       begin
@@ -367,6 +421,12 @@ begin
         if (SpellerLauncherKey = 'F10') and (IsTrueShift = False) and IsControl and (IsAlter = False) then
         begin
           AvroMainForm1.Spellcheck1Click(nil);
+          ShouldBlock := True;
+          goto ExitHere;
+        end;
+        if (AnsiVersionSwitchKey = 'F10') and IsControl and IsTrueShift and (IsAlter = False) then
+        begin
+          AvroMainForm1.ToggleAnsiVersionPicker;
           ShouldBlock := True;
           goto ExitHere;
         end;
@@ -391,6 +451,12 @@ begin
           ShouldBlock := True;
           goto ExitHere;
         end;
+        if (AnsiVersionSwitchKey = 'F11') and IsControl and IsTrueShift and (IsAlter = False) then
+        begin
+          AvroMainForm1.ToggleAnsiVersionPicker;
+          ShouldBlock := True;
+          goto ExitHere;
+        end;
       end
       else if kbdllhs.vkCode = VK_F12 then
       begin
@@ -409,6 +475,12 @@ begin
         if (SpellerLauncherKey = 'F12') and (IsTrueShift = False) and IsControl and (IsAlter = False) then
         begin
           AvroMainForm1.Spellcheck1Click(nil);
+          ShouldBlock := True;
+          goto ExitHere;
+        end;
+        if (AnsiVersionSwitchKey = 'F12') and IsControl and IsTrueShift and (IsAlter = False) then
+        begin
+          AvroMainForm1.ToggleAnsiVersionPicker;
           ShouldBlock := True;
           goto ExitHere;
         end;
@@ -468,6 +540,11 @@ begin
           ShouldBlock := True;
           goto ExitHere;
         end;
+        if (AnsiVersionSwitchKey = 'F1') and IsControl and IsTrueShift and (IsAlter = False) then
+        begin
+          ShouldBlock := True;
+          goto ExitHere;
+        end;
       end
       else if kbdllhs.vkCode = VK_F2 then
       begin
@@ -482,6 +559,11 @@ begin
           goto ExitHere;
         end;
         if (SpellerLauncherKey = 'F2') and (IsTrueShift = False) and IsControl and (IsAlter = False) then
+        begin
+          ShouldBlock := True;
+          goto ExitHere;
+        end;
+        if (AnsiVersionSwitchKey = 'F2') and IsControl and IsTrueShift and (IsAlter = False) then
         begin
           ShouldBlock := True;
           goto ExitHere;
@@ -504,6 +586,11 @@ begin
           ShouldBlock := True;
           goto ExitHere;
         end;
+        if (AnsiVersionSwitchKey = 'F3') and IsControl and IsTrueShift and (IsAlter = False) then
+        begin
+          ShouldBlock := True;
+          goto ExitHere;
+        end;
       end
       else if kbdllhs.vkCode = VK_F4 then
       begin
@@ -518,6 +605,11 @@ begin
           goto ExitHere;
         end;
         if (SpellerLauncherKey = 'F4') and (IsTrueShift = False) and IsControl and (IsAlter = False) then
+        begin
+          ShouldBlock := True;
+          goto ExitHere;
+        end;
+        if (AnsiVersionSwitchKey = 'F4') and IsControl and IsTrueShift and (IsAlter = False) then
         begin
           ShouldBlock := True;
           goto ExitHere;
@@ -540,6 +632,11 @@ begin
           ShouldBlock := True;
           goto ExitHere;
         end;
+        if (AnsiVersionSwitchKey = 'F5') and IsControl and IsTrueShift and (IsAlter = False) then
+        begin
+          ShouldBlock := True;
+          goto ExitHere;
+        end;
       end
       else if kbdllhs.vkCode = VK_F6 then
       begin
@@ -554,6 +651,11 @@ begin
           goto ExitHere;
         end;
         if (SpellerLauncherKey = 'F6') and (IsTrueShift = False) and IsControl and (IsAlter = False) then
+        begin
+          ShouldBlock := True;
+          goto ExitHere;
+        end;
+        if (AnsiVersionSwitchKey = 'F6') and IsControl and IsTrueShift and (IsAlter = False) then
         begin
           ShouldBlock := True;
           goto ExitHere;
@@ -576,6 +678,11 @@ begin
           ShouldBlock := True;
           goto ExitHere;
         end;
+        if (AnsiVersionSwitchKey = 'F7') and IsControl and IsTrueShift and (IsAlter = False) then
+        begin
+          ShouldBlock := True;
+          goto ExitHere;
+        end;
       end
       else if kbdllhs.vkCode = VK_F8 then
       begin
@@ -590,6 +697,11 @@ begin
           goto ExitHere;
         end;
         if (SpellerLauncherKey = 'F8') and (IsTrueShift = False) and IsControl and (IsAlter = False) then
+        begin
+          ShouldBlock := True;
+          goto ExitHere;
+        end;
+        if (AnsiVersionSwitchKey = 'F8') and IsControl and IsTrueShift and (IsAlter = False) then
         begin
           ShouldBlock := True;
           goto ExitHere;
@@ -612,6 +724,11 @@ begin
           ShouldBlock := True;
           goto ExitHere;
         end;
+        if (AnsiVersionSwitchKey = 'F9') and IsControl and IsTrueShift and (IsAlter = False) then
+        begin
+          ShouldBlock := True;
+          goto ExitHere;
+        end;
       end
       else if kbdllhs.vkCode = VK_F10 then
       begin
@@ -626,6 +743,11 @@ begin
           goto ExitHere;
         end;
         if (SpellerLauncherKey = 'F10') and (IsTrueShift = False) and IsControl and (IsAlter = False) then
+        begin
+          ShouldBlock := True;
+          goto ExitHere;
+        end;
+        if (AnsiVersionSwitchKey = 'F10') and IsControl and IsTrueShift and (IsAlter = False) then
         begin
           ShouldBlock := True;
           goto ExitHere;
@@ -648,6 +770,11 @@ begin
           ShouldBlock := True;
           goto ExitHere;
         end;
+        if (AnsiVersionSwitchKey = 'F11') and IsControl and IsTrueShift and (IsAlter = False) then
+        begin
+          ShouldBlock := True;
+          goto ExitHere;
+        end;
       end
       else if kbdllhs.vkCode = VK_F12 then
       begin
@@ -662,6 +789,11 @@ begin
           goto ExitHere;
         end;
         if (SpellerLauncherKey = 'F12') and (IsTrueShift = False) and IsControl and (IsAlter = False) then
+        begin
+          ShouldBlock := True;
+          goto ExitHere;
+        end;
+        if (AnsiVersionSwitchKey = 'F12') and IsControl and IsTrueShift and (IsAlter = False) then
         begin
           ShouldBlock := True;
           goto ExitHere;

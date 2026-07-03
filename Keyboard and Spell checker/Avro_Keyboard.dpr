@@ -35,6 +35,8 @@ uses
   ufrmAbout in 'Forms\ufrmAbout.pas' {frmAbout},
   ufrmAboutSkinLayout in 'Forms\ufrmAboutSkinLayout.pas' {frmAboutSkinLayout},
   ufrmAutoCorrect in 'Forms\ufrmAutoCorrect.pas' {frmAutoCorrect},
+  ufrmAnsiVersionPicker in 'Forms\ufrmAnsiVersionPicker.pas' {frmAnsiVersionPicker},
+  ufrmAnsiToast in 'Forms\ufrmAnsiToast.pas',
   ufrmAvroMouse in 'Forms\ufrmAvroMouse.pas' {frmAvroMouse},
   ufrmOptions in 'Forms\ufrmOptions.pas' {frmOptions},
   ufrmPrevW in 'Forms\ufrmPrevW.pas' {frmPrevW},

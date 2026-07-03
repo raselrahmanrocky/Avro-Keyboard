@@ -404,6 +404,7 @@ type
       procedure ToggleMode;
       procedure SetBengaliUnicodeMode;
       procedure SetBengaliANSIMode;
+      procedure ToggleAnsiVersionPicker;
       procedure TopBarDocToTop;
       function TransferKeyDown(const KeyCode: Integer; var Block: Boolean): string;
       procedure TransferKeyUp(const KeyCode: Integer; var Block: Boolean);
@@ -425,6 +426,7 @@ implementation
 
 uses
   uRegistrySettings,
+  ufrmAnsiVersionPicker,
   uProcessHandler,
   uAutoCorrect,
   KeyboardLayoutLoader,
@@ -1834,6 +1836,40 @@ begin
   end;
 
   SwitchLocaleToMatchMode;
+end;
+
+{ =============================================================================== }
+
+{ =============================================================================== }
+
+procedure TAvroMainForm1.ToggleAnsiVersionPicker;
+var
+  P: TPoint;
+begin
+  if AnsiPickerVisible then
+  begin
+    if Assigned(frmAnsiVersionPicker) then
+      frmAnsiVersionPicker.Close;
+    AnsiPickerVisible := False;
+    Exit;
+  end;
+  if not Assigned(frmAnsiVersionPicker) then
+  begin
+    frmAnsiVersionPicker := TfrmAnsiVersionPicker.CreateNew(Application);
+    frmAnsiVersionPicker.Setup;
+  end
+  else
+    frmAnsiVersionPicker.PopulateVersions;
+  GetCursorPos(P);
+  frmAnsiVersionPicker.Left := P.X;
+  frmAnsiVersionPicker.Top := P.Y;
+  if (frmAnsiVersionPicker.Left + frmAnsiVersionPicker.Width) > Screen.Width then
+    frmAnsiVersionPicker.Left := Screen.Width - frmAnsiVersionPicker.Width;
+  if (frmAnsiVersionPicker.Top + frmAnsiVersionPicker.Height) > Screen.Height then
+    frmAnsiVersionPicker.Top := Screen.Height - frmAnsiVersionPicker.Height;
+  frmAnsiVersionPicker.Show;
+  frmAnsiVersionPicker.ListBox.SetFocus;
+  AnsiPickerVisible := True;
 end;
 
 { =============================================================================== }
