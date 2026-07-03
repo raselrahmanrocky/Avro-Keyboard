@@ -41,22 +41,16 @@ uses
   Winapi.Windows,      // for the pre-defined registry key constants
   System.Win.Registry, // for the registry read access
   {$ENDIF}
-  VCL.themes; // Used for access to TStyleManager
+  System.SysUtils;
 
 procedure SetAppropriateThemeMode(const DarkModeThemeName, LightModeThemeName: string);
 begin
-  SetSpecificThemeMode(DarkModeIsEnabled, DarkModeThemeName, LightModeThemeName);
+  { No-op: native Windows theming active — VCL styles disabled for memory }
 end;
 
 procedure SetSpecificThemeMode(const AsDarkMode: boolean; const DarkModeThemeName, LightModeThemeName: string);
-var
-  ChosenTheme: string;
 begin
-  if AsDarkMode then
-    ChosenTheme := DarkModeThemeName
-  else
-    ChosenTheme := LightModeThemeName;
-  TStyleManager.TrySetStyle(ChosenTheme, False);
+  { No-op: native Windows theming active — VCL styles disabled for memory }
 end;
 
 function DarkModeIsEnabled: boolean;

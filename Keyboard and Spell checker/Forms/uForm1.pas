@@ -15,7 +15,7 @@ uses
   Windows,
   Messages,
   SysUtils,
-  Variants,
+
   Classes,
   Graphics,
   Controls,
@@ -431,6 +431,7 @@ implementation
 uses
   uRegistrySettings,
   ufrmAnsiVersionPicker,
+  ufrmAnsiToast,
   uProcessHandler,
   uAutoCorrect,
   KeyboardLayoutLoader,
@@ -1285,6 +1286,9 @@ end;
 procedure TAvroMainForm1.OutputasUnicodeRecommended1Click(Sender: TObject);
 begin
   OutputIsBijoy := 'NO';
+  AnsiVersion := 'Default';
+  ResetAnsiToDefaults;
+  OptimizeMemoryUsage;
   RefreshSettings;
 end;
 
@@ -1805,11 +1809,14 @@ begin
   begin
     if KeyLayout.KeyboardMode <> Bangla then
       KeyLayout.KeyboardMode := Bangla;
-    if OutputIsBijoy = 'YES' then
-    begin
-      OutputIsBijoy := 'NO';
-      RefreshSettings;
-    end;
+      if OutputIsBijoy = 'YES' then
+      begin
+        OutputIsBijoy := 'NO';
+        AnsiVersion := 'Default';
+        ResetAnsiToDefaults;
+        OptimizeMemoryUsage;
+        RefreshSettings;
+      end;
   end;
 
   SwitchLocaleToMatchMode;
@@ -1859,33 +1866,8 @@ end;
 { =============================================================================== }
 
 procedure TAvroMainForm1.ToggleAnsiVersionPicker;
-var
-  P: TPoint;
 begin
-  if AnsiPickerVisible then
-  begin
-    if Assigned(frmAnsiVersionPicker) then
-      frmAnsiVersionPicker.Close;
-    AnsiPickerVisible := False;
-    Exit;
-  end;
-  if not Assigned(frmAnsiVersionPicker) then
-  begin
-    frmAnsiVersionPicker := TfrmAnsiVersionPicker.CreateNew(Application);
-    frmAnsiVersionPicker.Setup;
-  end
-  else
-    frmAnsiVersionPicker.PopulateVersions;
-  GetCursorPos(P);
-  frmAnsiVersionPicker.Left := P.X;
-  frmAnsiVersionPicker.Top := P.Y;
-  if (frmAnsiVersionPicker.Left + frmAnsiVersionPicker.Width) > Screen.Width then
-    frmAnsiVersionPicker.Left := Screen.Width - frmAnsiVersionPicker.Width;
-  if (frmAnsiVersionPicker.Top + frmAnsiVersionPicker.Height) > Screen.Height then
-    frmAnsiVersionPicker.Top := Screen.Height - frmAnsiVersionPicker.Height;
-  frmAnsiVersionPicker.Show;
-  SetForegroundWindow(frmAnsiVersionPicker.Handle);
-  AnsiPickerVisible := True;
+  ShowAnsiVersionPicker;
 end;
 
 { =============================================================================== }
@@ -2242,6 +2224,9 @@ begin
       PrevCheckedItem.Checked := False;
     ClickedItem.Checked := True;
     BuildAnsiVersionMenus;
+    SaveSettings;
+    if ShowAnsiSwitchNotification = 'YES' then
+      ShowAnsiToastNotification('ANSI Version Switched to: ' + SelectedVersion);
   end;
 end;
 

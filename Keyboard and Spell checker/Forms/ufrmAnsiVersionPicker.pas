@@ -11,9 +11,12 @@ unit ufrmAnsiVersionPicker;
 interface
 
 uses
-  Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
-  Dialogs, StdCtrls, Generics.Collections, uRegistrySettings,
+  Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms,
+  Dialogs, StdCtrls, Generics.Collections, System.Types, uRegistrySettings,
   clsUnicodeToBijoy2000;
+
+const
+  WM_FOCUS_PICKER = WM_APP + 2;
 
 type
   TfrmAnsiVersionPicker = class(TForm)
@@ -35,22 +38,57 @@ type
     function GetSelectedVersion: string;
     procedure AutoSizeForm;
     procedure WMActivate(var Msg: TWMActivate); message WM_ACTIVATE;
+    procedure WMFocusPicker(var Msg: TMessage); message WM_FOCUS_PICKER;
+    procedure WMTimer(var Msg: TMessage); message WM_TIMER;
   public
     procedure Setup;
     procedure PopulateVersions;
   protected
     procedure CreateParams(var Params: TCreateParams); override;
+    destructor Destroy; override;
   end;
 
-var
-  frmAnsiVersionPicker: TfrmAnsiVersionPicker;
-  AnsiPickerVisible: Boolean;
+procedure ShowAnsiVersionPicker;
 
 implementation
 
 uses
   uForm1,
   ufrmAnsiToast;
+
+var
+  CurrentPicker: TfrmAnsiVersionPicker;
+
+procedure ShowAnsiVersionPicker;
+var
+  P: TPoint;
+  Picker: TfrmAnsiVersionPicker;
+begin
+  if Assigned(CurrentPicker) then
+  begin
+    CurrentPicker.Close;
+    CurrentPicker := nil;
+    Exit;
+  end;
+  Picker := TfrmAnsiVersionPicker.CreateNew(Application);
+  try
+    Picker.Setup;
+    GetCursorPos(P);
+    Picker.Left := P.X;
+    Picker.Top := P.Y;
+    if (Picker.Left + Picker.Width) > Screen.Width then
+      Picker.Left := Screen.Width - Picker.Width;
+    if (Picker.Top + Picker.Height) > Screen.Height then
+      Picker.Top := Screen.Height - Picker.Height;
+    CurrentPicker := Picker;
+    Picker.Show;
+  except
+    Picker.Free;
+    if CurrentPicker = Picker then
+      CurrentPicker := nil;
+    raise;
+  end;
+end;
 
 { TfrmAnsiVersionPicker }
 
@@ -100,15 +138,55 @@ end;
 
 procedure TfrmAnsiVersionPicker.FormShow(Sender: TObject);
 begin
+  SetTimer(Handle, 1, 100, nil);
+  PostMessage(Handle, WM_FOCUS_PICKER, 0, 0);
+end;
+
+procedure TfrmAnsiVersionPicker.WMFocusPicker(var Msg: TMessage);
+var
+  ForeWnd: HWND;
+  ForeThread: DWORD;
+begin
+  ForeWnd := GetForegroundWindow;
+  if ForeWnd <> 0 then
+  begin
+    ForeThread := GetWindowThreadProcessId(ForeWnd, nil);
+    AttachThreadInput(GetCurrentThreadId, ForeThread, True);
+    SetForegroundWindow(Handle);
+    BringWindowToTop(Handle);
+    AttachThreadInput(GetCurrentThreadId, ForeThread, False);
+  end
+  else
+  begin
+    SetForegroundWindow(Handle);
+    BringWindowToTop(Handle);
+  end;
   PostMessage(ListBox.Handle, WM_SETFOCUS, 0, 0);
+end;
+
+procedure TfrmAnsiVersionPicker.WMTimer(var Msg: TMessage);
+begin
+  if GetForegroundWindow <> Handle then
+  begin
+    KillTimer(Handle, 1);
+    Close;
+  end;
 end;
 
 procedure TfrmAnsiVersionPicker.FormClose(Sender: TObject;
   var Action: TCloseAction);
 begin
+  KillTimer(Handle, 1);
   Action := caFree;
-  AnsiPickerVisible := False;
-  frmAnsiVersionPicker := nil;
+  if CurrentPicker = Self then
+    CurrentPicker := nil;
+end;
+
+destructor TfrmAnsiVersionPicker.Destroy;
+begin
+  if CurrentPicker = Self then
+    CurrentPicker := nil;
+  inherited;
 end;
 
 procedure TfrmAnsiVersionPicker.FormDeactivate(Sender: TObject);
@@ -185,6 +263,12 @@ var
   GutterRect: TRect;
   DisplayText: string;
 begin
+  if (Index < 0) or (Index >= ListBox.Items.Count) then
+  begin
+    ListBox.Canvas.Brush.Color := RGB(242, 242, 242);
+    ListBox.Canvas.FillRect(Rect);
+    Exit;
+  end;
   IsActive := (AnsiVersion = ListBox.Items[Index]);
   IsHovered := (Index = FHoverIndex) or (odSelected in State);
 
@@ -255,6 +339,7 @@ procedure TfrmAnsiVersionPicker.ListBoxClick(Sender: TObject);
 var
   SelectedVersion, ErrorMsg: string;
 begin
+  if not Assigned(CurrentPicker) then Exit;
   SelectedVersion := GetSelectedVersion;
   if SelectedVersion = '' then Exit;
   if not TrySetAnsiVersion(SelectedVersion, ErrorMsg) then
@@ -271,11 +356,13 @@ begin
   SaveSettings;
   if ShowAnsiSwitchNotification = 'YES' then
     ShowAnsiToastNotification('ANSI Version Switched to: ' + SelectedVersion);
-  Close;
+  if IsWindow(FPrevFocusedWindow) then
+    Windows.SetFocus(FPrevFocusedWindow);
   if FPrevForegroundWindow <> 0 then
     SetForegroundWindow(FPrevForegroundWindow);
-  if FPrevFocusedWindow <> 0 then
-    PostMessage(FPrevFocusedWindow, WM_SETFOCUS, 0, 0);
+  CurrentPicker := nil;
+  Release;
+  OptimizeMemoryUsage;
 end;
 
 procedure TfrmAnsiVersionPicker.ListBoxKeyDown(Sender: TObject;
@@ -287,7 +374,9 @@ begin
 
   case Key of
     VK_ESCAPE:
-      Close;
+      begin
+        if Assigned(CurrentPicker) then Close;
+      end;
     VK_RETURN:
       if ListBox.ItemIndex >= 0 then ListBoxClick(nil);
     VK_UP:
