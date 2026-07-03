@@ -13,6 +13,7 @@ interface
 
 uses
   Windows,
+  Messages,
   SysUtils,
   Dialogs;
 
@@ -183,7 +184,7 @@ begin
         end;
         if (AnsiVersionSwitchKey = 'F1') and IsControl and IsTrueShift and (IsAlter = False) then
         begin
-          AvroMainForm1.ToggleAnsiVersionPicker;
+          PostMessage(AvroMainForm1.Handle, WM_APP + 1, 0, 0);
           ShouldBlock := True;
           goto ExitHere;
         end;
@@ -210,7 +211,7 @@ begin
         end;
         if (AnsiVersionSwitchKey = 'F2') and IsControl and IsTrueShift and (IsAlter = False) then
         begin
-          AvroMainForm1.ToggleAnsiVersionPicker;
+          PostMessage(AvroMainForm1.Handle, WM_APP + 1, 0, 0);
           ShouldBlock := True;
           goto ExitHere;
         end;
@@ -237,7 +238,7 @@ begin
         end;
         if (AnsiVersionSwitchKey = 'F3') and IsControl and IsTrueShift and (IsAlter = False) then
         begin
-          AvroMainForm1.ToggleAnsiVersionPicker;
+          PostMessage(AvroMainForm1.Handle, WM_APP + 1, 0, 0);
           ShouldBlock := True;
           goto ExitHere;
         end;
@@ -264,7 +265,7 @@ begin
         end;
         if (AnsiVersionSwitchKey = 'F4') and IsControl and IsTrueShift and (IsAlter = False) then
         begin
-          AvroMainForm1.ToggleAnsiVersionPicker;
+          PostMessage(AvroMainForm1.Handle, WM_APP + 1, 0, 0);
           ShouldBlock := True;
           goto ExitHere;
         end;
@@ -291,7 +292,7 @@ begin
         end;
         if (AnsiVersionSwitchKey = 'F5') and IsControl and IsTrueShift and (IsAlter = False) then
         begin
-          AvroMainForm1.ToggleAnsiVersionPicker;
+          PostMessage(AvroMainForm1.Handle, WM_APP + 1, 0, 0);
           ShouldBlock := True;
           goto ExitHere;
         end;
@@ -318,7 +319,7 @@ begin
         end;
         if (AnsiVersionSwitchKey = 'F6') and IsControl and IsTrueShift and (IsAlter = False) then
         begin
-          AvroMainForm1.ToggleAnsiVersionPicker;
+          PostMessage(AvroMainForm1.Handle, WM_APP + 1, 0, 0);
           ShouldBlock := True;
           goto ExitHere;
         end;
@@ -345,7 +346,7 @@ begin
         end;
         if (AnsiVersionSwitchKey = 'F7') and IsControl and IsTrueShift and (IsAlter = False) then
         begin
-          AvroMainForm1.ToggleAnsiVersionPicker;
+          PostMessage(AvroMainForm1.Handle, WM_APP + 1, 0, 0);
           ShouldBlock := True;
           goto ExitHere;
         end;
@@ -372,7 +373,7 @@ begin
         end;
         if (AnsiVersionSwitchKey = 'F8') and IsControl and IsTrueShift and (IsAlter = False) then
         begin
-          AvroMainForm1.ToggleAnsiVersionPicker;
+          PostMessage(AvroMainForm1.Handle, WM_APP + 1, 0, 0);
           ShouldBlock := True;
           goto ExitHere;
         end;
@@ -399,7 +400,7 @@ begin
         end;
         if (AnsiVersionSwitchKey = 'F9') and IsControl and IsTrueShift and (IsAlter = False) then
         begin
-          AvroMainForm1.ToggleAnsiVersionPicker;
+          PostMessage(AvroMainForm1.Handle, WM_APP + 1, 0, 0);
           ShouldBlock := True;
           goto ExitHere;
         end;
@@ -426,7 +427,7 @@ begin
         end;
         if (AnsiVersionSwitchKey = 'F10') and IsControl and IsTrueShift and (IsAlter = False) then
         begin
-          AvroMainForm1.ToggleAnsiVersionPicker;
+          PostMessage(AvroMainForm1.Handle, WM_APP + 1, 0, 0);
           ShouldBlock := True;
           goto ExitHere;
         end;
@@ -453,7 +454,7 @@ begin
         end;
         if (AnsiVersionSwitchKey = 'F11') and IsControl and IsTrueShift and (IsAlter = False) then
         begin
-          AvroMainForm1.ToggleAnsiVersionPicker;
+          PostMessage(AvroMainForm1.Handle, WM_APP + 1, 0, 0);
           ShouldBlock := True;
           goto ExitHere;
         end;
@@ -480,7 +481,7 @@ begin
         end;
         if (AnsiVersionSwitchKey = 'F12') and IsControl and IsTrueShift and (IsAlter = False) then
         begin
-          AvroMainForm1.ToggleAnsiVersionPicker;
+          PostMessage(AvroMainForm1.Handle, WM_APP + 1, 0, 0);
           ShouldBlock := True;
           goto ExitHere;
         end;
