@@ -1868,7 +1868,6 @@ begin
   if (frmAnsiVersionPicker.Top + frmAnsiVersionPicker.Height) > Screen.Height then
     frmAnsiVersionPicker.Top := Screen.Height - frmAnsiVersionPicker.Height;
   frmAnsiVersionPicker.Show;
-  frmAnsiVersionPicker.ListBox.SetFocus;
   AnsiPickerVisible := True;
 end;
 
