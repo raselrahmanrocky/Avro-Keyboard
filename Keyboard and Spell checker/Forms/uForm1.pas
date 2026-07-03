@@ -381,6 +381,8 @@ type
       procedure DeleteAnsiMappingClick(Sender: TObject);
       procedure OpenAnsiMappingDirClick(Sender: TObject);
       procedure IgnoreCapsLockClick(Sender: TObject);
+      procedure PopupToolsPopup(Sender: TObject);
+      procedure PopupTrayPopup(Sender: TObject);
 
       procedure WMCopyData(var Msg: TWMCopyData); message WM_COPYDATA;
       procedure WMShowAnsiPicker(var Msg: TMessage); message WM_APP + 1;
@@ -414,6 +416,7 @@ type
       procedure ToggleOutputEncoding;
       procedure ApplyPendingANSISwitchRevert;
       procedure PendingANSISwitchClear;
+      procedure CleanupDuplicateMappings;
     protected
       procedure CreateParams(var Params: TCreateParams); override;
   end;
@@ -1613,6 +1616,8 @@ begin
   ForceDirectories(AnsiMappingDir);
   LoadCurrentActiveMapping;
   BuildAnsiVersionMenus;
+  Popup_Tools.OnPopup := PopupToolsPopup;
+  Popup_Tray.OnPopup := PopupTrayPopup;
 
   IgnoreCapsLock1.Checked := (IgnoreCapsLock = 'YES');
   IgnoreCapsLock2.Checked := (IgnoreCapsLock = 'YES');
@@ -1667,6 +1672,16 @@ procedure TAvroMainForm1.Showactivekeyboardlayout1Click(Sender: TObject);
 begin
   CheckCreateForm(TLayoutViewer, LayoutViewer, 'LayoutViewer');
   LayoutViewer.Show;
+end;
+
+procedure TAvroMainForm1.PopupToolsPopup(Sender: TObject);
+begin
+  BuildAnsiVersionMenus;
+end;
+
+procedure TAvroMainForm1.PopupTrayPopup(Sender: TObject);
+begin
+  BuildAnsiVersionMenus;
 end;
 
 procedure TAvroMainForm1.UpdateTrayIcon;
@@ -2235,8 +2250,9 @@ end;
 procedure TAvroMainForm1.ImportAnsiMappingClick(Sender: TObject);
 var
   OpenDialog: TOpenDialog;
-  DestPath, ErrMsg: string;
+  DestPath, ErrMsg, NewName: string;
   ErrorLog: TStringList;
+  I: Integer;
 begin
   OpenDialog := TOpenDialog.Create(nil);
   try
@@ -2252,6 +2268,20 @@ begin
 
       ForceDirectories(AnsiMappingDir);
       DestPath := AnsiMappingDir + ExtractFileName(OpenDialog.FileName);
+      NewName := ChangeFileExt(ExtractFileName(OpenDialog.FileName), '');
+      for I := 0 to AnsiVersionSubmenu1.Count - 1 do
+        if SameText(AnsiVersionSubmenu1.Items[I].Caption, NewName) then
+        begin
+          MessageDlg('A mapping with this name already exists.'#13#10 +
+            'Please rename the file or delete the existing one first.', mtError, [mbOK], 0);
+          Exit;
+        end;
+      if FileExists(DestPath) then
+      begin
+        MessageDlg('A mapping with this name already exists.'#13#10 +
+          'Please rename the file and try again.', mtError, [mbOK], 0);
+        Exit;
+      end;
       if not CopyFile(PChar(OpenDialog.FileName), PChar(DestPath), False) then
       begin
         MessageDlg('Failed to copy file to the mapping directory.', mtError, [mbOK], 0);
@@ -2348,6 +2378,31 @@ begin
   SaveSettings;
 end;
 
+procedure TAvroMainForm1.CleanupDuplicateMappings;
+var
+  SearchRec: TSearchRec;
+  NameMap: TDictionary<string, string>;
+  FileTitle: string;
+begin
+  if not DirectoryExists(AnsiMappingDir) then Exit;
+  NameMap := TDictionary<string, string>.Create;
+  try
+    if FindFirst(AnsiMappingDir + '*.json', faAnyFile, SearchRec) = 0 then
+    begin
+      repeat
+        FileTitle := ChangeFileExt(SearchRec.Name, '');
+        if NameMap.ContainsKey(LowerCase(FileTitle)) then
+          DeleteFile(AnsiMappingDir + SearchRec.Name)
+        else
+          NameMap.Add(LowerCase(FileTitle), SearchRec.Name);
+      until FindNext(SearchRec) <> 0;
+      FindClose(SearchRec);
+    end;
+  finally
+    NameMap.Free;
+  end;
+end;
+
 { =============================================================================== }
 
 procedure TAvroMainForm1.BuildAnsiVersionMenus;
@@ -2427,6 +2482,7 @@ var
   end;
 
 begin
+  CleanupDuplicateMappings;
   BuildSingleMenu(AnsiVersionSubmenu1);
   BuildSingleMenu(AnsiVersionSubmenu2);
 end;
