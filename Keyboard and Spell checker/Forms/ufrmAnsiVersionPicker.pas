@@ -122,6 +122,7 @@ var
   FileTitle: string;
   I: Integer;
 begin
+  AvroMainForm1.CleanupDuplicateMappings;
   ListBox.Items.BeginUpdate;
   try
     ListBox.Clear;
@@ -132,7 +133,8 @@ begin
       begin
         repeat
           FileTitle := ChangeFileExt(SearchRec.Name, '');
-          ListBox.Items.Add(FileTitle);
+          if not SameText(FileTitle, 'Default') then
+            ListBox.Items.Add(FileTitle);
         until FindNext(SearchRec) <> 0;
         FindClose(SearchRec);
       end;
@@ -151,12 +153,15 @@ end;
 procedure TfrmAnsiVersionPicker.AutoSizeForm;
 var
   I, W, MaxW: Integer;
+  TempStr: string;
 begin
   MaxW := 0;
   Canvas.Font := ListBox.Font;
   for I := 0 to ListBox.Items.Count - 1 do
   begin
-    W := Canvas.TextWidth(ListBox.Items[I]);
+    if I < 9 then TempStr := IntToStr(I + 1) + '. ' + ListBox.Items[I]
+    else TempStr := ListBox.Items[I];
+    W := Canvas.TextWidth(TempStr);
     if W > MaxW then
       MaxW := W;
   end;
@@ -178,6 +183,7 @@ procedure TfrmAnsiVersionPicker.ListBoxDrawItem(Control: TWinControl;
 var
   IsActive, IsHovered: Boolean;
   GutterRect: TRect;
+  DisplayText: string;
 begin
   IsActive := (AnsiVersion = ListBox.Items[Index]);
   IsHovered := (Index = FHoverIndex) or (odSelected in State);
@@ -216,7 +222,11 @@ begin
   // 5. Draw the main item text (Transparent background, offset from gutter)
   ListBox.Canvas.Brush.Style := bsClear;
   ListBox.Canvas.Font.Color := RGB(0, 0, 0);
-  ListBox.Canvas.TextOut(Rect.Left + 35, Rect.Top + 3, ListBox.Items[Index]);
+  if Index < 9 then
+    DisplayText := IntToStr(Index + 1) + '. ' + ListBox.Items[Index]
+  else
+    DisplayText := ListBox.Items[Index];
+  ListBox.Canvas.TextOut(Rect.Left + 35, Rect.Top + 3, DisplayText);
   
   // Reset brush style to solid for next draw cycle
   ListBox.Canvas.Brush.Style := bsSolid;
@@ -270,7 +280,11 @@ end;
 
 procedure TfrmAnsiVersionPicker.ListBoxKeyDown(Sender: TObject;
   var Key: Word; Shift: TShiftState);
+var
+  TargetIdx: Integer;
 begin
+  TargetIdx := -1;
+
   case Key of
     VK_ESCAPE:
       Close;
@@ -293,16 +307,16 @@ begin
         Key := 0;
       end;
     Ord('1')..Ord('9'):
-      begin
-        ListBox.ItemIndex := Key - Ord('1');
-        Key := 0;
-      end;
-    Ord('0'):
-      begin
-        if ListBox.Items.Count > 9 then
-          ListBox.ItemIndex := 9;
-        Key := 0;
-      end;
+      TargetIdx := Key - Ord('1');
+    VK_NUMPAD1..VK_NUMPAD9:
+      TargetIdx := Key - VK_NUMPAD1;
+  end;
+
+  if (TargetIdx >= 0) and (TargetIdx < ListBox.Items.Count) then
+  begin
+    ListBox.ItemIndex := TargetIdx;
+    ListBoxClick(nil);
+    Key := 0;
   end;
 end;
 
