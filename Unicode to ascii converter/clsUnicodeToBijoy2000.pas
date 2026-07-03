@@ -901,7 +901,7 @@ begin
     PrevC := MidStr(fConvertedText, I - 1, 1);
 
     { P/G + RoFola }
-    if (PrevC = b_p) or (PrevC = b_g) then
+    if (PrevC = b_p) or (PrevC = b_g) or (PrevC = b_sh) then
     // MidStr(fConvertedText, I, 2) := A_RFola_3
       fConvertedText := WideStuffString(fConvertedText, I, 2, A_RFola_3)
       { V+Rofola, 2nd Half V+Rofola }
