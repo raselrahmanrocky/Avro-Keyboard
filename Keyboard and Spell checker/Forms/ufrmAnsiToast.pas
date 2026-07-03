@@ -23,6 +23,8 @@ type
     procedure FormDeactivate(Sender: TObject);
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
     procedure ClickHandler(Sender: TObject);
+  protected
+    procedure CreateParams(var Params: TCreateParams); override;
   public
     procedure Setup;
     procedure ShowToast(const AText: string);
@@ -42,6 +44,13 @@ begin
 end;
 
 { TfrmAnsiToast }
+
+procedure TfrmAnsiToast.CreateParams(var Params: TCreateParams);
+begin
+  inherited;
+  Params.ExStyle := Params.ExStyle or WS_EX_TOPMOST or WS_EX_NOACTIVATE;
+  Params.WndParent := GetDesktopWindow;
+end;
 
 procedure TfrmAnsiToast.Setup;
 begin
@@ -85,6 +94,8 @@ begin
   FTimer.Enabled := False;
   FTimer.Enabled := True;
   Show;
+  SetWindowPos(Handle, HWND_TOPMOST, 0, 0, 0, 0,
+    SWP_NOMOVE or SWP_NOSIZE or SWP_NOACTIVATE or SWP_SHOWWINDOW);
 end;
 
 procedure TfrmAnsiToast.TimerHandler(Sender: TObject);

@@ -74,6 +74,7 @@ begin
   FPrevForegroundWindow := GetForegroundWindow;
   BorderStyle := bsNone;
   FormStyle := fsStayOnTop;
+  PopupMode := pmAuto;
   Color := RGB(242, 242, 242);
   ListBox := TListBox.Create(Self);
   ListBox.Parent := Self;
@@ -99,8 +100,7 @@ end;
 
 procedure TfrmAnsiVersionPicker.FormShow(Sender: TObject);
 begin
-  SetForegroundWindow(Handle);
-  ListBox.SetFocus;
+  PostMessage(ListBox.Handle, WM_SETFOCUS, 0, 0);
 end;
 
 procedure TfrmAnsiVersionPicker.FormClose(Sender: TObject;

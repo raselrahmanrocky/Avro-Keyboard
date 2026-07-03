@@ -383,6 +383,7 @@ type
       procedure IgnoreCapsLockClick(Sender: TObject);
 
       procedure WMCopyData(var Msg: TWMCopyData); message WM_COPYDATA;
+      procedure WMShowAnsiPicker(var Msg: TMessage); message WM_APP + 1;
     public
       { Public declarations }
       KeyboardModeChanged: Boolean;
@@ -1868,6 +1869,7 @@ begin
   if (frmAnsiVersionPicker.Top + frmAnsiVersionPicker.Height) > Screen.Height then
     frmAnsiVersionPicker.Top := Screen.Height - frmAnsiVersionPicker.Height;
   frmAnsiVersionPicker.Show;
+  SetForegroundWindow(frmAnsiVersionPicker.Handle);
   AnsiPickerVisible := True;
 end;
 
@@ -2106,6 +2108,11 @@ begin
   KeyLayout.ResetDeadKey;
   LastWindow := hforewnd;
 
+end;
+
+procedure TAvroMainForm1.WMShowAnsiPicker(var Msg: TMessage);
+begin
+  ToggleAnsiVersionPicker;
 end;
 
 procedure TAvroMainForm1.WMCopyData(var Msg: TWMCopyData);
