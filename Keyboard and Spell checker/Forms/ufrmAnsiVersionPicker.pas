@@ -19,6 +19,7 @@ type
   TfrmAnsiVersionPicker = class(TForm)
     ListBox: TListBox;
     procedure FormShow(Sender: TObject);
+    procedure FormDeactivate(Sender: TObject);
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
     procedure ListBoxKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
     procedure ListBoxClick(Sender: TObject);
@@ -29,6 +30,8 @@ type
     procedure ListBoxMouseLeave(Sender: TObject);
   private
     FHoverIndex: Integer;
+    FPrevFocusedWindow: HWND;
+    FPrevForegroundWindow: HWND;
     function GetSelectedVersion: string;
     procedure AutoSizeForm;
     procedure WMActivate(var Msg: TWMActivate); message WM_ACTIVATE;
@@ -67,6 +70,8 @@ end;
 procedure TfrmAnsiVersionPicker.Setup;
 begin
   FHoverIndex := -1;
+  FPrevFocusedWindow := GetFocus;
+  FPrevForegroundWindow := GetForegroundWindow;
   BorderStyle := bsNone;
   FormStyle := fsStayOnTop;
   Color := RGB(242, 242, 242);
@@ -84,7 +89,9 @@ begin
   ListBox.OnDrawItem := ListBoxDrawItem;
   ListBox.OnMouseMove := ListBoxMouseMove;
   ListBox.OnMouseLeave := ListBoxMouseLeave;
+  ListBox.TabStop := True;
   OnShow := FormShow;
+  OnDeactivate := FormDeactivate;
   OnClose := FormClose;
   PopulateVersions;
   AutoSizeForm;
@@ -92,7 +99,8 @@ end;
 
 procedure TfrmAnsiVersionPicker.FormShow(Sender: TObject);
 begin
-  PostMessage(ListBox.Handle, WM_SETFOCUS, 0, 0);
+  SetForegroundWindow(Handle);
+  ListBox.SetFocus;
 end;
 
 procedure TfrmAnsiVersionPicker.FormClose(Sender: TObject;
@@ -101,6 +109,11 @@ begin
   Action := caFree;
   AnsiPickerVisible := False;
   frmAnsiVersionPicker := nil;
+end;
+
+procedure TfrmAnsiVersionPicker.FormDeactivate(Sender: TObject);
+begin
+  Close;
 end;
 
 procedure TfrmAnsiVersionPicker.PopulateVersions;
@@ -249,6 +262,10 @@ begin
   if ShowAnsiSwitchNotification = 'YES' then
     ShowAnsiToastNotification('ANSI Version Switched to: ' + SelectedVersion);
   Close;
+  if FPrevForegroundWindow <> 0 then
+    SetForegroundWindow(FPrevForegroundWindow);
+  if FPrevFocusedWindow <> 0 then
+    PostMessage(FPrevFocusedWindow, WM_SETFOCUS, 0, 0);
 end;
 
 procedure TfrmAnsiVersionPicker.ListBoxKeyDown(Sender: TObject;
