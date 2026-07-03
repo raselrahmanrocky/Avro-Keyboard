@@ -34,6 +34,9 @@ procedure ShowAnsiToastNotification(const AText: string);
 
 implementation
 
+uses
+  clsUnicodeToBijoy2000;
+
 procedure ShowAnsiToastNotification(const AText: string);
 var
   Toast: TfrmAnsiToast;
@@ -48,14 +51,13 @@ end;
 procedure TfrmAnsiToast.CreateParams(var Params: TCreateParams);
 begin
   inherited;
-  Params.ExStyle := Params.ExStyle or WS_EX_TOPMOST or WS_EX_NOACTIVATE;
+  Params.ExStyle := Params.ExStyle or WS_EX_TOPMOST or WS_EX_NOACTIVATE or WS_EX_TOOLWINDOW;
   Params.WndParent := GetDesktopWindow;
 end;
 
 procedure TfrmAnsiToast.Setup;
 begin
   BorderStyle := bsNone;
-  FormStyle := fsStayOnTop;
   AlphaBlend := True;
   AlphaBlendValue := 220;
   Color := $404040;
@@ -91,11 +93,9 @@ begin
   Left := Screen.Width - Width - 20;
   Top := Screen.Height - Height - 50;
 
-  FTimer.Enabled := False;
+  SetWindowPos(Handle, HWND_TOPMOST, Left, Top, Width, Height,
+    SWP_NOACTIVATE or SWP_SHOWWINDOW);
   FTimer.Enabled := True;
-  Show;
-  SetWindowPos(Handle, HWND_TOPMOST, 0, 0, 0, 0,
-    SWP_NOMOVE or SWP_NOSIZE or SWP_NOACTIVATE or SWP_SHOWWINDOW);
 end;
 
 procedure TfrmAnsiToast.TimerHandler(Sender: TObject);
@@ -112,6 +112,7 @@ end;
 procedure TfrmAnsiToast.FormClose(Sender: TObject; var Action: TCloseAction);
 begin
   Action := caFree;
+  OptimizeMemoryUsage;
 end;
 
 procedure TfrmAnsiToast.ClickHandler(Sender: TObject);

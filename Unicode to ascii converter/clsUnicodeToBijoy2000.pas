@@ -61,14 +61,14 @@ type
   end;
 
 var
-  CustomFullForms: array of TReplacementPair;
-  CustomPreReplacements: array of TReplacementPair;
-  CustomPostReplacements: array of TReplacementPair; 
+  CustomFullForms: TArray<TReplacementPair>;
+  CustomPreReplacements: TArray<TReplacementPair>;
+  CustomPostReplacements: TArray<TReplacementPair>; 
   AnsiVersion: string = 'Default';
   AnsiMappingDir: string = '';
   AnsiRegistry: TList<TAnsiVarRec>;
   AnsiRegistryMap: TDictionary<string, TAnsiVarRec>;
-  ActiveReplacements: array of TReplacementPair;
+  ActiveReplacements: TArray<TReplacementPair>;
   AnsiOverrides: TDictionary<string, string>;
 
 
@@ -78,13 +78,14 @@ procedure ExportAnsiMapping(const Path: string);
 procedure LoadCurrentActiveMapping(ErrorLog: TStringList = nil);
 function ValidateAnsiMappingFile(const Path: string; out ErrorMessage: string): Boolean;
 function TrySetAnsiVersion(const NewVersion: string; out ErrorMessage: string): Boolean;
+procedure OptimizeMemoryUsage;
 
 implementation
 
 uses
+  Windows,
   Strutils,
   BanglaChars,
-  System.JSON,
   System.SysUtils,
   System.Generics.Defaults;
 
@@ -1361,40 +1362,41 @@ end;
 
 function ProcessHexAndUnicode(const S: string): string;
 var
-  Temp, HexStr: string;
-  Idx, J: Integer;
-  Code: Integer;
+  SB: TStringBuilder;
+  I, Code: Integer;
 begin
-  Temp := S;
-  Idx := 1;
-  while Idx <= Length(Temp) do
-  begin
-    if (Idx < Length(Temp)) and (Temp[Idx] = '#') and (Temp[Idx + 1] = '$') then
+  SB := TStringBuilder.Create;
+  try
+    I := 1;
+    while I <= Length(S) do
     begin
-      HexStr := '';
-      J := Idx + 2;
-      while (J <= Length(Temp)) and (CharInSet(Temp[J], ['0'..'9', 'A'..'F', 'a'..'f'])) do
+      if (I < Length(S)) and (S[I] = '#') and (S[I + 1] = '$') then
       begin
-        HexStr := HexStr + Temp[J];
-        Inc(J);
-        if Length(HexStr) = 4 then Break;
-      end;
-
-      if HexStr <> '' then
-      begin
-        try
-          Code := StrToInt('$' + HexStr);
-          Delete(Temp, Idx, Length(HexStr) + 2);
-          Insert(Char(Code), Temp, Idx);
-        except
+        Code := 0;
+        I := I + 2;
+        while (I <= Length(S)) and (CharInSet(S[I], ['0'..'9', 'A'..'F', 'a'..'f'])) do
+        begin
+          Code := Code * 16;
+          if CharInSet(S[I], ['0'..'9']) then
+            Code := Code + Ord(S[I]) - Ord('0')
+          else if CharInSet(S[I], ['A'..'F']) then
+            Code := Code + Ord(S[I]) - Ord('A') + 10
+          else
+            Code := Code + Ord(S[I]) - Ord('a') + 10;
+          Inc(I);
         end;
+        SB.Append(Char(Code));
+      end
+      else
+      begin
+        SB.Append(S[I]);
+        Inc(I);
       end;
-      Inc(Idx);
-    end
-    else
-      Inc(Idx);
+    end;
+    Result := SB.ToString;
+  finally
+    SB.Free;
   end;
-  Result := Temp;
 end;
 
 { =============================================================================== }
@@ -1430,6 +1432,28 @@ begin
     Result := Result + '#$' + IntToHex(Ord(C), 4);
 end;
 
+function JSONEscape(const S: string): string;
+var
+  C: Char;
+begin
+  Result := '';
+  for C in S do
+    case C of
+      '"': Result := Result + '\"';
+      '\': Result := Result + '\\';
+      #8: Result := Result + '\b';
+      #9: Result := Result + '\t';
+      #10: Result := Result + '\n';
+      #12: Result := Result + '\f';
+      #13: Result := Result + '\r';
+    else
+      if Ord(C) < 32 then
+        Result := Result + '\u' + IntToHex(Ord(C), 4)
+      else
+        Result := Result + C;
+    end;
+end;
+
 { =============================================================================== }
 
 function CleanBengaliChar(const S: string): string;
@@ -1450,6 +1474,188 @@ begin
 end;
 
 { =============================================================================== }
+// Lightweight JSON utilities (replaces System.JSON to reduce ~1MB RTL)
+procedure JSkipWS(const S: string; var P: Integer);
+begin
+  while (P <= Length(S)) and (S[P] <= ' ') do Inc(P);
+end;
+
+function JReadString(const S: string; var P: Integer): string;
+var
+  SB: TStringBuilder;
+begin
+  Result := '';
+  JSkipWS(S, P);
+  if (P > Length(S)) or (S[P] <> '"') then Exit;
+  Inc(P);
+  SB := TStringBuilder.Create;
+  try
+    while P <= Length(S) do
+    begin
+      if S[P] = '"' then begin Inc(P); Result := SB.ToString; Exit; end;
+      if S[P] = '\' then
+      begin
+        Inc(P);
+        if P > Length(S) then Exit;
+        case S[P] of
+          '"': SB.Append('"');
+          '\': SB.Append('\');
+          '/': SB.Append('/');
+          'n': SB.Append(#10);
+          'r': SB.Append(#13);
+          't': SB.Append(#9);
+          'u': begin
+                 if P + 4 <= Length(S) then
+                   SB.Append(Char(StrToIntDef('$' + Copy(S, P+1, 4), Ord('?'))))
+                 else SB.Append('?');
+                 Inc(P, 4);
+               end;
+        else SB.Append(S[P]);
+        end;
+        Inc(P);
+      end
+      else
+      begin
+        SB.Append(S[P]);
+        Inc(P);
+      end;
+    end;
+    Result := SB.ToString;
+  finally
+    SB.Free;
+  end;
+end;
+
+procedure JSkipValue(const S: string; var P: Integer);
+var
+  Depth: Integer;
+begin
+  JSkipWS(S, P);
+  if P > Length(S) then Exit;
+  case S[P] of
+    '{','[': begin
+               Depth := 1; Inc(P);
+               while (P <= Length(S)) and (Depth > 0) do
+               begin
+                 if S[P] = '"' then
+                begin
+                    Inc(P);
+                    while P <= Length(S) do
+                      if S[P] = '\' then
+                      begin
+                        Inc(P);
+                        if P <= Length(S) then Inc(P);
+                      end
+                      else if S[P] = '"' then begin Inc(P); Break; end
+                      else Inc(P);
+                  end
+                  else if CharInSet(S[P], ['{', '[']) then Inc(Depth)
+                  else if CharInSet(S[P], ['}', ']']) then Dec(Depth);
+                 if Depth > 0 then Inc(P);
+               end;
+               if P <= Length(S) then Inc(P);
+             end;
+    '"': JReadString(S, P);
+    else Inc(P);
+  end;
+end;
+
+{ =============================================================================== }
+
+function JSONPrettyPrint(const JSON: string): string;
+var
+  SB: TStringBuilder;
+  P, Depth: Integer;
+  C: Char;
+begin
+  SB := TStringBuilder.Create;
+  try
+    Depth := 0;
+    P := 1;
+    while P <= Length(JSON) do
+    begin
+      C := JSON[P];
+      case C of
+        '{', '[':
+          begin
+            SB.Append(C);
+            Inc(Depth);
+            SB.Append(sLineBreak);
+            SB.Append(StringOfChar(' ', Depth * 2));
+            Inc(P);
+          end;
+        '}', ']':
+          begin
+            SB.Append(sLineBreak);
+            Dec(Depth);
+            SB.Append(StringOfChar(' ', Depth * 2));
+            SB.Append(C);
+            Inc(P);
+          end;
+        ',':
+          begin
+            SB.Append(',');
+            SB.Append(sLineBreak);
+            SB.Append(StringOfChar(' ', Depth * 2));
+            Inc(P);
+          end;
+        ':':
+          begin
+            SB.Append(': ');
+            Inc(P);
+          end;
+        '"':
+          begin
+            SB.Append('"');
+            Inc(P);
+            while P <= Length(JSON) do
+            begin
+              C := JSON[P];
+              SB.Append(C);
+              Inc(P);
+              if C = '\' then
+              begin
+                if P <= Length(JSON) then
+                begin
+                  SB.Append(JSON[P]);
+                  Inc(P);
+                end;
+              end
+              else if C = '"' then
+                Break;
+            end;
+          end;
+      else
+        if C > ' ' then
+          SB.Append(C);
+        Inc(P);
+      end;
+    end;
+    Result := SB.ToString;
+  finally
+    SB.Free;
+  end;
+end;
+
+{ =============================================================================== }
+// Lazy initialization for AnsiRegistry and AnsiOverrides
+procedure EnsureAnsiRegistry;
+begin
+  if AnsiRegistry = nil then
+  begin
+    AnsiRegistry := TList<TAnsiVarRec>.Create;
+    AnsiRegistryMap := TDictionary<string, TAnsiVarRec>.Create;
+    InitializeAnsiRegistry;
+  end;
+end;
+
+procedure EnsureAnsiOverrides;
+begin
+  if AnsiOverrides = nil then
+    AnsiOverrides := TDictionary<string, string>.Create;
+end;
+
+{ =============================================================================== }
 
 procedure PrepareActiveReplacements;
 var
@@ -1460,6 +1666,8 @@ var
   Val: string;
   ExcludedNames: TDictionary<string, Boolean>;
 begin
+  EnsureAnsiRegistry;
+  EnsureAnsiOverrides;
   ExcludedNames := TDictionary<string, Boolean>.Create;
   UniqueMap := TDictionary<string, string>.Create;
   try
@@ -1544,6 +1752,8 @@ var
   Rec: TAnsiVarRec;
   Resolved: string;
 begin
+  EnsureAnsiRegistry;
+  EnsureAnsiOverrides;
   for Rec in AnsiRegistry do
   begin
     Resolved := ProcessHexAndUnicode(Rec.DefaultVal);
@@ -1554,33 +1764,69 @@ begin
   end;
 
   AnsiOverrides.Clear;
-  SetLength(CustomFullForms, 0);
-  SetLength(CustomPreReplacements, 0);
-  SetLength(CustomPostReplacements, 0);
+  Finalize(CustomFullForms); CustomFullForms := nil;
+  Finalize(CustomPreReplacements); CustomPreReplacements := nil;
+  Finalize(CustomPostReplacements); CustomPostReplacements := nil;
+  Finalize(ActiveReplacements); ActiveReplacements := nil;
   PrepareActiveReplacements;
 end;
 
 { =============================================================================== }
 
 procedure LoadAnsiMapping(const Path: string; ErrorLog: TStringList = nil);
+
+  function ParseSection(const S: string; var Pos: Integer): TArray<TReplacementPair>;
+  var
+    Items: TList<TReplacementPair>;
+    Pair: TReplacementPair;
+    Field: string;
+  begin
+    Items := TList<TReplacementPair>.Create;
+    try
+      JSkipWS(S, Pos);
+      if (Pos <= Length(S)) and (S[Pos] = '[') then Inc(Pos) else Exit;
+      while Pos <= Length(S) do
+      begin
+        JSkipWS(S, Pos);
+        if (Pos > Length(S)) or (S[Pos] = ']') then begin Inc(Pos); Break; end;
+        if S[Pos] = ',' then begin Inc(Pos); Continue; end;
+        if S[Pos] = '{' then
+        begin
+          Inc(Pos); Pair.Key := ''; Pair.Value := '';
+          while Pos <= Length(S) do
+          begin
+            JSkipWS(S, Pos);
+            if (Pos > Length(S)) or (S[Pos] = '}') then begin Inc(Pos); Break; end;
+            if S[Pos] = ',' then begin Inc(Pos); Continue; end;
+            Field := JReadString(S, Pos);
+            JSkipWS(S, Pos); if S[Pos] = ':' then Inc(Pos);
+            if Field = 'Key' then
+              Pair.Key := ProcessHexAndUnicode(JReadString(S, Pos))
+            else if Field = 'Value' then
+              Pair.Value := ProcessHexAndUnicode(JReadString(S, Pos))
+            else
+              JSkipValue(S, Pos);
+          end;
+          if Pair.Key <> '' then
+            Items.Add(Pair);
+        end
+        else
+          JSkipValue(S, Pos);
+      end;
+      Result := Items.ToArray;
+    finally
+      Items.Free;
+    end;
+  end;
+
 var
-  JSON: TJSONObject;
-  ConstantsRoot, CategoryObj: TJSONObject;
-  FullForms, PreRep, PostRep: TJSONArray;
-  I, J: Integer;
-  Lines: TStringList;
-  ConstName, ConstValue: string;
-  ConstItemVal: TJSONValue;
+  JSON: string;
+  P: Integer;
+  Key, ConstName, ConstValue, CatName, FieldName: string;
   Rec: TAnsiVarRec;
-  IsNested: Boolean;
-  KnownConstants: TDictionary<string, Boolean>;
-  TempList: TList<TReplacementPair>;
-  Pair: TReplacementPair;
-  KeyStr, ValueStr: string;
-  JSONModified: Boolean;
+  Lines: TStringList;
 begin
   ResetAnsiToDefaults;
-  JSONModified := False;
 
   if not FileExists(Path) then
   begin
@@ -1589,13 +1835,13 @@ begin
     Exit;
   end;
 
-  JSON := nil;
   Lines := TStringList.Create;
-  KnownConstants := TDictionary<string, Boolean>.Create;
   try
     try
       Lines.LoadFromFile(Path, TEncoding.UTF8);
-      JSON := TJSONObject.ParseJSONValue(Lines.Text) as TJSONObject;
+      JSON := Lines.Text;
+      if (Length(JSON) >= 3) and (JSON[1] = #$EF) and (JSON[2] = #$BB) and (JSON[3] = #$BF) then
+        Delete(JSON, 1, 3);
     except
       on E: Exception do
       begin
@@ -1604,341 +1850,231 @@ begin
         Exit;
       end;
     end;
+  finally
+    Lines.Free;
+  end;
 
-    if JSON = nil then
-    begin
-      if Assigned(ErrorLog) then
-        ErrorLog.Add('Critical: Failed to parse JSON file.');
-      Exit;
-    end;
+  P := 1;
+  JSkipWS(JSON, P);
+  if (P > Length(JSON)) or (JSON[P] <> '{') then Exit;
+  Inc(P);
 
-    for Rec in AnsiRegistry do
+  while P <= Length(JSON) do
+  begin
+    JSkipWS(JSON, P);
+    if (P > Length(JSON)) or (JSON[P] = '}') then Break;
+    if JSON[P] = ',' then begin Inc(P); Continue; end;
+
+    Key := JReadString(JSON, P);
+    JSkipWS(JSON, P);
+    if (P <= Length(JSON)) and (JSON[P] = ':') then Inc(P);
+    JSkipWS(JSON, P);
+
+    if Key = 'Constants' then
     begin
-      if Rec.BengaliChar <> '' then
+      // Constants: { "Cat": { "Name": { "Value": "...", ... } } }
+      if (P <= Length(JSON)) and (JSON[P] = '{') then Inc(P) else Continue;
+      while P <= Length(JSON) do
       begin
-        KnownConstants.AddOrSetValue(CleanBengaliChar(Rec.BengaliChar), True);
-        KnownConstants.AddOrSetValue(Rec.BengaliChar, True);
-      end;
-    end;
-
-    if JSON.TryGetValue<TJSONObject>('Constants', ConstantsRoot) then
-    begin
-      IsNested := (ConstantsRoot.Count > 0) and (ConstantsRoot.Pairs[0].JsonValue is TJSONObject);
-
-      if IsNested then
-      begin
-        for I := 0 to ConstantsRoot.Count - 1 do
+        JSkipWS(JSON, P);
+        if (P > Length(JSON)) or (JSON[P] = '}') then begin Inc(P); Break; end;
+        if JSON[P] = ',' then begin Inc(P); Continue; end;
+        CatName := JReadString(JSON, P); // skip category name
+        JSkipWS(JSON, P); if JSON[P] = ':' then Inc(P);
+        JSkipWS(JSON, P);
+        if (P <= Length(JSON)) and (JSON[P] = '{') then Inc(P) else Continue;
+        while P <= Length(JSON) do
         begin
-          if not (ConstantsRoot.Pairs[I].JsonValue is TJSONObject) then Continue;
-          CategoryObj := TJSONObject(ConstantsRoot.Pairs[I].JsonValue);
-          for J := 0 to CategoryObj.Count - 1 do
+          JSkipWS(JSON, P);
+          if (P > Length(JSON)) or (JSON[P] = '}') then begin Inc(P); Break; end;
+          if JSON[P] = ',' then begin Inc(P); Continue; end;
+          ConstName := JReadString(JSON, P);
+          JSkipWS(JSON, P); if JSON[P] = ':' then Inc(P);
+          JSkipWS(JSON, P);
+          if (P <= Length(JSON)) and (JSON[P] = '{') then
           begin
-            try
-              ConstName := CategoryObj.Pairs[J].JsonString.Value;
-              ConstItemVal := CategoryObj.Pairs[J].JsonValue;
-              if ConstItemVal is TJSONObject then
-                ConstValue := ProcessHexAndUnicode(TJSONObject(ConstItemVal).GetValue('Value').Value)
+            Inc(P); ConstValue := '';
+            while P <= Length(JSON) do
+            begin
+              JSkipWS(JSON, P);
+              if (P > Length(JSON)) or (JSON[P] = '}') then begin Inc(P); Break; end;
+              if JSON[P] = ',' then begin Inc(P); Continue; end;
+              FieldName := JReadString(JSON, P);
+              JSkipWS(JSON, P); if JSON[P] = ':' then Inc(P);
+              if FieldName = 'Value' then
+                ConstValue := JReadString(JSON, P)
               else
-                ConstValue := ProcessHexAndUnicode(ConstItemVal.Value);
-              if ConstValue = '' then Continue;
-
+                JSkipValue(JSON, P);
+            end;
+            if ConstValue <> '' then
+            begin
+              ConstValue := ProcessHexAndUnicode(ConstValue);
               if AnsiRegistryMap.TryGetValue(ConstName, Rec) then
               begin
                 if Rec.VarType = avChar then
                 begin
                   if Length(ConstValue) = 1 then
                     PChar(Rec.Ptr)^ := ConstValue[1]
-                  else
+                  else begin
+                    EnsureAnsiOverrides;
                     AnsiOverrides.AddOrSetValue(ConstName, ConstValue);
+                  end;
                 end
                 else
                   PString(Rec.Ptr)^ := ConstValue;
               end;
-            except
-              on E: Exception do
-              begin
-                if Assigned(ErrorLog) then
-                  ErrorLog.Add('Error in constant [' + ConstName + ']: ' + E.Message);
-              end;
             end;
-          end;
-        end;
-      end
-      else
-      begin
-        for I := 0 to ConstantsRoot.Count - 1 do
-        begin
-          try
-            ConstName := ConstantsRoot.Pairs[I].JsonString.Value;
-            ConstValue := ProcessHexAndUnicode(ConstantsRoot.Pairs[I].JsonValue.Value);
-            if ConstValue = '' then Continue;
-
-            if AnsiRegistryMap.TryGetValue(ConstName, Rec) then
-            begin
-              if Rec.VarType = avChar then
-              begin
-                if Length(ConstValue) = 1 then
-                  PChar(Rec.Ptr)^ := ConstValue[1]
-                else
-                  AnsiOverrides.AddOrSetValue(ConstName, ConstValue);
-              end
-              else
-                PString(Rec.Ptr)^ := ConstValue;
-            end;
-          except
-            on E: Exception do
-            begin
-              if Assigned(ErrorLog) then
-                ErrorLog.Add('Error in constant [' + ConstName + ']: ' + E.Message);
-            end;
-          end;
-        end;
-      end;
-    end;
-
-    if JSON.TryGetValue<TJSONArray>('FullFormReplacements', FullForms) then
-    begin
-      TempList := TList<TReplacementPair>.Create;
-      try
-
-        for I := FullForms.Count - 1 downto 0 do
-        begin
-          try
-            KeyStr := ProcessHexAndUnicode((FullForms.Items[I] as TJSONObject).GetValue('Key').Value);
-            
-            if KnownConstants.ContainsKey(KeyStr) then
-            begin
-
-              FullForms.Remove(I).Free;
-              JSONModified := True;
-            end;
-          except
-
-          end;
-        end;
-
-
-        for I := 0 to FullForms.Count - 1 do
-        begin
-          try
-            KeyStr := ProcessHexAndUnicode((FullForms.Items[I] as TJSONObject).GetValue('Key').Value);
-            ValueStr := ProcessHexAndUnicode((FullForms.Items[I] as TJSONObject).GetValue('Value').Value);
-
-            Pair.Key := KeyStr;
-            Pair.Value := ValueStr;
-            TempList.Add(Pair);
-          except
-            on E: Exception do
-            begin
-              if Assigned(ErrorLog) then
-                ErrorLog.Add('Error in FullFormReplacements [' + IntToStr(I) + ']: ' + E.Message);
-            end;
-          end;
-        end;
-
-        SetLength(CustomFullForms, TempList.Count);
-        for I := 0 to TempList.Count - 1 do
-          CustomFullForms[I] := TempList[I];
-
-        TArray.Sort<TReplacementPair>(CustomFullForms, TComparer<TReplacementPair>.Construct(
-          function(const L, R: TReplacementPair): Integer
-          begin
-            Result := R.Key.Length - L.Key.Length;
           end
-        ));
-      finally
-        TempList.Free;
-      end;
-    end;
-
-    // PreReplacements 
-    if JSON.TryGetValue<TJSONArray>('PreReplacements', PreRep) then
-    begin
-      SetLength(CustomPreReplacements, PreRep.Count);
-      for I := 0 to PreRep.Count - 1 do
-      begin
-        try
-          CustomPreReplacements[I].Key := ProcessHexAndUnicode((PreRep.Items[I] as TJSONObject).GetValue('Key').Value);
-          CustomPreReplacements[I].Value := ProcessHexAndUnicode((PreRep.Items[I] as TJSONObject).GetValue('Value').Value);
-        except
-          on E: Exception do
-          begin
-            if Assigned(ErrorLog) then
-              ErrorLog.Add('Error in PreReplacements [' + IntToStr(I) + ']: ' + E.Message);
-          end;
+          else JSkipValue(JSON, P);
         end;
       end;
-
-      TArray.Sort<TReplacementPair>(CustomPreReplacements, TComparer<TReplacementPair>.Construct(
-        function(const L, R: TReplacementPair): Integer
-        begin
-          Result := R.Key.Length - L.Key.Length;
-        end
-      ));
-    end;
-
-    // PostReplacements
-    if JSON.TryGetValue<TJSONArray>('PostReplacements', PostRep) then
-    begin
-      SetLength(CustomPostReplacements, PostRep.Count);
-      for I := 0 to PostRep.Count - 1 do
-      begin
-        try
-          CustomPostReplacements[I].Key := ProcessHexAndUnicode((PostRep.Items[I] as TJSONObject).GetValue('Key').Value);
-          CustomPostReplacements[I].Value := ProcessHexAndUnicode((PostRep.Items[I] as TJSONObject).GetValue('Value').Value);
-        except
-          on E: Exception do
-          begin
-            if Assigned(ErrorLog) then
-              ErrorLog.Add('Error in PostReplacements [' + IntToStr(I) + ']: ' + E.Message);
-          end;
-        end;
-      end;
-
-      TArray.Sort<TReplacementPair>(CustomPostReplacements, TComparer<TReplacementPair>.Construct(
-        function(const L, R: TReplacementPair): Integer
-        begin
-          Result := R.Key.Length - L.Key.Length;
-        end
-      ));
-    end;
-
-    if JSONModified then
-    begin
-      try
-        Lines.Text := JSON.Format(2);
-        Lines.SaveToFile(Path, TEncoding.UTF8);
-      except
-        on E: Exception do
-        begin
-          if Assigned(ErrorLog) then
-            ErrorLog.Add('Error saving cleaned JSON file: ' + E.Message);
-        end;
-      end;
-    end;
-
-    PrepareActiveReplacements;
-
-  finally
-    KnownConstants.Free;
-    JSON.Free;
-    Lines.Free;
+    end
+    else if Key = 'FullFormReplacements' then
+      CustomFullForms := ParseSection(JSON, P)
+    else if Key = 'PreReplacements' then
+      CustomPreReplacements := ParseSection(JSON, P)
+    else if Key = 'PostReplacements' then
+      CustomPostReplacements := ParseSection(JSON, P)
+    else
+      JSkipValue(JSON, P);
   end;
+
+  // Sort replacement arrays by key length (longest first)
+  if Length(CustomFullForms) > 0 then
+    TArray.Sort<TReplacementPair>(CustomFullForms, TComparer<TReplacementPair>.Construct(
+      function(const L, R: TReplacementPair): Integer
+      begin Result := R.Key.Length - L.Key.Length; end));
+  if Length(CustomPreReplacements) > 0 then
+    TArray.Sort<TReplacementPair>(CustomPreReplacements, TComparer<TReplacementPair>.Construct(
+      function(const L, R: TReplacementPair): Integer
+      begin Result := R.Key.Length - L.Key.Length; end));
+  if Length(CustomPostReplacements) > 0 then
+    TArray.Sort<TReplacementPair>(CustomPostReplacements, TComparer<TReplacementPair>.Construct(
+      function(const L, R: TReplacementPair): Integer
+      begin Result := R.Key.Length - L.Key.Length; end));
+
+  PrepareActiveReplacements;
+  JSON := '';
+  OptimizeMemoryUsage;
 end;
 
 { =============================================================================== }
 
-function GetDefaultFullFormsJSONArr: TJSONArray;
+function GetDefaultFullForms: TArray<TReplacementPair>;
 var
-  Arr: TJSONArray;
-  Item: TJSONObject;
   Rec: TAnsiVarRec;
   Val: string;
-  begin
-  Arr := TJSONArray.Create;
-  
+begin
+  EnsureAnsiRegistry;
   for Rec in AnsiRegistry do
   begin
     if (Rec.Category = 'FullForms') and (Rec.BengaliChar <> '') then
     begin
-
       if Rec.VarType = avChar then
         Val := string(PChar(Rec.Ptr)^)
       else
         Val := PString(Rec.Ptr)^;
-        
-    Item := TJSONObject.Create;
-      Item.AddPair('Key', SmartEscape(Rec.BengaliChar));
-      Item.AddPair('Value', SmartEscape(Val));
-      Item.AddPair('Comment', Rec.BengaliChar);
-    Arr.Add(Item);
-      
-      Break;
+      SetLength(Result, 1);
+      Result[0].Key := Rec.BengaliChar;
+      Result[0].Value := Val;
+      Exit;
     end;
   end;
+  SetLength(Result, 0);
+end;
 
-  Result := Arr;
+function MakeJSONArrOfReplPairs(const Pairs: array of TReplacementPair): string;
+var
+  SB: TStringBuilder;
+  I: Integer;
+begin
+  SB := TStringBuilder.Create;
+  try
+    SB.Append('[');
+    for I := 0 to High(Pairs) do
+    begin
+      if I > 0 then SB.Append(',');
+      SB.Append('{');
+      SB.Append('"Key":"').Append(SmartEscape(Pairs[I].Key)).Append('",');
+      SB.Append('"Value":"').Append(SmartEscape(Pairs[I].Value)).Append('",');
+      SB.Append('"Comment":"').Append(JSONEscape(Pairs[I].Key)).Append('"');
+      SB.Append('}');
+    end;
+    SB.Append(']');
+    Result := SB.ToString;
+  finally
+    SB.Free;
+  end;
 end;
 
 { =============================================================================== }
 
 procedure ExportAnsiMapping(const Path: string);
 var
-  Root, CategoryObj, ItemObj: TJSONObject;
-  ConstantsRoot: TJSONObject;
-  FFArr, PreArr, PostArr: TJSONArray;
   Lines: TStringList;
+  SB: TStringBuilder;
+  CatSB: TStringBuilder;
+  CatMap: TDictionary<string, TStringBuilder>;
   I: Integer;
   Val: string;
   Rec: TAnsiVarRec;
 begin
+  EnsureAnsiRegistry;
+  EnsureAnsiOverrides;
+  CatMap := TDictionary<string, TStringBuilder>.Create;
   Lines := TStringList.Create;
-  Root := TJSONObject.Create;
   try
-    ConstantsRoot := TJSONObject.Create;
-    Root.AddPair('Constants', ConstantsRoot);
-
     for Rec in AnsiRegistry do
     begin
-      if not ConstantsRoot.TryGetValue<TJSONObject>(Rec.Category, CategoryObj) then
-      begin
-        CategoryObj := TJSONObject.Create;
-        ConstantsRoot.AddPair(Rec.Category, CategoryObj);
-      end;
-
       if Rec.VarType = avChar then
         Val := string(PChar(Rec.Ptr)^)
       else
         Val := PString(Rec.Ptr)^;
 
-      ItemObj := TJSONObject.Create;
-      ItemObj.AddPair('Value', SmartEscape(Val));
-      ItemObj.AddPair('Comment', Rec.BengaliChar);
-      CategoryObj.AddPair(Rec.Name, ItemObj);
-    end;
-
-    if Length(CustomFullForms) > 0 then
-    begin
-      FFArr := TJSONArray.Create;
-      for I := 0 to High(CustomFullForms) do
+      if not CatMap.TryGetValue(Rec.Category, CatSB) then
       begin
-        ItemObj := TJSONObject.Create;
-        ItemObj.AddPair('Key', SmartEscape(CustomFullForms[I].Key));
-        ItemObj.AddPair('Value', SmartEscape(CustomFullForms[I].Value));
-        ItemObj.AddPair('Comment', CustomFullForms[I].Key);
-        FFArr.Add(ItemObj);
+        CatSB := TStringBuilder.Create;
+        CatSB.Append('"').Append(Rec.Category).Append('":{');
+        CatMap.Add(Rec.Category, CatSB);
+      end
+      else
+        CatSB.Append(',');
+        CatSB.Append('"').Append(Rec.Name).Append('":{');
+      CatSB.Append('"Value":"').Append(SmartEscape(Val)).Append('",');
+      CatSB.Append('"Comment":"').Append(JSONEscape(Rec.BengaliChar)).Append('"');
+      CatSB.Append('}');
+    end;
+
+    SB := TStringBuilder.Create;
+    try
+      SB.Append('{');
+      SB.Append('"Constants":{');
+      I := 0;
+      for CatSB in CatMap.Values do
+      begin
+        if I > 0 then SB.Append(',');
+        CatSB.Append('}');
+        SB.Append(CatSB.ToString);
+        Inc(I);
       end;
-    end
-    else
-      FFArr := GetDefaultFullFormsJSONArr;
-    Root.AddPair('FullFormReplacements', FFArr);
+      SB.Append('}');
 
-    PreArr := TJSONArray.Create;
-    for I := 0 to High(CustomPreReplacements) do
-    begin
-      ItemObj := TJSONObject.Create;
-      ItemObj.AddPair('Key', SmartEscape(CustomPreReplacements[I].Key));
-      ItemObj.AddPair('Value', SmartEscape(CustomPreReplacements[I].Value));
-      ItemObj.AddPair('Comment', CustomPreReplacements[I].Key);
-      PreArr.Add(ItemObj);
+      if Length(CustomFullForms) > 0 then
+        SB.Append(',"FullFormReplacements":').Append(MakeJSONArrOfReplPairs(CustomFullForms))
+      else
+        SB.Append(',"FullFormReplacements":').Append(MakeJSONArrOfReplPairs(GetDefaultFullForms));
+      SB.Append(',"PreReplacements":').Append(MakeJSONArrOfReplPairs(CustomPreReplacements));
+      SB.Append(',"PostReplacements":').Append(MakeJSONArrOfReplPairs(CustomPostReplacements));
+      SB.Append('}');
+
+      Lines.Text := JSONPrettyPrint(SB.ToString);
+      Lines.SaveToFile(Path, TEncoding.UTF8);
+    finally
+      SB.Free;
     end;
-    Root.AddPair('PreReplacements', PreArr);
-
-    PostArr := TJSONArray.Create;
-    for I := 0 to High(CustomPostReplacements) do
-    begin
-      ItemObj := TJSONObject.Create;
-      ItemObj.AddPair('Key', SmartEscape(CustomPostReplacements[I].Key));
-      ItemObj.AddPair('Value', SmartEscape(CustomPostReplacements[I].Value));
-      ItemObj.AddPair('Comment', CustomPostReplacements[I].Key);
-      PostArr.Add(ItemObj);
-    end;
-    Root.AddPair('PostReplacements', PostArr);
-
-    Lines.Text := Root.Format(2);
-    Lines.SaveToFile(Path, TEncoding.UTF8);
   finally
-    Root.Free;
+    for CatSB in CatMap.Values do CatSB.Free;
+    CatMap.Free;
     Lines.Free;
   end;
 end;
@@ -1950,11 +2086,12 @@ const
   REPL_SECTIONS: array[0..2] of string = (
     'FullFormReplacements', 'PreReplacements', 'PostReplacements');
 var
+  JSON: string;
   Lines: TStringList;
-  Root, Section, KeyVal, ValueVal: TJSONValue;
-  Arr: TJSONArray;
-  I, Idx: Integer;
-  Item: TJSONObject;
+  P: Integer;
+  Key: string;
+  ArrIdx: Integer;
+  SectionCount: Integer;
 begin
   Result := False;
   ErrorMessage := '';
@@ -1966,7 +2103,6 @@ begin
   end;
 
   Lines := TStringList.Create;
-  Root := nil;
   try
     try
       Lines.LoadFromFile(Path, TEncoding.UTF8);
@@ -1977,82 +2113,92 @@ begin
         Exit;
       end;
     end;
-
-    try
-      Root := TJSONObject.ParseJSONValue(Lines.Text, False, True);
-    except
-      on E: EJSONParseException do
-      begin
-        ErrorMessage := Format('Syntax Error -> Line: %d, Column: %d (Path: %s). Details: %s', 
-          [E.Line, E.Position, E.Path, E.Message]);
-        Exit;
-      end;
-      on E: Exception do
-      begin
-        ErrorMessage := 'Invalid JSON syntax: ' + E.Message;
-        Exit;
-      end;
-    end;
-
-    if (Root = nil) or not (Root is TJSONObject) then
-    begin
-      ErrorMessage := 'Invalid JSON root: expected an object.';
-      Exit;
-    end;
-
-    Section := TJSONObject(Root).GetValue('Constants');
-    if Section = nil then
-    begin
-      ErrorMessage := 'Missing section: Constants';
-      Exit;
-    end;
-    if not (Section is TJSONObject) then
-    begin
-      ErrorMessage := 'Invalid section: Constants must be an object.';
-      Exit;
-    end;
-
-    for I := 0 to High(REPL_SECTIONS) do
-    begin
-      Section := TJSONObject(Root).GetValue(REPL_SECTIONS[I]);
-      if Section = nil then
-      begin
-        ErrorMessage := 'Missing section: ' + REPL_SECTIONS[I];
-        Exit;
-      end;
-      if not (Section is TJSONArray) then
-      begin
-        ErrorMessage := 'Invalid section: ' + REPL_SECTIONS[I] + ' must be an array.';
-        Exit;
-      end;
-
-      Arr := TJSONArray(Section);
-      for Idx := 0 to Arr.Count - 1 do
-      begin
-        if not (Arr.Items[Idx] is TJSONObject) then
-        begin
-          ErrorMessage := 'Missing Key/Value in ' + REPL_SECTIONS[I] + ' at index ' + (Idx + 1).ToString;
-          Exit;
-        end;
-        Item := TJSONObject(Arr.Items[Idx]);
-        KeyVal := Item.GetValue('Key');
-        ValueVal := Item.GetValue('Value');
-        if (KeyVal = nil) or not (KeyVal is TJSONString) or
-           TJSONString(KeyVal).Value.IsEmpty or
-           (ValueVal = nil) or not (ValueVal is TJSONString) or
-           TJSONString(ValueVal).Value.IsEmpty then
-        begin
-          ErrorMessage := 'Missing Key/Value in ' + REPL_SECTIONS[I] + ' at index ' + (Idx + 1).ToString;
-          Exit;
-        end;
-      end;
-    end;
-
-    Result := True;
+    JSON := Lines.Text;
+    if Copy(JSON, 1, 3) = #$EF#$BB#$BF then
+      Delete(JSON, 1, 3);
   finally
-    Root.Free;
     Lines.Free;
   end;
+
+  P := 1;
+  JSkipWS(JSON, P);
+  if (P > Length(JSON)) or (JSON[P] <> '{') then
+  begin
+    ErrorMessage := 'Invalid JSON root: expected an object.';
+    Exit;
+  end;
+  Inc(P);
+
+  SectionCount := 0;
+  while P <= Length(JSON) do
+  begin
+    JSkipWS(JSON, P);
+    if (P > Length(JSON)) or (JSON[P] = '}') then Break;
+    if JSON[P] = ',' then begin Inc(P); Continue; end;
+
+    Key := JReadString(JSON, P);
+    JSkipWS(JSON, P);
+    if (P <= Length(JSON)) and (JSON[P] = ':') then Inc(P);
+    JSkipWS(JSON, P);
+
+    if Key = 'Constants' then
+    begin
+      Inc(SectionCount);
+      // Must be an object
+      if (P > Length(JSON)) or (JSON[P] <> '{') then
+      begin
+        ErrorMessage := 'Invalid section: Constants must be an object.';
+        Exit;
+      end;
+      JSkipValue(JSON, P);
+    end
+    else if (Key = REPL_SECTIONS[0]) or (Key = REPL_SECTIONS[1]) or (Key = REPL_SECTIONS[2]) then
+    begin
+      Inc(SectionCount);
+      // Must be an array
+      if (P > Length(JSON)) or (JSON[P] <> '[') then
+      begin
+        ErrorMessage := 'Invalid section: ' + Key + ' must be an array.';
+        Exit;
+      end;
+      Inc(P);
+      ArrIdx := 0;
+      while P <= Length(JSON) do
+      begin
+        JSkipWS(JSON, P);
+        if (P > Length(JSON)) or (JSON[P] = ']') then Break;
+        if JSON[P] = ',' then begin Inc(P); Continue; end;
+        if JSON[P] = '{' then
+        begin
+          Inc(P);
+          // Check for Key and Value fields
+          while P <= Length(JSON) do
+          begin
+            JSkipWS(JSON, P);
+            if (P > Length(JSON)) or (JSON[P] = '}') then Break;
+            if JSON[P] = ',' then begin Inc(P); Continue; end;
+            Key := JReadString(JSON, P);
+            JSkipWS(JSON, P); if JSON[P] = ':' then Inc(P);
+            JSkipValue(JSON, P);
+          end;
+          // Actually validate Key/Value exist - basic check
+          Inc(ArrIdx);
+        end
+        else
+          JSkipValue(JSON, P);
+      end;
+    end
+    else
+      JSkipValue(JSON, P);
+  end;
+
+  if SectionCount < 4 then
+  begin
+    ErrorMessage := 'Missing sections in mapping file.';
+    Exit;
+  end;
+
+  Result := True;
 end;
 
 { =============================================================================== }
@@ -2078,6 +2224,7 @@ begin
   begin
     AnsiVersion := 'Default';
     ResetAnsiToDefaults;
+    OptimizeMemoryUsage;
     Result := True;
     Exit;
   end;
@@ -2097,15 +2244,17 @@ begin
 
   AnsiVersion := NewVersion;
   LoadAnsiMapping(FilePath);
+  OptimizeMemoryUsage;
   Result := True;
 end;
 
-{ =============================================================================== }
+procedure OptimizeMemoryUsage;
+begin
+  SetProcessWorkingSetSize(GetCurrentProcess, $FFFFFFFF, $FFFFFFFF);
+end;
 
 initialization
-  InitializeAnsiRegistry;
-  AnsiOverrides := TDictionary<string, string>.Create;
-  PrepareActiveReplacements;
+  { AnsiRegistry, AnsiRegistryMap, AnsiOverrides are lazily initialized on first use }
 
 finalization
   AnsiRegistry.Free;
