@@ -24,8 +24,7 @@ uses
   ExtCtrls,
   CategoryButtons,
   StdCtrls,
-  ComCtrls,
-  uLocale;
+  ComCtrls;
 
 type
   TfrmOptions = class(TForm)
@@ -108,15 +107,6 @@ type
     CheckUnicodeToggleShortcut: TCheckBox;
     CheckANSIToggleShortcut: TCheckBox;
     CheckIgnoreCapsLockShortcut: TCheckBox;
-    Locale_Panel: TPanel;
-    LabelLocaleHeader: TLabel;
-    CheckEnableLocaleChange: TCheckBox;
-    GroupBoxLocale: TGroupBox;
-    LabelPrefferedLocale: TLabel;
-    comboPrefferedLocale: TComboBox;
-    LabelLocaleHint: TLabel;
-    ButtonInstallLocale: TButton;
-    LabelLocaleStatus: TLabel;
     LabelHideTimer: TTimer;
     GroupBox8: TGroupBox;
     Label16: TLabel;
@@ -152,14 +142,11 @@ type
     procedure optOutputANSIMouseUp(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
     procedure LabelHideTimerTimer(Sender: TObject);
     procedure LabelGlobalHotkeysLinkClick(Sender: TObject);
-    procedure ButtonInstallLocaleClick(Sender: TObject);
-    procedure CheckEnableLocaleChangeClick(Sender: TObject);
     private
       { Private declarations }
       // Procedure SetTabOrder;
       procedure LoadSettings;
       procedure SaveSettings;
-      procedure RefreshLocaleStatus;
       function GetListIndex(List: TStrings; SearchS: string): Integer;
     public
       { Public declarations }
@@ -305,7 +292,6 @@ begin
   AvroPhonetic_Panel.Visible := False;
   FixedLayout_Panel.Visible := False;
   GlobalOutput_Panel.Visible := False;
-  Locale_Panel.Visible := False;
 
   case CategoryTree.Selected.Index of
     0: General_Panel.Visible := True;
@@ -314,7 +300,6 @@ begin
     3: AvroPhonetic_Panel.Visible := True;
     4: FixedLayout_Panel.Visible := True;
     5: GlobalOutput_Panel.Visible := True;
-    6: Locale_Panel.Visible := True;           { "Locale/Language" }
   end;
 
   TopLabel.Caption := CategoryTree.Selected.Text + ' Settings...';
@@ -461,7 +446,6 @@ begin
   General_Panel.Visible := False;
   Interface_Panel.Visible := False;
   GlobalOutput_Panel.Visible := False;
-  Locale_Panel.Visible := False;
 
   Interface_Panel.Top := 0;
   General_Panel.Top := 0;
@@ -469,7 +453,6 @@ begin
   AvroPhonetic_Panel.Top := 0;
   FixedLayout_Panel.Top := 0;
   GlobalOutput_Panel.Top := 0;
-  Locale_Panel.Top := 0;
 
   Interface_Panel.Left := 0;
   General_Panel.Left := 0;
@@ -477,7 +460,6 @@ begin
   AvroPhonetic_Panel.Left := 0;
   FixedLayout_Panel.Left := 0;
   GlobalOutput_Panel.Left := 0;
-  Locale_Panel.Left := 0;
 
   Interface_Panel.Width := Self.Width - CategoryTree.Width - 20;
   General_Panel.Width := Self.Width - CategoryTree.Width - 20;
@@ -485,7 +467,6 @@ begin
   AvroPhonetic_Panel.Width := Self.Width - CategoryTree.Width - 20;
   FixedLayout_Panel.Width := Self.Width - CategoryTree.Width - 20;
   GlobalOutput_Panel.Width := Self.Width - CategoryTree.Width - 20;
-  Locale_Panel.Width := Self.Width - CategoryTree.Width - 20;
 
   Interface_Panel.BevelKind := bknone { bkTile };
   General_Panel.BevelKind := bknone { bkTile };
@@ -493,12 +474,9 @@ begin
   AvroPhonetic_Panel.BevelKind := bknone { bkTile };
   FixedLayout_Panel.BevelKind := bknone { bkTile };
   GlobalOutput_Panel.BevelKind := bknone;
-  Locale_Panel.BevelKind := bknone;
 
   if CategoryTree.Items.Count > 0 then
     CategoryTree.Items[0].Selected := True;
-
-  CategoryTree.Items.Add(nil, 'Locale/Language');
 
   // =======================================================
   // ANSI Version Switcher Hotkey UI (runtime-created)
@@ -816,21 +794,6 @@ begin
   else
     CheckIgnoreCapsLockShortcut.Checked := False;
 
-  if PrefferedLocale = 'BANGLADESH' then
-    comboPrefferedLocale.ItemIndex := 0
-  else if PrefferedLocale = 'ASSAMESE' then
-    comboPrefferedLocale.ItemIndex := 2
-  else
-    comboPrefferedLocale.ItemIndex := 1;
-
-  if EnableLocaleChange = 'YES' then
-    CheckEnableLocaleChange.Checked := True
-  else
-    CheckEnableLocaleChange.Checked := False;
-
-  GroupBoxLocale.Enabled := CheckEnableLocaleChange.Checked;
-  RefreshLocaleStatus;
-
 end;
 
 { =============================================================================== }
@@ -1040,18 +1003,6 @@ begin
   else
     IgnoreCapsLock := 'NO';
 
-  case comboPrefferedLocale.ItemIndex of
-    0: PrefferedLocale := 'BANGLADESH';
-    2: PrefferedLocale := 'ASSAMESE';
-  else
-    PrefferedLocale := 'INDIA';
-  end;
-
-  if CheckEnableLocaleChange.Checked = True then
-    EnableLocaleChange := 'YES'
-  else
-    EnableLocaleChange := 'NO';
-
   uRegistrySettings.SaveSettings;
 end;
 
@@ -1060,54 +1011,6 @@ end;
 procedure TfrmOptions.TrackBar_TransparencyChange(Sender: TObject);
 begin
   Label_Transparency.Caption := IntToStr(TrackBar_Transparency.Position);
-end;
-
-{ =============================================================================== }
-
-procedure TfrmOptions.RefreshLocaleStatus;
-var
-  S: string;
-begin
-  S := 'Bangladesh (bn-BD): ';
-  if IsBangladeshLocaleInstalled then
-    S := S + 'INSTALLED'
-  else
-    S := S + 'NOT INSTALLED';
-  S := S + '   |   Assamese (as-IN): ';
-  if IsAssameseLocaleInstalled then
-    S := S + 'INSTALLED'
-  else
-    S := S + 'NOT INSTALLED';
-  S := S + '   |   Preffered Locale: ' + PrefferedLocale;
-  LabelLocaleStatus.Caption := S;
-end;
-
-{ =============================================================================== }
-
-procedure TfrmOptions.ButtonInstallLocaleClick(Sender: TObject);
-begin
-  LabelLocaleStatus.Caption := 'Registering locales in HKLM registry (requires administrator)...';
-  LabelLocaleStatus.Repaint;
-
-  try
-    InstallLocale;
-    RefreshLocaleStatus;
-    MessageDlg('Bangla BD, Bangla IN, and Assamese locales have been registered in the Windows registry.' + sLineBreak +
-      'Bangla IN is only registered on Windows XP SP2+ / Vista+.' + sLineBreak +
-      'You may need to log out and back in for the new locales to appear in the Windows language bar.',
-      mtInformation, [mbOK], 0);
-  except
-    on E: Exception do
-      MessageDlg('Failed to install locales. Please run Avro Keyboard as administrator.' + sLineBreak +
-        'Error: ' + E.Message, mtError, [mbOK], 0);
-  end;
-end;
-
-{ =============================================================================== }
-
-procedure TfrmOptions.CheckEnableLocaleChangeClick(Sender: TObject);
-begin
-  GroupBoxLocale.Enabled := CheckEnableLocaleChange.Checked;
 end;
 
 { =============================================================================== }

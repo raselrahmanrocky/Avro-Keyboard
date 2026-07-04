@@ -28,7 +28,6 @@ uses
   KeyboardFunctions in 'Units\KeyboardFunctions.pas',
   uAutoCorrect in 'Units\uAutoCorrect.pas',
   uRegistrySettings in 'Units\uRegistrySettings.pas',
-  uLocale in 'Units\uLocale.pas',
   uFileFolderHandling in 'Units\uFileFolderHandling.pas',
   u_VirtualFontInstall in 'Units\u_VirtualFontInstall.pas',
   u_Admin in 'Units\u_Admin.pas',
