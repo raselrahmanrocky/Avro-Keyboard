@@ -32,8 +32,7 @@ uses
   DateUtils,
   System.ImageList,
   Vcl.AppEvnts,
-  ShellAPI,
-  uLocale;
+  ShellAPI;
 
 type
   TMenuItemExtended = class(TMenuItem)
@@ -400,7 +399,7 @@ type
       procedure ExitApp;
       function GetMyCurrentLayout: string;
       procedure RefreshSettings;
-      procedure SwitchLocaleToMatchMode;
+
       procedure RestoreFromTray;
       procedure OpenHelpFile(const HelpID: Integer);
       procedure ShowOnTray;
@@ -997,7 +996,6 @@ begin
   if CurrentMode <> MyCurrentKeyboardMode then
     KeyboardModeChanged := True;
   hforewnd := GetForegroundWindow;
-  SwitchLocaleToMatchMode;
 
   if hforewnd = 0 then
     exit;
@@ -1058,24 +1056,6 @@ end;
 
 { =============================================================================== }
 
-procedure TAvroMainForm1.SwitchLocaleToMatchMode;
-var
-  hforewnd: Integer;
-begin
-  hforewnd := GetForegroundWindow;
-  if (hforewnd = 0) or (not IsWindow(hforewnd)) then
-    exit;
-
-  if KeyLayout.KeyboardMode = bangla then
-  begin
-    if OutputIsBijoy = 'YES' then
-      ChangeLocaleToEnglish(hforewnd)
-    else if EnableLocaleChange = 'YES' then
-      ChangeLocaleToBangla(hforewnd);
-  end
-  else if KeyLayout.KeyboardMode = SysDefault then
-    ChangeLocaleToEnglish(hforewnd);
-end;
 
 procedure TAvroMainForm1.LoadApp;
 var
@@ -1279,7 +1259,6 @@ begin
   else
     OutputIsBijoy := 'YES';
 
-  SwitchLocaleToMatchMode;
   RefreshSettings;
 end;
 
@@ -1819,7 +1798,6 @@ begin
       end;
   end;
 
-  SwitchLocaleToMatchMode;
 end;
 
 procedure TAvroMainForm1.SetBengaliANSIMode;
@@ -1858,10 +1836,7 @@ begin
     end;
   end;
 
-  SwitchLocaleToMatchMode;
 end;
-
-{ =============================================================================== }
 
 { =============================================================================== }
 
@@ -1878,14 +1853,8 @@ begin
     exit;
   PendingANSISwitch := False;
 
-  { Restore previous mode (English if user was in English, Bangla if they
-    were already typing Bangla in Unicode). Setting KeyboardMode back
-    fires KeyLayout_KeyboardModeChanged which calls SwitchLocaleToMatchMode,
-    so the Windows input locale is also re-synced. }
   if KeyLayout.KeyboardMode <> PreviousModeBeforeANSISwitch then
-    KeyLayout.KeyboardMode := PreviousModeBeforeANSISwitch
-  else
-    SwitchLocaleToMatchMode;
+    KeyLayout.KeyboardMode := PreviousModeBeforeANSISwitch;
 end;
 
 { =============================================================================== }

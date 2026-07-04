@@ -71,7 +71,6 @@ begin
     ShowOutputwarning := 'NO';
 
   AvroMainForm1.RefreshSettings;
-  AvroMainForm1.SwitchLocaleToMatchMode;
 
   { If the user cancelled an ANSI switch initiated by a hotkey,
     restore the previous keyboard mode. }
@@ -92,7 +91,6 @@ begin
   AvroMainForm1.PendingANSISwitchClear;
 
   AvroMainForm1.RefreshSettings;
-  AvroMainForm1.SwitchLocaleToMatchMode;
   Self.Close;
 end;
 

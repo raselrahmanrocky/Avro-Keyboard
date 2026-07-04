@@ -91,8 +91,6 @@ var
   UnicodeToggleShortcut: string;
   ANSIToggleShortcut: string;
   IgnoreCapsLock:    string;
-  PrefferedLocale:   string;
-  EnableLocaleChange: string;
 
 procedure SaveUISettings;
 procedure LoadSettings;
@@ -199,8 +197,6 @@ begin
   UnicodeToggleShortcut := UpperCase(XML.GetValue('UnicodeToggleShortcut', 'YES'));
   ANSIToggleShortcut := UpperCase(XML.GetValue('ANSIToggleShortcut', 'YES'));
   IgnoreCapsLock := UpperCase(XML.GetValue('IgnoreCapsLock', 'NO'));
-  PrefferedLocale := XML.GetValue('PrefferedLocale', 'INDIA');
-  EnableLocaleChange := UpperCase(XML.GetValue('EnableLocaleChange', 'NO'));
 
   clsUnicodeToBijoy2000.AnsiVersion := XML.GetValue('AnsiVersion', 'Default');
 
@@ -284,8 +280,6 @@ begin
   XML.SetValue('UnicodeToggleShortcut', UnicodeToggleShortcut);
   XML.SetValue('ANSIToggleShortcut', ANSIToggleShortcut);
   XML.SetValue('IgnoreCapsLock', IgnoreCapsLock);
-  XML.SetValue('PrefferedLocale', PrefferedLocale);
-  XML.SetValue('EnableLocaleChange', EnableLocaleChange);
   XML.SetValue('AnsiVersion', clsUnicodeToBijoy2000.AnsiVersion);
 
   XML.SaveXMLData;
@@ -375,8 +369,6 @@ begin
     UnicodeToggleShortcut := UpperCase(Reg.ReadStringDef('UnicodeToggleShortcut', 'YES'));
     ANSIToggleShortcut := UpperCase(Reg.ReadStringDef('ANSIToggleShortcut', 'YES'));
     IgnoreCapsLock := UpperCase(Reg.ReadStringDef('IgnoreCapsLock', 'NO'));
-    PrefferedLocale := Reg.ReadStringDef('PrefferedLocale', 'INDIA');
-    EnableLocaleChange := UpperCase(Reg.ReadStringDef('EnableLocaleChange', 'NO'));
     clsUnicodeToBijoy2000.AnsiVersion := Reg.ReadStringDef('AnsiVersion', 'Default');
 
   end;
@@ -465,8 +457,6 @@ begin
     Reg.WriteString('UnicodeToggleShortcut', UnicodeToggleShortcut);
     Reg.WriteString('ANSIToggleShortcut', ANSIToggleShortcut);
     Reg.WriteString('IgnoreCapsLock', IgnoreCapsLock);
-    Reg.WriteString('PrefferedLocale', PrefferedLocale);
-    Reg.WriteString('EnableLocaleChange', EnableLocaleChange);
     Reg.WriteString('AnsiVersion', clsUnicodeToBijoy2000.AnsiVersion);
 
   end;
@@ -611,11 +601,6 @@ begin
     ANSIToggleShortcut := 'YES';
   if not((IgnoreCapsLock = 'YES') or (IgnoreCapsLock = 'NO')) then
     IgnoreCapsLock := 'NO';
-  if not((EnableLocaleChange = 'YES') or (EnableLocaleChange = 'NO')) then
-    EnableLocaleChange := 'NO';
-  if (PrefferedLocale <> 'BANGLADESH') and (PrefferedLocale <> 'INDIA') and
-     (PrefferedLocale <> 'ASSAMESE') then
-    PrefferedLocale := 'INDIA';
 
   // ANSI Mapping Version
   if clsUnicodeToBijoy2000.AnsiVersion = '' then
