@@ -43,6 +43,7 @@ type
   public
     procedure Setup;
     procedure PopulateVersions;
+    procedure PositionFormNearCursor;
   protected
     procedure CreateParams(var Params: TCreateParams); override;
     destructor Destroy; override;
@@ -80,7 +81,6 @@ end;
 
 procedure ShowAnsiVersionPicker;
 var
-  P: TPoint;
   Picker: TfrmAnsiVersionPicker;
 begin
   if Assigned(CurrentPicker) then
@@ -92,13 +92,7 @@ begin
   Picker := TfrmAnsiVersionPicker.CreateNew(Application);
   try
     Picker.Setup;
-    GetCursorPos(P);
-    Picker.Left := P.X;
-    Picker.Top := P.Y;
-    if (Picker.Left + Picker.Width) > Screen.Width then
-      Picker.Left := Screen.Width - Picker.Width;
-    if (Picker.Top + Picker.Height) > Screen.Height then
-      Picker.Top := Screen.Height - Picker.Height;
+    Picker.PositionFormNearCursor;
     CurrentPicker := Picker;
     Picker.Show;
     ForceForegroundWindow(Picker.Handle);
@@ -266,6 +260,25 @@ begin
   Width := MaxW + 44;
   Height := ListBox.Items.Count * 26 + 6;
   ListBox.SetBounds(0, 3, Width, Height - 6);
+end;
+
+procedure TfrmAnsiVersionPicker.PositionFormNearCursor;
+var
+  CursorPos: TPoint;
+  Monitor: TMonitor;
+begin
+  GetCursorPos(CursorPos);
+  Monitor := Screen.MonitorFromPoint(CursorPos);
+  Left := CursorPos.X;
+  Top := CursorPos.Y + 10;
+  if Left + Width > Monitor.WorkAreaRect.Right then
+    Left := Monitor.WorkAreaRect.Right - Width;
+  if Left < Monitor.WorkAreaRect.Left then
+    Left := Monitor.WorkAreaRect.Left;
+  if Top + Height > Monitor.WorkAreaRect.Bottom then
+    Top := Monitor.WorkAreaRect.Bottom - Height;
+  if Top < Monitor.WorkAreaRect.Top then
+    Top := Monitor.WorkAreaRect.Top;
 end;
 
 function TfrmAnsiVersionPicker.GetSelectedVersion: string;
