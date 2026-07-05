@@ -1150,8 +1150,17 @@ begin
     else
       FActiveMappingLastWriteTime := 0;
   end
-  else
-    FActiveMappingLastWriteTime := 0;
+    else
+      FActiveMappingLastWriteTime := 0;
+
+  // Apply the loaded ANSI mapping
+  if AnsiMappingDir = '' then
+  begin
+    AnsiMappingDir := GetAvroDataDir + 'AnsiMapping\';
+    ForceDirectories(AnsiMappingDir);
+  end;
+  LoadCurrentActiveMapping;
+  BuildAnsiVersionMenus;
 
 end;
 

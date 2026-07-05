@@ -59,6 +59,25 @@ uses
 var
   CurrentPicker: TfrmAnsiVersionPicker;
 
+procedure ForceForegroundWindow(hWnd: HWND);
+var
+  ForegroundThreadID, ThisThreadID: DWORD;
+begin
+  ForegroundThreadID := GetWindowThreadProcessId(GetForegroundWindow, nil);
+  ThisThreadID := GetCurrentThreadId;
+  if ForegroundThreadID <> ThisThreadID then
+  begin
+    AttachThreadInput(ForegroundThreadID, ThisThreadID, True);
+    try
+      SetForegroundWindow(hWnd);
+    finally
+      AttachThreadInput(ForegroundThreadID, ThisThreadID, False);
+    end;
+  end
+  else
+    SetForegroundWindow(hWnd);
+end;
+
 procedure ShowAnsiVersionPicker;
 var
   P: TPoint;
@@ -82,6 +101,7 @@ begin
       Picker.Top := Screen.Height - Picker.Height;
     CurrentPicker := Picker;
     Picker.Show;
+    ForceForegroundWindow(Picker.Handle);
   except
     Picker.Free;
     if CurrentPicker = Picker then
