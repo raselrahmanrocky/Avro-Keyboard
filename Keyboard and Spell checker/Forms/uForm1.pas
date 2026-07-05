@@ -1274,8 +1274,6 @@ end;
 procedure TAvroMainForm1.OutputasUnicodeRecommended1Click(Sender: TObject);
 begin
   OutputIsBijoy := 'NO';
-  AnsiVersion := 'Default';
-  ResetAnsiToDefaults;
   OptimizeMemoryUsage;
   RefreshSettings;
 end;
@@ -1800,8 +1798,6 @@ begin
       if OutputIsBijoy = 'YES' then
       begin
         OutputIsBijoy := 'NO';
-        AnsiVersion := 'Default';
-        ResetAnsiToDefaults;
         OptimizeMemoryUsage;
         RefreshSettings;
       end;
