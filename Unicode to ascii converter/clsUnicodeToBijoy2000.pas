@@ -742,12 +742,15 @@ begin
   // If UU-Kar1 and Reph are together, you might want to use UU-Kar2
   fConvertedText := ReplaceStr(fConvertedText, string(A_UUKar1) + string(A_Reph), string(A_UUKar2) + string(A_Reph));
 
-  // Warning: Hardcoded conversion
-  fConvertedText := ReplaceStr(fConvertedText, 'Rz', 'Ry');
-  fConvertedText := ReplaceStr(fConvertedText, 'R‚', 'R~');
-  fConvertedText := ReplaceStr(fConvertedText, 'o‚', 'o~');
-  fConvertedText := ReplaceStr(fConvertedText, 'p‚', 'p~');
-  fConvertedText := ReplaceStr(fConvertedText, 'i‚', 'i~');
+  { =========================================================================
+    ডাইনামিক পোস্ট-প্রসেসিং কারেকশন (জেসন ফাইল অনুযায়ী কাজ করবে)
+    ========================================================================= }
+  fConvertedText := ReplaceStr(fConvertedText, string(A_T) + string(A_UKar1), string(A_T) + string(A_UKar2));
+  fConvertedText := ReplaceStr(fConvertedText, string(A_T) + string(A_UUKar1), string(A_T) + string(A_UUKar2));
+  fConvertedText := ReplaceStr(fConvertedText, string(A_RR) + string(A_UUKar1), string(A_RR) + string(A_UUKar2));
+  fConvertedText := ReplaceStr(fConvertedText, string(A_RRH) + string(A_UUKar1), string(A_RRH) + string(A_UUKar2));
+  fConvertedText := ReplaceStr(fConvertedText, string(A_R) + string(A_UUKar1), string(A_R) + string(A_UUKar2));
+  { ========================================================================= }
   
   // --- STRICT SANITIZATION FOR ANSI OUTPUT ---
   CleanedText := '';
