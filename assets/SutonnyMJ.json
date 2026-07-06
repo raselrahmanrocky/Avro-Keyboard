@@ -450,7 +450,7 @@
         "Comment": "ণ্ঠ"
       },
       "A_NN_Dd": {
-        "Value": "#$00CA",
+        "Value": "#$00D0",
         "Comment": "ণ্ড"
       },
       "A_T_T": {
@@ -668,7 +668,7 @@
         "Comment": "ঙ-এর প্রথম খন্ড"
       },
       "A_N_1H_2": {
-        "Value": "#$0153",
+        "Value": "#$203A",
         "Comment": "ন-এর প্রথম খন্ড ২"
       },
       "A_D_1H_2": {
@@ -722,7 +722,7 @@
         "Comment": "ল-এর দ্বিতীয় খন্ড ১"
       },
       "A_L_2H_2": {
-        "Value": "#$00AC",
+        "Value": "#$00AD",
         "Comment": "ল-এর দ্বিতীয় খন্ড ২"
       },
       "A_T_R_2H": {
@@ -734,7 +734,7 @@
         "Comment": "র-ফলা ৩"
       },
       "A_Nn_2H_1": {
-        "Value": "#$00E8",
+        "Value": "#$0153",
         "Comment": "ণ-এর দ্বিতীয় খন্ড ১"
       },
       "A_K_R_2H": {
@@ -771,7 +771,38 @@
       }
     }
   },
-  "FullFormReplacements": [],
+  "FullFormReplacements": [
+    {
+      "Key": "#$099A#$09CD#$09AC",
+      "Value": "#$0050#$00A6",
+      "Comment": "চ্ব → P¡"
+    },
+    {
+      "Key": "#$09A4#$09CD#$09AE",
+      "Value": "#$005A#$00A5",
+      "Comment": "ত্ম → Z¥"
+    },
+    {
+      "Key": "#$09A6#$09CD#$09A6#$09CD#$09AC",
+      "Value": "#$00CF#$00A1",
+      "Comment": "দ্দ্ব → Ï¡"
+    },
+    {
+      "Key": "#$09AD#$09CD#$09B0",
+      "Value": "#$00A3",
+      "Comment": "ভ্র → £ (A_BH_R_2H)"
+    },
+    {
+      "Key": "#$09A8#$09CD#$09A0",
+      "Value": "#$00DA",
+      "Comment": "ন্ঠ → Ú"
+    },
+    {
+      "Key": "#$09A8#$09CD#$09A4#$09CD#$09B0",
+      "Value": "#$0161#$00BF",
+      "Comment": "ন্ত্র → š¿"
+    }
+  ],
   "PreReplacements": [
     {
       "Key": "#$09CD#$0964",
@@ -779,5 +810,11 @@
       "Comment": "্। থেকে সরাসরি ব্যাকস্ল্যাশ"
     }
   ],
-  "PostReplacements": []
+  "PostReplacements": [
+    {
+      "Key": "#$0059#$00A1",
+      "Value": "#$0059#$00A6",
+      "Comment": "ণ্ব: সংশোধন Y¡ → Y¦"
+    }
+  ]
 }
