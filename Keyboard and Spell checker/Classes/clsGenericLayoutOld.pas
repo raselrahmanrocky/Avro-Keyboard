@@ -867,6 +867,7 @@ begin
   if (IsWinKey = True) or (IsOnlyCtrlKey = True) or (IsOnlyLeftAltKey = True) then
   begin
     Block := False;
+    CommittedBanglaT := '';
     ResetDeadKey;
     ProcessVKeyDown := '';
     Exit;

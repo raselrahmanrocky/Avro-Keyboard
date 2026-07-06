@@ -1447,6 +1447,7 @@ begin
   begin
     Block := False;
     BlockLast := False;
+    CommittedBanglaT := '';
     ResetDeadKey;
     ProcessVKeyDown := '';
     exit;
