@@ -799,6 +799,8 @@ begin
   end
   // Photoshop drag window exception
   else if GetWindowClassName(lngHWND) = 'PSDocDragFeedback' then
+    Result := True
+  else if (CurrentPicker <> nil) and (lngHWND = CurrentPicker.Handle) then
     Result := True;
 end;
 

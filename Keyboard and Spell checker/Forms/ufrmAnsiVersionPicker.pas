@@ -51,14 +51,14 @@ type
 
 procedure ShowAnsiVersionPicker;
 
+var
+  CurrentPicker: TfrmAnsiVersionPicker;
+
 implementation
 
 uses
   uForm1,
   ufrmAnsiToast;
-
-var
-  CurrentPicker: TfrmAnsiVersionPicker;
 
 procedure ForceForegroundWindow(hWnd: HWND);
 var
