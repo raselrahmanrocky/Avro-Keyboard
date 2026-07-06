@@ -22,7 +22,6 @@ type
   TfrmAnsiVersionPicker = class(TForm)
     ListBox: TListBox;
     procedure FormShow(Sender: TObject);
-    procedure FormDeactivate(Sender: TObject);
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
     procedure ListBoxKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
     procedure ListBoxClick(Sender: TObject);
@@ -37,7 +36,7 @@ type
     FPrevForegroundWindow: HWND;
     function GetSelectedVersion: string;
     procedure AutoSizeForm;
-    procedure WMActivate(var Msg: TWMActivate); message WM_ACTIVATE;
+    procedure WMNCActivate(var Msg: TWMNCActivate); message WM_NCACTIVATE;
     procedure WMFocusPicker(var Msg: TMessage); message WM_FOCUS_PICKER;
     procedure WMTimer(var Msg: TMessage); message WM_TIMER;
   public
@@ -60,23 +59,31 @@ uses
   uForm1,
   ufrmAnsiToast;
 
+// Force a window to the foreground using AttachThreadInput — the most reliable way
 procedure ForceForegroundWindow(hWnd: HWND);
 var
-  ForegroundThreadID, ThisThreadID: DWORD;
+  ForeThread, ThisThread: DWORD;
 begin
-  ForegroundThreadID := GetWindowThreadProcessId(GetForegroundWindow, nil);
-  ThisThreadID := GetCurrentThreadId;
-  if ForegroundThreadID <> ThisThreadID then
+  if not IsWindow(hWnd) then Exit;
+  ForeThread := GetWindowThreadProcessId(GetForegroundWindow, nil);
+  ThisThread := GetCurrentThreadId;
+  if ForeThread <> ThisThread then
   begin
-    AttachThreadInput(ForegroundThreadID, ThisThreadID, True);
+    AttachThreadInput(ForeThread, ThisThread, True);
     try
       SetForegroundWindow(hWnd);
+      BringWindowToTop(hWnd);
+      Windows.SetFocus(hWnd);
     finally
-      AttachThreadInput(ForegroundThreadID, ThisThreadID, False);
+      AttachThreadInput(ForeThread, ThisThread, False);
     end;
   end
   else
+  begin
     SetForegroundWindow(hWnd);
+    BringWindowToTop(hWnd);
+    Windows.SetFocus(hWnd);
+  end;
 end;
 
 procedure ShowAnsiVersionPicker;
@@ -110,13 +117,15 @@ procedure TfrmAnsiVersionPicker.CreateParams(var Params: TCreateParams);
 begin
   inherited;
   Params.WindowClass.Style := Params.WindowClass.Style or CS_DROPSHADOW;
+  Params.Style := WS_POPUP or WS_CLIPSIBLINGS;
+  Params.ExStyle := WS_EX_TOPMOST or WS_EX_TOOLWINDOW;
 end;
 
-procedure TfrmAnsiVersionPicker.WMActivate(var Msg: TWMActivate);
+procedure TfrmAnsiVersionPicker.WMNCActivate(var Msg: TWMNCActivate);
 begin
   inherited;
-  if Msg.Active = WA_INACTIVE then
-    Close;
+  if not Msg.Active then
+    PostMessage(Handle, WM_CLOSE, 0, 0);
 end;
 
 procedure TfrmAnsiVersionPicker.Setup;
@@ -144,7 +153,6 @@ begin
   ListBox.OnMouseLeave := ListBoxMouseLeave;
   ListBox.TabStop := True;
   OnShow := FormShow;
-  OnDeactivate := FormDeactivate;
   OnClose := FormClose;
   PopulateVersions;
   AutoSizeForm;
@@ -152,30 +160,18 @@ end;
 
 procedure TfrmAnsiVersionPicker.FormShow(Sender: TObject);
 begin
-  SetTimer(Handle, 1, 100, nil);
+  SetTimer(Handle, 1, 200, nil);
   PostMessage(Handle, WM_FOCUS_PICKER, 0, 0);
 end;
 
 procedure TfrmAnsiVersionPicker.WMFocusPicker(var Msg: TMessage);
-var
-  ForeWnd: HWND;
-  ForeThread: DWORD;
 begin
-  ForeWnd := GetForegroundWindow;
-  if ForeWnd <> 0 then
+  if IsWindow(Handle) then
   begin
-    ForeThread := GetWindowThreadProcessId(ForeWnd, nil);
-    AttachThreadInput(GetCurrentThreadId, ForeThread, True);
-    SetForegroundWindow(Handle);
-    BringWindowToTop(Handle);
-    AttachThreadInput(GetCurrentThreadId, ForeThread, False);
-  end
-  else
-  begin
-    SetForegroundWindow(Handle);
-    BringWindowToTop(Handle);
+    ForceForegroundWindow(Handle);
+    if ListBox.CanFocus then
+      ListBox.SetFocus;
   end;
-  PostMessage(ListBox.Handle, WM_SETFOCUS, 0, 0);
 end;
 
 procedure TfrmAnsiVersionPicker.WMTimer(var Msg: TMessage);
@@ -203,11 +199,6 @@ begin
   inherited;
 end;
 
-procedure TfrmAnsiVersionPicker.FormDeactivate(Sender: TObject);
-begin
-  Close;
-end;
-
 procedure TfrmAnsiVersionPicker.PopulateVersions;
 var
   SearchRec: TSearchRec;
@@ -221,14 +212,14 @@ begin
     ListBox.Items.Add('Default');
     if DirectoryExists(AnsiMappingDir) then
     begin
-      if FindFirst(AnsiMappingDir + '*.json', faAnyFile, SearchRec) = 0 then
+      if System.SysUtils.FindFirst(AnsiMappingDir + '*.json', System.SysUtils.faAnyFile, SearchRec) = 0 then
       begin
         repeat
           FileTitle := ChangeFileExt(SearchRec.Name, '');
           if not SameText(FileTitle, 'Default') then
             ListBox.Items.Add(FileTitle);
-        until FindNext(SearchRec) <> 0;
-        FindClose(SearchRec);
+        until System.SysUtils.FindNext(SearchRec) <> 0;
+        System.SysUtils.FindClose(SearchRec);
       end;
     end;
   finally

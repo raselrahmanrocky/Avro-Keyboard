@@ -2019,17 +2019,22 @@ var
   hforewnd:    HWND;
 begin
 
-  // --- Auto-refresh: check if JSON mapping file changed externally ---
+  // --- Auto-refresh: check if JSON mapping file changed externally (Safe Wrapper) ---
   if (AnsiVersion <> 'Default') and (AnsiMappingDir <> '') then
   begin
-    if TFile.Exists(AnsiMappingDir + AnsiVersion + '.json') then
-    begin
-      if TFile.GetLastWriteTime(AnsiMappingDir + AnsiVersion + '.json') <> FActiveMappingLastWriteTime then
+    try
+      if TFile.Exists(AnsiMappingDir + AnsiVersion + '.json') then
       begin
-        FActiveMappingLastWriteTime := TFile.GetLastWriteTime(AnsiMappingDir + AnsiVersion + '.json');
-        LoadCurrentActiveMapping;
-        Log('ANSI Mapping Auto-Refreshed: ' + AnsiVersion);
+        if TFile.GetLastWriteTime(AnsiMappingDir + AnsiVersion + '.json') <> FActiveMappingLastWriteTime then
+        begin
+          FActiveMappingLastWriteTime := TFile.GetLastWriteTime(AnsiMappingDir + AnsiVersion + '.json');
+          LoadCurrentActiveMapping;
+          Log('ANSI Mapping Auto-Refreshed: ' + AnsiVersion);
+        end;
       end;
+    except
+      on E: Exception do
+        Log('Error checking/loading mapping file: ' + E.Message);
     end;
   end;
 
