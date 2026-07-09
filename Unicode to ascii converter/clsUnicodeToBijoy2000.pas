@@ -103,35 +103,35 @@ var
   A_8: string = #$38;
   A_9: string = #$39;
 
-  { Vowels and Kars }
-  A_A: Char       = #$41;
-  A_AA: string    = #$41#$76;
-  A_AAKar: Char   = #$76;
-  A_I: Char       = #$42;
-  A_IKar: Char    = #$77;
-  A_II: Char      = #$43;
-  A_IIKar: Char   = #$78;
-  A_U: Char       = #$44;
-  A_UKar2: Char   = #$79;
-  A_UKar1: Char   = #$7A;
-  A_UKar3: Char   = #$2013;
-  A_UKar4: Char   = #$201C;
-  A_UU: Char      = #$45;
-  A_UUKar2: Char  = #$7E;
-  A_UUKar1: Char  = #$201A;
-  A_UUKar3: Char  = #$192;
-  A_RRI: Char     = #$46;
-  A_RRIKar1: Char = #$201E;
-  A_RRIKar2: Char = #$2026;
-  A_E: Char       = #$47;
-  A_EKar1: Char   = #$2020;
-  A_EKar2: Char   = #$2021;
-  A_OI: Char      = #$48;
-  A_OIKar1: Char  = #$2C6;
-  A_OIKar2: Char  = #$2030;
-  A_O: Char       = #$49;
-  A_OU: Char      = #$4A;
-  A_OUKar: Char   = #$160;
+   { Vowels and Kars }
+   A_A: string     = #$41;
+   A_AA: string    = #$41#$76;
+   A_AAKar: string = #$76;
+   A_I: string     = #$42;
+   A_IKar: string  = #$77;
+   A_II: string    = #$43;
+   A_IIKar: string = #$78;
+   A_U: string     = #$44;
+   A_UKar2: string = #$79;
+   A_UKar1: string = #$7A;
+   A_UKar3: string = #$2013;
+   A_UKar4: string = #$201C;
+   A_UU: string    = #$45;
+   A_UUKar2: string= #$7E;
+   A_UUKar1: string= #$201A;
+   A_UUKar3: string= #$192;
+   A_RRI: string   = #$46;
+   A_RRIKar1: string=#$201E;
+   A_RRIKar2: string=#$2026;
+   A_E: string     = #$47;
+   A_EKar1: string = #$2020;
+   A_EKar2: string = #$2021;
+   A_OI: string    = #$48;
+   A_OIKar1: string= #$2C6;
+   A_OIKar2: string= #$2030;
+   A_O: string     = #$49;
+   A_OU: string    = #$4A;
+   A_OUKar: string = #$160;
 
    { Symbols }
   A_Taka: string             = #$24;
@@ -257,43 +257,43 @@ var
   A_H_M: string      = #$FE;
   A_Rr_G: string     = #$FF;
 
-  { First Half forms }
-  A_Reph: Char   = #$A9;
-  A_M_1H: Char   = #$A4;
-  A_Ss_1H: Char  = #$AE;
-  A_S_1H_1: Char = #$AF;
-  A_N_1H_1: Char = #$161;
-  A_S_1H_2: Char = #$2C9; // -----------Not used
-  A_D_1H_1: Char = #$2DC;
-  A_C_1H: Char   = #$201D;
-  A_NGA_1H: Char = #$2022;
-  A_N_1H_2: Char = #$203A;
-  A_D_1H_2: Char = #$2122;
+   { First Half forms }
+   A_Reph: string   = #$A9;
+   A_M_1H: string   = #$A4;
+   A_Ss_1H: string  = #$AE;
+   A_S_1H_1: string = #$AF;
+   A_N_1H_1: string = #$161;
+   A_S_1H_2: string = #$2C9; // -----------Not used
+   A_D_1H_1: string = #$2DC;
+   A_C_1H: string   = #$201D;
+   A_NGA_1H: string = #$2022;
+   A_N_1H_2: string = #$203A;
+   A_D_1H_2: string = #$2122;
 
-  { Second Half forms }
-  A_B_2H_1: Char    = #$5E; //
-  A_B_2H_2: Char    = #$A1; //
-  A_BH_2H: Char     = #$A2; //
-  A_BH_R_2H: Char   = #$A3; //
-  A_M_2H_1: Char    = #$A5; //
-  A_B_2H_3: Char    = #$A6; //
-  A_M_2H_2: Char    = #$A7; //
-  A_ZFola: Char     = #$A8; //
-  A_RFola_1: Char   = #$AA; //
-  A_RFola_2: Char   = #$AB; //
-  A_L_2H_1: Char    = #$AC; //
-  A_L_2H_2: Char    = #$AD; // <--- Not used
-  A_T_R_2H: Char    = #$BF; //
-  A_RFola_3: Char   = #$D6; //
-  A_Nn_2H_1: Char   = #$E8;
-  A_K_R_2H: Char    = #$152; //
-  A_Nn_2H_2: Char   = #$153;
-  A_B_2H_4: Char    = #$178;  //
-  A_T_2H: Char      = #$2014; //
-  A_T_UKar_2H: Char = #$2018; //
-  A_Th_2H: Char     = #$2019; //
-  A_K_2H: Char      = #$2039; //
-  A_L_2H_3: Char    = #$2212; //
+   { Second Half forms }
+   A_B_2H_1: string    = #$5E; //
+   A_B_2H_2: string    = #$A1; //
+   A_BH_2H: string     = #$A2; //
+   A_BH_R_2H: string   = #$A3; //
+   A_M_2H_1: string    = #$A5; //
+   A_B_2H_3: string    = #$A6; //
+   A_M_2H_2: string    = #$A7; //
+   A_ZFola: string     = #$A8; //
+   A_RFola_1: string   = #$AA; //
+   A_RFola_2: string   = #$AB; //
+   A_L_2H_1: string    = #$AC; //
+   A_L_2H_2: string    = #$AD; // <--- Not used
+   A_T_R_2H: string    = #$BF; //
+   A_RFola_3: string   = #$D6; //
+   A_Nn_2H_1: string   = #$E8;
+   A_K_R_2H: string    = #$152; //
+   A_Nn_2H_2: string   = #$153;
+   A_B_2H_4: string    = #$178;  //
+   A_T_2H: string      = #$2014; //
+   A_T_UKar_2H: string = #$2018; //
+   A_Th_2H: string     = #$2019; //
+   A_K_2H: string      = #$2039; //
+   A_L_2H_3: string    = #$2212; //
 
 
 { ============================================================================= }
@@ -333,35 +333,35 @@ begin
   RegVar('A_8', 'Numbers', avString, @A_8, '#$38', '৮');
   RegVar('A_9', 'Numbers', avString, @A_9, '#$39', '৯');
 
-  // VowelsAndKars
-  RegVar('A_A', 'VowelsAndKars', avChar, @A_A, '#$41', 'অ');
-  RegVar('A_AA', 'VowelsAndKars', avString, @A_AA, '#$41#$76', 'আ');
-  RegVar('A_AAKar', 'VowelsAndKars', avChar, @A_AAKar, '#$76', 'া (আ-কার)');
-  RegVar('A_I', 'VowelsAndKars', avChar, @A_I, '#$42', 'ই');
-  RegVar('A_IKar', 'VowelsAndKars', avChar, @A_IKar, '#$77', 'ি (ই-কার)');
-  RegVar('A_II', 'VowelsAndKars', avChar, @A_II, '#$43', 'ঈ');
-  RegVar('A_IIKar', 'VowelsAndKars', avChar, @A_IIKar, '#$78', 'ী (ঈ-কার)');
-  RegVar('A_U', 'VowelsAndKars', avChar, @A_U, '#$44', 'উ');
-  RegVar('A_UKar2', 'VowelsAndKars', avChar, @A_UKar2, '#$79', 'ু (উ-কার ২ - ঝুলন্ত)');
-  RegVar('A_UKar1', 'VowelsAndKars', avChar, @A_UKar1, '#$7A', 'ু (উ-কার ১ - সাধারণ)');
-  RegVar('A_UKar3', 'VowelsAndKars', avChar, @A_UKar3, '#$2013', 'ু (উ-কার ৩ - ড়ু/ঢ়ু)');
-  RegVar('A_UKar4', 'VowelsAndKars', avChar, @A_UKar4, '#$201C', 'ু (উ-কার ৪ - রু)');
-  RegVar('A_UU', 'VowelsAndKars', avChar, @A_UU, '#$45', 'ঊ');
-  RegVar('A_UUKar2', 'VowelsAndKars', avChar, @A_UUKar2, '#$7E', 'ূ (ঊ-কার ২ - ঝুলন্ত)');
-  RegVar('A_UUKar1', 'VowelsAndKars', avChar, @A_UUKar1, '#$201A', 'ূ (ঊ-কার ১ - সাধারণ)');
-  RegVar('A_UUKar3', 'VowelsAndKars', avChar, @A_UUKar3, '#$192', 'ূ (ঊ-কার ৩ - রূ)');
-  RegVar('A_RRI', 'VowelsAndKars', avChar, @A_RRI, '#$46', 'ঋ');
-  RegVar('A_RRIKar1', 'VowelsAndKars', avChar, @A_RRIKar1, '#$201E', 'ৃ (ঋ-কার ১)');
-  RegVar('A_RRIKar2', 'VowelsAndKars', avChar, @A_RRIKar2, '#$2026', 'ৃ (ঋ-কার ২)');
-  RegVar('A_E', 'VowelsAndKars', avChar, @A_E, '#$47', 'এ');
-  RegVar('A_EKar1', 'VowelsAndKars', avChar, @A_EKar1, '#$2020', 'ে (এ-কার ১ - সাধারণ)');
-  RegVar('A_EKar2', 'VowelsAndKars', avChar, @A_EKar2, '#$2021', 'ে (এ-কার ২ - ঝুলন্ত)');
-  RegVar('A_OI', 'VowelsAndKars', avChar, @A_OI, '#$48', 'ঐ');
-  RegVar('A_OIKar1', 'VowelsAndKars', avChar, @A_OIKar1, '#$2C6', 'ৈ (ঐ-কার ১ - সাধারণ)');
-  RegVar('A_OIKar2', 'VowelsAndKars', avChar, @A_OIKar2, '#$2030', 'ৈ (ঐ-কার ২ - ঝুলন্ত)');
-  RegVar('A_O', 'VowelsAndKars', avChar, @A_O, '#$49', 'ও');
-  RegVar('A_OU', 'VowelsAndKars', avChar, @A_OU, '#$4A', 'ঔ');
-  RegVar('A_OUKar', 'VowelsAndKars', avChar, @A_OUKar, '#$160', 'ৌ (ঔ-কার)');
+   // VowelsAndKars
+   RegVar('A_A', 'VowelsAndKars', avString, @A_A, '#$41', 'অ');
+   RegVar('A_AA', 'VowelsAndKars', avString, @A_AA, '#$41#$76', 'আ');
+   RegVar('A_AAKar', 'VowelsAndKars', avString, @A_AAKar, '#$76', 'া (আ-কার)');
+   RegVar('A_I', 'VowelsAndKars', avString, @A_I, '#$42', 'ই');
+   RegVar('A_IKar', 'VowelsAndKars', avString, @A_IKar, '#$77', 'ি (ই-কার)');
+   RegVar('A_II', 'VowelsAndKars', avString, @A_II, '#$43', 'ঈ');
+   RegVar('A_IIKar', 'VowelsAndKars', avString, @A_IIKar, '#$78', 'ী (ঈ-কার)');
+   RegVar('A_U', 'VowelsAndKars', avString, @A_U, '#$44', 'উ');
+   RegVar('A_UKar2', 'VowelsAndKars', avString, @A_UKar2, '#$79', 'ু (উ-কার ২ - ঝুলন্ত)');
+   RegVar('A_UKar1', 'VowelsAndKars', avString, @A_UKar1, '#$7A', 'ু (উ-কার ১ - সাধারণ)');
+   RegVar('A_UKar3', 'VowelsAndKars', avString, @A_UKar3, '#$2013', 'ু (উ-কার ৩ - ড়ু/ঢ়ু)');
+   RegVar('A_UKar4', 'VowelsAndKars', avString, @A_UKar4, '#$201C', 'ু (উ-কার ৪ - রু)');
+   RegVar('A_UU', 'VowelsAndKars', avString, @A_UU, '#$45', 'ঊ');
+   RegVar('A_UUKar2', 'VowelsAndKars', avString, @A_UUKar2, '#$7E', 'ূ (ঊ-কার ২ - ঝুলন্ত)');
+   RegVar('A_UUKar1', 'VowelsAndKars', avString, @A_UUKar1, '#$201A', 'ূ (ঊ-কার ১ - সাধারণ)');
+   RegVar('A_UUKar3', 'VowelsAndKars', avString, @A_UUKar3, '#$192', 'ূ (ঊ-কার ৩ - রূ)');
+   RegVar('A_RRI', 'VowelsAndKars', avString, @A_RRI, '#$46', 'ঋ');
+   RegVar('A_RRIKar1', 'VowelsAndKars', avString, @A_RRIKar1, '#$201E', 'ৃ (ঋ-কার ১)');
+   RegVar('A_RRIKar2', 'VowelsAndKars', avString, @A_RRIKar2, '#$2026', 'ৃ (ঋ-কার ২)');
+   RegVar('A_E', 'VowelsAndKars', avString, @A_E, '#$47', 'এ');
+   RegVar('A_EKar1', 'VowelsAndKars', avString, @A_EKar1, '#$2020', 'ে (এ-কার ১ - সাধারণ)');
+   RegVar('A_EKar2', 'VowelsAndKars', avString, @A_EKar2, '#$2021', 'ে (এ-কার ২ - ঝুলন্ত)');
+   RegVar('A_OI', 'VowelsAndKars', avString, @A_OI, '#$48', 'ঐ');
+   RegVar('A_OIKar1', 'VowelsAndKars', avString, @A_OIKar1, '#$2C6', 'ৈ (ঐ-কার ১ - সাধারণ)');
+   RegVar('A_OIKar2', 'VowelsAndKars', avString, @A_OIKar2, '#$2030', 'ৈ (ঐ-কার ২ - ঝুলন্ত)');
+   RegVar('A_O', 'VowelsAndKars', avString, @A_O, '#$49', 'ও');
+   RegVar('A_OU', 'VowelsAndKars', avString, @A_OU, '#$4A', 'ঔ');
+   RegVar('A_OUKar', 'VowelsAndKars', avString, @A_OUKar, '#$160', 'ৌ (ঔ-কার)');
 
   // Symbols
   RegVar('A_Taka', 'Symbols', avString, @A_Taka, '#$24', '৳ (টাকা)');
@@ -486,43 +486,43 @@ begin
   RegVar('A_H_M', 'FullForms', avString, @A_H_M, '#$FE', 'হ্ম');
   RegVar('A_Rr_G', 'FullForms', avString, @A_Rr_G, '#$FF', 'র্গ');
 
-  // FirstHalfForms
-  RegVar('A_Reph', 'FirstHalfForms', avChar, @A_Reph, '#$A9', '্র (র-এর রেফ)');
-  RegVar('A_M_1H', 'FirstHalfForms', avChar, @A_M_1H, '#$A4', 'ম-এর প্রথম খন্ড');
-  RegVar('A_Ss_1H', 'FirstHalfForms', avChar, @A_Ss_1H, '#$AE', 'ষ-এর প্রথম খন্ড');
-  RegVar('A_S_1H_1', 'FirstHalfForms', avChar, @A_S_1H_1, '#$AF', 'স-এর প্রথম খন্ড ১');
-  RegVar('A_N_1H_1', 'FirstHalfForms', avChar, @A_N_1H_1, '#$161', 'ন-এর প্রথম খন্ড ১');
-  RegVar('A_S_1H_2', 'FirstHalfForms', avChar, @A_S_1H_2, '#$2C9', 'স-এর প্রথম খন্ড ২');
-  RegVar('A_D_1H_1', 'FirstHalfForms', avChar, @A_D_1H_1, '#$2DC', 'দ-এর প্রথম খন্ড ১');
-  RegVar('A_C_1H', 'FirstHalfForms', avChar, @A_C_1H, '#$201D', 'চ-এর প্রথম খন্ড');
-  RegVar('A_NGA_1H', 'FirstHalfForms', avChar, @A_NGA_1H, '#$2022', 'ঙ-এর প্রথম খন্ড');
-  RegVar('A_N_1H_2', 'FirstHalfForms', avChar, @A_N_1H_2, '#$203A', 'ন-এর প্রথম খন্ড ২');
-  RegVar('A_D_1H_2', 'FirstHalfForms', avChar, @A_D_1H_2, '#$2122', 'দ-এর প্রথম খন্ড ২');
+   // FirstHalfForms
+   RegVar('A_Reph', 'FirstHalfForms', avString, @A_Reph, '#$A9', '্র (র-এর রেফ)');
+   RegVar('A_M_1H', 'FirstHalfForms', avString, @A_M_1H, '#$A4', 'ম-এর প্রথম খন্ড');
+   RegVar('A_Ss_1H', 'FirstHalfForms', avString, @A_Ss_1H, '#$AE', 'ষ-এর প্রথম খন্ড');
+   RegVar('A_S_1H_1', 'FirstHalfForms', avString, @A_S_1H_1, '#$AF', 'স-এর প্রথম খন্ড ১');
+   RegVar('A_N_1H_1', 'FirstHalfForms', avString, @A_N_1H_1, '#$161', 'ন-এর প্রথম খন্ড ১');
+   RegVar('A_S_1H_2', 'FirstHalfForms', avString, @A_S_1H_2, '#$2C9', 'স-এর প্রথম খন্ড ২');
+   RegVar('A_D_1H_1', 'FirstHalfForms', avString, @A_D_1H_1, '#$2DC', 'দ-এর প্রথম খন্ড ১');
+   RegVar('A_C_1H', 'FirstHalfForms', avString, @A_C_1H, '#$201D', 'চ-এর প্রথম খন্ড');
+   RegVar('A_NGA_1H', 'FirstHalfForms', avString, @A_NGA_1H, '#$2022', 'ঙ-এর প্রথম খন্ড');
+   RegVar('A_N_1H_2', 'FirstHalfForms', avString, @A_N_1H_2, '#$203A', 'ন-এর প্রথম খন্ড ২');
+   RegVar('A_D_1H_2', 'FirstHalfForms', avString, @A_D_1H_2, '#$2122', 'দ-এর প্রথম খন্ড ২');
 
-  // SecondHalfForms
-  RegVar('A_B_2H_1', 'SecondHalfForms', avChar, @A_B_2H_1, '#$5E', 'ব-এর দ্বিতীয় খন্ড ১');
-  RegVar('A_B_2H_2', 'SecondHalfForms', avChar, @A_B_2H_2, '#$A1', 'ব-এর দ্বিতীয় খন্ড ২');
-  RegVar('A_BH_2H', 'SecondHalfForms', avChar, @A_BH_2H, '#$A2', 'ভ-এর দ্বিতীয় খন্ড');
-  RegVar('A_BH_R_2H', 'SecondHalfForms', avChar, @A_BH_R_2H, '#$A3', 'ভ্র-এর দ্বিতীয় খন্ড');
-  RegVar('A_M_2H_1', 'SecondHalfForms', avChar, @A_M_2H_1, '#$A5', 'ম-এর দ্বিতীয় খন্ড ১');
-  RegVar('A_B_2H_3', 'SecondHalfForms', avChar, @A_B_2H_3, '#$A6', 'ব-এর দ্বিতীয় খন্ড ৩');
-  RegVar('A_M_2H_2', 'SecondHalfForms', avChar, @A_M_2H_2, '#$A7', 'ম-এর দ্বিতীয় খন্ড ২');
-  RegVar('A_ZFola', 'SecondHalfForms', avChar, @A_ZFola, '#$A8', 'য-ফলা');
-  RegVar('A_RFola_1', 'SecondHalfForms', avChar, @A_RFola_1, '#$AA', 'র-ফলা ১');
-  RegVar('A_RFola_2', 'SecondHalfForms', avChar, @A_RFola_2, '#$AB', 'র-ফলা ২');
-  RegVar('A_L_2H_1', 'SecondHalfForms', avChar, @A_L_2H_1, '#$AC', 'ল-এর দ্বিতীয় খন্ড ১');
-  RegVar('A_L_2H_2', 'SecondHalfForms', avChar, @A_L_2H_2, '#$AD', 'ল-এর দ্বিতীয় খন্ড ২');
-  RegVar('A_T_R_2H', 'SecondHalfForms', avChar, @A_T_R_2H, '#$BF', 'ত্র-এর দ্বিতীয় খন্ড');
-  RegVar('A_RFola_3', 'SecondHalfForms', avChar, @A_RFola_3, '#$D6', 'র-ফলা ৩');
-  RegVar('A_Nn_2H_1', 'SecondHalfForms', avChar, @A_Nn_2H_1, '#$E8', 'ণ-এর দ্বিতীয় খন্ড ১');
-  RegVar('A_K_R_2H', 'SecondHalfForms', avChar, @A_K_R_2H, '#$152', 'ক্র-এর দ্বিতীয় খন্ড');
-  RegVar('A_Nn_2H_2', 'SecondHalfForms', avChar, @A_Nn_2H_2, '#$153', 'ণ-এর দ্বিতীয় খন্ড ২');
-  RegVar('A_B_2H_4', 'SecondHalfForms', avChar, @A_B_2H_4, '#$178', 'ব-এর দ্বিতীয় খন্ড ৪');
-  RegVar('A_T_2H', 'SecondHalfForms', avChar, @A_T_2H, '#$2014', 'ত-এর দ্বিতীয় খন্ড');
-  RegVar('A_T_UKar_2H', 'SecondHalfForms', avChar, @A_T_UKar_2H, '#$2018', 'তু-এর দ্বিতীয় খন্ড');
-  RegVar('A_Th_2H', 'SecondHalfForms', avChar, @A_Th_2H, '#$2019', 'থ-এর দ্বিতীয় খন্ড');
-  RegVar('A_K_2H', 'SecondHalfForms', avChar, @A_K_2H, '#$2039', 'ক-এর দ্বিতীয় খন্ড');
-  RegVar('A_L_2H_3', 'SecondHalfForms', avChar, @A_L_2H_3, '#$2212', 'ল-এর দ্বিতীয় খন্ড ৩');
+   // SecondHalfForms
+   RegVar('A_B_2H_1', 'SecondHalfForms', avString, @A_B_2H_1, '#$5E', 'ব-এর দ্বিতীয় খন্ড ১');
+   RegVar('A_B_2H_2', 'SecondHalfForms', avString, @A_B_2H_2, '#$A1', 'ব-এর দ্বিতীয় খন্ড ২');
+   RegVar('A_BH_2H', 'SecondHalfForms', avString, @A_BH_2H, '#$A2', 'ভ-এর দ্বিতীয় খন্ড');
+   RegVar('A_BH_R_2H', 'SecondHalfForms', avString, @A_BH_R_2H, '#$A3', 'ভ্র-এর দ্বিতীয় খন্ড');
+   RegVar('A_M_2H_1', 'SecondHalfForms', avString, @A_M_2H_1, '#$A5', 'ম-এর দ্বিতীয় খন্ড ১');
+   RegVar('A_B_2H_3', 'SecondHalfForms', avString, @A_B_2H_3, '#$A6', 'ব-এর দ্বিতীয় খন্ড ৩');
+   RegVar('A_M_2H_2', 'SecondHalfForms', avString, @A_M_2H_2, '#$A7', 'ম-এর দ্বিতীয় খন্ড ২');
+   RegVar('A_ZFola', 'SecondHalfForms', avString, @A_ZFola, '#$A8', 'য-ফলা');
+   RegVar('A_RFola_1', 'SecondHalfForms', avString, @A_RFola_1, '#$AA', 'র-ফলা ১');
+   RegVar('A_RFola_2', 'SecondHalfForms', avString, @A_RFola_2, '#$AB', 'র-ফলা ২');
+   RegVar('A_L_2H_1', 'SecondHalfForms', avString, @A_L_2H_1, '#$AC', 'ল-এর দ্বিতীয় খন্ড ১');
+   RegVar('A_L_2H_2', 'SecondHalfForms', avString, @A_L_2H_2, '#$AD', 'ল-এর দ্বিতীয় খন্ড ২');
+   RegVar('A_T_R_2H', 'SecondHalfForms', avString, @A_T_R_2H, '#$BF', 'ত্র-এর দ্বিতীয় খন্ড');
+   RegVar('A_RFola_3', 'SecondHalfForms', avString, @A_RFola_3, '#$D6', 'র-ফলা ৩');
+   RegVar('A_Nn_2H_1', 'SecondHalfForms', avString, @A_Nn_2H_1, '#$E8', 'ণ-এর দ্বিতীয় খন্ড ১');
+   RegVar('A_K_R_2H', 'SecondHalfForms', avString, @A_K_R_2H, '#$152', 'ক্র-এর দ্বিতীয় খন্ড');
+   RegVar('A_Nn_2H_2', 'SecondHalfForms', avString, @A_Nn_2H_2, '#$153', 'ণ-এর দ্বিতীয় খন্ড ২');
+   RegVar('A_B_2H_4', 'SecondHalfForms', avString, @A_B_2H_4, '#$178', 'ব-এর দ্বিতীয় খন্ড ৪');
+   RegVar('A_T_2H', 'SecondHalfForms', avString, @A_T_2H, '#$2014', 'ত-এর দ্বিতীয় খন্ড');
+   RegVar('A_T_UKar_2H', 'SecondHalfForms', avString, @A_T_UKar_2H, '#$2018', 'তু-এর দ্বিতীয় খন্ড');
+   RegVar('A_Th_2H', 'SecondHalfForms', avString, @A_Th_2H, '#$2019', 'থ-এর দ্বিতীয় খন্ড');
+   RegVar('A_K_2H', 'SecondHalfForms', avString, @A_K_2H, '#$2039', 'ক-এর দ্বিতীয় খন্ড');
+   RegVar('A_L_2H_3', 'SecondHalfForms', avString, @A_L_2H_3, '#$2212', 'ল-এর দ্বিতীয় খন্ড ৩');
 end;
 { TUnicodeToBijoy2000 }
 { =============================================================================== }
@@ -614,9 +614,9 @@ begin
     if I <= 0 then
       break;
     if MidStr(fConvertedText, I + 2, 1) = b_g then
-      fConvertedText[I] := A_D_1H_1
+      fConvertedText := WideStuffString(fConvertedText, I, 1, A_D_1H_1)
     else
-      fConvertedText[I] := A_D_1H_2;
+      fConvertedText := WideStuffString(fConvertedText, I, 1, A_D_1H_2);
   until I <= 0;
 
   { Elevate first-half N-forms }
@@ -627,13 +627,13 @@ begin
     if ((I + 2 <= Length(fConvertedText)) and 
         ((fConvertedText[I + 2] = b_t) or (fConvertedText[I + 2] = b_Th) or 
          (fConvertedText[I + 2] = b_L) or (fConvertedText[I + 2] = b_b) or 
-         (fConvertedText[I + 2] = A_T_R_2H) or (fConvertedText[I + 2] = A_T_UKar_2H))) then
-      fConvertedText[I] := A_N_1H_1
+         (MidStr(fConvertedText, I + 2, 1) = A_T_R_2H) or (MidStr(fConvertedText, I + 2, 1) = A_T_UKar_2H))) then
+      fConvertedText := WideStuffString(fConvertedText, I, 1, A_N_1H_1)
     else if (I + 2 <= Length(fConvertedText)) and 
             ((fConvertedText[I + 2] = b_m) or (fConvertedText[I + 2] = b_n)) then
       fConvertedText[I] := A_N[1]
     else
-      fConvertedText[I] := A_N_1H_2;
+      fConvertedText := WideStuffString(fConvertedText, I, 1, A_N_1H_2);
   until I <= 0;
 end;
 
@@ -743,13 +743,16 @@ begin
   fConvertedText := ReplaceStr(fConvertedText, string(A_UUKar1) + string(A_Reph), string(A_UUKar2) + string(A_Reph));
 
   { =========================================================================
-    ডাইনামিক পোস্ট-প্রসেসিং কারেকশন (জেসন ফাইল অনুযায়ী কাজ করবে)
+    লিগ্যাসি পোস্ট-প্রসেসিং কারেকশন (শুধু Default ভার্সনের জন্য)
     ========================================================================= }
-  fConvertedText := ReplaceStr(fConvertedText, string(A_T) + string(A_UKar1), string(A_T) + string(A_UKar2));
-  fConvertedText := ReplaceStr(fConvertedText, string(A_T) + string(A_UUKar1), string(A_T) + string(A_UUKar2));
-  fConvertedText := ReplaceStr(fConvertedText, string(A_RR) + string(A_UUKar1), string(A_RR) + string(A_UUKar2));
-  fConvertedText := ReplaceStr(fConvertedText, string(A_RRH) + string(A_UUKar1), string(A_RRH) + string(A_UUKar2));
-  fConvertedText := ReplaceStr(fConvertedText, string(A_R) + string(A_UUKar1), string(A_R) + string(A_UUKar2));
+  if AnsiVersion = 'Default' then
+  begin
+    fConvertedText := ReplaceStr(fConvertedText, string(A_T) + string(A_UKar1), string(A_T) + string(A_UKar2));
+    fConvertedText := ReplaceStr(fConvertedText, string(A_T) + string(A_UUKar1), string(A_T) + string(A_UUKar2));
+    fConvertedText := ReplaceStr(fConvertedText, string(A_RR) + string(A_UUKar1), string(A_RR) + string(A_UUKar2));
+    fConvertedText := ReplaceStr(fConvertedText, string(A_RRH) + string(A_UUKar1), string(A_RRH) + string(A_UUKar2));
+    fConvertedText := ReplaceStr(fConvertedText, string(A_R) + string(A_UUKar1), string(A_R) + string(A_UUKar2));
+  end;
   { ========================================================================= }
   
   // --- STRICT SANITIZATION FOR ANSI OUTPUT ---
@@ -770,10 +773,46 @@ end;
 
 procedure TUnicodeToBijoy2000.ReplaceFullForms;
 var
-  I: Integer;
+  I, J, BestLen: Integer;
+  BestMatch: string;
+  SourceText: string;
+  Map: TDictionary<string, string>;
 begin
-  for I := 0 to Length(ActiveReplacements) - 1 do
-    fConvertedText := ReplaceStr(fConvertedText, ActiveReplacements[I].Key, ActiveReplacements[I].Value);
+  Map := TDictionary<string, string>.Create;
+  try
+    for I := 0 to Length(ActiveReplacements) - 1 do
+      Map.AddOrSetValue(ActiveReplacements[I].Key, ActiveReplacements[I].Value);
+
+    SourceText := fConvertedText;
+    fConvertedText := '';
+    J := 1;
+    while J <= Length(SourceText) do
+    begin
+      BestLen := 0;
+      BestMatch := '';
+      for I := 0 to Length(ActiveReplacements) - 1 do
+      begin
+        if (Length(ActiveReplacements[I].Key) > BestLen) and
+           (Copy(SourceText, J, Length(ActiveReplacements[I].Key)) = ActiveReplacements[I].Key) then
+        begin
+          BestLen := Length(ActiveReplacements[I].Key);
+          BestMatch := ActiveReplacements[I].Key;
+        end;
+      end;
+      if BestLen > 0 then
+      begin
+        fConvertedText := fConvertedText + Map[BestMatch];
+        J := J + BestLen;
+      end
+      else
+      begin
+        fConvertedText := fConvertedText + SourceText[J];
+        Inc(J);
+      end;
+    end;
+  finally
+    Map.Free;
+  end;
 end;
 
 { =============================================================================== }
@@ -1142,11 +1181,11 @@ begin
     I := Pos(b_Ekar, fConvertedText);
     if I <= 0 then
       break;
-    if ((I = 1) or (MidStr(fConvertedText, I - 1, 1) = ' ') or (MidStr(fConvertedText, I - 1, 1) = #13) or (MidStr(fConvertedText, I - 1, 1) = #10) or
+      if ((I = 1) or (MidStr(fConvertedText, I - 1, 1) = ' ') or (MidStr(fConvertedText, I - 1, 1) = #13) or (MidStr(fConvertedText, I - 1, 1) = #10) or
         (MidStr(fConvertedText, I - 1, 1) = #9)) then
-      fConvertedText[I] := A_EKar1
+      fConvertedText := WideStuffString(fConvertedText, I, 1, A_EKar1)
     else
-      fConvertedText[I] := A_EKar2;
+      fConvertedText := WideStuffString(fConvertedText, I, 1, A_EKar2);
   until I <= 0;
 
   // Convert OIKar
@@ -1156,9 +1195,9 @@ begin
       break;
     if ((I = 1) or (MidStr(fConvertedText, I - 1, 1) = ' ') or (MidStr(fConvertedText, I - 1, 1) = #13) or (MidStr(fConvertedText, I - 1, 1) = #10) or
         (MidStr(fConvertedText, I - 1, 1) = #9)) then
-      fConvertedText[I] := A_OIKar1
+      fConvertedText := WideStuffString(fConvertedText, I, 1, A_OIKar1)
     else
-      fConvertedText[I] := A_OIKar2;
+      fConvertedText := WideStuffString(fConvertedText, I, 1, A_OIKar2);
   until I <= 0;
 
 // Convert UKar
@@ -1189,38 +1228,38 @@ begin
         if PrecedingChar = b_r then
         begin
           if fRaUKarToggle then
-            fConvertedText[I] := A_UKar2
+            fConvertedText := WideStuffString(fConvertedText, I, 1, A_UKar2)
           else
-            fConvertedText[I] := A_UKar4;
+            fConvertedText := WideStuffString(fConvertedText, I, 1, A_UKar4);
         end
         else if PrecedingChar = b_L then
         begin
           if ((MidStr(fConvertedText, I - 3, 3) = b_g + b_Hasanta + b_L) or (MidStr(fConvertedText, I - 3, 3) = b_p + b_Hasanta + b_L) or
               (MidStr(fConvertedText, I - 3, 3) = b_b + b_Hasanta + b_L) or (MidStr(fConvertedText, I - 3, 3) = b_sh + b_Hasanta + b_L) or
               (MidStr(fConvertedText, I - 3, 3) = b_s + b_Hasanta + b_L) or (MidStr(fConvertedText, I - 5, 5) = b_s + b_Hasanta + b_p + b_Hasanta + b_L)) then
-            fConvertedText[I] := A_UKar4
+            fConvertedText := WideStuffString(fConvertedText, I, 1, A_UKar4)
           else
-            fConvertedText[I] := A_UKar2;
+            fConvertedText := WideStuffString(fConvertedText, I, 1, A_UKar2);
         end
         else
-          fConvertedText[I] := A_UKar2;
+          fConvertedText := WideStuffString(fConvertedText, I, 1, A_UKar2);
 
         if MidStr(fConvertedText, I - 3, 3) = b_ss + b_Hasanta + b_Nn then
-          fConvertedText[I] := A_UKar1;
+          fConvertedText := WideStuffString(fConvertedText, I, 1, A_UKar1);
 
       end
       else
       begin
         if ((PrecedingChar = b_rr) or (PrecedingChar = b_rrh)) then
         begin
-          fConvertedText[I] := A_UKar1;
+          fConvertedText := WideStuffString(fConvertedText, I, 1, A_UKar1);
         end
         else
-          fConvertedText[I] := A_UKar1;
+          fConvertedText := WideStuffString(fConvertedText, I, 1, A_UKar1);
       end;
     end
     else
-      fConvertedText[I] := A_UKar1;
+      fConvertedText := WideStuffString(fConvertedText, I, 1, A_UKar1);
   until I <= 0;
 
   // Convert UUKar
@@ -1254,34 +1293,34 @@ begin
               (MidStr(fConvertedText, I - 3, 3) = b_s + b_Hasanta + b_r) or (MidStr(fConvertedText, I - 5, 5) = b_m + b_Hasanta + b_p + b_Hasanta + b_r) or
               (MidStr(fConvertedText, I - 5, 5) = b_ss + b_Hasanta + b_p + b_Hasanta + b_r) or
               (MidStr(fConvertedText, I - 5, 5) = b_s + b_Hasanta + b_p + b_Hasanta + b_r)) then
-            fConvertedText[I] := A_UUKar3
+            fConvertedText := WideStuffString(fConvertedText, I, 1, A_UUKar3)
           else if MidStr(fConvertedText, I - 2, 1) <> b_Hasanta then
           begin
             if fRaUUKarToggle then
-              fConvertedText[I] := A_UUKar2
+              fConvertedText := WideStuffString(fConvertedText, I, 1, A_UUKar2)
             else
-              fConvertedText[I] := A_UUKar3;
+              fConvertedText := WideStuffString(fConvertedText, I, 1, A_UUKar3);
           end
           else
-            fConvertedText[I] := A_UUKar2;
+            fConvertedText := WideStuffString(fConvertedText, I, 1, A_UUKar2);
         end
         else if PrecedingChar = b_L then
         begin
           if ((MidStr(fConvertedText, I - 3, 3) = b_g + b_Hasanta + b_L) or (MidStr(fConvertedText, I - 3, 3) = b_p + b_Hasanta + b_L) or
               (MidStr(fConvertedText, I - 3, 3) = b_b + b_Hasanta + b_L) or (MidStr(fConvertedText, I - 3, 3) = b_sh + b_Hasanta + b_L) or
               (MidStr(fConvertedText, I - 3, 3) = b_s + b_Hasanta + b_L) or (MidStr(fConvertedText, I - 5, 5) = b_s + b_Hasanta + b_p + b_Hasanta + b_L)) then
-            fConvertedText[I] := A_UUKar3
+            fConvertedText := WideStuffString(fConvertedText, I, 1, A_UUKar3)
           else
-            fConvertedText[I] := A_UUKar2;
+            fConvertedText := WideStuffString(fConvertedText, I, 1, A_UUKar2);
         end
         else
-          fConvertedText[I] := A_UUKar2;
+          fConvertedText := WideStuffString(fConvertedText, I, 1, A_UUKar2);
       end
       else
-        fConvertedText[I] := A_UUKar1;
+        fConvertedText := WideStuffString(fConvertedText, I, 1, A_UUKar1);
     end
     else
-      fConvertedText[I] := A_UUKar1;
+      fConvertedText := WideStuffString(fConvertedText, I, 1, A_UUKar1);
   until I <= 0;
 
   // Convert RRIKar
@@ -1294,13 +1333,13 @@ begin
     begin
       if BaseLineRightCharacter(fConvertedText[I - 1]) = True then
       begin
-        fConvertedText[I] := A_RRIKar1;
+        fConvertedText := WideStuffString(fConvertedText, I, 1, A_RRIKar1);
       end
       else
-        fConvertedText[I] := A_RRIKar2;
+        fConvertedText := WideStuffString(fConvertedText, I, 1, A_RRIKar2);
     end
     else
-      fConvertedText[I] := A_RRIKar2;
+      fConvertedText := WideStuffString(fConvertedText, I, 1, A_RRIKar2);
   until I <= 0;
 
   // Convert rest of the Kars
@@ -1708,12 +1747,7 @@ begin
         Continue;
 
       if not AnsiOverrides.TryGetValue(Rec.Name, Val) then
-      begin
-        if Rec.VarType = avChar then
-          Val := string(PChar(Rec.Ptr)^)
-        else
-          Val := PString(Rec.Ptr)^;
-      end;
+        Val := PString(Rec.Ptr)^;
 
       if Val = '' then
         Continue;
@@ -1760,10 +1794,7 @@ begin
   for Rec in AnsiRegistry do
   begin
     Resolved := ProcessHexAndUnicode(Rec.DefaultVal);
-    if Rec.VarType = avChar then
-      PChar(Rec.Ptr)^ := Resolved[1]
-    else
-      PString(Rec.Ptr)^ := Resolved;
+    PString(Rec.Ptr)^ := Resolved;
   end;
 
   AnsiOverrides.Clear;
@@ -1913,19 +1944,7 @@ begin
             begin
               ConstValue := ProcessHexAndUnicode(ConstValue);
               if AnsiRegistryMap.TryGetValue(ConstName, Rec) then
-              begin
-                if Rec.VarType = avChar then
-                begin
-                  if Length(ConstValue) = 1 then
-                    PChar(Rec.Ptr)^ := ConstValue[1]
-                  else begin
-                    EnsureAnsiOverrides;
-                    AnsiOverrides.AddOrSetValue(ConstName, ConstValue);
-                  end;
-                end
-                else
-                  PString(Rec.Ptr)^ := ConstValue;
-              end;
+                PString(Rec.Ptr)^ := ConstValue;
             end;
           end
           else JSkipValue(JSON, P);
@@ -1973,10 +1992,7 @@ begin
   begin
     if (Rec.Category = 'FullForms') and (Rec.BengaliChar <> '') then
     begin
-      if Rec.VarType = avChar then
-        Val := string(PChar(Rec.Ptr)^)
-      else
-        Val := PString(Rec.Ptr)^;
+      Val := PString(Rec.Ptr)^;
       SetLength(Result, 1);
       Result[0].Key := Rec.BengaliChar;
       Result[0].Value := Val;
@@ -2029,10 +2045,7 @@ begin
   try
     for Rec in AnsiRegistry do
     begin
-      if Rec.VarType = avChar then
-        Val := string(PChar(Rec.Ptr)^)
-      else
-        Val := PString(Rec.Ptr)^;
+      Val := PString(Rec.Ptr)^;
 
       if not CatMap.TryGetValue(Rec.Category, CatSB) then
       begin
