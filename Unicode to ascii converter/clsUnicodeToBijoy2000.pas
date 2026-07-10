@@ -36,6 +36,7 @@ type
 
       // Utility Functions
       function BaseLineRightCharacter(const wC: string): Boolean;
+      function ExtractPrecedingCluster(const S: string; VowelPos: Integer): string;
       function GetVowelGlyph(const AVowel, AConsonant: string; UseAlt: Boolean): string;
       function WideStuffString(Source: string; Start, Len: Integer; SubString: string): string;
       function IsVowel(C: Char): Boolean;
@@ -843,6 +844,39 @@ begin
       Result := GroupList.Contains(wC);
 end;
 
+function TUnicodeToBijoy2000.ExtractPrecedingCluster(const S: string; VowelPos: Integer): string;
+var
+  I: Integer;
+begin
+  Result := '';
+  if (VowelPos < 2) or (VowelPos > Length(S)) then Exit;
+  I := VowelPos - 1;
+  while I >= 1 do
+  begin
+    Result := S[I] + Result;
+    if I = 1 then Break;
+    if S[I - 1] = b_Hasanta then
+    begin
+      Dec(I);
+      Result := b_Hasanta + Result;
+      Dec(I);
+      if I < 1 then Break;
+    end
+    else
+      Break;
+  end;
+end;
+
+function ContainsBengaliChar(const S: string): Boolean;
+var
+  C: Char;
+begin
+  for C in S do
+    if (C >= #$0980) and (C <= #$09FF) then
+      Exit(True);
+  Result := False;
+end;
+
 function TUnicodeToBijoy2000.GetVowelGlyph(const AVowel, AConsonant: string; UseAlt: Boolean): string;
 var
   Rule: TVowelRule;
@@ -869,7 +903,7 @@ begin
         if (ConsonantGroupsMap <> nil) and ConsonantGroupsMap.TryGetValue(Map.Consonants, GroupList) then
           IsMatched := GroupList.Contains(AConsonant)
         else
-          IsMatched := (AConsonant <> '') and (Pos(AConsonant, Map.Consonants) > 0);
+          IsMatched := (AConsonant <> '') and (Map.Consonants = AConsonant);
 
         if IsMatched then
         begin
@@ -918,10 +952,14 @@ begin
   fUniText := UniText;
   fConvertedText := fUniText;
 
-  if (fLastUniText = b_r + b_Ukar) and (UniText = b_r) then
+  if (Length(fLastUniText) >= 2) and
+     (fLastUniText[Length(fLastUniText)] = b_Ukar) and
+     (UniText = Copy(fLastUniText, 1, Length(fLastUniText) - 1)) then
     fRaUKarToggle := True;
 
-  if (fLastUniText = b_r + b_UUKar) and (UniText = b_r) then
+  if (Length(fLastUniText) >= 2) and
+     (fLastUniText[Length(fLastUniText)] = b_UUKar) and
+     (UniText = Copy(fLastUniText, 1, Length(fLastUniText) - 1)) then
     fRaUUKarToggle := True;
 
   fLastUniText := UniText;
@@ -1219,9 +1257,8 @@ end;
 
 procedure TUnicodeToBijoy2000.ReplaceKarsVowels;
 var
-  I: Integer;
+  I, J: Integer;
   PrecedingChar, VowelGlyph: string;
-  IsZfola: Boolean;
 begin
   // Convert Ekar
   repeat
@@ -1258,11 +1295,15 @@ begin
     VowelGlyph := '';
     if I - 1 >= 1 then
     begin
-      PrecedingChar := fConvertedText[I - 1];
-      IsZfola := (PrecedingChar = b_z) and (I - 2 >= 1) and (fConvertedText[I - 2] = b_Hasanta);
-      if IsZfola then
+      PrecedingChar := ExtractPrecedingCluster(fConvertedText, I);
+      if (PrecedingChar <> '') and not ContainsBengaliChar(PrecedingChar) then
       begin
-        if I - 3 >= 1 then PrecedingChar := fConvertedText[I - 3] else PrecedingChar := '';
+        for J := Length(fUniText) downto 1 do
+          if fUniText[J] = b_Ukar then
+          begin
+            PrecedingChar := ExtractPrecedingCluster(fUniText, J);
+            Break;
+          end;
       end;
       VowelGlyph := GetVowelGlyph(b_Ukar, PrecedingChar, fRaUKarToggle);
     end;
@@ -1278,11 +1319,15 @@ begin
     VowelGlyph := '';
     if I - 1 >= 1 then
     begin
-      PrecedingChar := fConvertedText[I - 1];
-      IsZfola := (PrecedingChar = b_z) and (I - 2 >= 1) and (fConvertedText[I - 2] = b_Hasanta);
-      if IsZfola then
+      PrecedingChar := ExtractPrecedingCluster(fConvertedText, I);
+      if (PrecedingChar <> '') and not ContainsBengaliChar(PrecedingChar) then
       begin
-        if I - 3 >= 1 then PrecedingChar := fConvertedText[I - 3] else PrecedingChar := '';
+        for J := Length(fUniText) downto 1 do
+          if fUniText[J] = b_UUKar then
+          begin
+            PrecedingChar := ExtractPrecedingCluster(fUniText, J);
+            Break;
+          end;
       end;
       VowelGlyph := GetVowelGlyph(b_UUKar, PrecedingChar, fRaUUKarToggle);
     end;
@@ -1298,7 +1343,19 @@ begin
     if I <= 0 then break;
     VowelGlyph := '';
     if I - 1 >= 1 then
-      VowelGlyph := GetVowelGlyph(b_Rrikar, fConvertedText[I - 1], False);
+    begin
+      PrecedingChar := ExtractPrecedingCluster(fConvertedText, I);
+      if (PrecedingChar <> '') and not ContainsBengaliChar(PrecedingChar) then
+      begin
+        for J := Length(fUniText) downto 1 do
+          if fUniText[J] = b_Rrikar then
+          begin
+            PrecedingChar := ExtractPrecedingCluster(fUniText, J);
+            Break;
+          end;
+      end;
+      VowelGlyph := GetVowelGlyph(b_Rrikar, PrecedingChar, False);
+    end;
     if VowelGlyph = '' then
       VowelGlyph := GetVowelGlyph(b_Rrikar, '', False);
     fConvertedText := WideStuffString(fConvertedText, I, 1, VowelGlyph);
