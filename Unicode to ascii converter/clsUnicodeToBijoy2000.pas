@@ -36,6 +36,7 @@ type
 
       // Utility Functions
       function BaseLineRightCharacter(const wC: string): Boolean;
+      function GetVowelGlyph(const AVowel, AConsonant: string; UseAlt: Boolean): string;
       function WideStuffString(Source: string; Start, Len: Integer; SubString: string): string;
       function IsVowel(C: Char): Boolean;
     public
@@ -47,6 +48,19 @@ type
   TReplacementPair = record
     Key: string;
     Value: string;
+  end;
+
+  TVowelMapping = record
+    Consonants: string;
+    Value: string;
+    AltValue: string;
+  end;
+
+  TVowelRule = record
+    Vowel: string;
+    DefaultVal: string;
+    BaselineRightVal: string;
+    Mappings: TArray<TVowelMapping>;
   end;
 
   TAnsiVarType = (avChar, avString);
@@ -70,6 +84,8 @@ var
   AnsiRegistryMap: TDictionary<string, TAnsiVarRec>;
   ActiveReplacements: TArray<TReplacementPair>;
   AnsiOverrides: TDictionary<string, string>;
+  ConsonantGroupsMap: TDictionary<string, TList<string>> = nil;
+  VowelRulesList: TList<TVowelRule> = nil;
 
 
 procedure ResetAnsiToDefaults;
@@ -818,23 +834,54 @@ end;
 { =============================================================================== }
 
 function TUnicodeToBijoy2000.BaseLineRightCharacter(const wC: string): Boolean;
+var
+  GroupList: TList<string>;
 begin
   Result := False;
-  if (wC = b_kh) or (wC = b_g) or (wC = b_gh) or (wC = b_Nn) or (wC = b_Th) or (wC = b_d) or (wC = b_dh) or (wC = b_n) or (wC = b_p) or (wC = b_b) or
-    (wC = b_m) or (wC = b_z) or (wC = b_r) or (wC = b_L) or (wC = b_sh) or (wC = b_ss) or (wC = b_s) or (wC = b_h) or (wC = b_y) or
-    // Also support ANSI conjunct characters that end with baseline-right consonants
-    (wC = string(A_K_Ss_M)) or (wC = string(A_K_M)) or (wC = string(A_K_Ss)) or (wC = string(A_K_S)) or
-    (wC = string(A_G_G)) or (wC = string(A_G_D)) or (wC = string(A_G_Dh)) or (wC = string(A_NGA_G)) or
-    (wC = string(A_T_Th)) or (wC = string(A_T_M)) or
-    (wC = string(A_D_D)) or (wC = string(A_D_Dh)) or (wC = string(A_D_B)) or (wC = string(A_D_M)) or
-    (wC = string(A_N_Tth)) or (wC = string(A_N_Dh)) or (wC = string(A_N_S)) or
-    (wC = string(A_P_P)) or (wC = string(A_P_S)) or
-    (wC = string(A_B_D)) or (wC = string(A_B_Dh)) or (wC = string(A_Bh_R)) or (wC = string(A_M_N)) or
-    (wC = string(A_L_G)) or (wC = string(A_L_P)) or
-    (wC = string(A_Ss_Nn)) or (wC = string(A_S_Kh)) or (wC = string(A_S_N)) or
-    (wC = string(A_H_N)) or (wC = string(A_H_M)) or (wC = string(A_Rr_G)) then
-    Result := True;
+  if ConsonantGroupsMap <> nil then
+    if ConsonantGroupsMap.TryGetValue('BaseLineRight', GroupList) then
+      Result := GroupList.Contains(wC);
+end;
 
+function TUnicodeToBijoy2000.GetVowelGlyph(const AVowel, AConsonant: string; UseAlt: Boolean): string;
+var
+  Rule: TVowelRule;
+  Map: TVowelMapping;
+  GroupList: TList<string>;
+  IsMatched: Boolean;
+begin
+  Result := '';
+  if VowelRulesList = nil then
+  begin
+    if AVowel = b_Ukar then Exit(A_UKar1);
+    if AVowel = b_UUKar then Exit(A_UUKar1);
+    if AVowel = b_Rrikar then Exit(A_RRIKar2);
+    Exit;
+  end;
+  for Rule in VowelRulesList do
+  begin
+    if Rule.Vowel = AVowel then
+    begin
+      for Map in Rule.Mappings do
+      begin
+        IsMatched := False;
+
+        if (ConsonantGroupsMap <> nil) and ConsonantGroupsMap.TryGetValue(Map.Consonants, GroupList) then
+          IsMatched := GroupList.Contains(AConsonant)
+        else
+          IsMatched := (AConsonant <> '') and (Pos(AConsonant, Map.Consonants) > 0);
+
+        if IsMatched then
+        begin
+          if UseAlt and (Map.AltValue <> '') then
+            Exit(Map.AltValue)
+          else
+            Exit(Map.Value);
+        end;
+      end;
+      Exit(Rule.DefaultVal);
+    end;
+  end;
 end;
 
 { =============================================================================== }
@@ -1173,7 +1220,7 @@ end;
 procedure TUnicodeToBijoy2000.ReplaceKarsVowels;
 var
   I: Integer;
-  PrecedingChar: string;
+  PrecedingChar, VowelGlyph: string;
   IsZfola: Boolean;
 begin
   // Convert Ekar
@@ -1200,146 +1247,61 @@ begin
       fConvertedText := WideStuffString(fConvertedText, I, 1, A_OIKar2);
   until I <= 0;
 
-// Convert UKar
+// Convert UKar (ু)
   fConvertedText := ReplaceStr(fConvertedText, b_g + b_Ukar, A_G_Ukar);
   fConvertedText := ReplaceStr(fConvertedText, b_sh + b_Ukar, A_Sh_UKar);
   fConvertedText := ReplaceStr(fConvertedText, b_h + b_Ukar, A_H_UKar);
   fConvertedText := ReplaceStr(fConvertedText, b_Hasanta + b_t + b_Ukar, b_Hasanta + A_T_UKar_2H);
   repeat
     I := Pos(b_Ukar, fConvertedText);
-    if I <= 0 then
-      break;
-    if I - 1 >= 1 then
-    begin
-      PrecedingChar := fConvertedText[I - 1];      
-      IsZfola := (PrecedingChar = b_z) and (I - 2 >= 1) and (fConvertedText[I - 2] = b_Hasanta);
-      
-      if IsZfola then
-      begin
-        if I - 3 >= 1 then
-          PrecedingChar := fConvertedText[I - 3]
-        else
-          PrecedingChar := '';
-      end;
-
-      if BaseLineRightCharacter(PrecedingChar) = True then
-      begin
-
-        if PrecedingChar = b_r then
-        begin
-          if fRaUKarToggle then
-            fConvertedText := WideStuffString(fConvertedText, I, 1, A_UKar2)
-          else
-            fConvertedText := WideStuffString(fConvertedText, I, 1, A_UKar4);
-        end
-        else if PrecedingChar = b_L then
-        begin
-          if ((MidStr(fConvertedText, I - 3, 3) = b_g + b_Hasanta + b_L) or (MidStr(fConvertedText, I - 3, 3) = b_p + b_Hasanta + b_L) or
-              (MidStr(fConvertedText, I - 3, 3) = b_b + b_Hasanta + b_L) or (MidStr(fConvertedText, I - 3, 3) = b_sh + b_Hasanta + b_L) or
-              (MidStr(fConvertedText, I - 3, 3) = b_s + b_Hasanta + b_L) or (MidStr(fConvertedText, I - 5, 5) = b_s + b_Hasanta + b_p + b_Hasanta + b_L)) then
-            fConvertedText := WideStuffString(fConvertedText, I, 1, A_UKar4)
-          else
-            fConvertedText := WideStuffString(fConvertedText, I, 1, A_UKar2);
-        end
-        else
-          fConvertedText := WideStuffString(fConvertedText, I, 1, A_UKar2);
-
-        if MidStr(fConvertedText, I - 3, 3) = b_ss + b_Hasanta + b_Nn then
-          fConvertedText := WideStuffString(fConvertedText, I, 1, A_UKar1);
-
-      end
-      else
-      begin
-        if ((PrecedingChar = b_rr) or (PrecedingChar = b_rrh)) then
-        begin
-          fConvertedText := WideStuffString(fConvertedText, I, 1, A_UKar1);
-        end
-        else
-          fConvertedText := WideStuffString(fConvertedText, I, 1, A_UKar1);
-      end;
-    end
-    else
-      fConvertedText := WideStuffString(fConvertedText, I, 1, A_UKar1);
-  until I <= 0;
-
-  // Convert UUKar
-  repeat
-    I := Pos(b_UUKar, fConvertedText);
-    if I <= 0 then
-      break;
+    if I <= 0 then break;
+    VowelGlyph := '';
     if I - 1 >= 1 then
     begin
       PrecedingChar := fConvertedText[I - 1];
       IsZfola := (PrecedingChar = b_z) and (I - 2 >= 1) and (fConvertedText[I - 2] = b_Hasanta);
-      
       if IsZfola then
       begin
-        if I - 3 >= 1 then
-          PrecedingChar := fConvertedText[I - 3]
-        else
-          PrecedingChar := '';
+        if I - 3 >= 1 then PrecedingChar := fConvertedText[I - 3] else PrecedingChar := '';
       end;
-
-      if BaseLineRightCharacter(PrecedingChar) = True then
-      begin
-        if PrecedingChar = b_r then
-        begin
-          if ((MidStr(fConvertedText, I - 3, 3) = b_sh + b_Hasanta + b_r) or (MidStr(fConvertedText, I - 3, 3) = b_d + b_Hasanta + b_r) or
-              (MidStr(fConvertedText, I - 3, 3) = b_g + b_Hasanta + b_r) or (MidStr(fConvertedText, I - 3, 3) = b_t + b_Hasanta + b_r) or
-              (MidStr(fConvertedText, I - 3, 3) = b_j + b_Hasanta + b_r) or (MidStr(fConvertedText, I - 3, 3) = b_Th + b_Hasanta + b_r) or
-              (MidStr(fConvertedText, I - 3, 3) = b_dh + b_Hasanta + b_r) or (MidStr(fConvertedText, I - 5, 5) = b_n + b_Hasanta + b_d + b_Hasanta + b_r) or
-              (MidStr(fConvertedText, I - 3, 3) = b_p + b_Hasanta + b_r) or (MidStr(fConvertedText, I - 3, 3) = b_b + b_Hasanta + b_r) or
-              (MidStr(fConvertedText, I - 3, 3) = b_Bh + b_Hasanta + b_r) or (MidStr(fConvertedText, I - 3, 3) = b_m + b_Hasanta + b_r) or
-              (MidStr(fConvertedText, I - 3, 3) = b_s + b_Hasanta + b_r) or (MidStr(fConvertedText, I - 5, 5) = b_m + b_Hasanta + b_p + b_Hasanta + b_r) or
-              (MidStr(fConvertedText, I - 5, 5) = b_ss + b_Hasanta + b_p + b_Hasanta + b_r) or
-              (MidStr(fConvertedText, I - 5, 5) = b_s + b_Hasanta + b_p + b_Hasanta + b_r)) then
-            fConvertedText := WideStuffString(fConvertedText, I, 1, A_UUKar3)
-          else if MidStr(fConvertedText, I - 2, 1) <> b_Hasanta then
-          begin
-            if fRaUUKarToggle then
-              fConvertedText := WideStuffString(fConvertedText, I, 1, A_UUKar2)
-            else
-              fConvertedText := WideStuffString(fConvertedText, I, 1, A_UUKar3);
-          end
-          else
-            fConvertedText := WideStuffString(fConvertedText, I, 1, A_UUKar2);
-        end
-        else if PrecedingChar = b_L then
-        begin
-          if ((MidStr(fConvertedText, I - 3, 3) = b_g + b_Hasanta + b_L) or (MidStr(fConvertedText, I - 3, 3) = b_p + b_Hasanta + b_L) or
-              (MidStr(fConvertedText, I - 3, 3) = b_b + b_Hasanta + b_L) or (MidStr(fConvertedText, I - 3, 3) = b_sh + b_Hasanta + b_L) or
-              (MidStr(fConvertedText, I - 3, 3) = b_s + b_Hasanta + b_L) or (MidStr(fConvertedText, I - 5, 5) = b_s + b_Hasanta + b_p + b_Hasanta + b_L)) then
-            fConvertedText := WideStuffString(fConvertedText, I, 1, A_UUKar3)
-          else
-            fConvertedText := WideStuffString(fConvertedText, I, 1, A_UUKar2);
-        end
-        else
-          fConvertedText := WideStuffString(fConvertedText, I, 1, A_UUKar2);
-      end
-      else
-        fConvertedText := WideStuffString(fConvertedText, I, 1, A_UUKar1);
-    end
-    else
-      fConvertedText := WideStuffString(fConvertedText, I, 1, A_UUKar1);
+      VowelGlyph := GetVowelGlyph(b_Ukar, PrecedingChar, fRaUKarToggle);
+    end;
+    if VowelGlyph = '' then
+      VowelGlyph := GetVowelGlyph(b_Ukar, '', False);
+    fConvertedText := WideStuffString(fConvertedText, I, 1, VowelGlyph);
   until I <= 0;
 
-  // Convert RRIKar
+  // Convert UUKar (ূ)
+  repeat
+    I := Pos(b_UUKar, fConvertedText);
+    if I <= 0 then break;
+    VowelGlyph := '';
+    if I - 1 >= 1 then
+    begin
+      PrecedingChar := fConvertedText[I - 1];
+      IsZfola := (PrecedingChar = b_z) and (I - 2 >= 1) and (fConvertedText[I - 2] = b_Hasanta);
+      if IsZfola then
+      begin
+        if I - 3 >= 1 then PrecedingChar := fConvertedText[I - 3] else PrecedingChar := '';
+      end;
+      VowelGlyph := GetVowelGlyph(b_UUKar, PrecedingChar, fRaUUKarToggle);
+    end;
+    if VowelGlyph = '' then
+      VowelGlyph := GetVowelGlyph(b_UUKar, '', False);
+    fConvertedText := WideStuffString(fConvertedText, I, 1, VowelGlyph);
+  until I <= 0;
+
+  // Convert RRIKar (ৃ)
   fConvertedText := ReplaceStr(fConvertedText, b_h + b_Rrikar, A_H_RRIKar);
   repeat
     I := Pos(b_Rrikar, fConvertedText);
-    if I <= 0 then
-      break;
+    if I <= 0 then break;
+    VowelGlyph := '';
     if I - 1 >= 1 then
-    begin
-      if BaseLineRightCharacter(fConvertedText[I - 1]) = True then
-      begin
-        fConvertedText := WideStuffString(fConvertedText, I, 1, A_RRIKar1);
-      end
-      else
-        fConvertedText := WideStuffString(fConvertedText, I, 1, A_RRIKar2);
-    end
-    else
-      fConvertedText := WideStuffString(fConvertedText, I, 1, A_RRIKar2);
+      VowelGlyph := GetVowelGlyph(b_Rrikar, fConvertedText[I - 1], False);
+    if VowelGlyph = '' then
+      VowelGlyph := GetVowelGlyph(b_Rrikar, '', False);
+    fConvertedText := WideStuffString(fConvertedText, I, 1, VowelGlyph);
   until I <= 0;
 
   // Convert rest of the Kars
@@ -1439,6 +1401,56 @@ begin
   finally
     SB.Free;
   end;
+end;
+
+{ =============================================================================== }
+
+procedure EnsureAnsiRegistry;
+begin
+  if AnsiRegistry = nil then
+  begin
+    AnsiRegistry := TList<TAnsiVarRec>.Create;
+    AnsiRegistryMap := TDictionary<string, TAnsiVarRec>.Create;
+    InitializeAnsiRegistry;
+  end;
+end;
+
+function ExpandVarRefs(const S: string): string;
+var
+  I, J: Integer;
+  VarName, VarVal: string;
+  Rec: TAnsiVarRec;
+begin
+  Result := S;
+  I := Pos('#{', Result);
+  while I > 0 do
+  begin
+    J := PosEx('}', Result, I + 2);
+    if J > 0 then
+    begin
+      VarName := Copy(Result, I + 2, J - I - 2);
+      EnsureAnsiRegistry;
+      if AnsiRegistryMap.TryGetValue(VarName, Rec) then
+      begin
+        if Rec.VarType = avChar then
+          VarVal := string(PChar(Rec.Ptr)^)
+        else
+          VarVal := PString(Rec.Ptr)^;
+      end
+      else
+        VarVal := ''; // Skip unrecognized variables
+
+      Result := Copy(Result, 1, I - 1) + VarVal + Copy(Result, J + 1, MaxInt);
+      I := Pos('#{', Result);
+    end
+    else
+      Break;
+  end;
+end;
+
+function ResolveStringValue(const S: string): string;
+begin
+  Result := ProcessHexAndUnicode(ExpandVarRefs(S));
 end;
 
 { =============================================================================== }
@@ -1679,18 +1691,6 @@ begin
   end;
 end;
 
-{ =============================================================================== }
-// Lazy initialization for AnsiRegistry and AnsiOverrides
-procedure EnsureAnsiRegistry;
-begin
-  if AnsiRegistry = nil then
-  begin
-    AnsiRegistry := TList<TAnsiVarRec>.Create;
-    AnsiRegistryMap := TDictionary<string, TAnsiVarRec>.Create;
-    InitializeAnsiRegistry;
-  end;
-end;
-
 procedure EnsureAnsiOverrides;
 begin
   if AnsiOverrides = nil then
@@ -1784,6 +1784,40 @@ end;
 
 { =============================================================================== }
 
+procedure InitializeDefaultConsonantGroups;
+var
+  DefaultList: TList<string>;
+  GroupPair: TPair<string, TList<string>>;
+begin
+  if ConsonantGroupsMap = nil then
+    ConsonantGroupsMap := TDictionary<string, TList<string>>.Create
+  else
+  begin
+    for GroupPair in ConsonantGroupsMap do
+      GroupPair.Value.Free;
+    ConsonantGroupsMap.Clear;
+  end;
+
+  DefaultList := TList<string>.Create;
+  DefaultList.AddRange([
+    b_kh, b_g, b_gh, b_Nn, b_Th, b_d, b_dh, b_n, b_p, b_b,
+    b_m, b_z, b_r, b_L, b_sh, b_ss, b_s, b_h, b_y,
+    string(A_K_Ss_M), string(A_K_M), string(A_K_Ss), string(A_K_S),
+    string(A_G_G), string(A_G_D), string(A_G_Dh), string(A_NGA_G),
+    string(A_T_Th), string(A_T_M),
+    string(A_D_D), string(A_D_Dh), string(A_D_B), string(A_D_M),
+    string(A_N_Tth), string(A_N_Dh), string(A_N_S),
+    string(A_P_P), string(A_P_S),
+    string(A_B_D), string(A_B_Dh), string(A_Bh_R), string(A_M_N),
+    string(A_L_G), string(A_L_P),
+    string(A_Ss_Nn), string(A_S_Kh), string(A_S_N),
+    string(A_H_N), string(A_H_M), string(A_Rr_G)
+  ]);
+  ConsonantGroupsMap.Add('BaseLineRight', DefaultList);
+end;
+
+{ =============================================================================== }
+
 procedure ResetAnsiToDefaults;
 var
   Rec: TAnsiVarRec;
@@ -1803,6 +1837,7 @@ begin
   Finalize(CustomPostReplacements); CustomPostReplacements := nil;
   Finalize(ActiveReplacements); ActiveReplacements := nil;
   PrepareActiveReplacements;
+  InitializeDefaultConsonantGroups;
 end;
 
 { =============================================================================== }
@@ -1835,9 +1870,9 @@ procedure LoadAnsiMapping(const Path: string; ErrorLog: TStringList = nil);
             Field := JReadString(S, Pos);
             JSkipWS(S, Pos); if S[Pos] = ':' then Inc(Pos);
             if Field = 'Key' then
-              Pair.Key := ProcessHexAndUnicode(JReadString(S, Pos))
+              Pair.Key := ResolveStringValue(JReadString(S, Pos))
             else if Field = 'Value' then
-              Pair.Value := ProcessHexAndUnicode(JReadString(S, Pos))
+              Pair.Value := ResolveStringValue(JReadString(S, Pos))
             else
               JSkipValue(S, Pos);
           end;
@@ -1856,10 +1891,16 @@ procedure LoadAnsiMapping(const Path: string; ErrorLog: TStringList = nil);
 var
   JSON: string;
   P: Integer;
-  Key, ConstName, ConstValue, CatName, FieldName: string;
+  Key, ConstName, ConstValue, CatName, FieldName, VowelName, Field, MapField: string;
   Rec: TAnsiVarRec;
   Lines: TStringList;
+  ConsonantGroupsFound: Boolean;
+  GroupList: TList<string>;
+  GroupPair: TPair<string, TList<string>>;
+  Rule: TVowelRule;
+  Map: TVowelMapping;
 begin
+  ConsonantGroupsFound := False;
   ResetAnsiToDefaults;
 
   if not FileExists(Path) then
@@ -1942,7 +1983,7 @@ begin
             end;
             if ConstValue <> '' then
             begin
-              ConstValue := ProcessHexAndUnicode(ConstValue);
+              ConstValue := ResolveStringValue(ConstValue);
               if AnsiRegistryMap.TryGetValue(ConstName, Rec) then
                 PString(Rec.Ptr)^ := ConstValue;
             end;
@@ -1957,6 +1998,120 @@ begin
       CustomPreReplacements := ParseSection(JSON, P)
     else if Key = 'PostReplacements' then
       CustomPostReplacements := ParseSection(JSON, P)
+    else if Key = 'VowelRules' then
+    begin
+      if (P <= Length(JSON)) and (JSON[P] = '{') then Inc(P) else Continue;
+      if VowelRulesList = nil then
+        VowelRulesList := TList<TVowelRule>.Create;
+      VowelRulesList.Clear;
+      while P <= Length(JSON) do
+      begin
+        JSkipWS(JSON, P);
+        if (P > Length(JSON)) or (JSON[P] = '}') then begin Inc(P); Break; end;
+        if JSON[P] = ',' then begin Inc(P); Continue; end;
+        VowelName := JReadString(JSON, P);
+        JSkipWS(JSON, P);
+        if (P <= Length(JSON)) and (JSON[P] = ':') then Inc(P);
+        JSkipWS(JSON, P);
+        if (P <= Length(JSON)) and (JSON[P] = '{') then Inc(P) else Continue;
+        Rule.Vowel := ResolveStringValue(VowelName);
+        Rule.DefaultVal := '';
+        Rule.BaselineRightVal := '';
+        SetLength(Rule.Mappings, 0);
+        while P <= Length(JSON) do
+        begin
+          JSkipWS(JSON, P);
+          if (P > Length(JSON)) or (JSON[P] = '}') then begin Inc(P); Break; end;
+          if JSON[P] = ',' then begin Inc(P); Continue; end;
+          Field := JReadString(JSON, P);
+          JSkipWS(JSON, P);
+          if (P <= Length(JSON)) and (JSON[P] = ':') then Inc(P);
+          JSkipWS(JSON, P);
+          if Field = 'default' then
+            Rule.DefaultVal := ResolveStringValue(JReadString(JSON, P))
+          else if Field = 'baselineRight' then
+            Rule.BaselineRightVal := ResolveStringValue(JReadString(JSON, P))
+          else if Field = 'mappings' then
+          begin
+            if (P <= Length(JSON)) and (JSON[P] = '[') then Inc(P) else Continue;
+            while P <= Length(JSON) do
+            begin
+              JSkipWS(JSON, P);
+              if (P > Length(JSON)) or (JSON[P] = ']') then begin Inc(P); Break; end;
+              if JSON[P] = ',' then begin Inc(P); Continue; end;
+              if (P <= Length(JSON)) and (JSON[P] = '{') then Inc(P) else Continue;
+              Map.Consonants := '';
+              Map.Value := '';
+              Map.AltValue := '';
+              while P <= Length(JSON) do
+              begin
+                JSkipWS(JSON, P);
+                if (P > Length(JSON)) or (JSON[P] = '}') then begin Inc(P); Break; end;
+                if JSON[P] = ',' then begin Inc(P); Continue; end;
+                MapField := JReadString(JSON, P);
+                JSkipWS(JSON, P);
+                if (P <= Length(JSON)) and (JSON[P] = ':') then Inc(P);
+                JSkipWS(JSON, P);
+                if MapField = 'consonants' then
+                  Map.Consonants := ResolveStringValue(JReadString(JSON, P))
+                else if MapField = 'value' then
+                  Map.Value := ResolveStringValue(JReadString(JSON, P))
+                else if MapField = 'alt' then
+                  Map.AltValue := ResolveStringValue(JReadString(JSON, P))
+                else
+                  JSkipValue(JSON, P);
+              end;
+              SetLength(Rule.Mappings, Length(Rule.Mappings) + 1);
+              Rule.Mappings[High(Rule.Mappings)] := Map;
+            end;
+          end
+          else
+            JSkipValue(JSON, P);
+        end;
+        VowelRulesList.Add(Rule);
+      end;
+    end
+    else if Key = 'ConsonantGroups' then
+    begin
+      ConsonantGroupsFound := True;
+      if (P <= Length(JSON)) and (JSON[P] = '{') then Inc(P) else Continue;
+
+      if ConsonantGroupsMap = nil then
+        ConsonantGroupsMap := TDictionary<string, TList<string>>.Create
+      else
+      begin
+        for GroupPair in ConsonantGroupsMap do
+          GroupPair.Value.Free;
+        ConsonantGroupsMap.Clear;
+      end;
+
+      while P <= Length(JSON) do
+      begin
+        JSkipWS(JSON, P);
+        if (P > Length(JSON)) or (JSON[P] = '}') then begin Inc(P); Break; end;
+        if JSON[P] = ',' then begin Inc(P); Continue; end;
+
+        CatName := JReadString(JSON, P);
+        JSkipWS(JSON, P);
+        if (P <= Length(JSON)) and (JSON[P] = ':') then Inc(P);
+        JSkipWS(JSON, P);
+
+        if (P <= Length(JSON)) and (JSON[P] = '[') then Inc(P) else Continue;
+
+        GroupList := TList<string>.Create;
+        while P <= Length(JSON) do
+        begin
+          JSkipWS(JSON, P);
+          if (P > Length(JSON)) or (JSON[P] = ']') then begin Inc(P); Break; end;
+          if JSON[P] = ',' then begin Inc(P); Continue; end;
+          if JSON[P] = '"' then
+            GroupList.Add(ResolveStringValue(JReadString(JSON, P)))
+          else
+            JSkipValue(JSON, P);
+        end;
+        ConsonantGroupsMap.AddOrSetValue(CatName, GroupList);
+      end;
+    end
     else
       JSkipValue(JSON, P);
   end;
@@ -1974,6 +2129,9 @@ begin
     TArray.Sort<TReplacementPair>(CustomPostReplacements, TComparer<TReplacementPair>.Construct(
       function(const L, R: TReplacementPair): Integer
       begin Result := R.Key.Length - L.Key.Length; end));
+
+  if not ConsonantGroupsFound then
+    InitializeDefaultConsonantGroups;
 
   PrepareActiveReplacements;
   JSON := '';
@@ -2276,5 +2434,12 @@ finalization
   AnsiRegistry.Free;
   AnsiRegistryMap.Free;
   AnsiOverrides.Free;
+  if ConsonantGroupsMap <> nil then
+  begin
+    for var GroupPair in ConsonantGroupsMap do
+      GroupPair.Value.Free;
+    ConsonantGroupsMap.Free;
+  end;
+  VowelRulesList.Free;
 
 end.
