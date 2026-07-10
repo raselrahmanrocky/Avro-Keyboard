@@ -730,7 +730,7 @@
         "Comment": "ত্র-এর দ্বিতীয় খন্ড"
       },
       "A_RFola_3": {
-        "Value": "",
+        "Value": "#$D6",
         "Comment": "র-ফলা ৩"
       },
       "A_Nn_2H_1": {
@@ -1407,6 +1407,7 @@
       "default": "#{A_UKar1}",
       "mappings": [
         { "consonants": "#$09B0", "value": "#{A_UKar4}", "alt": "#{A_UKar2}" },
+        { "consonants": "RuClusters", "value": "#{A_UKar4}", "alt": "#{A_UKar2}" },
         { "consonants": "BaseLineRight", "value": "#{A_UKar2}" }
       ]
     },
@@ -1414,17 +1415,27 @@
       "default": "#{A_UUKar1}",
       "mappings": [
         { "consonants": "#$09B0", "value": "#{A_UUKar3}", "alt": "#{A_UUKar2}" },
+        { "consonants": "RuClusters", "value": "#{A_UUKar3}", "alt": "#{A_UUKar2}" },
         { "consonants": "BaseLineRight", "value": "#{A_UUKar2}" }
       ]
     },
     "#$09C3": {
       "default": "#{A_RRIKar2}",
       "mappings": [
+        { "consonants": "RuClusters", "value": "#{A_RRIKar1}" },
         { "consonants": "BaseLineRight", "value": "#{A_RRIKar1}" }
       ]
     }
   },
   "ConsonantGroups": {
+    "RuClusters": [
+      "#$0995#$09CD#$09B0", "#$0997#$09CD#$09B0", "#$0998#$09CD#$09B0",
+      "#$09A4#$09CD#$09B0", "#$09A6#$09CD#$09B0", "#$09A7#$09CD#$09B0",
+      "#$09A8#$09CD#$09B0", "#$09AA#$09CD#$09B0", "#$09AC#$09CD#$09B0",
+      "#$09AD#$09CD#$09B0", "#$09AE#$09CD#$09B0",
+      "#$09B6#$09CD#$09B0", "#$09B7#$09CD#$09B0", "#$09B8#$09CD#$09B0",
+      "#$09B9#$09CD#$09B0"
+    ],
     "BaseLineRight": [
       "খ", "গ", "ঘ", "ণ", "থ", "দ", "ধ", "ন", "প", "ব", "ম", "য", "র", "ল", "শ", "ষ", "স", "হ", "য়",
       "#{A_K_Ss_M}", "#{A_K_M}", "#{A_K_Ss}", "#{A_K_S}",
