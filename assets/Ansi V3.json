@@ -80,7 +80,7 @@
         "Comment": "ু (উ-কার ২ - ঝুলন্ত)"
       },
       "A_UKar1": {
-        "Value": "#$24",
+        "Value": "#$25",
         "Comment": "ু (উ-কার ১ - সাধারণ)"
       },
       "A_UKar3": {
@@ -100,7 +100,7 @@
         "Comment": "ূ (ঊ-কার ২ - ঝুলন্ত)"
       },
       "A_UUKar1": {
-        "Value": "#$28",
+        "Value": "#$29",
         "Comment": "ূ (ঊ-কার ১ - সাধারণ)"
       },
       "A_UUKar3": {
@@ -112,7 +112,7 @@
         "Comment": "ঋ"
       },
       "A_RRIKar1": {
-        "Value": "#$2B",
+        "Value": "#$2C",
         "Comment": "ৃ (ঋ-কার ১)"
       },
       "A_RRIKar2": {
@@ -350,7 +350,7 @@
     },
     "FullForms": {
       "A_K_K": {
-        "Value": "#$45",
+        "Value": "#$45#$FE",
         "Comment": "ক্ক"
       },
       "A_K_Tt": {
@@ -394,7 +394,7 @@
         "Comment": "গ্দ"
       },
       "A_G_Dh": {
-        "Value": "#$3F",
+        "Value": "#$3F#$FE",
         "Comment": "গ্ধ"
       },
       "A_NGA_K": {
@@ -750,7 +750,7 @@
         "Comment": "ব-এর দ্বিতীয় খন্ড ৪"
       },
       "A_T_2H": {
-        "Value": "",
+        "Value": "#$201C#$00FE",
         "Comment": "ত-এর দ্বিতীয় খন্ড"
       },
       "A_T_UKar_2H": {
@@ -958,6 +958,11 @@
       "Comment": "দঘ"
     },
     {
+      "Key": "ঘ্ন",
+      "Value": "‡ø",
+      "Comment": "ঘ্ন"
+    },
+    {
       "Key": "#$09A3#$09CD#$09A2",
       "Value": "#$5E#$E9#$57",
       "Comment": "ণ্ঢ"
@@ -973,9 +978,19 @@
       "Comment": "ক্ল"
     },
     {
+      "Key": "#$0995#$09CD#$09B2#$09C1",
+      "Value": "#$201E#$CF#$24#$FE",
+      "Comment": "ক্লু"
+    },
+    {
       "Key": "#$09B2#$09CD#$09AC",
       "Value": "#$CD#$BA",
       "Comment": "ল্ব"
+    },
+    {
+      "Key": "ল্ল",
+      "Value": "#$CD#$D4",
+      "Comment": "ল্ল"
     },
     {
       "Key": "#$0999#$09CD#$0995#$09CD#$09A4",
@@ -1076,11 +1091,6 @@
       "Key": "#$0997#$09CD#$09A7#$09CD#$09AF",
       "Value": "#$3F#$FE#$C4",
       "Comment": "গ্ধ্য"
-    },
-    {
-      "Key": "",
-      "Value": "",
-      "Comment": ""
     },
     {
       "Key": "#$09B8#$09CD#$09A4#$09CD#$09B0",
@@ -1300,5 +1310,133 @@
       "Comment": "্। থেকে সরাসরি ব্যাকস্ল্যাশ"
     }
   ],
-  "PostReplacements": []
+  "PostReplacements": [
+    {
+      "Key": "#$FE#{A_UKar1}",
+      "Value": "#{A_UKar1}#$FE",
+      "Comment": "FE কানেক্টর + উ-কার ১ → আদর্শ ক্রম"
+    },
+    {
+      "Key": "#$FE#{A_UKar2}",
+      "Value": "#{A_UKar2}#$FE",
+      "Comment": "FE কানেক্টর + উ-কার ২ → আদর্শ ক্রম"
+    },
+    {
+      "Key": "#$FE#{A_UKar4}",
+      "Value": "#{A_UKar4}#$FE",
+      "Comment": "FE কানেক্টর + উ-কার ৪ → আদর্শ ক্রম"
+    },
+    {
+      "Key": "#$FE#{A_UUKar1}",
+      "Value": "#{A_UUKar1}#$FE",
+      "Comment": "FE কানেক্টর + ঊ-কার ১ → আদর্শ ক্রম"
+    },
+    {
+      "Key": "#$FE#{A_UUKar2}",
+      "Value": "#{A_UUKar2}#$FE",
+      "Comment": "FE কানেক্টর + ঊ-কার ২ → আদর্শ ক্রম"
+    },
+    {
+      "Key": "#$FE#{A_UUKar3}",
+      "Value": "#{A_UUKar3}#$FE",
+      "Comment": "FE কানেক্টর + ঊ-কার ৩ → আদর্শ ক্রম"
+    },
+    {
+      "Key": "#$E9#{A_UKar1}",
+      "Value": "#{A_UKar1}#$E9",
+      "Comment": "E9 কানেক্টর + উ-কার ১ → আদর্শ ক্রম"
+    },
+    {
+      "Key": "#$E9#{A_UKar2}",
+      "Value": "#{A_UKar2}#$E9",
+      "Comment": "E9 কানেক্টর + উ-কার ২ → আদর্শ ক্রম"
+    },
+    {
+      "Key": "#$E9#{A_UKar4}",
+      "Value": "#{A_UKar4}#$E9",
+      "Comment": "E9 কানেক্টর + উ-কার ৪ → আদর্শ ক্রম"
+    },
+    {
+      "Key": "#$E9#{A_UUKar1}",
+      "Value": "#{A_UUKar1}#$E9",
+      "Comment": "E9 কানেক্টর + ঊ-কার ১ → আদর্শ ক্রম"
+    },
+    {
+      "Key": "#$E9#{A_UUKar2}",
+      "Value": "#{A_UUKar2}#$E9",
+      "Comment": "E9 কানেক্টর + ঊ-কার ২ → আদর্শ ক্রম"
+    },
+    {
+      "Key": "#$E9#{A_UUKar3}",
+      "Value": "#{A_UUKar3}#$E9",
+      "Comment": "E9 কানেক্টর + ঊ-কার ৩ → আদর্শ ক্রম"
+    },
+    {
+      "Key": "#$FE#{A_RRIKar1}",
+      "Value": "#{A_RRIKar1}#$FE",
+      "Comment": "FE কানেক্টর + ঋ-কার → আদর্শ ক্রম"
+    },
+    {
+      "Key": "#$E9#{A_RRIKar1}",
+      "Value": "#{A_RRIKar1}#$E9",
+      "Comment": "E9 কানেক্টর + ঋ-কার → আদর্শ ক্রম"
+    },
+    {
+      "Key": "#{A_RFola_2}#{A_UKar2}",
+      "Value": "#{A_UKar2}#{A_RFola_2}",
+      "Comment": "AB কানেক্টর + উ-কার ১ও২ → আদর্শ ক্রম"
+    },
+    {
+      "Key": "#{A_RFola_2}#{A_UUKar2}",
+      "Value": "#{A_UUKar2}#{A_RFola_2}",
+      "Comment": "AB কানেক্টর + ঊ-কার ১ও২ → আদর্শ ক্রম"
+    },
+    {
+      "Key": "#{A_D_D}#{A_UKar2}",
+      "Value": "#{A_UKar2}#{A_D_D}",
+      "Comment": "CF কানেক্টর + উ-কার ১ও২ → আদর্শ ক্রম"
+    },
+    {
+      "Key": "þÅ,",
+      "Value": ",þÅ",
+      "Comment": "Thron+Reph+Ree → Ree+Thron+Reph"
+    }
+  ],
+  "VowelRules": {
+    "#$09C1": {
+      "default": "#{A_UKar1}",
+      "mappings": [
+        { "consonants": "#$09B0", "value": "#{A_UKar4}", "alt": "#{A_UKar2}" },
+        { "consonants": "BaseLineRight", "value": "#{A_UKar2}" }
+      ]
+    },
+    "#$09C2": {
+      "default": "#{A_UUKar1}",
+      "mappings": [
+        { "consonants": "#$09B0", "value": "#{A_UUKar3}", "alt": "#{A_UUKar2}" },
+        { "consonants": "BaseLineRight", "value": "#{A_UUKar2}" }
+      ]
+    },
+    "#$09C3": {
+      "default": "#{A_RRIKar2}",
+      "mappings": [
+        { "consonants": "BaseLineRight", "value": "#{A_RRIKar1}" }
+      ]
+    }
+  },
+  "ConsonantGroups": {
+    "BaseLineRight": [
+      "খ", "গ", "ঘ", "ণ", "থ", "দ", "ধ", "ন", "প", "ব", "ম", "য", "র", "ল", "শ", "ষ", "স", "হ", "য়",
+      "#{A_K_Ss_M}", "#{A_K_M}", "#{A_K_Ss}", "#{A_K_S}",
+      "#{A_G_G}", "#{A_G_D}", "#{A_G_Dh}", "#{A_NGA_G}",
+      "#{A_T_Th}", "#{A_T_M}",
+      "#{A_D_D}", "#{A_D_Dh}", "#{A_D_B}", "#{A_D_M}",
+      "#{A_N_Tth}", "#{A_N_Dh}", "#{A_N_S}",
+      "#{A_P_P}", "#{A_P_S}",
+      "#{A_B_D}", "#{A_B_Dh}", "#{A_Bh_R}", "#{A_M_N}",
+      "#{A_L_G}", "#{A_L_P}",
+      "#{A_Ss_Nn}", "#{A_S_Kh}", "#{A_S_N}",
+      "#{A_H_N}", "#{A_H_M}", "#{A_Rr_G}"
+    ]
+  }
 }

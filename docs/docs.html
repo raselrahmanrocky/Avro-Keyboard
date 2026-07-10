@@ -1,0 +1,1422 @@
+<!DOCTYPE html><html lang="bn" style=""><head>
+<meta charset="utf-8">
+<meta content="width=device-width,initial-scale=1" name="viewport">
+<title>Avro ANSI Mapping Editor</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+<script>
+tailwind.config={
+  theme:{
+    extend:{
+      colors:{
+        brand:{
+          50: '#f5f3ff',
+          100: '#ede9fe',
+          200: '#ddd6fe',
+          500: '#6366f1',
+          600: '#4f46e5',
+          700: '#4338ca',
+          900: '#312e81'
+        },
+        surface: {
+          DEFAULT: '#121212',
+          L1: '#1e1e1e',
+          L2: '#2c2c2c',
+          L3: '#333333'
+        }
+      },
+      borderRadius: {
+        'md-sm': '4px',
+        'md': '12px',
+        'md-lg': '16px'
+      }
+    }
+  }
+};
+</script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700&family=Noto+Sans+Bengali:wght@400;500;600;700&display=swap');
+
+*{box-sizing:border-box;margin:0;padding:0}
+body {
+  background-color: #121212;
+  color: #e4e4e7;
+  font-family: 'Inter', 'Noto Sans Bengali', system-ui, -apple-system, sans-serif;
+  min-height: 100vh;
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+/* ===== MATERIAL SCROLLBAR ===== */
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.1);border-radius:10px}
+::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,0.2)}
+
+/* ===== MATERIAL ELEVATION ===== */
+.elevation-1 { box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24); }
+.elevation-2 { box-shadow: 0 3px 6px rgba(0,0,0,0.16), 0 3px 6px rgba(0,0,0,0.23); }
+.elevation-4 { box-shadow: 0 10px 20px rgba(0,0,0,0.19), 0 6px 6px rgba(0,0,0,0.23); }
+
+.premium-card {
+  background: #1e1e1e;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  transition: all 0.2s ease;
+}
+
+/* ===== MATERIAL INPUTS ===== */
+.md-input-container {
+  position: relative;
+  width: 100%;
+}
+.md-input {
+  background: #2c2c2c;
+  border: none;
+  border-bottom: 2px solid rgba(255,255,255,0.2);
+  color: #fff;
+  padding: 12px 16px;
+  border-radius: 4px 4px 0 0;
+  font-size: 15px;
+  width: 100%;
+  outline: none;
+  transition: all 0.2s ease;
+}
+.md-input:focus {
+  background: #333333;
+  border-bottom-color: #6366f1;
+}
+.md-input.hex-input {
+  font-family: 'Fira Code', monospace;
+  font-size: 14px;
+}
+
+/* ===== MATERIAL TABS ===== */
+.tab-btn {
+  position: relative;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  color: #a1a1aa;
+  font-size: 14px;
+  padding: 16px 24px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.tab-btn:hover { color: #fff; background: rgba(255,255,255,0.04); }
+.tab-btn.active { color: #818cf8; }
+.tab-btn.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: #6366f1;
+  border-radius: 3px 3px 0 0;
+}
+
+.sub-tab-btn {
+  transition: all 0.2s ease;
+  cursor: pointer;
+  color: #a1a1aa;
+  font-size: 13px;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-weight: 500;
+  border: 1px solid rgba(255,255,255,0.1);
+}
+.sub-tab-btn.active {
+  background: #6366f1;
+  color: #fff;
+  border-color: #6366f1;
+}
+
+/* ===== BUTTONS ===== */
+.btn {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+  border-radius: 8px;
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.btn-primary { background: #6366f1; color: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+.btn-primary:hover { background: #4f46e5; box-shadow: 0 4px 8px rgba(0,0,0,0.3); }
+.btn-ghost { background: transparent; color: #a1a1aa; border: 1px solid rgba(255,255,255,0.1); }
+.btn-ghost:hover { color: #fff; background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.2); }
+
+.icon-btn {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  color: #71717a;
+  transition: all 0.2s ease;
+  background: rgba(255,255,255,0.03);
+}
+.icon-btn:hover { color: #818cf8; background: rgba(99,102,241,0.1); }
+
+/* ===== TABLE ===== */
+.table-md { width: 100%; border-collapse: collapse; }
+.table-md th {
+  text-align: left;
+  padding: 16px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #a1a1aa;
+  text-transform: uppercase;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+.table-md td { padding: 12px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+
+/* ===== CHAR PREVIEW ===== */
+.preview-char {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  background: #2c2c2c;
+  border-radius: 8px;
+  font-size: 20px;
+  font-family: 'Noto Sans Bengali', sans-serif;
+  color: #fff;
+}
+
+details.premium-card summary {
+  cursor: pointer;
+  padding: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+details.premium-card .details-content {
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: max-height 0.45s ease, opacity 0.35s ease, padding 0.35s ease;
+  padding: 0 20px;
+}
+details.premium-card[open] .details-content {
+  max-height: 5000px;
+  opacity: 1;
+  padding: 16px 20px 20px;
+}
+</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&amp;family=Inter:wght@300;400;500;600;700&amp;family=Noto+Sans+Bengali:wght@400;500;600;700&amp;display=swap" data-snapdom="injected-import"></head>
+<body class="selection:bg-indigo-500/30">
+<div class="max-w-7xl mx-auto px-4 md:px-8 py-6">
+<!-- Material Header -->
+<header class="mb-8 premium-card p-6 elevation-2">
+<div class="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
+<div>
+<div class="flex items-center gap-2 mb-1">
+<span class="text-indigo-400 material-symbols-outlined text-sm">precision_manufacturing</span>
+<span class="text-[10px] font-bold text-zinc-500 tracking-[0.2em] uppercase">V1.3 Core Utility</span>
+</div>
+<h1 class="text-3xl font-bold text-white tracking-tight">Avro ANSI Mapping Editor</h1>
+<p class="text-sm text-zinc-400 mt-1 font-medium">Bengali Unicode → ANSI (SutonnyMJ) JSON Orchestrator</p>
+</div>
+<div class="flex flex-wrap items-center gap-2 bg-black/20 p-2 rounded-md">
+<label class="btn btn-ghost cursor-pointer py-2 px-3">
+<span class="material-symbols-outlined text-sm">attach_file</span>
+<span class="">Load</span>
+<input accept=".json" class="hidden" id="fileInput" onchange="loadFile(event)" type="file">
+</label>
+<button class="btn btn-ghost py-2 px-3" onclick="togglePasteModal(true)">
+<span class="material-symbols-outlined text-sm">content_paste</span>
+<span class="">Paste</span>
+</button>
+<button class="btn btn-ghost py-2 px-3" onclick="copyJSON()">
+<span class="material-symbols-outlined text-sm">content_copy</span>
+<span class="">Copy All</span>
+</button>
+<div class="w-px h-6 bg-white/10 mx-1"></div>
+<button class="btn btn-primary py-2 px-4" onclick="downloadJSON()">
+<span class="material-symbols-outlined text-sm">download</span>
+<span class="">Download JSON</span>
+</button>
+</div>
+</div>
+</header>
+<!-- Material Navigation Tabs -->
+<div class="flex border-b border-white/10 mb-8 overflow-x-auto no-scrollbar" id="mainTabs">
+<button class="tab-btn active" data-tab="constants"><span class="material-symbols-outlined text-[18px]">settings</span>Constants</button>
+<button class="tab-btn" data-tab="replacements"><span class="material-symbols-outlined text-[18px]">find_replace</span>Replacements</button>
+<button class="tab-btn" data-tab="vowelrules"><span class="material-symbols-outlined text-[18px]">rule</span>Vowel Rules</button>
+<button class="tab-btn" data-tab="groups"><span class="material-symbols-outlined text-[18px]">group_work</span>Groups</button>
+<button class="tab-btn" data-tab="tools"><span class="material-symbols-outlined text-[18px]">build</span>Hex &amp; Tools</button>
+<button class="tab-btn" data-tab="docs"><span class="material-symbols-outlined text-[18px]">menu_book</span>Documentation</button>
+</div>
+<!-- Tab Contents -->
+<!-- Tab: Constants -->
+<div class="tab-content" id="tab-constants">
+<div class="flex flex-wrap gap-2 mb-8" id="constSubTabs">
+<button class="sub-tab-btn active" data-sub="Numbers">Numbers</button>
+<button class="sub-tab-btn" data-sub="VowelsAndKars">Vowels &amp; Kars</button>
+<button class="sub-tab-btn" data-sub="Symbols">Symbols</button>
+<button class="sub-tab-btn" data-sub="Consonants">Consonants</button>
+<button class="sub-tab-btn" data-sub="FullForms">Full Forms</button>
+<button class="sub-tab-btn" data-sub="FirstHalfForms">First Half</button>
+<button class="sub-tab-btn" data-sub="SecondHalfForms">Second Half</button>
+</div>
+<div class="mb-8 md-input-container max-w-md">
+<input class="md-input" id="constSearch" oninput="renderConstants()" placeholder="Search variables...">
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-[600px] overflow-y-auto pr-2" id="constantsGrid"><div class="premium-card p-4 elevation-1">
+      <div class="flex items-center justify-between mb-4">
+        <span class="text-[11px] font-mono font-bold text-indigo-400 tracking-wider">A_0</span>
+        <span class="preview-char elevation-1">0</span>
+      </div>
+      <div class="space-y-3">
+        <div class="flex items-center gap-2">
+          <input class="md-input hex-input" id="input-Numbers-A_0" value="#$0030" onchange="updateConst('Numbers','A_0','Value',this.value)" placeholder="Hex Value">
+          <div class="flex gap-1">
+            <button class="icon-btn" onclick="copyToLocalClipboard('#$0030')" title="Copy"><span class="material-symbols-outlined text-[18px]">content_copy</span></button>
+            <button class="icon-btn" onclick="pasteToConst('Numbers', 'A_0', 'Value', 'input-Numbers-A_0')" title="Paste"><span class="material-symbols-outlined text-[18px]">content_paste</span></button>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <input class="md-input" id="comment-Numbers-A_0" value="০" onchange="updateConst('Numbers','A_0','Comment',this.value)" placeholder="Comment">
+          <div class="flex gap-1">
+            <button class="icon-btn" onclick="copyToLocalClipboard('০')" title="Copy"><span class="material-symbols-outlined text-[18px]">content_copy</span></button>
+            <button class="icon-btn" onclick="pasteToConst('Numbers', 'A_0', 'Comment', 'comment-Numbers-A_0')" title="Paste"><span class="material-symbols-outlined text-[18px]">content_paste</span></button>
+          </div>
+        </div>
+      </div>
+    </div><div class="premium-card p-4 elevation-1">
+      <div class="flex items-center justify-between mb-4">
+        <span class="text-[11px] font-mono font-bold text-indigo-400 tracking-wider">A_1</span>
+        <span class="preview-char elevation-1">1</span>
+      </div>
+      <div class="space-y-3">
+        <div class="flex items-center gap-2">
+          <input class="md-input hex-input" id="input-Numbers-A_1" value="#$0031" onchange="updateConst('Numbers','A_1','Value',this.value)" placeholder="Hex Value">
+          <div class="flex gap-1">
+            <button class="icon-btn" onclick="copyToLocalClipboard('#$0031')" title="Copy"><span class="material-symbols-outlined text-[18px]">content_copy</span></button>
+            <button class="icon-btn" onclick="pasteToConst('Numbers', 'A_1', 'Value', 'input-Numbers-A_1')" title="Paste"><span class="material-symbols-outlined text-[18px]">content_paste</span></button>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <input class="md-input" id="comment-Numbers-A_1" value="১" onchange="updateConst('Numbers','A_1','Comment',this.value)" placeholder="Comment">
+          <div class="flex gap-1">
+            <button class="icon-btn" onclick="copyToLocalClipboard('১')" title="Copy"><span class="material-symbols-outlined text-[18px]">content_copy</span></button>
+            <button class="icon-btn" onclick="pasteToConst('Numbers', 'A_1', 'Comment', 'comment-Numbers-A_1')" title="Paste"><span class="material-symbols-outlined text-[18px]">content_paste</span></button>
+          </div>
+        </div>
+      </div>
+    </div></div>
+</div>
+<!-- Tab: Replacements -->
+<div class="tab-content hidden" id="tab-replacements">
+<div class="flex flex-wrap gap-2 mb-6" id="replSubTabs">
+<button class="sub-tab-btn active" data-sub="FullFormReplacements">Full Form</button>
+<button class="sub-tab-btn" data-sub="PreReplacements">Pre Replacements</button>
+<button class="sub-tab-btn" data-sub="PostReplacements">Post Replacements</button>
+</div>
+<div class="premium-card overflow-hidden elevation-1" id="replTables"></div>
+</div>
+<!-- Tab: Vowel Rules -->
+<div class="tab-content hidden" id="tab-vowelrules">
+<div class="p-5 mb-8 bg-indigo-500/10 border border-indigo-500/20 rounded-md flex items-center justify-between">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-indigo-400">info</span>
+<p class="text-sm text-indigo-200">Configure structural rules for choosing exact vowel-kars (ু, ূ, ৃ) dynamically.</p>
+</div>
+<button class="btn btn-ghost py-1 px-3 text-xs" onclick="pasteVowelRule()">Paste Rule Profile</button>
+</div>
+<div class="space-y-6" id="vowelRulesContainer"></div>
+<button class="btn btn-primary mt-8" onclick="addVowelRule()">+ Add Vowel Rule</button>
+</div>
+<!-- Tab: Groups -->
+<div class="tab-content hidden" id="tab-groups">
+<div class="space-y-6" id="groupsContainer"></div>
+</div>
+<!-- Tab: Tools -->
+<div class="tab-content hidden" id="tab-tools">
+<div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+<div class="premium-card p-6 elevation-1">
+<h3 class="font-bold text-white mb-6 flex items-center gap-2"><span class="material-symbols-outlined text-indigo-400">code</span>Hex Translator</h3>
+<div class="space-y-6">
+<div class="md-input-container">
+<label class="text-[10px] uppercase font-bold text-zinc-500 mb-1 block">Character to Hex</label>
+<div class="flex items-center gap-2">
+<input class="md-input" id="charToHexInput" oninput="charToHex()" placeholder="e.g. র">
+<button class="icon-btn" onclick="pasteToField('charToHexInput', charToHex)"><span class="material-symbols-outlined text-[18px]">content_paste</span></button>
+</div>
+<div class="mt-2 text-sm font-mono text-indigo-300 min-h-[20px]" id="charToHexResult"></div>
+</div>
+<div class="md-input-container">
+<label class="text-[10px] uppercase font-bold text-zinc-500 mb-1 block">Hex to Character</label>
+<div class="flex items-center gap-2">
+<input class="md-input hex-input" id="hexToCharInput" oninput="hexToChar()" placeholder="e.g. #$09B0">
+<button class="icon-btn" onclick="pasteToField('hexToCharInput', hexToChar)"><span class="material-symbols-outlined text-[18px]">content_paste</span></button>
+</div>
+<div class="mt-2 flex items-center gap-3 min-h-[44px]" id="hexToCharResult"></div>
+</div>
+</div>
+</div>
+<div class="premium-card p-6 elevation-1">
+<h3 class="font-bold text-white mb-6 flex items-center gap-2"><span class="material-symbols-outlined text-indigo-400">list_alt</span>Variable Browser</h3>
+<div class="md-input-container mb-4">
+<input class="md-input" id="varBrowserSearch" oninput="renderVarBrowser()" placeholder="Filter variable names...">
+</div>
+<div class="max-h-[300px] overflow-y-auto space-y-1" id="varBrowserList">
+    <div class="flex items-center gap-3 p-2 hover:bg-white/5 rounded-md transition-colors cursor-pointer" onclick="copyToLocalClipboard('#{A_0}')">
+      <span class="preview-char !w-8 !h-8 !text-sm">0</span>
+      <div class="flex-1 overflow-hidden">
+        <div class="font-mono text-[11px] text-indigo-300 truncate">A_0</div>
+        <div class="text-[10px] text-zinc-500 truncate">০</div>
+      </div>
+      <span class="text-[9px] font-bold text-zinc-600 uppercase border border-zinc-800 px-1.5 rounded">Numb</span>
+    </div>
+  
+    <div class="flex items-center gap-3 p-2 hover:bg-white/5 rounded-md transition-colors cursor-pointer" onclick="copyToLocalClipboard('#{A_1}')">
+      <span class="preview-char !w-8 !h-8 !text-sm">1</span>
+      <div class="flex-1 overflow-hidden">
+        <div class="font-mono text-[11px] text-indigo-300 truncate">A_1</div>
+        <div class="text-[10px] text-zinc-500 truncate">১</div>
+      </div>
+      <span class="text-[9px] font-bold text-zinc-600 uppercase border border-zinc-800 px-1.5 rounded">Numb</span>
+    </div>
+  
+    <div class="flex items-center gap-3 p-2 hover:bg-white/5 rounded-md transition-colors cursor-pointer" onclick="copyToLocalClipboard('#{A_AAKar}')">
+      <span class="preview-char !w-8 !h-8 !text-sm">y</span>
+      <div class="flex-1 overflow-hidden">
+        <div class="font-mono text-[11px] text-indigo-300 truncate">A_AAKar</div>
+        <div class="text-[10px] text-zinc-500 truncate">া (আ-কার)</div>
+      </div>
+      <span class="text-[9px] font-bold text-zinc-600 uppercase border border-zinc-800 px-1.5 rounded">Vowe</span>
+    </div>
+  
+    <div class="flex items-center gap-3 p-2 hover:bg-white/5 rounded-md transition-colors cursor-pointer" onclick="copyToLocalClipboard('#{A_IKar}')">
+      <span class="preview-char !w-8 !h-8 !text-sm">!</span>
+      <div class="flex-1 overflow-hidden">
+        <div class="font-mono text-[11px] text-indigo-300 truncate">A_IKar</div>
+        <div class="text-[10px] text-zinc-500 truncate">ি (ই-কার)</div>
+      </div>
+      <span class="text-[9px] font-bold text-zinc-600 uppercase border border-zinc-800 px-1.5 rounded">Vowe</span>
+    </div>
+  
+    <div class="flex items-center gap-3 p-2 hover:bg-white/5 rounded-md transition-colors cursor-pointer" onclick="copyToLocalClipboard('#{A_UKar1}')">
+      <span class="preview-char !w-8 !h-8 !text-sm">%</span>
+      <div class="flex-1 overflow-hidden">
+        <div class="font-mono text-[11px] text-indigo-300 truncate">A_UKar1</div>
+        <div class="text-[10px] text-zinc-500 truncate">ু (উ-কার ১)</div>
+      </div>
+      <span class="text-[9px] font-bold text-zinc-600 uppercase border border-zinc-800 px-1.5 rounded">Vowe</span>
+    </div>
+  
+    <div class="flex items-center gap-3 p-2 hover:bg-white/5 rounded-md transition-colors cursor-pointer" onclick="copyToLocalClipboard('#{A_UKar2}')">
+      <span class="preview-char !w-8 !h-8 !text-sm">%</span>
+      <div class="flex-1 overflow-hidden">
+        <div class="font-mono text-[11px] text-indigo-300 truncate">A_UKar2</div>
+        <div class="text-[10px] text-zinc-500 truncate">ু (উ-কার ২)</div>
+      </div>
+      <span class="text-[9px] font-bold text-zinc-600 uppercase border border-zinc-800 px-1.5 rounded">Vowe</span>
+    </div>
+  
+    <div class="flex items-center gap-3 p-2 hover:bg-white/5 rounded-md transition-colors cursor-pointer" onclick="copyToLocalClipboard('#{A_Hasanta}')">
+      <span class="preview-char !w-8 !h-8 !text-sm">ä</span>
+      <div class="flex-1 overflow-hidden">
+        <div class="font-mono text-[11px] text-indigo-300 truncate">A_Hasanta</div>
+        <div class="text-[10px] text-zinc-500 truncate">্ (হসন্ত)</div>
+      </div>
+      <span class="text-[9px] font-bold text-zinc-600 uppercase border border-zinc-800 px-1.5 rounded">Symb</span>
+    </div>
+  
+    <div class="flex items-center gap-3 p-2 hover:bg-white/5 rounded-md transition-colors cursor-pointer" onclick="copyToLocalClipboard('#{A_K}')">
+      <span class="preview-char !w-8 !h-8 !text-sm">„þ</span>
+      <div class="flex-1 overflow-hidden">
+        <div class="font-mono text-[11px] text-indigo-300 truncate">A_K</div>
+        <div class="text-[10px] text-zinc-500 truncate">ক</div>
+      </div>
+      <span class="text-[9px] font-bold text-zinc-600 uppercase border border-zinc-800 px-1.5 rounded">Cons</span>
+    </div>
+  
+    <div class="flex items-center gap-3 p-2 hover:bg-white/5 rounded-md transition-colors cursor-pointer" onclick="copyToLocalClipboard('#{A_K_K}')">
+      <span class="preview-char !w-8 !h-8 !text-sm">Eþ</span>
+      <div class="flex-1 overflow-hidden">
+        <div class="font-mono text-[11px] text-indigo-300 truncate">A_K_K</div>
+        <div class="text-[10px] text-zinc-500 truncate">ক্ক</div>
+      </div>
+      <span class="text-[9px] font-bold text-zinc-600 uppercase border border-zinc-800 px-1.5 rounded">Full</span>
+    </div>
+  </div>
+</div>
+</div>
+</div>
+<!-- Tab: Docs -->
+<div class="tab-content hidden" id="tab-docs">
+<div class="space-y-5 max-w-4xl mx-auto py-4">
+
+  <!-- 1. ANSI Mapping কী -->
+  <details class="premium-card elevation-1 group" open>
+    <summary class="font-bold text-white flex items-center justify-between p-5">
+      <div class="flex items-center gap-3"><span class="material-symbols-outlined text-indigo-400">language</span><span>১. ANSI ম্যাপিং কী?</span></div>
+      <span class="material-symbols-outlined transition-transform group-open:rotate-180">expand_more</span>
+    </summary>
+    <div class="details-content text-zinc-400 leading-relaxed space-y-3">
+      <p>আপনি যখন বাংলায় টাইপ করেন — যেমন "সালাম" — আপনার কম্পিউটার ইউনিকোড (Unicode) ব্যবহার করে। কিন্তু পুরনো অনেক ফন্ট (যেমন সোটনমিজে / বিজয়) ইউনিকোড বোঝে না। তারা ANSI এনকোডিং বোঝে।</p>
+      <p>এই JSON ফাইলটি হল সেই <strong class="text-white">অনুবাদক</strong> — এটি বলে দেয় প্রতিটি ইউনিকোড বর্ণের জন্য কোন ANSI কোড ব্যবহার করতে হবে। যেমন:</p>
+      <pre class="bg-black/40 p-3 rounded-lg text-zinc-300 text-sm">স (ইউনিকোড) &#x2192; #$A2 (ANSI কোড)
+া (ইউনিকোড) &#x2192; #$79 (ANSI কোড)
+ল (ইউনিকোড) &#x2192; #$0153 (ANSI কোড)
+া (ইউনিকোড) &#x2192; #$79 (ANSI কোড)
+ম (ইউনিকোড) &#x2192; #$203A (ANSI কোড)</pre>
+      <p>ফলাফল: <code>সালাম</code> (ইউনিকোড) &#x2192; <code>‡yv</code> (ANSI সোটনমিজে)</p>
+    </div>
+  </details>
+
+  <!-- 2. JSON ফাইলের গঠন -->
+  <details class="premium-card elevation-1 group">
+    <summary class="font-bold text-white flex items-center justify-between p-5">
+      <div class="flex items-center gap-3"><span class="material-symbols-outlined text-indigo-400">account_tree</span><span>২. JSON ফাইলের গঠন</span></div>
+      <span class="material-symbols-outlined transition-transform group-open:rotate-180">expand_more</span>
+    </summary>
+    <div class="details-content text-zinc-400 leading-relaxed space-y-3">
+      <p>JSON ফাইলটি ৫টি প্রধান অংশে বিভক্ত:</p>
+      <pre class="bg-black/40 p-3 rounded-lg text-zinc-300 text-sm">{
+  "Constants":        // বর্ণ ও গ্লিফের সংজ্ঞা
+  "FullFormReplacements": // পূর্ণ যুক্তাক্ষরের তালিকা
+  "PreReplacements":  // আগাম প্রতিস্থাপন
+  "PostReplacements": // পশ্চাৎ প্রতিস্থাপন (সবার শেষে)
+  "VowelRules":       // স্বরবর্ণের গ্লিফ নির্বাচনের নিয়ম
+  "ConsonantGroups":  // ব্যঞ্জনবর্ণের গ্রুপ
+}</pre>
+      <details>
+        <summary class="font-semibold text-indigo-300 cursor-pointer text-sm">Constants &#x2192; ৭টি উপবিভাগ</summary>
+        <div class="mt-2 space-y-2 pl-4">
+          <p><strong class="text-white">Numbers</strong> (০-৯): অঙ্কের ANSI ম্যাপিং — <code class="text-xs">"A_0": { "Value": "#$0030", "Comment": "০" }</code></p>
+          <p><strong class="text-white">VowelsAndKars</strong>: স্বরবর্ণ ও কারচিহ্ন — <code class="text-xs">"A_AAKar": { "Value": "#$0079", "Comment": "া" }</code></p>
+          <p><strong class="text-white">Symbols</strong>: যতি ও প্রতীক — <code class="text-xs">"A_Hasanta": { "Value": "#$E4", "Comment": "্" }</code></p>
+          <p><strong class="text-white">Consonants</strong>: ব্যঞ্জনবর্ণ — <code class="text-xs">"A_K": { "Value": "#$201E#$FE", "Comment": "ক" }</code></p>
+          <p><strong class="text-white">FullForms</strong>: যুক্তাক্ষর — <code class="text-xs">"A_K_K": { "Value": "#$45#$FE", "Comment": "ক্ক" }</code></p>
+          <p><strong class="text-white">FirstHalfForms</strong>: বর্ণের প্রথম খন্ড — <code class="text-xs">"A_Reph": { "Value": "#$C5", "Comment": "র-এর রেফ" }</code></p>
+          <p><strong class="text-white">SecondHalfForms</strong>: বর্ণের দ্বিতীয় খন্ড — <code class="text-xs">"A_ZFola": { "Value": "#$C4", "Comment": "য-ফলা" }</code></p>
+        </div>
+      </details>
+      <details>
+        <summary class="font-semibold text-indigo-300 cursor-pointer text-sm">FullFormReplacements &#x2192; পূর্ণ যুক্তাক্ষর</summary>
+        <div class="mt-2 pl-4">
+          <pre class="bg-black/40 p-2 rounded-lg text-zinc-300 text-xs mt-1">{ "Key": "#$09A8#$09CD#$09A4", "Value": "#$68#$73#$FE", "Comment": "ন্ত" }</pre>
+        </div>
+      </details>
+    </div>
+  </details>
+
+  <!-- 3. Processing Pipeline -->
+  <details class="premium-card elevation-1 group">
+    <summary class="font-bold text-white flex items-center justify-between p-5">
+      <div class="flex items-center gap-3"><span class="material-symbols-outlined text-indigo-400">alt_route</span><span>৩. কনভার্সন প্রক্রিয়া: ধাপে ধাপে</span></div>
+      <span class="material-symbols-outlined transition-transform group-open:rotate-180">expand_more</span>
+    </summary>
+    <div class="details-content text-zinc-400 leading-relaxed space-y-3">
+      <p>ইউনিকোড থেকে ANSI-তে রূপান্তর একটি নির্দিষ্ট ক্রমে ঘটে। নিচে প্রতিটি ধাপ বর্ণনা করা হলো:</p>
+      <pre class="bg-black/40 p-4 rounded-lg text-zinc-300 text-sm text-center leading-loose">
+<span class="text-white font-bold">সালাম (ইউনিকোড)</span>
+    &#x2193;
+<span class="text-indigo-300 font-semibold">&#x2460; FullFormReplacements</span>
+    &#x2193;
+<span class="text-indigo-300 font-semibold">&#x2461; PreReplacements</span>
+    &#x2193;
+<span class="text-indigo-300 font-semibold">&#x2462; ReplaceFullForms</span> (FirstHalf + SecondHalf)
+    &#x2193;
+<span class="text-indigo-300 font-semibold">&#x2463; ReplaceKarsVowels</span> (VowelRules দ্বারা)
+    &#x2193;
+<span class="text-indigo-300 font-semibold">&#x2464; PostReplacements</span> (#{Var} সম্প্রসারণ)
+    &#x2193;
+<span class="text-indigo-300 font-semibold">&#x2465; FinalTouch</span> (গ্লিফ পুনর্বিন্যাস + ANSI পরিশোধন)
+    &#x2193;
+<span class="text-white font-bold">‡yv (ANSI আউটপুট)</span></pre>
+
+      <details>
+        <summary class="font-semibold text-indigo-300 cursor-pointer text-sm">&#x2460; FullFormReplacements — বিস্তারিত</summary>
+        <div class="mt-2 pl-4 space-y-2">
+          <p>সবচেয়ে আগে চলে। যুক্তাক্ষর পুরো আকারে ANSI-তে রূপান্তরিত হয়। Key-গুলো দীর্ঘ থেকে ক্ষুদ্র ক্রমে সাজানো থাকে।</p>
+          <pre class="bg-black/40 p-2 rounded-lg text-zinc-300 text-xs">ন্ত্ব &#x2192; #$67#$73#$FE
+ন্ত   &#x2192; #$68#$73#$FE</pre>
+        </div>
+      </details>
+      <details>
+        <summary class="font-semibold text-indigo-300 cursor-pointer text-sm">&#x2461; PreReplacements — বিস্তারিত</summary>
+        <div class="mt-2 pl-4">
+          <p class="mb-1">ক্যারেক্টার প্রসেসিংয়ের আগে বিশেষ প্রতিস্থাপন। যেমন হসন্ত+দাঁড়ি &#x2192; ব্যাকস্ল্যাশ।</p>
+          <pre class="bg-black/40 p-2 rounded-lg text-zinc-300 text-xs">&#x09CD;&#x0964; &#x2192; #$FF</pre>
+        </div>
+      </details>
+      <details>
+        <summary class="font-semibold text-indigo-300 cursor-pointer text-sm">&#x2462; ReplaceFullForms — বিস্তারিত</summary>
+        <div class="mt-2 pl-4">
+          <p>FirstHalfForms ও SecondHalfForms ব্যবহার করে যুক্তাক্ষর তৈরি। যেমন র-এর রেফ + প = র্প।</p>
+        </div>
+      </details>
+      <details>
+        <summary class="font-semibold text-indigo-300 cursor-pointer text-sm">&#x2463; ReplaceKarsVowels — বিস্তারিত</summary>
+        <div class="mt-2 pl-4">
+          <p>সবচেয়ে জটিল ধাপ। কারচিহ্ন (ু, ূ, ৃ) বসানোর জন্য VowelRules ব্যবহার করে। নিচে বিস্তারিত দেখুন।</p>
+        </div>
+      </details>
+      <details>
+        <summary class="font-semibold text-indigo-300 cursor-pointer text-sm">&#x2464; PostReplacements — বিস্তারিত</summary>
+        <div class="mt-2 pl-4 space-y-2">
+          <p>সব গ্লিফ বসানোর পর অর্ডারিং ফিক্স। এখানে <code>#{VariableName}</code> ব্যবহার করা যায়।</p>
+          <pre class="bg-black/40 p-2 rounded-lg text-zinc-300 text-xs">"Key": "#$FE#{A_UKar1}", "Value": "#{A_UKar1}#$FE"</pre>
+        </div>
+      </details>
+      <details>
+        <summary class="font-semibold text-indigo-300 cursor-pointer text-sm">&#x2465; FinalTouch — বিস্তারিত</summary>
+        <div class="mt-2 pl-4 space-y-1">
+          <p>সর্বশেষ ধাপে পুনর্বিন্যাস ও পরিষ্কারকরণ:</p>
+          <ul class="list-disc list-inside text-xs space-y-1">য-ফলা+উ-কার &#x2192; উ-কার+য-ফলা</ul>
+          <ul class="list-disc list-inside text-xs space-y-1">র-ফলা+উ-কার &#x2192; উ-কার+র-ফলা</ul>
+          <ul class="list-disc list-inside text-xs space-y-1">রেফ+উ-কার &#x2192; উ-কার+রেফ</ul>
+          <ul class="list-disc list-inside text-xs space-y-1">অপ্রয়োজনীয় ইউনিকোড (ZWJ, ZWNJ) সরানো</ul>
+        </div>
+      </details>
+    </div>
+  </details>
+
+  <!-- 4. VowelRules বিস্তারিত -->
+  <details class="premium-card elevation-1 group">
+    <summary class="font-bold text-white flex items-center justify-between p-5">
+      <div class="flex items-center gap-3"><span class="material-symbols-outlined text-indigo-400">rule</span><span>৪. VowelRules: স্বরবর্ণের গ্লিফ নির্বাচন</span></div>
+      <span class="material-symbols-outlined transition-transform group-open:rotate-180">expand_more</span>
+    </summary>
+    <div class="details-content text-zinc-400 leading-relaxed space-y-3">
+      <p>VowelRules নির্ধারণ করে — একটি কারচিহ্ন (ু, ূ, ৃ) কোন ব্যঞ্জনবর্ণের পরে বসলে <strong class="text-white">কোন ANSI গ্লিফ</strong> ব্যবহার করবে।</p>
+
+      <div class="bg-black/30 p-4 rounded-lg space-y-2 text-sm">
+        <p><span class="text-indigo-300 font-bold">প্রথমে:</span> ম্যাপিং (mappings) চেক করে। পূর্ববর্তী ব্যঞ্জনবর্ণ "consonants" তালিকায় থাকলে সেই mapping-এর value ব্যবহার করে।</p>
+        <p><span class="text-indigo-300 font-bold">দ্বিতীয়ত:</span> ম্যাপিং না মিললে কিন্তু বর্ণটি BaseLineRight তালিকায় থাকলে "baselineRight" ব্যবহার করে।</p>
+        <p><span class="text-indigo-300 font-bold">সর্বশেষ:</span> কোনটাই না মিললে "default" মান ব্যবহার করে।</p>
+      </div>
+
+      <h4 class="text-white font-semibold">বাস্তব উদাহরণ: উ-কার</h4>
+      <pre class="bg-black/40 p-3 rounded-lg text-zinc-300 text-sm">"#{b_Ukar}": {
+  "default": "#{A_UKar1}",        // #$25 — সাধারণ
+  "baselineRight": "#{A_UKar2}",  // #$25 — ঝুলন্ত
+  "mappings": [
+    { "consonants": "#{b_r}", "value": "#{A_UKar2}", "alt": "#{A_UKar4}" },
+    { "consonants": "#{b_L}", "value": "#{A_UKar2}", "alt": "#{A_UKar4}" }
+  ]
+}</pre>
+
+      <div class="bg-indigo-900/20 border border-indigo-800/30 p-3 rounded-lg">
+        <p><strong class="text-white">কেস ১: রু</strong> — পূর্ববর্তী বর্ণ &#x09B0; (র) mapping-এ আছে &#x2192; A_UKar2। toggle চালু থাকলে alt = A_UKar4।</p>
+      </div>
+      <div class="bg-indigo-900/20 border border-indigo-800/30 p-3 rounded-lg">
+        <p><strong class="text-white">কেস ২: গু</strong> — &#x0997; (গ) mapping-এ নেই, কিন্তু BaseLineRight &#x2192; baselineRight = A_UKar2।</p>
+      </div>
+      <div class="bg-indigo-900/20 border border-indigo-800/30 p-3 rounded-lg">
+        <p><strong class="text-white">কেস ৩: ড়ু</strong> — &#x09A1;&#x09BC; (ড়) mapping-এ নেই, BaseLineRight-ও নয় &#x2192; default = A_UKar1।</p>
+      </div>
+    </div>
+  </details>
+
+  <!-- 5. Variable Expansion -->
+  <details class="premium-card elevation-1 group">
+    <summary class="font-bold text-white flex items-center justify-between p-5">
+      <div class="flex items-center gap-3"><span class="material-symbols-outlined text-indigo-400">variables</span><span>৫. #{VariableName} — ভ্যারিয়েবল এক্সপ্যানশন</span></div>
+      <span class="material-symbols-outlined transition-transform group-open:rotate-180">expand_more</span>
+    </summary>
+    <div class="details-content text-zinc-400 leading-relaxed space-y-3">
+      <p>সরাসরি হেক্স কোডের পরিবর্তে <code>#{A_UKar1}</code> ব্যবহার করতে পারেন। ইঞ্জিন JSON লোড করার সময় Constants থেকে রেজল্ভ করে।</p>
+      <div class="bg-black/30 p-4 rounded-lg text-sm space-y-2">
+        <p><span class="text-indigo-300 font-bold">সংগতি:</span> এক জায়গায় পরিবর্তন করুন, সব জায়গায় আপডেট হবে।</p>
+        <p><span class="text-indigo-300 font-bold">পাঠযোগ্যতা:</span> <code>#{A_UKar2}</code> বোঝা সহজ, <code>#$25</code> বোঝা কঠিন।</p>
+        <p><span class="text-indigo-300 font-bold">ভার্সনিং:</span> প্রতি AnsiVersion-এর জন্য আলাদা Constants সেট।</p>
+      </div>
+      <pre class="bg-black/40 p-3 rounded-lg text-zinc-300 text-sm">উদাহরণ: #$FE#{A_UKar1}
+&#x2192; #{A_UKar1} রেজল্ভ হয় #$25-এ
+&#x2192; ফলে #$FE#$25 = দুটি ANSI বাইট</pre>
+    </div>
+  </details>
+
+  <!-- 6. ফাংশন ব্যাখ্যা -->
+  <details class="premium-card elevation-1 group">
+    <summary class="font-bold text-white flex items-center justify-between p-5">
+      <div class="flex items-center gap-3"><span class="material-symbols-outlined text-indigo-400">code</span><span>৬. প্রতিটি ফাংশন কিভাবে কাজ করে</span></div>
+      <span class="material-symbols-outlined transition-transform group-open:rotate-180">expand_more</span>
+    </summary>
+    <div class="details-content text-zinc-400 leading-relaxed space-y-4">
+      <div class="bg-black/30 p-4 rounded-lg">
+        <h4 class="text-white font-semibold mb-2">ExpandVarRefs</h4>
+        <p class="mb-2">ইনপুট স্ট্রিং-এ <code>#{VarName}</code> প্যাটার্ন খুঁজে Constants থেকে মান এনে বসায়।</p>
+        <pre class="text-zinc-500 text-xs">লজিক: Pos('#{') &#x2192; PosEx('}') &#x2192; AnsiRegistryMap খুঁজে &#x2192; মান বসায় &#x2192; আবার খোঁজে</pre>
+      </div>
+      <div class="bg-black/30 p-4 rounded-lg">
+        <h4 class="text-white font-semibold mb-2">ResolveStringValue</h4>
+        <p class="mb-2">ExpandVarRefs + ProcessHexAndUnicode একসাথে করে।</p>
+        <pre class="text-zinc-500 text-xs">"#$FE#{A_UKar1}" &#x2192; ExpandVarRefs &#x2192; "#$FE#$25" &#x2192; ProcessHexAndUnicode &#x2192; দুটি ক্যারেক্টার</pre>
+      </div>
+      <div class="bg-black/30 p-4 rounded-lg">
+        <h4 class="text-white font-semibold mb-2">GetVowelGlyph</h4>
+        <p class="mb-2">3-স্তরের প্রায়োরিটি: mapping match &#x2192; baselineRight fallback &#x2192; default।</p>
+      </div>
+      <div class="bg-black/30 p-4 rounded-lg">
+        <h4 class="text-white font-semibold mb-2">BaseLineRightCharacter</h4>
+        <p class="mb-2">ব্যঞ্জনবর্ণ বেসলাইনে বসে কিনা পরীক্ষা করে। বেসলাইনে বসা বর্ণ: খ, গ, ঘ, ণ, থ, দ, ধ, ন, প, ব, ম, য, র, ল, শ, ষ, স, হ, য়।</p>
+      </div>
+      <div class="bg-black/30 p-4 rounded-lg">
+        <h4 class="text-white font-semibold mb-2">ReplaceKarsVowels</h4>
+        <p>উ-কার, ঊ-কার, ঋ-কার প্রক্রিয়া করে। Pos দিয়ে কার খুঁজে &#x2192; পূর্ববর্তী ক্যারেক্টার বের করে &#x2192; GetVowelGlyph ডাকে &#x2192; WideStuffString দিয়ে প্রতিস্থাপন করে।</p>
+      </div>
+      <div class="bg-black/30 p-4 rounded-lg">
+        <h4 class="text-white font-semibold mb-2">FinalTouch</h4>
+        <p>সর্বশেষ ধাপ: হসন্ত গ্লিফ ফিক্স, য-ফলা+উ-কার অর্ডার, র-ফলা+উ-কার অর্ডার, ANSI পরিশোধন (শুধু 0x00-0xFF) রাখে।</p>
+      </div>
+    </div>
+  </details>
+
+  <!-- 7. কখন কী এডিট করবেন -->
+  <details class="premium-card elevation-1 group">
+    <summary class="font-bold text-white flex items-center justify-between p-5">
+      <div class="flex items-center gap-3"><span class="material-symbols-outlined text-indigo-400">help</span><span>৭. কখন কী এডিট করবেন?</span></div>
+      <span class="material-symbols-outlined transition-transform group-open:rotate-180">expand_more</span>
+    </summary>
+    <div class="details-content text-zinc-400 leading-relaxed">
+      <table class="table-md">
+        <thead><tr><th>সেকশন</th><th>কখন এডিট করবেন</th></tr></thead>
+        <tbody>
+          <tr><td class="font-mono text-indigo-300">Constants</td><td>কোনো বর্ণ বা গ্লিফের ANSI আউটপুট পরিবর্তন করতে</td></tr>
+          <tr><td class="font-mono text-indigo-300">FullFormReplacements</td><td>নতুন যুক্তাক্ষর যোগ/বাদ দিতে</td></tr>
+          <tr><td class="font-mono text-indigo-300">PreReplacements</td><td>Vowel প্রক্রিয়ার আগে বিশেষ ফিক্স দরকার হলে</td></tr>
+          <tr><td class="font-mono text-indigo-300">PostReplacements</td><td>গ্লিফ বসানোর পর অর্ডার ঠিক করতে</td></tr>
+          <tr><td class="font-mono text-indigo-300">VowelRules</td><td>কোন ব্যঞ্জনের পর কোন কার-গ্লিফ বসবে সেটা নিয়ন্ত্রণে</td></tr>
+          <tr><td class="font-mono text-indigo-300">ConsonantGroups</td><td>BaseLineRight তালিকা কাস্টমাইজ করতে</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </details>
+
+  <!-- 8. পূর্ণ উদাহরণ -->
+  <details class="premium-card elevation-1 group">
+    <summary class="font-bold text-white flex items-center justify-between p-5">
+      <div class="flex items-center gap-3"><span class="material-symbols-outlined text-indigo-400">preview</span><span>৮. পূর্ণ উদাহরণ: "গু" (গ+উ-কার) থেকে ANSI</span></div>
+      <span class="material-symbols-outlined transition-transform group-open:rotate-180">expand_more</span>
+    </summary>
+    <div class="details-content text-zinc-400 leading-relaxed space-y-3">
+      <p>ধাপে ধাপে &#x0997;&#x09C1; (গ+উ-কার) কিভাবে ANSI-তে রূপান্তরিত হয়:</p>
+      <div class="bg-black/30 p-4 rounded-lg space-y-2 text-sm">
+        <p><strong class="text-white">&#x2460; শুরু:</strong> ইনপুট = &#x0997; (গ) + &#x09C1; (উ-কার)</p>
+        <p><strong class="text-white">&#x2461; FullFormReplacements:</strong> &#x0997;&#x09C1; এর জন্য এন্ট্রি নেই &#x2192; skip</p>
+        <p><strong class="text-white">&#x2462; PreReplacements:</strong> প্রযোজ্য নয় &#x2192; skip</p>
+        <p><strong class="text-white">&#x2463; ReplaceFullForms:</strong> &#x0997; যুক্তাক্ষর নয় &#x2192; skip</p>
+        <p><strong class="text-white">&#x2464; ReplaceKarsVowels:</strong> পূর্ববর্তী বর্ণ 'গ' BaseLineRight &#x2192; baselineRight = A_UKar2 (#$25)</p>
+        <p><strong class="text-white">&#x2465; PostReplacements &amp; FinalTouch:</strong> প্রযোজ্য নয় &#x2192; skip</p>
+        <p class="text-white font-bold text-base mt-2">শেষ ফলাফল: &#x0997; + #$25 = গু (ANSI)</p>
+      </div>
+    </div>
+  </details>
+
+  <!-- 9. SutonnyMJ Glyph Reference -->
+  <details class="premium-card elevation-1 group">
+    <summary class="font-bold text-white flex items-center justify-between p-5">
+      <div class="flex items-center gap-3"><span class="material-symbols-outlined text-indigo-400">grid_view</span><span>৯. SutonnyMJ গ্লিফ রেফারেন্স</span></div>
+      <span class="material-symbols-outlined transition-transform group-open:rotate-180">expand_more</span>
+    </summary>
+    <div class="details-content text-zinc-400">
+      <div class="overflow-x-auto">
+        <table class="table-md">
+          <thead><tr><th>ANSI Hex</th><th>Glyph</th><th>Name</th></tr></thead>
+          <tbody id="glyphRefTbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </details>
+
+</div>
+</div>
+<!-- Live JSON Preview -->
+<div class="mt-12">
+<div class="flex items-center justify-between mb-4 px-2">
+<h2 class="text-[11px] font-bold text-zinc-400 uppercase tracking-widest flex items-center gap-2">
+<span class="w-1.5 h-1.5 rounded-full bg-indigo-500"></span> Generated Output
+      </h2>
+<span class="text-[10px] text-zinc-500 font-mono" id="jsonSize">1465 B</span>
+</div>
+<div class="premium-card overflow-hidden elevation-1">
+<div class="flex items-center justify-between px-5 py-3 bg-white/5 border-b border-white/5">
+<span class="text-xs font-mono text-zinc-400">schema.json</span>
+<div class="flex gap-4">
+<button class="text-xs font-bold text-indigo-400 hover:text-indigo-300 transition-colors uppercase tracking-wider" onclick="togglePasteModal(true)">Paste JSON</button>
+<button class="text-xs font-bold text-indigo-400 hover:text-indigo-300 transition-colors uppercase tracking-wider" onclick="copyJSON()">Copy Raw</button>
+</div>
+</div>
+<pre class="text-zinc-300 p-6 overflow-y-auto max-h-[380px] text-sm font-mono" id="jsonPreview">{
+  "Constants": {
+    "Numbers": {
+      "A_0": {
+        "Value": "#$0030",
+        "Comment": "০"
+      },
+      "A_1": {
+        "Value": "#$0031",
+        "Comment": "১"
+      }
+    },
+    "VowelsAndKars": {
+      "A_AAKar": {
+        "Value": "#$0079",
+        "Comment": "া (আ-কার)"
+      },
+      "A_IKar": {
+        "Value": "#$21",
+        "Comment": "ি (ই-কার)"
+      },
+      "A_UKar1": {
+        "Value": "#$25",
+        "Comment": "ু (উ-কার ১)"
+      },
+      "A_UKar2": {
+        "Value": "#$25",
+        "Comment": "ু (উ-কার ২)"
+      }
+    },
+    "Symbols": {
+      "A_Hasanta": {
+        "Value": "#$E4",
+        "Comment": "্ (হসন্ত)"
+      }
+    },
+    "Consonants": {
+      "A_K": {
+        "Value": "#$201E#$FE",
+        "Comment": "ক"
+      }
+    },
+    "FullForms": {
+      "A_K_K": {
+        "Value": "#$45#$FE",
+        "Comment": "ক্ক"
+      }
+    },
+    "FirstHalfForms": {},
+    "SecondHalfForms": {}
+  },
+  "FullFormReplacements": [
+    {
+      "Key": "#$09A8#$09CD#$09A4",
+      "Value": "#$68#$73#$FE",
+      "Comment": "ন্ত"
+    }
+  ],
+  "PreReplacements": [],
+  "PostReplacements": [],
+  "VowelRules": {
+    "#{b_Ukar}": {
+      "default": "#{A_UKar1}",
+      "baselineRight": "#{A_UKar2}",
+      "mappings": []
+    }
+  },
+  "ConsonantGroups": {
+    "BaseLineRight": [
+      "খ",
+      "গ",
+      "ঘ",
+      "ণ",
+      "থ",
+      "দ"
+    ]
+  }
+}</pre>
+</div>
+</div>
+</div>
+<!-- Modals -->
+<div class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center z-50 p-4" id="pasteModal">
+<div class="premium-card max-w-2xl w-full p-6 elevation-4">
+<div class="flex items-center justify-between mb-6">
+<h3 class="text-lg font-bold text-white">Import Schema</h3>
+<button class="text-zinc-500 hover:text-white" onclick="togglePasteModal(false)"><span class="material-symbols-outlined">close</span></button>
+</div>
+<textarea class="h-64 font-mono text-xs bg-black/40 border border-white/10 rounded-md p-4 w-full focus:border-indigo-500 outline-none transition-all" id="pasteTextArea" placeholder="{ &quot;Constants&quot;: ... }"></textarea>
+<div class="flex justify-end gap-3 mt-6">
+<button class="btn btn-ghost" onclick="togglePasteModal(false)">Cancel</button>
+<button class="btn btn-primary" onclick="loadPastedJSON()">Load Schema</button>
+</div>
+</div>
+</div>
+<div class="fixed bottom-8 left-1/2 -translate-x-1/2 bg-indigo-600 text-white px-6 py-3 rounded-full shadow-2xl hidden z-50 items-center gap-3 transition-all duration-300 opacity-0 translate-y-4" id="toast">
+<span class="material-symbols-outlined text-sm">check_circle</span>
+<span class="text-sm font-bold" id="toastMessage">Action successful</span>
+</div>
+<script>
+// ===== STATE =====
+let state = null;
+let rowClipboard = null;
+let vowelRuleClipboard = null;
+
+const CONST_CATS = ['Numbers','VowelsAndKars','Symbols','Consonants','FullForms','FirstHalfForms','SecondHalfForms'];
+const REPL_KEYS = ['FullFormReplacements','PreReplacements','PostReplacements'];
+
+const SAMPLE = {
+  "Constants": {
+    "Numbers": {"A_0":{"Value":"#$0030","Comment":"০"},"A_1":{"Value":"#$0031","Comment":"১"}},
+    "VowelsAndKars": {"A_AAKar":{"Value":"#$0079","Comment":"া (আ-কার)"},"A_IKar":{"Value":"#$21","Comment":"ি (ই-কার)"},"A_UKar1":{"Value":"#$25","Comment":"ু (উ-কার ১)"},"A_UKar2":{"Value":"#$25","Comment":"ু (উ-কার ২)"}},
+    "Symbols": {"A_Hasanta":{"Value":"#$E4","Comment":"্ (হসন্ত)"}},
+    "Consonants": {"A_K":{"Value":"#$201E#$FE","Comment":"ক"}},
+    "FullForms": {"A_K_K":{"Value":"#$45#$FE","Comment":"ক্ক"}},
+    "FirstHalfForms": {},
+    "SecondHalfForms": {}
+  },
+  "FullFormReplacements": [{"Key":"#$09A8#$09CD#$09A4","Value":"#$68#$73#$FE","Comment":"ন্ত"}],
+  "PreReplacements": [],
+  "PostReplacements": [],
+  "VowelRules": {
+    "#{b_Ukar}": {"default":"#{A_UKar1}","baselineRight":"#{A_UKar2}","mappings":[]}
+  },
+  "ConsonantGroups": {
+    "BaseLineRight": ["খ","গ","ঘ","ণ","থ","দ"]
+  }
+};
+
+function hexToChars(hexStr) {
+  if (!hexStr) return '';
+  const re = /#\$([0-9A-Fa-f]+)/g;
+  let m, out='';
+  while ((m=re.exec(hexStr)) !== null) {
+    const cp = parseInt(m[1],16);
+    out += cp > 0xFFFF ? String.fromCodePoint(cp) : String.fromCharCode(cp);
+  }
+  return out;
+}
+function decodeValuePreview(val, state) {
+  if (!val) return '';
+  const expanded = val.replace(/#\{(\w+)\}/g, (_,vn)=> {
+    for (const cat of CONST_CATS) {
+      const c = state.Constants[cat];
+      if (c && c[vn]) return hexToChars(c[vn].Value) || '?';
+    }
+    return '?';
+  });
+  return hexToChars(expanded);
+}
+function _charToHex(ch) {
+  const cp = ch.codePointAt(0);
+  return cp === undefined ? '' : '#$' + cp.toString(16).toUpperCase().padStart(4,'0');
+}
+
+function showToast(message) {
+  const toast = document.getElementById('toast');
+  const msg = document.getElementById('toastMessage');
+  msg.textContent = message;
+  toast.classList.remove('hidden');
+  setTimeout(() => {
+    toast.classList.remove('opacity-0', 'translate-y-4');
+    toast.classList.add('flex', 'opacity-100', 'translate-y-0');
+  }, 10);
+  setTimeout(() => {
+    toast.classList.add('opacity-0', 'translate-y-4');
+    setTimeout(() => toast.classList.add('hidden'), 300);
+  }, 2500);
+}
+
+// ===== PASTE HELPERS =====
+async function pasteToField(id, callback) {
+  try {
+    const text = await navigator.clipboard.readText();
+    if (text !== null) {
+      document.getElementById(id).value = text;
+      if (callback) callback(text);
+      showToast('Pasted from clipboard');
+    }
+  } catch (err) {
+    showToast('Paste failed');
+  }
+}
+
+async function pasteToConst(cat, key, field, id) {
+  try {
+    const text = await navigator.clipboard.readText();
+    if (text !== null) {
+      document.getElementById(id).value = text;
+      updateConst(cat, key, field, text);
+      showToast('Pasted into ' + field);
+    }
+  } catch (err) {
+    showToast('Paste failed');
+  }
+}
+
+async function pasteToRepl(key, idx, field) {
+  try {
+    const text = await navigator.clipboard.readText();
+    if (text !== null) {
+      updateRepl(key, idx, field, text);
+      showToast('Pasted into ' + field);
+    }
+  } catch (err) {
+    showToast('Paste failed');
+  }
+}
+
+// ===== TAB SWITCHING =====
+document.getElementById('mainTabs').addEventListener('click', e => {
+  const btn = e.target.closest('.tab-btn');
+  if (!btn) return;
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.tab-content').forEach(t=>t.classList.add('hidden'));
+  const tab = document.getElementById('tab-'+btn.dataset.tab);
+  if (tab) { tab.classList.remove('hidden'); refreshTab(btn.dataset.tab); }
+});
+
+// SUB-TAB SWITCHING FIX
+function setupSubTabListeners() {
+  document.querySelectorAll('.sub-tab-btn').forEach(btn => {
+    btn.onclick = (e) => {
+      const container = e.target.parentElement;
+      container.querySelectorAll('.sub-tab-btn').forEach(b => b.classList.remove('active'));
+      e.target.classList.add('active');
+      
+      // Determine which function to call based on the container ID
+      if (container.id === 'constSubTabs') {
+        renderConstants();
+      } else if (container.id === 'replSubTabs') {
+        renderReplacements();
+      }
+    };
+  });
+}
+
+function refreshTab(name) {
+  if (name==='constants') renderConstants();
+  else if (name==='replacements') renderReplacements();
+  else if (name==='vowelrules') renderVowelRules();
+  else if (name==='groups') renderGroups();
+  else if (name==='tools') renderVarBrowser();
+  else if (name==='docs') renderGlyphRef();
+}
+
+// ===== RENDERERS =====
+function renderConstants() {
+  const grid = document.getElementById('constantsGrid');
+  const active = document.querySelector('#constSubTabs .sub-tab-btn.active');
+  const cat = active ? active.dataset.sub : 'Numbers';
+  const search = document.getElementById('constSearch').value.toLowerCase();
+  const items = (state.Constants && state.Constants[cat]) || {};
+  const keys = Object.keys(items).filter(k => !search || k.toLowerCase().includes(search) || (items[k].Comment||'').toLowerCase().includes(search));
+  grid.innerHTML = keys.map(k => {
+    const v = items[k].Value||'';
+    const preview = decodeValuePreview(v, state);
+    return `<div class="premium-card p-4 elevation-1">
+      <div class="flex items-center justify-between mb-4">
+        <span class="text-[11px] font-mono font-bold text-indigo-400 tracking-wider">${k}</span>
+        <span class="preview-char elevation-1">${preview||''}</span>
+      </div>
+      <div class="space-y-3">
+        <div class="flex items-center gap-2">
+          <input class="md-input hex-input" id="input-${cat}-${k}" value="${escHtml(v)}" onchange="updateConst('${cat}','${k}','Value',this.value)" placeholder="Hex Value">
+          <div class="flex gap-1">
+            <button class="icon-btn" onclick="copyToLocalClipboard('${v}')" title="Copy"><span class="material-symbols-outlined text-[18px]">content_copy</span></button>
+            <button class="icon-btn" onclick="pasteToConst('${cat}', '${k}', 'Value', 'input-${cat}-${k}')" title="Paste"><span class="material-symbols-outlined text-[18px]">content_paste</span></button>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <input class="md-input" id="comment-${cat}-${k}" value="${escHtml(items[k].Comment||'')}" onchange="updateConst('${cat}','${k}','Comment',this.value)" placeholder="Comment">
+          <div class="flex gap-1">
+            <button class="icon-btn" onclick="copyToLocalClipboard('${items[k].Comment||''}')" title="Copy"><span class="material-symbols-outlined text-[18px]">content_copy</span></button>
+            <button class="icon-btn" onclick="pasteToConst('${cat}', '${k}', 'Comment', 'comment-${cat}-${k}')" title="Paste"><span class="material-symbols-outlined text-[18px]">content_paste</span></button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderReplacements() {
+  const active = document.querySelector('#replSubTabs .sub-tab-btn.active');
+  const key = active ? active.dataset.sub : 'FullFormReplacements';
+  const container = document.getElementById('replTables');
+  const arr = state[key] || [];
+  
+  let html = `<table class="table-md">
+    <thead><tr>
+      <th class="w-12">#</th>
+      <th class="w-1/4">Key Input</th>
+      <th class="w-1/4">ANSI Target</th>
+      <th>Comment</th>
+      <th class="w-24 text-center">Actions</th>
+    </tr></thead><tbody>`;
+  
+  arr.forEach((item, i) => {
+    html += `<tr>
+      <td class="text-[10px] text-zinc-500 font-mono">${i+1}</td>
+      <td>
+        <div class="flex items-center gap-2">
+          <input class="md-input hex-input" value="${escHtml(item.Key)}" onchange="updateRepl('${key}',${i},'Key',this.value)">
+          <div class="flex gap-1">
+            <button class="icon-btn" onclick="copyToLocalClipboard('${item.Key}')"><span class="material-symbols-outlined text-[16px]">content_copy</span></button>
+            <button class="icon-btn" onclick="pasteToRepl('${key}', ${i}, 'Key')"><span class="material-symbols-outlined text-[16px]">content_paste</span></button>
+          </div>
+        </div>
+        <div class="mt-1 text-[10px] text-zinc-500 pl-1">Preview: ${decodeValuePreview(item.Key, state)}</div>
+      </td>
+      <td>
+        <div class="flex items-center gap-2">
+          <input class="md-input hex-input" value="${escHtml(item.Value)}" onchange="updateRepl('${key}',${i},'Value',this.value)">
+          <div class="flex gap-1">
+            <button class="icon-btn" onclick="copyToLocalClipboard('${item.Value}')"><span class="material-symbols-outlined text-[16px]">content_copy</span></button>
+            <button class="icon-btn" onclick="pasteToRepl('${key}', ${i}, 'Value')"><span class="material-symbols-outlined text-[16px]">content_paste</span></button>
+          </div>
+        </div>
+        <div class="mt-1 text-[10px] text-zinc-500 pl-1">Preview: ${decodeValuePreview(item.Value, state)}</div>
+      </td>
+      <td><input class="md-input" value="${escHtml(item.Comment||'')}" onchange="updateRepl('${key}',${i},'Comment',this.value)"></td>
+      <td class="text-center">
+        <button class="icon-btn text-red-400 hover:bg-red-500/10 hover:text-red-400" onclick="deleteRepl('${key}',${i})"><span class="material-symbols-outlined">delete</span></button>
+      </td>
+    </tr>`;
+  });
+  
+  html += `</tbody></table>
+    <div class="p-4 bg-white/5 border-t border-white/5 flex gap-2">
+      <button class="btn btn-ghost py-2" onclick="addRepl('${key}')"><span class="material-symbols-outlined text-sm">add</span> Add New</button>
+    </div>`;
+  container.innerHTML = html;
+}
+
+function renderVowelRules() {
+  const container = document.getElementById('vowelRulesContainer');
+  const rules = state.VowelRules || {};
+  container.innerHTML = Object.keys(rules).map((vk, vi) => {
+    const r = rules[vk];
+    return `<div class="premium-card p-6 elevation-1">
+      <div class="flex items-center justify-between mb-6">
+        <div class="flex items-center gap-4">
+          <span class="preview-char">${decodeValuePreview(vk, state)}</span>
+          <span class="font-mono text-indigo-300 font-bold">${vk}</span>
+        </div>
+        <button class="icon-btn text-red-400" onclick="deleteVowelRule(${vi})"><span class="material-symbols-outlined">delete</span></button>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        <div class="md-input-container">
+          <label class="text-[10px] uppercase font-bold text-zinc-500 mb-1 block">Default Mapping</label>
+          <div class="flex gap-2">
+            <input class="md-input hex-input" value="${escHtml(r.default)}" onchange="updateVowelRule(${vi},'default',this.value)">
+            <button class="icon-btn" onclick="copyToLocalClipboard('${r.default}')"><span class="material-symbols-outlined text-[18px]">content_copy</span></button>
+            <button class="icon-btn" onclick="pasteToVowelRuleField(${vi}, 'default')"><span class="material-symbols-outlined text-[18px]">content_paste</span></button>
+          </div>
+        </div>
+        <div class="md-input-container">
+          <label class="text-[10px] uppercase font-bold text-zinc-500 mb-1 block">BaselineRight Mapping</label>
+          <div class="flex gap-2">
+            <input class="md-input hex-input" value="${escHtml(r.baselineRight)}" onchange="updateVowelRule(${vi},'baselineRight',this.value)">
+            <button class="icon-btn" onclick="copyToLocalClipboard('${r.baselineRight}')"><span class="material-symbols-outlined text-[18px]">content_copy</span></button>
+            <button class="icon-btn" onclick="pasteToVowelRuleField(${vi}, 'baselineRight')"><span class="material-symbols-outlined text-[18px]">content_paste</span></button>
+          </div>
+        </div>
+      </div>
+      <div>
+        <label class="text-[10px] uppercase font-bold text-zinc-500 mb-2 block">Specific Consonant Mappings</label>
+        <div class="space-y-2">
+          ${(r.mappings||[]).map((m, mi) => `
+            <div class="flex items-center gap-2">
+              <input class="md-input" placeholder="Consonant" value="${escHtml(m.consonants)}" onchange="updateVowelMapping(${vi},${mi},'consonants',this.value)">
+              <input class="md-input hex-input" placeholder="Value" value="${escHtml(m.value)}" onchange="updateVowelMapping(${vi},${mi},'value',this.value)">
+              <div class="flex gap-1">
+                <button class="icon-btn" onclick="copyToLocalClipboard('${m.value}')"><span class="material-symbols-outlined text-[16px]">content_copy</span></button>
+                <button class="icon-btn" onclick="pasteToVowelMappingField(${vi}, ${mi}, 'value')"><span class="material-symbols-outlined text-[16px]">content_paste</span></button>
+              </div>
+              <button class="icon-btn text-red-400" onclick="deleteVowelMapping(${vi},${mi})"><span class="material-symbols-outlined">close</span></button>
+            </div>
+          `).join('')}
+        </div>
+        <button class="btn btn-ghost py-1 px-3 mt-3 text-xs" onclick="addVowelMapping(${vi})">+ Add Mapping</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function pasteToVowelRuleField(vIdx, field) {
+  const text = await navigator.clipboard.readText();
+  if (text) updateVowelRule(vIdx, field, text);
+}
+
+async function pasteToVowelMappingField(vIdx, mIdx, field) {
+  const text = await navigator.clipboard.readText();
+  if (text) updateVowelMapping(vIdx, mIdx, field, text);
+}
+
+function renderGroups() {
+  const container = document.getElementById('groupsContainer');
+  const groups = state.ConsonantGroups || {};
+  container.innerHTML = Object.keys(groups).map(gk => {
+    const items = groups[gk] || [];
+    return `<div class="premium-card p-6 elevation-1">
+      <h3 class="font-mono text-indigo-400 font-bold mb-4">${gk}</h3>
+      <div class="flex flex-wrap gap-2">
+        ${items.map((item, i) => `
+          <div class="flex items-center bg-black/20 rounded-md p-1 pl-2 gap-2">
+            <span class="text-xs font-mono text-zinc-400">${item}</span>
+            <span class="text-white font-medium text-sm">${decodeValuePreview(item, state)}</span>
+            <button class="icon-btn !w-6 !h-6" onclick="deleteGroupItem('${gk}',${i})"><span class="material-symbols-outlined text-[14px]">close</span></button>
+          </div>
+        `).join('')}
+        <button class="btn btn-ghost py-1 px-3 text-xs" onclick="addGroupItem('${gk}')">+ Add</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ===== HELPER FUNCTIONS =====
+function copyToLocalClipboard(val) {
+  navigator.clipboard.writeText(val);
+  showToast('Value copied: ' + val);
+}
+
+function updateConst(cat, name, field, val) { state.Constants[cat][name][field] = val; renderAll(); }
+function updateRepl(key, i, field, val) { state[key][i][field] = val; renderAll(); }
+function addRepl(key) { state[key].push({Key:'',Value:'',Comment:''}); renderReplacements(); renderJSONPreview(); }
+function deleteRepl(key, i) { state[key].splice(i,1); renderReplacements(); renderJSONPreview(); }
+
+function updateVowelRule(idx, field, val) {
+  const keys = Object.keys(state.VowelRules);
+  state.VowelRules[keys[idx]][field] = val;
+  renderAll();
+}
+function addVowelRule() {
+  const name = prompt('Variable name (e.g. #{b_Ukar}):');
+  if (name) { state.VowelRules[name] = {default:'',baselineRight:'',mappings:[]}; renderVowelRules(); renderJSONPreview(); }
+}
+function deleteVowelRule(idx) {
+  const keys = Object.keys(state.VowelRules);
+  delete state.VowelRules[keys[idx]];
+  renderVowelRules(); renderJSONPreview();
+}
+function addVowelMapping(vIdx) {
+  const keys = Object.keys(state.VowelRules);
+  state.VowelRules[keys[vIdx]].mappings.push({consonants:'',value:'',alt:''});
+  renderVowelRules(); renderJSONPreview();
+}
+function updateVowelMapping(vIdx, mIdx, field, val) {
+  const keys = Object.keys(state.VowelRules);
+  state.VowelRules[keys[vIdx]].mappings[mIdx][field] = val;
+  renderAll();
+}
+function deleteVowelMapping(vIdx, mIdx) {
+  const keys = Object.keys(state.VowelRules);
+  state.VowelRules[keys[vIdx]].mappings.splice(mIdx,1);
+  renderVowelRules(); renderJSONPreview();
+}
+
+function addGroupItem(gk) { state.ConsonantGroups[gk].push(''); renderGroups(); renderJSONPreview(); }
+function deleteGroupItem(gk, i) { state.ConsonantGroups[gk].splice(i,1); renderGroups(); renderJSONPreview(); }
+
+// ===== CORE ENGINE =====
+function renderAll() {
+  renderJSONPreview();
+  const activeTab = document.querySelector('#mainTabs .tab-btn.active');
+  if (activeTab) refreshTab(activeTab.dataset.tab);
+  renderVarBrowser();
+}
+
+function renderJSONPreview() {
+  const pre = document.getElementById('jsonPreview');
+  const size = document.getElementById('jsonSize');
+  if (!state) return;
+  const json = JSON.stringify(state, null, 2);
+  pre.textContent = json;
+  size.textContent = new Blob([json]).size + ' B';
+}
+
+function downloadJSON() {
+  const blob = new Blob([JSON.stringify(state, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'AnsiMapping.json';
+  a.click();
+}
+
+function copyJSON() {
+  navigator.clipboard.writeText(JSON.stringify(state, null, 2)).then(() => showToast('Full JSON copied to clipboard'));
+}
+
+function togglePasteModal(show) { document.getElementById('pasteModal').classList.toggle('hidden', !show); }
+function loadPastedJSON() {
+  try {
+    const parsed = JSON.parse(document.getElementById('pasteTextArea').value);
+    state = parsed;
+    renderAll();
+    togglePasteModal(false);
+    showToast('Schema loaded from paste');
+  } catch (err) { alert('Invalid JSON: ' + err.message); }
+}
+
+function loadFile(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    try {
+      state = JSON.parse(ev.target.result);
+      renderAll();
+      showToast('File loaded successfully');
+    } catch(err) { alert('Error: ' + err.message); }
+  };
+  reader.readAsText(file);
+}
+
+function charToHex() {
+  const inp = document.getElementById('charToHexInput').value;
+  document.getElementById('charToHexResult').textContent = [...inp].map(c => _charToHex(c)).join(' ');
+}
+function hexToChar() {
+  const inp = document.getElementById('hexToCharInput').value;
+  const ch = hexToChars(inp);
+  document.getElementById('hexToCharResult').innerHTML = ch ? `<span class="preview-char elevation-1">${ch}</span> <span class="text-zinc-500 text-xs font-mono">U+${ch.codePointAt(0).toString(16).toUpperCase()}</span>` : '';
+}
+function renderVarBrowser() {
+  const search = document.getElementById('varBrowserSearch').value.toLowerCase();
+  const list = document.getElementById('varBrowserList');
+  if (!state) return;
+  const items = [];
+  CONST_CATS.forEach(cat => {
+    const c = state.Constants[cat];
+    for(let k in c) {
+      if (!search || k.toLowerCase().includes(search)) items.push({k, cat, comment:c[k].Comment, v:c[k].Value});
+    }
+  });
+  list.innerHTML = items.map(i => `
+    <div class="flex items-center gap-3 p-2 hover:bg-white/5 rounded-md transition-colors cursor-pointer" onclick="copyToLocalClipboard('#{${i.k}}')">
+      <span class="preview-char !w-8 !h-8 !text-sm">${decodeValuePreview(i.v, state)}</span>
+      <div class="flex-1 overflow-hidden">
+        <div class="font-mono text-[11px] text-indigo-300 truncate">${i.k}</div>
+        <div class="text-[10px] text-zinc-500 truncate">${i.comment||''}</div>
+      </div>
+      <span class="text-[9px] font-bold text-zinc-600 uppercase border border-zinc-800 px-1.5 rounded">${i.cat.substring(0,4)}</span>
+    </div>
+  `).join('');
+}
+
+function escHtml(s) {
+  return (s||'').toString().replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ===== GLYPH REFERENCE =====
+const GLYPH_REF = [
+  {hex:'#$A0',glyph:'‡',name:'বাংলা দাঁড়ি / পূর্ণচ্ছেদ'},
+  {hex:'#$A1',glyph:'এইচ',name:'প্রশ্নবোধক চিহ্ন'},
+  {hex:'#$A2',glyph:'স',name:'স-বর্ণ'},
+  {hex:'#$A3',glyph:'‡স',name:'স-বর্ণ + দাঁড়ি'},
+  {hex:'#$A4',glyph:'ক',name:'ক-বর্ণ'},
+  {hex:'#$A5',glyph:'‡ক',name:'ক-বর্ণ + দাঁড়ি'},
+  {hex:'#$A6',glyph:'‡ক',name:'ক-বর্ণ (ভিন্ন গ্লিফ)'},
+  {hex:'#$A7',glyph:'‡ক‡',name:'ক-বর্ণ (ডবল দাঁড়ি)'},
+  {hex:'#$A8',glyph:'গ',name:'গ-বর্ণ'},
+  {hex:'#$A9',glyph:'‡গ',name:'গ-বর্ণ + দাঁড়ি'},
+  {hex:'#$AA',glyph:'ঘ',name:'ঘ-বর্ণ'},
+  {hex:'#$AB',glyph:'‡ঘ',name:'ঘ-বর্ণ + দাঁড়ি'},
+  {hex:'#$AC',glyph:'‡ঘ',name:'ঘ-বর্ণ (ভিন্ন গ্লিফ)'},
+  {hex:'#$AD',glyph:'‡ঘ‡',name:'ঘ-বর্ণ (ডবল দাঁড়ি)'},
+  {hex:'#$AE',glyph:'¶গ',name:'গ-বর্ণ (পূর্ণ আকার)'},
+  {hex:'#$AF',glyph:'§গ',name:'গ-বর্ণ (হসন্ত আকার)'},
+  {hex:'#$B0',glyph:'ই‡',name:'ই-কার'},
+  {hex:'#$B1',glyph:'‡ই',name:'ই-কার (পূর্বে)'},
+  {hex:'#$B2',glyph:'‡ই‡',name:'ই-কার (ডবল)'},
+  {hex:'#$B3',glyph:'‡ই‡ই',name:'দ্বৈত ই-কার'},
+  {hex:'#$B4',glyph:'ঈ‡',name:'ঈ-কার'},
+  {hex:'#$B5',glyph:'‡ঈ',name:'ঈ-কার (পূর্বে)'},
+  {hex:'#$B6',glyph:'‡ঈ‡',name:'ঈ-কার (ডবল)'},
+  {hex:'#$B7',glyph:'‡ঈ‡ই',name:'ঈ-কার + ই-কার'},
+  {hex:'#$B8',glyph:'উ‡',name:'উ-কার ১ (ডিফল্ট)'},
+  {hex:'#$B9',glyph:'‡উ',name:'উ-কার ২ (বেসলাইন)'},
+  {hex:'#$BA',glyph:'‡উ‡',name:'উ-কার ৩'},
+  {hex:'#$BB',glyph:'‡উ‡উ',name:'উ-কার ৪'},
+  {hex:'#$BC',glyph:'‡উ‡উ‡',name:'উ-কার ৫'},
+  {hex:'#$BD',glyph:'‡উ‡উ‡উ',name:'উ-কার ৬'},
+  {hex:'#$BE',glyph:'‡উ‡উ‡উ‡',name:'উ-কার ৭'},
+  {hex:'#$BF',glyph:'‡উ‡উ‡উ‡উ',name:'উ-কার ৮'},
+  {hex:'#$C0',glyph:'‡উ‡উ‡উ‡উ‡',name:'উ-কার ৯'},
+  {hex:'#$C1',glyph:'‡উ‡উ‡উ‡উ‡উ',name:'উ-কার ১০'},
+  {hex:'#$C2',glyph:'ঊ‡',name:'ঊ-কার ১'},
+  {hex:'#$C3',glyph:'‡ঊ',name:'ঊ-কার ২'},
+  {hex:'#$C4',glyph:'‡ঊ‡',name:'য-ফলা'},
+  {hex:'#$C5',glyph:'‡ঊ‡ঊ',name:'র-এর রেফ'},
+  {hex:'#$C6',glyph:'‡ঊ‡ঊ‡',name:'র-ফলা'},
+  {hex:'#$C7',glyph:'‡ঊ‡ঊ‡ঊ',name:'ব-ফলা'},
+  {hex:'#$C8',glyph:'‡ঊ‡ঊ‡ঊ‡',name:'ম-ফলা'},
+  {hex:'#$C9',glyph:'‡ঊ‡ঊ‡ঊ‡ঊ',name:'ন-ফলা'},
+  {hex:'#$CA',glyph:'‡ঊ‡ঊ‡ঊ‡ঊ‡',name:'ল-ফলা'},
+  {hex:'#$CB',glyph:'‡ঊ‡ঊ‡ঊ‡ঊ‡ঊ',name:'স-ফলা'},
+  {hex:'#$CC',glyph:'‡ঊ‡ঊ‡ঊ‡ঊ‡ঊ‡',name:'হ-মি'},
+  {hex:'#$CD',glyph:'‡ঊ‡ঊ‡ঊ‡ঊ‡ঊ‡ঊ',name:'ঢ-ফলা'},
+  {hex:'#$CE',glyph:'‡ঊ‡ঊ‡ঊ‡ঊ‡ঊ‡ঊ‡',name:'ক্ষ'},
+  {hex:'#$CF',glyph:'‡ঊ‡ঊ‡ঊ‡ঊ‡ঊ‡ঊ‡ঊ',name:'জ্ঞ'},
+  {hex:'#$D0',glyph:'‡ঊ‡ঊ‡ঊ‡ঊ‡ঊ‡ঊ‡ঊ‡',name:'ঞ'},
+  {hex:'#$D1',glyph:'৪',name:'৪ (চার)'},
+  {hex:'#$D2',glyph:'†',name:'পাউন্ড / টাকা চিহ্ন'},
+  {hex:'#$D3',glyph:'‡ক',name:'ক-ফলা'},
+  {hex:'#$D4',glyph:'‡',name:'দাঁড়ি'},
+  {hex:'#$D5',glyph:'০',name:'০ (শূন্য)'},
+  {hex:'#$D6',glyph:'১',name:'১ (এক)'},
+  {hex:'#$D7',glyph:'২',name:'২ (দুই)'},
+  {hex:'#$D8',glyph:'৩',name:'৩ (তিন)'},
+  {hex:'#$D9',glyph:'৪',name:'৪ (চার)'},
+  {hex:'#$DA',glyph:'৫',name:'৫ (পাঁচ)'},
+  {hex:'#$DB',glyph:'৬',name:'৬ (ছয়)'},
+  {hex:'#$DC',glyph:'৭',name:'৭ (সাত)'},
+  {hex:'#$DD',glyph:'৮',name:'৮ (আট)'},
+  {hex:'#$DE',glyph:'৯',name:'৯ (নয়)'},
+  {hex:'#$DF',glyph:'ড়',name:'ড়'},
+  {hex:'#$E0',glyph:'াত',name:'াত'},
+  {hex:'#$E1',glyph:'াব',name:'াব'},
+  {hex:'#$E2',glyph:'া',name:'া-কার'},
+  {hex:'#$E3',glyph:'ি',name:'ি-কার'},
+  {hex:'#$E4',glyph:'্',name:'হসন্ত'},
+  {hex:'#$E5',glyph:'া‡',name:'া-কার (বিশেষ)'},
+  {hex:'#$E6',glyph:'ে',name:'ে-কার'},
+  {hex:'#$E7',glyph:'ৈ',name:'ৈ-কার'},
+  {hex:'#$E8',glyph:'ে‡',name:'ে-কার (বিশেষ)'},
+  {hex:'#$E9',glyph:'ে‡া',name:'ে + া'},
+  {hex:'#$EA',glyph:'ে‡া‡',name:'ে + া (বিশেষ)'},
+  {hex:'#$EB',glyph:'¤',name:'¤'},
+  {hex:'#$EC',glyph:'ৎ',name:'ৎ'},
+  {hex:'#$ED',glyph:'ং',name:'ং'},
+  {hex:'#$EE',glyph:'ঃ',name:'ঃ'},
+  {hex:'#$EF',glyph:'ঁ',name:'ঁ (চন্দ্রবিন্দু)'},
+  {hex:'#$F0',glyph:'‡ক',name:'ক (যুক্ত)'},
+  {hex:'#$F1',glyph:'‡ক‡',name:'ক (যুক্ত বিশেষ)'},
+  {hex:'#$F2',glyph:'‡ক‡ক',name:'ক্ক'},
+  {hex:'#$F3',glyph:'‡ক‡ক‡',name:'ক্ট'},
+  {hex:'#$F4',glyph:'‡ক‡ক‡ক',name:'ক্ত'},
+  {hex:'#$F5',glyph:'‡ক‡ক‡ক‡',name:'ক্ল'},
+  {hex:'#$F6',glyph:'‡ক‡ক‡ক‡ক',name:'ক্লি'},
+  {hex:'#$F7',glyph:'‡ক‡ক‡ক‡ক‡',name:'ক্ষ্ম'},
+  {hex:'#$F8',glyph:'‡ক‡ক‡ক‡ক‡ক',name:'ক্ষ্ণ'},
+  {hex:'#$F9',glyph:'‡ক‡ক‡ক‡ক‡ক‡',name:'ক্র'},
+  {hex:'#$FA',glyph:'‡ক‡ক‡ক‡ক‡ক‡ক',name:'ক্লী'},
+  {hex:'#$FB',glyph:'‡ক‡ক‡ক‡ক‡ক‡ক‡',name:'ক্‌ষ'},
+  {hex:'#$FC',glyph:'‡ক‡ক‡ক‡ক‡ক‡ক‡ক',name:'ক্‌ষ্ণ'},
+  {hex:'#$FD',glyph:'‡ক‡ক‡ক‡ক‡ক‡ক‡ক‡',name:'ক্ক'},
+  {hex:'#$FE',glyph:'হসন্ত',name:'হসন্ত (যুক্তি সেতু)'},
+  {hex:'#$FF',glyph:'‡',name:'ব্যাকস্ল্যাশ / দাঁড়ি'}
+];
+
+function renderGlyphRef() {
+  const tbody = document.getElementById('glyphRefTbody');
+  if (!tbody) return;
+  tbody.innerHTML = GLYPH_REF.map(r => `<tr><td class="font-mono text-indigo-300">${r.hex}</td><td class="text-xl text-center">${r.glyph}</td><td class="text-zinc-400">${r.name}</td></tr>`).join('');
+}
+
+// Initial state
+state = JSON.parse(JSON.stringify(SAMPLE));
+setupSubTabListeners();
+renderAll();
+</script>
+
+
+</body></html>
