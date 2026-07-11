@@ -1895,6 +1895,7 @@ begin
   Finalize(ActiveReplacements); ActiveReplacements := nil;
   PrepareActiveReplacements;
   InitializeDefaultConsonantGroups;
+  FreeAndNil(VowelRulesList);
 end;
 
 { =============================================================================== }
@@ -2173,19 +2174,14 @@ begin
       JSkipValue(JSON, P);
   end;
 
-  // Sort replacement arrays by key length (longest first)
+  // Sort ONLY FullForms by key length (longest first) to prevent partial matching
   if Length(CustomFullForms) > 0 then
     TArray.Sort<TReplacementPair>(CustomFullForms, TComparer<TReplacementPair>.Construct(
       function(const L, R: TReplacementPair): Integer
       begin Result := R.Key.Length - L.Key.Length; end));
-  if Length(CustomPreReplacements) > 0 then
-    TArray.Sort<TReplacementPair>(CustomPreReplacements, TComparer<TReplacementPair>.Construct(
-      function(const L, R: TReplacementPair): Integer
-      begin Result := R.Key.Length - L.Key.Length; end));
-  if Length(CustomPostReplacements) > 0 then
-    TArray.Sort<TReplacementPair>(CustomPostReplacements, TComparer<TReplacementPair>.Construct(
-      function(const L, R: TReplacementPair): Integer
-      begin Result := R.Key.Length - L.Key.Length; end));
+      
+  // Dynamic Pre/Post Replacements must execute in their natural JSON order.
+  // No sorting performed on CustomPreReplacements or CustomPostReplacements.
 
   if not ConsonantGroupsFound then
     InitializeDefaultConsonantGroups;
