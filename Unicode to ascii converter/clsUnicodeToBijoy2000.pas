@@ -36,8 +36,6 @@ type
 
       // Utility Functions
       function BaseLineRightCharacter(const wC: string): Boolean;
-      function ExtractPrecedingCluster(const S: string; VowelPos: Integer): string;
-      function GetVowelGlyph(const AVowel, AConsonant: string; UseAlt: Boolean): string;
       function WideStuffString(Source: string; Start, Len: Integer; SubString: string): string;
       function IsVowel(C: Char): Boolean;
     public
@@ -49,19 +47,6 @@ type
   TReplacementPair = record
     Key: string;
     Value: string;
-  end;
-
-  TVowelMapping = record
-    Consonants: string;
-    Value: string;
-    AltValue: string;
-  end;
-
-  TVowelRule = record
-    Vowel: string;
-    DefaultVal: string;
-    BaselineRightVal: string;
-    Mappings: TArray<TVowelMapping>;
   end;
 
   TAnsiVarType = (avChar, avString);
@@ -85,8 +70,6 @@ var
   AnsiRegistryMap: TDictionary<string, TAnsiVarRec>;
   ActiveReplacements: TArray<TReplacementPair>;
   AnsiOverrides: TDictionary<string, string>;
-  ConsonantGroupsMap: TDictionary<string, TList<string>> = nil;
-  VowelRulesList: TList<TVowelRule> = nil;
 
 
 procedure ResetAnsiToDefaults;
@@ -120,35 +103,35 @@ var
   A_8: string = #$38;
   A_9: string = #$39;
 
-   { Vowels and Kars }
-   A_A: string     = #$41;
-   A_AA: string    = #$41#$76;
-   A_AAKar: string = #$76;
-   A_I: string     = #$42;
-   A_IKar: string  = #$77;
-   A_II: string    = #$43;
-   A_IIKar: string = #$78;
-   A_U: string     = #$44;
-   A_UKar2: string = #$79;
-   A_UKar1: string = #$7A;
-   A_UKar3: string = #$2013;
-   A_UKar4: string = #$201C;
-   A_UU: string    = #$45;
-   A_UUKar2: string= #$7E;
-   A_UUKar1: string= #$201A;
-   A_UUKar3: string= #$192;
-   A_RRI: string   = #$46;
-   A_RRIKar1: string=#$201E;
-   A_RRIKar2: string=#$2026;
-   A_E: string     = #$47;
-   A_EKar1: string = #$2020;
-   A_EKar2: string = #$2021;
-   A_OI: string    = #$48;
-   A_OIKar1: string= #$2C6;
-   A_OIKar2: string= #$2030;
-   A_O: string     = #$49;
-   A_OU: string    = #$4A;
-   A_OUKar: string = #$160;
+  { Vowels and Kars }
+  A_A: Char       = #$41;
+  A_AA: string    = #$41#$76;
+  A_AAKar: Char   = #$76;
+  A_I: Char       = #$42;
+  A_IKar: Char    = #$77;
+  A_II: Char      = #$43;
+  A_IIKar: Char   = #$78;
+  A_U: Char       = #$44;
+  A_UKar2: Char   = #$79;
+  A_UKar1: Char   = #$7A;
+  A_UKar3: Char   = #$2013;
+  A_UKar4: Char   = #$201C;
+  A_UU: Char      = #$45;
+  A_UUKar2: Char  = #$7E;
+  A_UUKar1: Char  = #$201A;
+  A_UUKar3: Char  = #$192;
+  A_RRI: Char     = #$46;
+  A_RRIKar1: Char = #$201E;
+  A_RRIKar2: Char = #$2026;
+  A_E: Char       = #$47;
+  A_EKar1: Char   = #$2020;
+  A_EKar2: Char   = #$2021;
+  A_OI: Char      = #$48;
+  A_OIKar1: Char  = #$2C6;
+  A_OIKar2: Char  = #$2030;
+  A_O: Char       = #$49;
+  A_OU: Char      = #$4A;
+  A_OUKar: Char   = #$160;
 
    { Symbols }
   A_Taka: string             = #$24;
@@ -274,43 +257,43 @@ var
   A_H_M: string      = #$FE;
   A_Rr_G: string     = #$FF;
 
-   { First Half forms }
-   A_Reph: string   = #$A9;
-   A_M_1H: string   = #$A4;
-   A_Ss_1H: string  = #$AE;
-   A_S_1H_1: string = #$AF;
-   A_N_1H_1: string = #$161;
-   A_S_1H_2: string = #$2C9; // -----------Not used
-   A_D_1H_1: string = #$2DC;
-   A_C_1H: string   = #$201D;
-   A_NGA_1H: string = #$2022;
-   A_N_1H_2: string = #$203A;
-   A_D_1H_2: string = #$2122;
+  { First Half forms }
+  A_Reph: Char   = #$A9;
+  A_M_1H: Char   = #$A4;
+  A_Ss_1H: Char  = #$AE;
+  A_S_1H_1: Char = #$AF;
+  A_N_1H_1: Char = #$161;
+  A_S_1H_2: Char = #$2C9; // -----------Not used
+  A_D_1H_1: Char = #$2DC;
+  A_C_1H: Char   = #$201D;
+  A_NGA_1H: Char = #$2022;
+  A_N_1H_2: Char = #$203A;
+  A_D_1H_2: Char = #$2122;
 
-   { Second Half forms }
-   A_B_2H_1: string    = #$5E; //
-   A_B_2H_2: string    = #$A1; //
-   A_BH_2H: string     = #$A2; //
-   A_BH_R_2H: string   = #$A3; //
-   A_M_2H_1: string    = #$A5; //
-   A_B_2H_3: string    = #$A6; //
-   A_M_2H_2: string    = #$A7; //
-   A_ZFola: string     = #$A8; //
-   A_RFola_1: string   = #$AA; //
-   A_RFola_2: string   = #$AB; //
-   A_L_2H_1: string    = #$AC; //
-   A_L_2H_2: string    = #$AD; // <--- Not used
-   A_T_R_2H: string    = #$BF; //
-   A_RFola_3: string   = #$D6; //
-   A_Nn_2H_1: string   = #$E8;
-   A_K_R_2H: string    = #$152; //
-   A_Nn_2H_2: string   = #$153;
-   A_B_2H_4: string    = #$178;  //
-   A_T_2H: string      = #$2014; //
-   A_T_UKar_2H: string = #$2018; //
-   A_Th_2H: string     = #$2019; //
-   A_K_2H: string      = #$2039; //
-   A_L_2H_3: string    = #$2212; //
+  { Second Half forms }
+  A_B_2H_1: Char    = #$5E; //
+  A_B_2H_2: Char    = #$A1; //
+  A_BH_2H: Char     = #$A2; //
+  A_BH_R_2H: Char   = #$A3; //
+  A_M_2H_1: Char    = #$A5; //
+  A_B_2H_3: Char    = #$A6; //
+  A_M_2H_2: Char    = #$A7; //
+  A_ZFola: Char     = #$A8; //
+  A_RFola_1: Char   = #$AA; //
+  A_RFola_2: Char   = #$AB; //
+  A_L_2H_1: Char    = #$AC; //
+  A_L_2H_2: Char    = #$AD; // <--- Not used
+  A_T_R_2H: Char    = #$BF; //
+  A_RFola_3: Char   = #$D6; //
+  A_Nn_2H_1: Char   = #$E8;
+  A_K_R_2H: Char    = #$152; //
+  A_Nn_2H_2: Char   = #$153;
+  A_B_2H_4: Char    = #$178;  //
+  A_T_2H: Char      = #$2014; //
+  A_T_UKar_2H: Char = #$2018; //
+  A_Th_2H: Char     = #$2019; //
+  A_K_2H: Char      = #$2039; //
+  A_L_2H_3: Char    = #$2212; //
 
 
 { ============================================================================= }
@@ -350,35 +333,35 @@ begin
   RegVar('A_8', 'Numbers', avString, @A_8, '#$38', '৮');
   RegVar('A_9', 'Numbers', avString, @A_9, '#$39', '৯');
 
-   // VowelsAndKars
-   RegVar('A_A', 'VowelsAndKars', avString, @A_A, '#$41', 'অ');
-   RegVar('A_AA', 'VowelsAndKars', avString, @A_AA, '#$41#$76', 'আ');
-   RegVar('A_AAKar', 'VowelsAndKars', avString, @A_AAKar, '#$76', 'া (আ-কার)');
-   RegVar('A_I', 'VowelsAndKars', avString, @A_I, '#$42', 'ই');
-   RegVar('A_IKar', 'VowelsAndKars', avString, @A_IKar, '#$77', 'ি (ই-কার)');
-   RegVar('A_II', 'VowelsAndKars', avString, @A_II, '#$43', 'ঈ');
-   RegVar('A_IIKar', 'VowelsAndKars', avString, @A_IIKar, '#$78', 'ী (ঈ-কার)');
-   RegVar('A_U', 'VowelsAndKars', avString, @A_U, '#$44', 'উ');
-   RegVar('A_UKar2', 'VowelsAndKars', avString, @A_UKar2, '#$79', 'ু (উ-কার ২ - ঝুলন্ত)');
-   RegVar('A_UKar1', 'VowelsAndKars', avString, @A_UKar1, '#$7A', 'ু (উ-কার ১ - সাধারণ)');
-   RegVar('A_UKar3', 'VowelsAndKars', avString, @A_UKar3, '#$2013', 'ু (উ-কার ৩ - ড়ু/ঢ়ু)');
-   RegVar('A_UKar4', 'VowelsAndKars', avString, @A_UKar4, '#$201C', 'ু (উ-কার ৪ - রু)');
-   RegVar('A_UU', 'VowelsAndKars', avString, @A_UU, '#$45', 'ঊ');
-   RegVar('A_UUKar2', 'VowelsAndKars', avString, @A_UUKar2, '#$7E', 'ূ (ঊ-কার ২ - ঝুলন্ত)');
-   RegVar('A_UUKar1', 'VowelsAndKars', avString, @A_UUKar1, '#$201A', 'ূ (ঊ-কার ১ - সাধারণ)');
-   RegVar('A_UUKar3', 'VowelsAndKars', avString, @A_UUKar3, '#$192', 'ূ (ঊ-কার ৩ - রূ)');
-   RegVar('A_RRI', 'VowelsAndKars', avString, @A_RRI, '#$46', 'ঋ');
-   RegVar('A_RRIKar1', 'VowelsAndKars', avString, @A_RRIKar1, '#$201E', 'ৃ (ঋ-কার ১)');
-   RegVar('A_RRIKar2', 'VowelsAndKars', avString, @A_RRIKar2, '#$2026', 'ৃ (ঋ-কার ২)');
-   RegVar('A_E', 'VowelsAndKars', avString, @A_E, '#$47', 'এ');
-   RegVar('A_EKar1', 'VowelsAndKars', avString, @A_EKar1, '#$2020', 'ে (এ-কার ১ - সাধারণ)');
-   RegVar('A_EKar2', 'VowelsAndKars', avString, @A_EKar2, '#$2021', 'ে (এ-কার ২ - ঝুলন্ত)');
-   RegVar('A_OI', 'VowelsAndKars', avString, @A_OI, '#$48', 'ঐ');
-   RegVar('A_OIKar1', 'VowelsAndKars', avString, @A_OIKar1, '#$2C6', 'ৈ (ঐ-কার ১ - সাধারণ)');
-   RegVar('A_OIKar2', 'VowelsAndKars', avString, @A_OIKar2, '#$2030', 'ৈ (ঐ-কার ২ - ঝুলন্ত)');
-   RegVar('A_O', 'VowelsAndKars', avString, @A_O, '#$49', 'ও');
-   RegVar('A_OU', 'VowelsAndKars', avString, @A_OU, '#$4A', 'ঔ');
-   RegVar('A_OUKar', 'VowelsAndKars', avString, @A_OUKar, '#$160', 'ৌ (ঔ-কার)');
+  // VowelsAndKars
+  RegVar('A_A', 'VowelsAndKars', avChar, @A_A, '#$41', 'অ');
+  RegVar('A_AA', 'VowelsAndKars', avString, @A_AA, '#$41#$76', 'আ');
+  RegVar('A_AAKar', 'VowelsAndKars', avChar, @A_AAKar, '#$76', 'া (আ-কার)');
+  RegVar('A_I', 'VowelsAndKars', avChar, @A_I, '#$42', 'ই');
+  RegVar('A_IKar', 'VowelsAndKars', avChar, @A_IKar, '#$77', 'ি (ই-কার)');
+  RegVar('A_II', 'VowelsAndKars', avChar, @A_II, '#$43', 'ঈ');
+  RegVar('A_IIKar', 'VowelsAndKars', avChar, @A_IIKar, '#$78', 'ী (ঈ-কার)');
+  RegVar('A_U', 'VowelsAndKars', avChar, @A_U, '#$44', 'উ');
+  RegVar('A_UKar2', 'VowelsAndKars', avChar, @A_UKar2, '#$79', 'ু (উ-কার ২ - ঝুলন্ত)');
+  RegVar('A_UKar1', 'VowelsAndKars', avChar, @A_UKar1, '#$7A', 'ু (উ-কার ১ - সাধারণ)');
+  RegVar('A_UKar3', 'VowelsAndKars', avChar, @A_UKar3, '#$2013', 'ু (উ-কার ৩ - ড়ু/ঢ়ু)');
+  RegVar('A_UKar4', 'VowelsAndKars', avChar, @A_UKar4, '#$201C', 'ু (উ-কার ৪ - রু)');
+  RegVar('A_UU', 'VowelsAndKars', avChar, @A_UU, '#$45', 'ঊ');
+  RegVar('A_UUKar2', 'VowelsAndKars', avChar, @A_UUKar2, '#$7E', 'ূ (ঊ-কার ২ - ঝুলন্ত)');
+  RegVar('A_UUKar1', 'VowelsAndKars', avChar, @A_UUKar1, '#$201A', 'ূ (ঊ-কার ১ - সাধারণ)');
+  RegVar('A_UUKar3', 'VowelsAndKars', avChar, @A_UUKar3, '#$192', 'ূ (ঊ-কার ৩ - রূ)');
+  RegVar('A_RRI', 'VowelsAndKars', avChar, @A_RRI, '#$46', 'ঋ');
+  RegVar('A_RRIKar1', 'VowelsAndKars', avChar, @A_RRIKar1, '#$201E', 'ৃ (ঋ-কার ১)');
+  RegVar('A_RRIKar2', 'VowelsAndKars', avChar, @A_RRIKar2, '#$2026', 'ৃ (ঋ-কার ২)');
+  RegVar('A_E', 'VowelsAndKars', avChar, @A_E, '#$47', 'এ');
+  RegVar('A_EKar1', 'VowelsAndKars', avChar, @A_EKar1, '#$2020', 'ে (এ-কার ১ - সাধারণ)');
+  RegVar('A_EKar2', 'VowelsAndKars', avChar, @A_EKar2, '#$2021', 'ে (এ-কার ২ - ঝুলন্ত)');
+  RegVar('A_OI', 'VowelsAndKars', avChar, @A_OI, '#$48', 'ঐ');
+  RegVar('A_OIKar1', 'VowelsAndKars', avChar, @A_OIKar1, '#$2C6', 'ৈ (ঐ-কার ১ - সাধারণ)');
+  RegVar('A_OIKar2', 'VowelsAndKars', avChar, @A_OIKar2, '#$2030', 'ৈ (ঐ-কার ২ - ঝুলন্ত)');
+  RegVar('A_O', 'VowelsAndKars', avChar, @A_O, '#$49', 'ও');
+  RegVar('A_OU', 'VowelsAndKars', avChar, @A_OU, '#$4A', 'ঔ');
+  RegVar('A_OUKar', 'VowelsAndKars', avChar, @A_OUKar, '#$160', 'ৌ (ঔ-কার)');
 
   // Symbols
   RegVar('A_Taka', 'Symbols', avString, @A_Taka, '#$24', '৳ (টাকা)');
@@ -503,43 +486,43 @@ begin
   RegVar('A_H_M', 'FullForms', avString, @A_H_M, '#$FE', 'হ্ম');
   RegVar('A_Rr_G', 'FullForms', avString, @A_Rr_G, '#$FF', 'র্গ');
 
-   // FirstHalfForms
-   RegVar('A_Reph', 'FirstHalfForms', avString, @A_Reph, '#$A9', '্র (র-এর রেফ)');
-   RegVar('A_M_1H', 'FirstHalfForms', avString, @A_M_1H, '#$A4', 'ম-এর প্রথম খন্ড');
-   RegVar('A_Ss_1H', 'FirstHalfForms', avString, @A_Ss_1H, '#$AE', 'ষ-এর প্রথম খন্ড');
-   RegVar('A_S_1H_1', 'FirstHalfForms', avString, @A_S_1H_1, '#$AF', 'স-এর প্রথম খন্ড ১');
-   RegVar('A_N_1H_1', 'FirstHalfForms', avString, @A_N_1H_1, '#$161', 'ন-এর প্রথম খন্ড ১');
-   RegVar('A_S_1H_2', 'FirstHalfForms', avString, @A_S_1H_2, '#$2C9', 'স-এর প্রথম খন্ড ২');
-   RegVar('A_D_1H_1', 'FirstHalfForms', avString, @A_D_1H_1, '#$2DC', 'দ-এর প্রথম খন্ড ১');
-   RegVar('A_C_1H', 'FirstHalfForms', avString, @A_C_1H, '#$201D', 'চ-এর প্রথম খন্ড');
-   RegVar('A_NGA_1H', 'FirstHalfForms', avString, @A_NGA_1H, '#$2022', 'ঙ-এর প্রথম খন্ড');
-   RegVar('A_N_1H_2', 'FirstHalfForms', avString, @A_N_1H_2, '#$203A', 'ন-এর প্রথম খন্ড ২');
-   RegVar('A_D_1H_2', 'FirstHalfForms', avString, @A_D_1H_2, '#$2122', 'দ-এর প্রথম খন্ড ২');
+  // FirstHalfForms
+  RegVar('A_Reph', 'FirstHalfForms', avChar, @A_Reph, '#$A9', '্র (র-এর রেফ)');
+  RegVar('A_M_1H', 'FirstHalfForms', avChar, @A_M_1H, '#$A4', 'ম-এর প্রথম খন্ড');
+  RegVar('A_Ss_1H', 'FirstHalfForms', avChar, @A_Ss_1H, '#$AE', 'ষ-এর প্রথম খন্ড');
+  RegVar('A_S_1H_1', 'FirstHalfForms', avChar, @A_S_1H_1, '#$AF', 'স-এর প্রথম খন্ড ১');
+  RegVar('A_N_1H_1', 'FirstHalfForms', avChar, @A_N_1H_1, '#$161', 'ন-এর প্রথম খন্ড ১');
+  RegVar('A_S_1H_2', 'FirstHalfForms', avChar, @A_S_1H_2, '#$2C9', 'স-এর প্রথম খন্ড ২');
+  RegVar('A_D_1H_1', 'FirstHalfForms', avChar, @A_D_1H_1, '#$2DC', 'দ-এর প্রথম খন্ড ১');
+  RegVar('A_C_1H', 'FirstHalfForms', avChar, @A_C_1H, '#$201D', 'চ-এর প্রথম খন্ড');
+  RegVar('A_NGA_1H', 'FirstHalfForms', avChar, @A_NGA_1H, '#$2022', 'ঙ-এর প্রথম খন্ড');
+  RegVar('A_N_1H_2', 'FirstHalfForms', avChar, @A_N_1H_2, '#$203A', 'ন-এর প্রথম খন্ড ২');
+  RegVar('A_D_1H_2', 'FirstHalfForms', avChar, @A_D_1H_2, '#$2122', 'দ-এর প্রথম খন্ড ২');
 
-   // SecondHalfForms
-   RegVar('A_B_2H_1', 'SecondHalfForms', avString, @A_B_2H_1, '#$5E', 'ব-এর দ্বিতীয় খন্ড ১');
-   RegVar('A_B_2H_2', 'SecondHalfForms', avString, @A_B_2H_2, '#$A1', 'ব-এর দ্বিতীয় খন্ড ২');
-   RegVar('A_BH_2H', 'SecondHalfForms', avString, @A_BH_2H, '#$A2', 'ভ-এর দ্বিতীয় খন্ড');
-   RegVar('A_BH_R_2H', 'SecondHalfForms', avString, @A_BH_R_2H, '#$A3', 'ভ্র-এর দ্বিতীয় খন্ড');
-   RegVar('A_M_2H_1', 'SecondHalfForms', avString, @A_M_2H_1, '#$A5', 'ম-এর দ্বিতীয় খন্ড ১');
-   RegVar('A_B_2H_3', 'SecondHalfForms', avString, @A_B_2H_3, '#$A6', 'ব-এর দ্বিতীয় খন্ড ৩');
-   RegVar('A_M_2H_2', 'SecondHalfForms', avString, @A_M_2H_2, '#$A7', 'ম-এর দ্বিতীয় খন্ড ২');
-   RegVar('A_ZFola', 'SecondHalfForms', avString, @A_ZFola, '#$A8', 'য-ফলা');
-   RegVar('A_RFola_1', 'SecondHalfForms', avString, @A_RFola_1, '#$AA', 'র-ফলা ১');
-   RegVar('A_RFola_2', 'SecondHalfForms', avString, @A_RFola_2, '#$AB', 'র-ফলা ২');
-   RegVar('A_L_2H_1', 'SecondHalfForms', avString, @A_L_2H_1, '#$AC', 'ল-এর দ্বিতীয় খন্ড ১');
-   RegVar('A_L_2H_2', 'SecondHalfForms', avString, @A_L_2H_2, '#$AD', 'ল-এর দ্বিতীয় খন্ড ২');
-   RegVar('A_T_R_2H', 'SecondHalfForms', avString, @A_T_R_2H, '#$BF', 'ত্র-এর দ্বিতীয় খন্ড');
-   RegVar('A_RFola_3', 'SecondHalfForms', avString, @A_RFola_3, '#$D6', 'র-ফলা ৩');
-   RegVar('A_Nn_2H_1', 'SecondHalfForms', avString, @A_Nn_2H_1, '#$E8', 'ণ-এর দ্বিতীয় খন্ড ১');
-   RegVar('A_K_R_2H', 'SecondHalfForms', avString, @A_K_R_2H, '#$152', 'ক্র-এর দ্বিতীয় খন্ড');
-   RegVar('A_Nn_2H_2', 'SecondHalfForms', avString, @A_Nn_2H_2, '#$153', 'ণ-এর দ্বিতীয় খন্ড ২');
-   RegVar('A_B_2H_4', 'SecondHalfForms', avString, @A_B_2H_4, '#$178', 'ব-এর দ্বিতীয় খন্ড ৪');
-   RegVar('A_T_2H', 'SecondHalfForms', avString, @A_T_2H, '#$2014', 'ত-এর দ্বিতীয় খন্ড');
-   RegVar('A_T_UKar_2H', 'SecondHalfForms', avString, @A_T_UKar_2H, '#$2018', 'তু-এর দ্বিতীয় খন্ড');
-   RegVar('A_Th_2H', 'SecondHalfForms', avString, @A_Th_2H, '#$2019', 'থ-এর দ্বিতীয় খন্ড');
-   RegVar('A_K_2H', 'SecondHalfForms', avString, @A_K_2H, '#$2039', 'ক-এর দ্বিতীয় খন্ড');
-   RegVar('A_L_2H_3', 'SecondHalfForms', avString, @A_L_2H_3, '#$2212', 'ল-এর দ্বিতীয় খন্ড ৩');
+  // SecondHalfForms
+  RegVar('A_B_2H_1', 'SecondHalfForms', avChar, @A_B_2H_1, '#$5E', 'ব-এর দ্বিতীয় খন্ড ১');
+  RegVar('A_B_2H_2', 'SecondHalfForms', avChar, @A_B_2H_2, '#$A1', 'ব-এর দ্বিতীয় খন্ড ২');
+  RegVar('A_BH_2H', 'SecondHalfForms', avChar, @A_BH_2H, '#$A2', 'ভ-এর দ্বিতীয় খন্ড');
+  RegVar('A_BH_R_2H', 'SecondHalfForms', avChar, @A_BH_R_2H, '#$A3', 'ভ্র-এর দ্বিতীয় খন্ড');
+  RegVar('A_M_2H_1', 'SecondHalfForms', avChar, @A_M_2H_1, '#$A5', 'ম-এর দ্বিতীয় খন্ড ১');
+  RegVar('A_B_2H_3', 'SecondHalfForms', avChar, @A_B_2H_3, '#$A6', 'ব-এর দ্বিতীয় খন্ড ৩');
+  RegVar('A_M_2H_2', 'SecondHalfForms', avChar, @A_M_2H_2, '#$A7', 'ম-এর দ্বিতীয় খন্ড ২');
+  RegVar('A_ZFola', 'SecondHalfForms', avChar, @A_ZFola, '#$A8', 'য-ফলা');
+  RegVar('A_RFola_1', 'SecondHalfForms', avChar, @A_RFola_1, '#$AA', 'র-ফলা ১');
+  RegVar('A_RFola_2', 'SecondHalfForms', avChar, @A_RFola_2, '#$AB', 'র-ফলা ২');
+  RegVar('A_L_2H_1', 'SecondHalfForms', avChar, @A_L_2H_1, '#$AC', 'ল-এর দ্বিতীয় খন্ড ১');
+  RegVar('A_L_2H_2', 'SecondHalfForms', avChar, @A_L_2H_2, '#$AD', 'ল-এর দ্বিতীয় খন্ড ২');
+  RegVar('A_T_R_2H', 'SecondHalfForms', avChar, @A_T_R_2H, '#$BF', 'ত্র-এর দ্বিতীয় খন্ড');
+  RegVar('A_RFola_3', 'SecondHalfForms', avChar, @A_RFola_3, '#$D6', 'র-ফলা ৩');
+  RegVar('A_Nn_2H_1', 'SecondHalfForms', avChar, @A_Nn_2H_1, '#$E8', 'ণ-এর দ্বিতীয় খন্ড ১');
+  RegVar('A_K_R_2H', 'SecondHalfForms', avChar, @A_K_R_2H, '#$152', 'ক্র-এর দ্বিতীয় খন্ড');
+  RegVar('A_Nn_2H_2', 'SecondHalfForms', avChar, @A_Nn_2H_2, '#$153', 'ণ-এর দ্বিতীয় খন্ড ২');
+  RegVar('A_B_2H_4', 'SecondHalfForms', avChar, @A_B_2H_4, '#$178', 'ব-এর দ্বিতীয় খন্ড ৪');
+  RegVar('A_T_2H', 'SecondHalfForms', avChar, @A_T_2H, '#$2014', 'ত-এর দ্বিতীয় খন্ড');
+  RegVar('A_T_UKar_2H', 'SecondHalfForms', avChar, @A_T_UKar_2H, '#$2018', 'তু-এর দ্বিতীয় খন্ড');
+  RegVar('A_Th_2H', 'SecondHalfForms', avChar, @A_Th_2H, '#$2019', 'থ-এর দ্বিতীয় খন্ড');
+  RegVar('A_K_2H', 'SecondHalfForms', avChar, @A_K_2H, '#$2039', 'ক-এর দ্বিতীয় খন্ড');
+  RegVar('A_L_2H_3', 'SecondHalfForms', avChar, @A_L_2H_3, '#$2212', 'ল-এর দ্বিতীয় খন্ড ৩');
 end;
 { TUnicodeToBijoy2000 }
 { =============================================================================== }
@@ -631,9 +614,9 @@ begin
     if I <= 0 then
       break;
     if MidStr(fConvertedText, I + 2, 1) = b_g then
-      fConvertedText := WideStuffString(fConvertedText, I, 1, A_D_1H_1)
+      fConvertedText[I] := A_D_1H_1
     else
-      fConvertedText := WideStuffString(fConvertedText, I, 1, A_D_1H_2);
+      fConvertedText[I] := A_D_1H_2;
   until I <= 0;
 
   { Elevate first-half N-forms }
@@ -644,13 +627,13 @@ begin
     if ((I + 2 <= Length(fConvertedText)) and 
         ((fConvertedText[I + 2] = b_t) or (fConvertedText[I + 2] = b_Th) or 
          (fConvertedText[I + 2] = b_L) or (fConvertedText[I + 2] = b_b) or 
-         (MidStr(fConvertedText, I + 2, 1) = A_T_R_2H) or (MidStr(fConvertedText, I + 2, 1) = A_T_UKar_2H))) then
-      fConvertedText := WideStuffString(fConvertedText, I, 1, A_N_1H_1)
+         (fConvertedText[I + 2] = A_T_R_2H) or (fConvertedText[I + 2] = A_T_UKar_2H))) then
+      fConvertedText[I] := A_N_1H_1
     else if (I + 2 <= Length(fConvertedText)) and 
             ((fConvertedText[I + 2] = b_m) or (fConvertedText[I + 2] = b_n)) then
       fConvertedText[I] := A_N[1]
     else
-      fConvertedText := WideStuffString(fConvertedText, I, 1, A_N_1H_2);
+      fConvertedText[I] := A_N_1H_2;
   until I <= 0;
 end;
 
@@ -760,16 +743,13 @@ begin
   fConvertedText := ReplaceStr(fConvertedText, string(A_UUKar1) + string(A_Reph), string(A_UUKar2) + string(A_Reph));
 
   { =========================================================================
-    লিগ্যাসি পোস্ট-প্রসেসিং কারেকশন (শুধু Default ভার্সনের জন্য)
+    ডাইনামিক পোস্ট-প্রসেসিং কারেকশন (জেসন ফাইল অনুযায়ী কাজ করবে)
     ========================================================================= }
-  if AnsiVersion = 'Default' then
-  begin
-    fConvertedText := ReplaceStr(fConvertedText, string(A_T) + string(A_UKar1), string(A_T) + string(A_UKar2));
-    fConvertedText := ReplaceStr(fConvertedText, string(A_T) + string(A_UUKar1), string(A_T) + string(A_UUKar2));
-    fConvertedText := ReplaceStr(fConvertedText, string(A_RR) + string(A_UUKar1), string(A_RR) + string(A_UUKar2));
-    fConvertedText := ReplaceStr(fConvertedText, string(A_RRH) + string(A_UUKar1), string(A_RRH) + string(A_UUKar2));
-    fConvertedText := ReplaceStr(fConvertedText, string(A_R) + string(A_UUKar1), string(A_R) + string(A_UUKar2));
-  end;
+  fConvertedText := ReplaceStr(fConvertedText, string(A_T) + string(A_UKar1), string(A_T) + string(A_UKar2));
+  fConvertedText := ReplaceStr(fConvertedText, string(A_T) + string(A_UUKar1), string(A_T) + string(A_UUKar2));
+  fConvertedText := ReplaceStr(fConvertedText, string(A_RR) + string(A_UUKar1), string(A_RR) + string(A_UUKar2));
+  fConvertedText := ReplaceStr(fConvertedText, string(A_RRH) + string(A_UUKar1), string(A_RRH) + string(A_UUKar2));
+  fConvertedText := ReplaceStr(fConvertedText, string(A_R) + string(A_UUKar1), string(A_R) + string(A_UUKar2));
   { ========================================================================= }
   
   // --- STRICT SANITIZATION FOR ANSI OUTPUT ---
@@ -790,132 +770,32 @@ end;
 
 procedure TUnicodeToBijoy2000.ReplaceFullForms;
 var
-  I, J, BestLen: Integer;
-  BestMatch: string;
-  SourceText: string;
-  Map: TDictionary<string, string>;
+  I: Integer;
 begin
-  Map := TDictionary<string, string>.Create;
-  try
-    for I := 0 to Length(ActiveReplacements) - 1 do
-      Map.AddOrSetValue(ActiveReplacements[I].Key, ActiveReplacements[I].Value);
-
-    SourceText := fConvertedText;
-    fConvertedText := '';
-    J := 1;
-    while J <= Length(SourceText) do
-    begin
-      BestLen := 0;
-      BestMatch := '';
-      for I := 0 to Length(ActiveReplacements) - 1 do
-      begin
-        if (Length(ActiveReplacements[I].Key) > BestLen) and
-           (Copy(SourceText, J, Length(ActiveReplacements[I].Key)) = ActiveReplacements[I].Key) then
-        begin
-          BestLen := Length(ActiveReplacements[I].Key);
-          BestMatch := ActiveReplacements[I].Key;
-        end;
-      end;
-      if BestLen > 0 then
-      begin
-        fConvertedText := fConvertedText + Map[BestMatch];
-        J := J + BestLen;
-      end
-      else
-      begin
-        fConvertedText := fConvertedText + SourceText[J];
-        Inc(J);
-      end;
-    end;
-  finally
-    Map.Free;
-  end;
+  for I := 0 to Length(ActiveReplacements) - 1 do
+    fConvertedText := ReplaceStr(fConvertedText, ActiveReplacements[I].Key, ActiveReplacements[I].Value);
 end;
 
 { =============================================================================== }
 
 function TUnicodeToBijoy2000.BaseLineRightCharacter(const wC: string): Boolean;
-var
-  GroupList: TList<string>;
 begin
   Result := False;
-  if ConsonantGroupsMap <> nil then
-    if ConsonantGroupsMap.TryGetValue('BaseLineRight', GroupList) then
-      Result := GroupList.Contains(wC);
-end;
+  if (wC = b_kh) or (wC = b_g) or (wC = b_gh) or (wC = b_Nn) or (wC = b_Th) or (wC = b_d) or (wC = b_dh) or (wC = b_n) or (wC = b_p) or (wC = b_b) or
+    (wC = b_m) or (wC = b_z) or (wC = b_r) or (wC = b_L) or (wC = b_sh) or (wC = b_ss) or (wC = b_s) or (wC = b_h) or (wC = b_y) or
+    // Also support ANSI conjunct characters that end with baseline-right consonants
+    (wC = string(A_K_Ss_M)) or (wC = string(A_K_M)) or (wC = string(A_K_Ss)) or (wC = string(A_K_S)) or
+    (wC = string(A_G_G)) or (wC = string(A_G_D)) or (wC = string(A_G_Dh)) or (wC = string(A_NGA_G)) or
+    (wC = string(A_T_Th)) or (wC = string(A_T_M)) or
+    (wC = string(A_D_D)) or (wC = string(A_D_Dh)) or (wC = string(A_D_B)) or (wC = string(A_D_M)) or
+    (wC = string(A_N_Tth)) or (wC = string(A_N_Dh)) or (wC = string(A_N_S)) or
+    (wC = string(A_P_P)) or (wC = string(A_P_S)) or
+    (wC = string(A_B_D)) or (wC = string(A_B_Dh)) or (wC = string(A_Bh_R)) or (wC = string(A_M_N)) or
+    (wC = string(A_L_G)) or (wC = string(A_L_P)) or
+    (wC = string(A_Ss_Nn)) or (wC = string(A_S_Kh)) or (wC = string(A_S_N)) or
+    (wC = string(A_H_N)) or (wC = string(A_H_M)) or (wC = string(A_Rr_G)) then
+    Result := True;
 
-function TUnicodeToBijoy2000.ExtractPrecedingCluster(const S: string; VowelPos: Integer): string;
-var
-  I: Integer;
-begin
-  Result := '';
-  if (VowelPos < 2) or (VowelPos > Length(S)) then Exit;
-  I := VowelPos - 1;
-  while I >= 1 do
-  begin
-    Result := S[I] + Result;
-    if I = 1 then Break;
-    if S[I - 1] = b_Hasanta then
-    begin
-      Dec(I);
-      Result := b_Hasanta + Result;
-      Dec(I);
-      if I < 1 then Break;
-    end
-    else
-      Break;
-  end;
-end;
-
-function ContainsBengaliChar(const S: string): Boolean;
-var
-  C: Char;
-begin
-  for C in S do
-    if (C >= #$0980) and (C <= #$09FF) then
-      Exit(True);
-  Result := False;
-end;
-
-function TUnicodeToBijoy2000.GetVowelGlyph(const AVowel, AConsonant: string; UseAlt: Boolean): string;
-var
-  Rule: TVowelRule;
-  Map: TVowelMapping;
-  GroupList: TList<string>;
-  IsMatched: Boolean;
-begin
-  Result := '';
-  if VowelRulesList = nil then
-  begin
-    if AVowel = b_Ukar then Exit(A_UKar1);
-    if AVowel = b_UUKar then Exit(A_UUKar1);
-    if AVowel = b_Rrikar then Exit(A_RRIKar2);
-    Exit;
-  end;
-  for Rule in VowelRulesList do
-  begin
-    if Rule.Vowel = AVowel then
-    begin
-      for Map in Rule.Mappings do
-      begin
-        IsMatched := False;
-
-        if (ConsonantGroupsMap <> nil) and ConsonantGroupsMap.TryGetValue(Map.Consonants, GroupList) then
-          IsMatched := GroupList.Contains(AConsonant)
-        else
-          IsMatched := (AConsonant <> '') and (Map.Consonants = AConsonant);
-
-        if IsMatched then
-        begin
-          if UseAlt and (Map.AltValue <> '') then
-            Exit(Map.AltValue)
-          else
-            Exit(Map.Value);
-        end;
-      end;
-      Exit(Rule.DefaultVal);
-    end;
-  end;
 end;
 
 { =============================================================================== }
@@ -952,14 +832,10 @@ begin
   fUniText := UniText;
   fConvertedText := fUniText;
 
-  if (Length(fLastUniText) >= 2) and
-     (fLastUniText[Length(fLastUniText)] = b_Ukar) and
-     (UniText = Copy(fLastUniText, 1, Length(fLastUniText) - 1)) then
+  if (fLastUniText = b_r + b_Ukar) and (UniText = b_r) then
     fRaUKarToggle := True;
 
-  if (Length(fLastUniText) >= 2) and
-     (fLastUniText[Length(fLastUniText)] = b_UUKar) and
-     (UniText = Copy(fLastUniText, 1, Length(fLastUniText) - 1)) then
+  if (fLastUniText = b_r + b_UUKar) and (UniText = b_r) then
     fRaUUKarToggle := True;
 
   fLastUniText := UniText;
@@ -1257,19 +1133,20 @@ end;
 
 procedure TUnicodeToBijoy2000.ReplaceKarsVowels;
 var
-  I, J: Integer;
-  PrecedingChar, VowelGlyph: string;
+  I: Integer;
+  PrecedingChar: string;
+  IsZfola: Boolean;
 begin
   // Convert Ekar
   repeat
     I := Pos(b_Ekar, fConvertedText);
     if I <= 0 then
       break;
-      if ((I = 1) or (MidStr(fConvertedText, I - 1, 1) = ' ') or (MidStr(fConvertedText, I - 1, 1) = #13) or (MidStr(fConvertedText, I - 1, 1) = #10) or
+    if ((I = 1) or (MidStr(fConvertedText, I - 1, 1) = ' ') or (MidStr(fConvertedText, I - 1, 1) = #13) or (MidStr(fConvertedText, I - 1, 1) = #10) or
         (MidStr(fConvertedText, I - 1, 1) = #9)) then
-      fConvertedText := WideStuffString(fConvertedText, I, 1, A_EKar1)
+      fConvertedText[I] := A_EKar1
     else
-      fConvertedText := WideStuffString(fConvertedText, I, 1, A_EKar2);
+      fConvertedText[I] := A_EKar2;
   until I <= 0;
 
   // Convert OIKar
@@ -1279,86 +1156,151 @@ begin
       break;
     if ((I = 1) or (MidStr(fConvertedText, I - 1, 1) = ' ') or (MidStr(fConvertedText, I - 1, 1) = #13) or (MidStr(fConvertedText, I - 1, 1) = #10) or
         (MidStr(fConvertedText, I - 1, 1) = #9)) then
-      fConvertedText := WideStuffString(fConvertedText, I, 1, A_OIKar1)
+      fConvertedText[I] := A_OIKar1
     else
-      fConvertedText := WideStuffString(fConvertedText, I, 1, A_OIKar2);
+      fConvertedText[I] := A_OIKar2;
   until I <= 0;
 
-// Convert UKar (ু)
+// Convert UKar
   fConvertedText := ReplaceStr(fConvertedText, b_g + b_Ukar, A_G_Ukar);
   fConvertedText := ReplaceStr(fConvertedText, b_sh + b_Ukar, A_Sh_UKar);
   fConvertedText := ReplaceStr(fConvertedText, b_h + b_Ukar, A_H_UKar);
   fConvertedText := ReplaceStr(fConvertedText, b_Hasanta + b_t + b_Ukar, b_Hasanta + A_T_UKar_2H);
   repeat
     I := Pos(b_Ukar, fConvertedText);
-    if I <= 0 then break;
-    VowelGlyph := '';
+    if I <= 0 then
+      break;
     if I - 1 >= 1 then
     begin
-      PrecedingChar := ExtractPrecedingCluster(fConvertedText, I);
-      if (PrecedingChar <> '') and not ContainsBengaliChar(PrecedingChar) then
+      PrecedingChar := fConvertedText[I - 1];      
+      IsZfola := (PrecedingChar = b_z) and (I - 2 >= 1) and (fConvertedText[I - 2] = b_Hasanta);
+      
+      if IsZfola then
       begin
-        for J := Length(fUniText) downto 1 do
-          if fUniText[J] = b_Ukar then
-          begin
-            PrecedingChar := ExtractPrecedingCluster(fUniText, J);
-            Break;
-          end;
+        if I - 3 >= 1 then
+          PrecedingChar := fConvertedText[I - 3]
+        else
+          PrecedingChar := '';
       end;
-      VowelGlyph := GetVowelGlyph(b_Ukar, PrecedingChar, fRaUKarToggle);
-    end;
-    if VowelGlyph = '' then
-      VowelGlyph := GetVowelGlyph(b_Ukar, '', False);
-    fConvertedText := WideStuffString(fConvertedText, I, 1, VowelGlyph);
+
+      if BaseLineRightCharacter(PrecedingChar) = True then
+      begin
+
+        if PrecedingChar = b_r then
+        begin
+          if fRaUKarToggle then
+            fConvertedText[I] := A_UKar2
+          else
+            fConvertedText[I] := A_UKar4;
+        end
+        else if PrecedingChar = b_L then
+        begin
+          if ((MidStr(fConvertedText, I - 3, 3) = b_g + b_Hasanta + b_L) or (MidStr(fConvertedText, I - 3, 3) = b_p + b_Hasanta + b_L) or
+              (MidStr(fConvertedText, I - 3, 3) = b_b + b_Hasanta + b_L) or (MidStr(fConvertedText, I - 3, 3) = b_sh + b_Hasanta + b_L) or
+              (MidStr(fConvertedText, I - 3, 3) = b_s + b_Hasanta + b_L) or (MidStr(fConvertedText, I - 5, 5) = b_s + b_Hasanta + b_p + b_Hasanta + b_L)) then
+            fConvertedText[I] := A_UKar4
+          else
+            fConvertedText[I] := A_UKar2;
+        end
+        else
+          fConvertedText[I] := A_UKar2;
+
+        if MidStr(fConvertedText, I - 3, 3) = b_ss + b_Hasanta + b_Nn then
+          fConvertedText[I] := A_UKar1;
+
+      end
+      else
+      begin
+        if ((PrecedingChar = b_rr) or (PrecedingChar = b_rrh)) then
+        begin
+          fConvertedText[I] := A_UKar1;
+        end
+        else
+          fConvertedText[I] := A_UKar1;
+      end;
+    end
+    else
+      fConvertedText[I] := A_UKar1;
   until I <= 0;
 
-  // Convert UUKar (ূ)
+  // Convert UUKar
   repeat
     I := Pos(b_UUKar, fConvertedText);
-    if I <= 0 then break;
-    VowelGlyph := '';
+    if I <= 0 then
+      break;
     if I - 1 >= 1 then
     begin
-      PrecedingChar := ExtractPrecedingCluster(fConvertedText, I);
-      if (PrecedingChar <> '') and not ContainsBengaliChar(PrecedingChar) then
+      PrecedingChar := fConvertedText[I - 1];
+      IsZfola := (PrecedingChar = b_z) and (I - 2 >= 1) and (fConvertedText[I - 2] = b_Hasanta);
+      
+      if IsZfola then
       begin
-        for J := Length(fUniText) downto 1 do
-          if fUniText[J] = b_UUKar then
-          begin
-            PrecedingChar := ExtractPrecedingCluster(fUniText, J);
-            Break;
-          end;
+        if I - 3 >= 1 then
+          PrecedingChar := fConvertedText[I - 3]
+        else
+          PrecedingChar := '';
       end;
-      VowelGlyph := GetVowelGlyph(b_UUKar, PrecedingChar, fRaUUKarToggle);
-    end;
-    if VowelGlyph = '' then
-      VowelGlyph := GetVowelGlyph(b_UUKar, '', False);
-    fConvertedText := WideStuffString(fConvertedText, I, 1, VowelGlyph);
+
+      if BaseLineRightCharacter(PrecedingChar) = True then
+      begin
+        if PrecedingChar = b_r then
+        begin
+          if ((MidStr(fConvertedText, I - 3, 3) = b_sh + b_Hasanta + b_r) or (MidStr(fConvertedText, I - 3, 3) = b_d + b_Hasanta + b_r) or
+              (MidStr(fConvertedText, I - 3, 3) = b_g + b_Hasanta + b_r) or (MidStr(fConvertedText, I - 3, 3) = b_t + b_Hasanta + b_r) or
+              (MidStr(fConvertedText, I - 3, 3) = b_j + b_Hasanta + b_r) or (MidStr(fConvertedText, I - 3, 3) = b_Th + b_Hasanta + b_r) or
+              (MidStr(fConvertedText, I - 3, 3) = b_dh + b_Hasanta + b_r) or (MidStr(fConvertedText, I - 5, 5) = b_n + b_Hasanta + b_d + b_Hasanta + b_r) or
+              (MidStr(fConvertedText, I - 3, 3) = b_p + b_Hasanta + b_r) or (MidStr(fConvertedText, I - 3, 3) = b_b + b_Hasanta + b_r) or
+              (MidStr(fConvertedText, I - 3, 3) = b_Bh + b_Hasanta + b_r) or (MidStr(fConvertedText, I - 3, 3) = b_m + b_Hasanta + b_r) or
+              (MidStr(fConvertedText, I - 3, 3) = b_s + b_Hasanta + b_r) or (MidStr(fConvertedText, I - 5, 5) = b_m + b_Hasanta + b_p + b_Hasanta + b_r) or
+              (MidStr(fConvertedText, I - 5, 5) = b_ss + b_Hasanta + b_p + b_Hasanta + b_r) or
+              (MidStr(fConvertedText, I - 5, 5) = b_s + b_Hasanta + b_p + b_Hasanta + b_r)) then
+            fConvertedText[I] := A_UUKar3
+          else if MidStr(fConvertedText, I - 2, 1) <> b_Hasanta then
+          begin
+            if fRaUUKarToggle then
+              fConvertedText[I] := A_UUKar2
+            else
+              fConvertedText[I] := A_UUKar3;
+          end
+          else
+            fConvertedText[I] := A_UUKar2;
+        end
+        else if PrecedingChar = b_L then
+        begin
+          if ((MidStr(fConvertedText, I - 3, 3) = b_g + b_Hasanta + b_L) or (MidStr(fConvertedText, I - 3, 3) = b_p + b_Hasanta + b_L) or
+              (MidStr(fConvertedText, I - 3, 3) = b_b + b_Hasanta + b_L) or (MidStr(fConvertedText, I - 3, 3) = b_sh + b_Hasanta + b_L) or
+              (MidStr(fConvertedText, I - 3, 3) = b_s + b_Hasanta + b_L) or (MidStr(fConvertedText, I - 5, 5) = b_s + b_Hasanta + b_p + b_Hasanta + b_L)) then
+            fConvertedText[I] := A_UUKar3
+          else
+            fConvertedText[I] := A_UUKar2;
+        end
+        else
+          fConvertedText[I] := A_UUKar2;
+      end
+      else
+        fConvertedText[I] := A_UUKar1;
+    end
+    else
+      fConvertedText[I] := A_UUKar1;
   until I <= 0;
 
-  // Convert RRIKar (ৃ)
+  // Convert RRIKar
   fConvertedText := ReplaceStr(fConvertedText, b_h + b_Rrikar, A_H_RRIKar);
   repeat
     I := Pos(b_Rrikar, fConvertedText);
-    if I <= 0 then break;
-    VowelGlyph := '';
+    if I <= 0 then
+      break;
     if I - 1 >= 1 then
     begin
-      PrecedingChar := ExtractPrecedingCluster(fConvertedText, I);
-      if (PrecedingChar <> '') and not ContainsBengaliChar(PrecedingChar) then
+      if BaseLineRightCharacter(fConvertedText[I - 1]) = True then
       begin
-        for J := Length(fUniText) downto 1 do
-          if fUniText[J] = b_Rrikar then
-          begin
-            PrecedingChar := ExtractPrecedingCluster(fUniText, J);
-            Break;
-          end;
-      end;
-      VowelGlyph := GetVowelGlyph(b_Rrikar, PrecedingChar, False);
-    end;
-    if VowelGlyph = '' then
-      VowelGlyph := GetVowelGlyph(b_Rrikar, '', False);
-    fConvertedText := WideStuffString(fConvertedText, I, 1, VowelGlyph);
+        fConvertedText[I] := A_RRIKar1;
+      end
+      else
+        fConvertedText[I] := A_RRIKar2;
+    end
+    else
+      fConvertedText[I] := A_RRIKar2;
   until I <= 0;
 
   // Convert rest of the Kars
@@ -1458,56 +1400,6 @@ begin
   finally
     SB.Free;
   end;
-end;
-
-{ =============================================================================== }
-
-procedure EnsureAnsiRegistry;
-begin
-  if AnsiRegistry = nil then
-  begin
-    AnsiRegistry := TList<TAnsiVarRec>.Create;
-    AnsiRegistryMap := TDictionary<string, TAnsiVarRec>.Create;
-    InitializeAnsiRegistry;
-  end;
-end;
-
-function ExpandVarRefs(const S: string): string;
-var
-  I, J: Integer;
-  VarName, VarVal: string;
-  Rec: TAnsiVarRec;
-begin
-  Result := S;
-  I := Pos('#{', Result);
-  while I > 0 do
-  begin
-    J := PosEx('}', Result, I + 2);
-    if J > 0 then
-    begin
-      VarName := Copy(Result, I + 2, J - I - 2);
-      EnsureAnsiRegistry;
-      if AnsiRegistryMap.TryGetValue(VarName, Rec) then
-      begin
-        if Rec.VarType = avChar then
-          VarVal := string(PChar(Rec.Ptr)^)
-        else
-          VarVal := PString(Rec.Ptr)^;
-      end
-      else
-        VarVal := ''; // Skip unrecognized variables
-
-      Result := Copy(Result, 1, I - 1) + VarVal + Copy(Result, J + 1, MaxInt);
-      I := Pos('#{', Result);
-    end
-    else
-      Break;
-  end;
-end;
-
-function ResolveStringValue(const S: string): string;
-begin
-  Result := ProcessHexAndUnicode(ExpandVarRefs(S));
 end;
 
 { =============================================================================== }
@@ -1748,6 +1640,18 @@ begin
   end;
 end;
 
+{ =============================================================================== }
+// Lazy initialization for AnsiRegistry and AnsiOverrides
+procedure EnsureAnsiRegistry;
+begin
+  if AnsiRegistry = nil then
+  begin
+    AnsiRegistry := TList<TAnsiVarRec>.Create;
+    AnsiRegistryMap := TDictionary<string, TAnsiVarRec>.Create;
+    InitializeAnsiRegistry;
+  end;
+end;
+
 procedure EnsureAnsiOverrides;
 begin
   if AnsiOverrides = nil then
@@ -1804,7 +1708,12 @@ begin
         Continue;
 
       if not AnsiOverrides.TryGetValue(Rec.Name, Val) then
-        Val := PString(Rec.Ptr)^;
+      begin
+        if Rec.VarType = avChar then
+          Val := string(PChar(Rec.Ptr)^)
+        else
+          Val := PString(Rec.Ptr)^;
+      end;
 
       if Val = '' then
         Continue;
@@ -1841,40 +1750,6 @@ end;
 
 { =============================================================================== }
 
-procedure InitializeDefaultConsonantGroups;
-var
-  DefaultList: TList<string>;
-  GroupPair: TPair<string, TList<string>>;
-begin
-  if ConsonantGroupsMap = nil then
-    ConsonantGroupsMap := TDictionary<string, TList<string>>.Create
-  else
-  begin
-    for GroupPair in ConsonantGroupsMap do
-      GroupPair.Value.Free;
-    ConsonantGroupsMap.Clear;
-  end;
-
-  DefaultList := TList<string>.Create;
-  DefaultList.AddRange([
-    b_kh, b_g, b_gh, b_Nn, b_Th, b_d, b_dh, b_n, b_p, b_b,
-    b_m, b_z, b_r, b_L, b_sh, b_ss, b_s, b_h, b_y,
-    string(A_K_Ss_M), string(A_K_M), string(A_K_Ss), string(A_K_S),
-    string(A_G_G), string(A_G_D), string(A_G_Dh), string(A_NGA_G),
-    string(A_T_Th), string(A_T_M),
-    string(A_D_D), string(A_D_Dh), string(A_D_B), string(A_D_M),
-    string(A_N_Tth), string(A_N_Dh), string(A_N_S),
-    string(A_P_P), string(A_P_S),
-    string(A_B_D), string(A_B_Dh), string(A_Bh_R), string(A_M_N),
-    string(A_L_G), string(A_L_P),
-    string(A_Ss_Nn), string(A_S_Kh), string(A_S_N),
-    string(A_H_N), string(A_H_M), string(A_Rr_G)
-  ]);
-  ConsonantGroupsMap.Add('BaseLineRight', DefaultList);
-end;
-
-{ =============================================================================== }
-
 procedure ResetAnsiToDefaults;
 var
   Rec: TAnsiVarRec;
@@ -1885,7 +1760,10 @@ begin
   for Rec in AnsiRegistry do
   begin
     Resolved := ProcessHexAndUnicode(Rec.DefaultVal);
-    PString(Rec.Ptr)^ := Resolved;
+    if Rec.VarType = avChar then
+      PChar(Rec.Ptr)^ := Resolved[1]
+    else
+      PString(Rec.Ptr)^ := Resolved;
   end;
 
   AnsiOverrides.Clear;
@@ -1894,8 +1772,6 @@ begin
   Finalize(CustomPostReplacements); CustomPostReplacements := nil;
   Finalize(ActiveReplacements); ActiveReplacements := nil;
   PrepareActiveReplacements;
-  InitializeDefaultConsonantGroups;
-  FreeAndNil(VowelRulesList);
 end;
 
 { =============================================================================== }
@@ -1928,9 +1804,9 @@ procedure LoadAnsiMapping(const Path: string; ErrorLog: TStringList = nil);
             Field := JReadString(S, Pos);
             JSkipWS(S, Pos); if S[Pos] = ':' then Inc(Pos);
             if Field = 'Key' then
-              Pair.Key := ResolveStringValue(JReadString(S, Pos))
+              Pair.Key := ProcessHexAndUnicode(JReadString(S, Pos))
             else if Field = 'Value' then
-              Pair.Value := ResolveStringValue(JReadString(S, Pos))
+              Pair.Value := ProcessHexAndUnicode(JReadString(S, Pos))
             else
               JSkipValue(S, Pos);
           end;
@@ -1949,16 +1825,10 @@ procedure LoadAnsiMapping(const Path: string; ErrorLog: TStringList = nil);
 var
   JSON: string;
   P: Integer;
-  Key, ConstName, ConstValue, CatName, FieldName, VowelName, Field, MapField: string;
+  Key, ConstName, ConstValue, CatName, FieldName: string;
   Rec: TAnsiVarRec;
   Lines: TStringList;
-  ConsonantGroupsFound: Boolean;
-  GroupList: TList<string>;
-  GroupPair: TPair<string, TList<string>>;
-  Rule: TVowelRule;
-  Map: TVowelMapping;
 begin
-  ConsonantGroupsFound := False;
   ResetAnsiToDefaults;
 
   if not FileExists(Path) then
@@ -2041,9 +1911,21 @@ begin
             end;
             if ConstValue <> '' then
             begin
-              ConstValue := ResolveStringValue(ConstValue);
+              ConstValue := ProcessHexAndUnicode(ConstValue);
               if AnsiRegistryMap.TryGetValue(ConstName, Rec) then
-                PString(Rec.Ptr)^ := ConstValue;
+              begin
+                if Rec.VarType = avChar then
+                begin
+                  if Length(ConstValue) = 1 then
+                    PChar(Rec.Ptr)^ := ConstValue[1]
+                  else begin
+                    EnsureAnsiOverrides;
+                    AnsiOverrides.AddOrSetValue(ConstName, ConstValue);
+                  end;
+                end
+                else
+                  PString(Rec.Ptr)^ := ConstValue;
+              end;
             end;
           end
           else JSkipValue(JSON, P);
@@ -2056,135 +1938,23 @@ begin
       CustomPreReplacements := ParseSection(JSON, P)
     else if Key = 'PostReplacements' then
       CustomPostReplacements := ParseSection(JSON, P)
-    else if Key = 'VowelRules' then
-    begin
-      if (P <= Length(JSON)) and (JSON[P] = '{') then Inc(P) else Continue;
-      if VowelRulesList = nil then
-        VowelRulesList := TList<TVowelRule>.Create;
-      VowelRulesList.Clear;
-      while P <= Length(JSON) do
-      begin
-        JSkipWS(JSON, P);
-        if (P > Length(JSON)) or (JSON[P] = '}') then begin Inc(P); Break; end;
-        if JSON[P] = ',' then begin Inc(P); Continue; end;
-        VowelName := JReadString(JSON, P);
-        JSkipWS(JSON, P);
-        if (P <= Length(JSON)) and (JSON[P] = ':') then Inc(P);
-        JSkipWS(JSON, P);
-        if (P <= Length(JSON)) and (JSON[P] = '{') then Inc(P) else Continue;
-        Rule.Vowel := ResolveStringValue(VowelName);
-        Rule.DefaultVal := '';
-        Rule.BaselineRightVal := '';
-        SetLength(Rule.Mappings, 0);
-        while P <= Length(JSON) do
-        begin
-          JSkipWS(JSON, P);
-          if (P > Length(JSON)) or (JSON[P] = '}') then begin Inc(P); Break; end;
-          if JSON[P] = ',' then begin Inc(P); Continue; end;
-          Field := JReadString(JSON, P);
-          JSkipWS(JSON, P);
-          if (P <= Length(JSON)) and (JSON[P] = ':') then Inc(P);
-          JSkipWS(JSON, P);
-          if Field = 'default' then
-            Rule.DefaultVal := ResolveStringValue(JReadString(JSON, P))
-          else if Field = 'baselineRight' then
-            Rule.BaselineRightVal := ResolveStringValue(JReadString(JSON, P))
-          else if Field = 'mappings' then
-          begin
-            if (P <= Length(JSON)) and (JSON[P] = '[') then Inc(P) else Continue;
-            while P <= Length(JSON) do
-            begin
-              JSkipWS(JSON, P);
-              if (P > Length(JSON)) or (JSON[P] = ']') then begin Inc(P); Break; end;
-              if JSON[P] = ',' then begin Inc(P); Continue; end;
-              if (P <= Length(JSON)) and (JSON[P] = '{') then Inc(P) else Continue;
-              Map.Consonants := '';
-              Map.Value := '';
-              Map.AltValue := '';
-              while P <= Length(JSON) do
-              begin
-                JSkipWS(JSON, P);
-                if (P > Length(JSON)) or (JSON[P] = '}') then begin Inc(P); Break; end;
-                if JSON[P] = ',' then begin Inc(P); Continue; end;
-                MapField := JReadString(JSON, P);
-                JSkipWS(JSON, P);
-                if (P <= Length(JSON)) and (JSON[P] = ':') then Inc(P);
-                JSkipWS(JSON, P);
-                if MapField = 'consonants' then
-                  Map.Consonants := ResolveStringValue(JReadString(JSON, P))
-                else if MapField = 'value' then
-                  Map.Value := ResolveStringValue(JReadString(JSON, P))
-                else if MapField = 'alt' then
-                  Map.AltValue := ResolveStringValue(JReadString(JSON, P))
-                else
-                  JSkipValue(JSON, P);
-              end;
-              SetLength(Rule.Mappings, Length(Rule.Mappings) + 1);
-              Rule.Mappings[High(Rule.Mappings)] := Map;
-            end;
-          end
-          else
-            JSkipValue(JSON, P);
-        end;
-        VowelRulesList.Add(Rule);
-      end;
-    end
-    else if Key = 'ConsonantGroups' then
-    begin
-      ConsonantGroupsFound := True;
-      if (P <= Length(JSON)) and (JSON[P] = '{') then Inc(P) else Continue;
-
-      if ConsonantGroupsMap = nil then
-        ConsonantGroupsMap := TDictionary<string, TList<string>>.Create
-      else
-      begin
-        for GroupPair in ConsonantGroupsMap do
-          GroupPair.Value.Free;
-        ConsonantGroupsMap.Clear;
-      end;
-
-      while P <= Length(JSON) do
-      begin
-        JSkipWS(JSON, P);
-        if (P > Length(JSON)) or (JSON[P] = '}') then begin Inc(P); Break; end;
-        if JSON[P] = ',' then begin Inc(P); Continue; end;
-
-        CatName := JReadString(JSON, P);
-        JSkipWS(JSON, P);
-        if (P <= Length(JSON)) and (JSON[P] = ':') then Inc(P);
-        JSkipWS(JSON, P);
-
-        if (P <= Length(JSON)) and (JSON[P] = '[') then Inc(P) else Continue;
-
-        GroupList := TList<string>.Create;
-        while P <= Length(JSON) do
-        begin
-          JSkipWS(JSON, P);
-          if (P > Length(JSON)) or (JSON[P] = ']') then begin Inc(P); Break; end;
-          if JSON[P] = ',' then begin Inc(P); Continue; end;
-          if JSON[P] = '"' then
-            GroupList.Add(ResolveStringValue(JReadString(JSON, P)))
-          else
-            JSkipValue(JSON, P);
-        end;
-        ConsonantGroupsMap.AddOrSetValue(CatName, GroupList);
-      end;
-    end
     else
       JSkipValue(JSON, P);
   end;
 
-  // Sort ONLY FullForms by key length (longest first) to prevent partial matching
+  // Sort replacement arrays by key length (longest first)
   if Length(CustomFullForms) > 0 then
     TArray.Sort<TReplacementPair>(CustomFullForms, TComparer<TReplacementPair>.Construct(
       function(const L, R: TReplacementPair): Integer
       begin Result := R.Key.Length - L.Key.Length; end));
-      
-  // Dynamic Pre/Post Replacements must execute in their natural JSON order.
-  // No sorting performed on CustomPreReplacements or CustomPostReplacements.
-
-  if not ConsonantGroupsFound then
-    InitializeDefaultConsonantGroups;
+  if Length(CustomPreReplacements) > 0 then
+    TArray.Sort<TReplacementPair>(CustomPreReplacements, TComparer<TReplacementPair>.Construct(
+      function(const L, R: TReplacementPair): Integer
+      begin Result := R.Key.Length - L.Key.Length; end));
+  if Length(CustomPostReplacements) > 0 then
+    TArray.Sort<TReplacementPair>(CustomPostReplacements, TComparer<TReplacementPair>.Construct(
+      function(const L, R: TReplacementPair): Integer
+      begin Result := R.Key.Length - L.Key.Length; end));
 
   PrepareActiveReplacements;
   JSON := '';
@@ -2203,7 +1973,10 @@ begin
   begin
     if (Rec.Category = 'FullForms') and (Rec.BengaliChar <> '') then
     begin
-      Val := PString(Rec.Ptr)^;
+      if Rec.VarType = avChar then
+        Val := string(PChar(Rec.Ptr)^)
+      else
+        Val := PString(Rec.Ptr)^;
       SetLength(Result, 1);
       Result[0].Key := Rec.BengaliChar;
       Result[0].Value := Val;
@@ -2256,7 +2029,10 @@ begin
   try
     for Rec in AnsiRegistry do
     begin
-      Val := PString(Rec.Ptr)^;
+      if Rec.VarType = avChar then
+        Val := string(PChar(Rec.Ptr)^)
+      else
+        Val := PString(Rec.Ptr)^;
 
       if not CatMap.TryGetValue(Rec.Category, CatSB) then
       begin
@@ -2487,12 +2263,5 @@ finalization
   AnsiRegistry.Free;
   AnsiRegistryMap.Free;
   AnsiOverrides.Free;
-  if ConsonantGroupsMap <> nil then
-  begin
-    for var GroupPair in ConsonantGroupsMap do
-      GroupPair.Value.Free;
-    ConsonantGroupsMap.Free;
-  end;
-  VowelRulesList.Free;
 
 end.

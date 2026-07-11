@@ -1498,6 +1498,10 @@
           "alt": "#{A_UKar1}"
         },
         {
+          "consonants": "RaPhalas",
+          "value": "#{A_UKar2}"
+        },
+        {
           "consonants": "BaseLineRight",
           "value": "#{A_UKar1}"
         }
@@ -1521,6 +1525,10 @@
           "alt": "#{A_UUKar1}"
         },
         {
+          "consonants": "RaPhalas",
+          "value": "#{A_UUKar2}"
+        },
+        {
           "consonants": "BaseLineRight",
           "value": "#{A_UUKar1}"
         }
@@ -1534,6 +1542,10 @@
           "value": "#{A_RRIKar1}"
         },
         {
+          "consonants": "RaPhalas",
+          "value": "#{A_RRIKar1}"
+        },
+        {
           "consonants": "BaseLineRight",
           "value": "#{A_RRIKar1}"
         },
@@ -1543,6 +1555,10 @@
         }
       ]
     }
+  },
+  "AnsiGroups": {
+    "RaPhalas": ["#$C6", "#$C8", "#$C9", "#$CA", "#$CB", "#$CC"],
+    "Connectors": ["#$FE", "#$E9"]
   },
   "ConsonantGroups": {
     "BelowBaseVariant": [
