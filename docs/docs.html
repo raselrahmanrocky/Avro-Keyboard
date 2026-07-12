@@ -275,28 +275,56 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
+      user-select: none;
     }
 
     details.premium-card .details-content {
       max-height: 0;
       overflow: hidden;
       opacity: 0;
-      transition: max-height 0.50s ease, opacity 0.40s ease, padding 0.40s ease;
       padding: 0 20px;
       box-sizing: border-box;
+      transition: max-height 0.4s ease, opacity 0.4s ease, padding 0.4s ease;
     }
 
+    /* When open the card */
     details.premium-card.open .details-content {
+      max-height: 500px;
       opacity: 1;
       padding: 16px 20px 20px;
     }
-    details.premium-card.open summary > .material-symbols-outlined {
+
+
+    details.premium-card.open summary>.material-symbols-outlined {
       transform: rotate(180deg);
+    }
+
+    /* Sub-details inside premium-card — smooth open/close animation */
+    details.premium-card details> :not(summary) {
+      overflow: hidden;
+      max-height: 0;
+      opacity: 0;
+      margin: 0 !important;
+      padding: 0 !important;
+      transition: max-height 0.50s ease, opacity 0.40s ease, padding 0.40s ease;
+    }
+
+    details.premium-card details.open> :not(summary) {
+      opacity: 1;
+      padding: 0.5rem 0 0 1rem !important;
     }
 
     .text-md {
       font-size: 1.0rem !important;
       line-height: 1.5rem !important;
+    }
+
+    pre {
+      font-family: 'Fira Code', monospace;
+      font-size: 0.9rem;
+      line-height: 1.4rem;
+      overflow: auto;
+      display: block;
     }
   </style>
   <link rel="stylesheet"
@@ -623,7 +651,8 @@
           </summary>
           <div class="details-content text-zinc-400 leading-relaxed space-y-3">
             <p>আপনি যখন বাংলায় টাইপ করেন — যেমন "সালাম" — আপনার কম্পিউটার ইউনিকোড (Unicode) ব্যবহার করে। কিন্তু পুরনো
-              অনেক ফন্ট (যেমন সোটনমিজে / বিজয়) ইউনিকোড বোঝে না। তারা ANSI এনকোডিং বোঝে।</p>
+              ফন্ট গুলো যেহেতু অনেক আগে তৈরি করা হয়েছে তখন (Unicode Encoding) বলতে কোন কিছু ছিল না। ইংরেজি অক্ষরের উপর
+              বাংলা অক্ষরকে বসিয়ে ফন্ট গুলো তৈরি করা হতো। যাকে (ANSI Encoding) বলা হয়। </p>
             <p>এই JSON ফাইলটি হল সেই <strong class="text-white">অনুবাদক</strong> — এটি বলে দেয় প্রতিটি ইউনিকোড বর্ণের
               জন্য কোন ANSI কোড ব্যবহার করতে হবে। যেমন:</p>
             <pre class="bg-black/40 p-3 rounded-lg text-zinc-300 text-md">স (ইউনিকোড) &#x2192; #$A2 (ANSI কোড)
@@ -654,7 +683,7 @@
   "ConsonantGroups":     // ইউনিকোড ব্যঞ্জনবর্ণের গ্রুপ
   "AnsiGroups":          // ANSI কোডপয়েন্টের গ্রুপ (RaPhalas, Connectors)
 }</pre>
-            <details>
+            <details open>
               <summary class="font-semibold text-indigo-300 cursor-pointer text-md">Constants &#x2192; ৭টি উপবিভাগ
               </summary>
               <div class="mt-2 space-y-2 pl-4">
@@ -674,7 +703,7 @@
                     class="text-md">"A_ZFola": { "Value": "#$C4", "Comment": "য-ফলা" }</code></p>
               </div>
             </details>
-            <details>
+            <details open>
               <summary class="font-semibold text-indigo-300 cursor-pointer text-md">ConsonantGroups &#x2192; ব্যঞ্জনবর্ণ
                 গ্রুপ</summary>
               <div class="mt-2 pl-4">
@@ -684,7 +713,7 @@
                   class="bg-black/40 p-2 rounded-lg text-zinc-300 text-md mt-1">"BaseLineRight": ["খ", "গ", "ঘ", "ন", "প", "ব", "ম", "ল", "স", "হ"]</pre>
               </div>
             </details>
-            <details>
+            <details open>
               <summary class="font-semibold text-indigo-300 cursor-pointer text-md">AnsiGroups &#x2192; ANSI কোডপয়েন্ট
                 গ্রুপ</summary>
               <div class="mt-2 pl-4">
@@ -724,7 +753,7 @@
     &#x2193;
 <span class="text-white font-bold">‡yv (ANSI আউটপুট)</span></pre>
 
-            <details>
+            <details open>
               <summary class="font-semibold text-indigo-300 cursor-pointer text-md">&#x2776; FullFormReplacements —
                 বিস্তারিত</summary>
               <div class="mt-2 pl-4 space-y-2">
@@ -734,7 +763,7 @@
 ন্ত   &#x2192; #$68#$73#$FE</pre>
               </div>
             </details>
-            <details>
+            <details open>
               <summary class="font-semibold text-indigo-300 cursor-pointer text-md">&#x2777; PreReplacements — বিস্তারিত
               </summary>
               <div class="mt-2 pl-4">
@@ -743,21 +772,21 @@
                 <pre class="bg-black/40 p-2 rounded-lg text-zinc-300 text-md">&#x09CD;&#x0964; &#x2192; #$FF</pre>
               </div>
             </details>
-            <details>
+            <details open>
               <summary class="font-semibold text-indigo-300 cursor-pointer text-md">&#x2778; ReplaceFullForms —
                 বিস্তারিত</summary>
               <div class="mt-2 pl-4">
                 <p>FirstHalfForms ও SecondHalfForms ব্যবহার করে যুক্তাক্ষর তৈরি। যেমন র-এর রেফ + প = র্প।</p>
               </div>
             </details>
-            <details>
+            <details open>
               <summary class="font-semibold text-indigo-300 cursor-pointer text-md">&#x2779; ReplaceKarsVowels —
                 বিস্তারিত</summary>
               <div class="mt-2 pl-4">
                 <p>সবচেয়ে জটিল ধাপ। কারচিহ্ন (ু, ূ, ৃ) বসানোর জন্য VowelRules ব্যবহার করে। নিচে বিস্তারিত দেখুন।</p>
               </div>
             </details>
-            <details>
+            <details open>
               <summary class="font-semibold text-indigo-300 cursor-pointer text-md">&#x277A; PostReplacements —
                 বিস্তারিত</summary>
               <div class="mt-2 pl-4 space-y-2">
@@ -766,7 +795,7 @@
                   class="bg-black/40 p-2 rounded-lg text-zinc-300 text-md">"Key": "#$FE#{A_UKar1}", "Value": "#{A_UKar1}#$FE"</pre>
               </div>
             </details>
-            <details>
+            <details open>
               <summary class="font-semibold text-indigo-300 cursor-pointer text-md">&#x277B; FinalTouch — বিস্তারিত
               </summary>
               <div class="mt-2 pl-4 space-y-1">
@@ -823,15 +852,18 @@
               <p><span class="text-indigo-300 font-bold">স্তর ১ — Direct Unicode Char:</span>
                 <code>"consonants"</code>-এর মান যদি একটি ইউনিকোড বর্ণ হয় (যেমন <code>"#$09B0"</code> বা
                 <code>"র"</code>), তাহলে পূর্ববর্তী বর্ণের সাথে সরাসরি তুলনা করা হয়। মিললে <code>value</code> ব্যবহার
-                হয়।</p>
+                হয়।
+              </p>
               <p><span class="text-indigo-300 font-bold">স্তর ২ — ConsonantGroups (Unicode):</span> যদি
                 <code>"consonants"</code> ConsonantGroups সেকশনের একটি গ্রুপের নাম হয় (যেমন
                 <code>"BaseLineRight"</code>, <code>"BottomCenter"</code>), তাহলে গ্রুপের তালিকায় পূর্ববর্তী বর্ণ আছে
-                কিনা চেক করা হয়।</p>
+                কিনা চেক করা হয়।
+              </p>
               <p><span class="text-indigo-300 font-bold">স্তর ৩ — AnsiGroups (ANSI):</span> যদি গ্রুপটি AnsiGroups
                 সেকশনে থাকে (যেমন <code>"RaPhalas"</code>), তাহলে ANSI কোডপয়েন্টের সাথে ম্যাচ করা হয়।</p>
               <p><span class="text-indigo-300 font-bold">সর্বশেষ — Default:</span> উপরের কোনোটাই না মিললে
-                <code>"default"</code> মান ব্যবহার হয়।</p>
+                <code>"default"</code> মান ব্যবহার হয়।
+              </p>
             </div>
 
             <h4 class="text-white font-semibold mt-4">alt (Toggle) ফিল্ড</h4>
@@ -845,7 +877,8 @@
             </div>
             <div class="bg-indigo-900/20 border border-indigo-800/30 p-3 rounded-lg">
               <p><strong class="text-white">টু (ট + উ-কার):</strong> 'ট' BelowBaseVariant গ্রুপে আছে (স্তর ২) &#x2192;
-                <code>value = #$0024</code> (নিচে বসা উ-কার)।</p>
+                <code>value = #$0024</code> (নিচে বসা উ-কার)।
+              </p>
             </div>
             <div class="bg-indigo-900/20 border border-indigo-800/30 p-3 rounded-lg">
               <p><strong class="text-white">ক্রু (ক্র + উ-কার):</strong> 'ক্র'-এর ANSI-তে র-ফলা <code>#$C6</code> থাকে —
@@ -853,11 +886,13 @@
             </div>
             <div class="bg-indigo-900/20 border border-indigo-800/30 p-3 rounded-lg">
               <p><strong class="text-white">গু (গ + উ-কার):</strong> 'গ' BaseLineRight গ্রুপে (স্তর ২) &#x2192;
-                <code>A_UKar1</code> (সাধারণ উ-কার)।</p>
+                <code>A_UKar1</code> (সাধারণ উ-কার)।
+              </p>
             </div>
             <div class="bg-indigo-900/20 border border-indigo-800/30 p-3 rounded-lg">
               <p><strong class="text-white">ড়ু (ড় + উ-কার):</strong> 'ড়' কোনো গ্রুপেই নেই &#x2192;
-                <code>default = A_UKar1</code>।</p>
+                <code>default = A_UKar1</code>।
+              </p>
             </div>
 
             <div class="mt-6 bg-black/40 p-4 rounded-lg border border-indigo-900/30">
@@ -896,14 +931,16 @@
               <p class="text-md text-zinc-400 mt-2">ইঞ্জিন VowelRulesList লুপ করে → প্রতিটি Rule.Vowel ম্যাচ করে →
                 Mappings-এ <code>ConsonantGroupsMap.TryGetValue(Map.Consonants, GroupList)</code> কল করে →
                 <code>GroupList.Contains(AConsonant)</code> দিয়ে বর্ণটি গ্রুপে আছে কিনা চেক করে। ম্যাচ পেলে
-                <code>value</code> ব্যবহার করে, না পেলে <code>default</code>।</p>
+                <code>value</code> ব্যবহার করে, না পেলে <code>default</code>।
+              </p>
             </div>
 
             <div class="mt-4 bg-black/40 p-4 rounded-lg border border-indigo-900/30">
               <h4 class="text-white font-semibold mb-2">&#x2778; VowelRules-এ AnsiGroups-এর ব্যবহার (স্তর ৩)</h4>
               <p class="text-md text-zinc-400">যখন কোনো বর্ণ রূপান্তরের পরে ANSI-তে কনভার্ট হয়ে যায় (যেমন র-ফলা গ্লিফ
                 <code>#$C6</code>), তখন ConsonantGroups (ইউনিকোড) দিয়ে ম্যাচ করা যায় না — কারণ ইউনিকোড বর্ণটি আর নেই।
-                সেক্ষেত্রে AnsiGroups ব্যবহার করা হয়:</p>
+                সেক্ষেত্রে AnsiGroups ব্যবহার করা হয়:
+              </p>
               <pre class="bg-black/40 p-2 rounded-lg text-zinc-300 text-md mt-2">"mappings": [
   {
     "consonants": "RaPhalas",    // AnsiGroups নাম
@@ -921,7 +958,8 @@
             <div class="mt-4 bg-black/40 p-4 rounded-lg border border-indigo-900/30">
               <h4 class="text-white font-semibold mb-2">&#x2779; GetVowelGlyph — ভেতরে কী হয়?</h4>
               <p class="text-md text-zinc-400">VowelRules প্রক্রিয়াকরণের সময়
-                <code>GetVowelGlyph(AVowel, AConsonant, UseAlt)</code> ফাংশনটি নিচের ধাপগুলো সম্পন্ন করে:</p>
+                <code>GetVowelGlyph(AVowel, AConsonant, UseAlt)</code> ফাংশনটি নিচের ধাপগুলো সম্পন্ন করে:
+              </p>
               <pre class="bg-black/40 p-2 rounded-lg text-zinc-300 text-md mt-2">1. VowelRulesList = nil? → সরাসরি A_UKar1/A_UUKar1/A_RRIKar2 রিটার্ন করে (fallback)
 2. VowelRulesList লুপ → Rule.Vowel = AVowel (যেমন #$09C1 = উ-কার) খোঁজে
 3. প্রতিটি Mappings-এ:
@@ -933,7 +971,8 @@
               <p class="text-md text-zinc-400 mt-2"><strong class="text-white">গুরুত্বপূর্ণ:</strong>
                 ReplaceFullForms-এর পর চলে, তাই পূর্ববর্তী বর্ণ ANSI-তে কনভার্ট হয়ে যেতে পারে —
                 <code>ContainsBengaliChar</code> চেক করে না পেলে <code>fUniText</code> (মূল ইউনিকোড) ব্যবহার করে
-                পূর্ববর্তী বর্ণ বের করে।</p>
+                পূর্ববর্তী বর্ণ বের করে।
+              </p>
             </div>
           </div>
         </details>
@@ -1000,7 +1039,8 @@
                     বা সোজা</span></p>
                 <p class="text-md text-zinc-400">যেসব বর্ণের নিচে সাধারণ র-ফলা ঝুলে না থেকে সোজা বা ছাতার মতো বসে। যেমন:
                   <code>ট্র</code>, <code>ড্র</code>, <code>ঢ্র</code> (এবং যুক্তবর্ণ যেমন <code>ণ্ট্র</code>,
-                  <code>ণ্ড্র</code>, <code>ষ্ট্র</code>)।</p>
+                  <code>ণ্ড্র</code>, <code>ষ্ট্র</code>)।
+                </p>
                 <p class="text-md text-zinc-400 mt-1">কেন আলাদা: এদের নিচে উ-কার দিলে সেটি সাধারণ উ-কারের মতো না হয়ে
                   ফন্টের ভেতরে থাকা একটি বিশেষ গ্লিফ (যেমন <code>#$0024</code> বা <code>$</code>) ব্যবহার করতে হয়।</p>
               </div>
@@ -1020,7 +1060,8 @@
                     বা স্টেম যুক্ত বর্ণ</span></p>
                 <p class="text-md text-zinc-400">যেসব বর্ণের ডানপাশে খাড়া টান আছে এবং নিচে ডান কোণায় র-ফলা বা উ-কার বসে।
                   যেমন: <code>খ</code>, <code>গ</code>, <code>ঘ</code>, <code>ণ</code>, <code>থ</code>, <code>দ</code>,
-                  <code>ধ</code>, <code>ন</code>, <code>প</code> ইত্যাদি এবং এদের দিয়ে তৈরি যুক্তবর্ণ।</p>
+                  <code>ধ</code>, <code>ন</code>, <code>প</code> ইত্যাদি এবং এদের দিয়ে তৈরি যুক্তবর্ণ।
+                </p>
                 <p class="text-md text-zinc-400 mt-1">কেন আলাদা: এদের নিচে সাধারণ ঝুলন্ত উ-কার (<code>A_UKar1</code>)
                   বসে।</p>
               </div>
@@ -1358,7 +1399,8 @@
             <div class="bg-black/30 p-4 rounded-lg text-md space-y-2">
               <p><span class="text-indigo-300 font-bold">সংগতি:</span> এক জায়গায় পরিবর্তন করুন, সব জায়গায় আপডেট হবে।</p>
               <p><span class="text-indigo-300 font-bold">পাঠযোগ্যতা:</span> <code>#{A_UKar2}</code> বোঝা সহজ,
-                <code>#$25</code> বোঝা কঠিন।</p>
+                <code>#$25</code> বোঝা কঠিন।
+              </p>
               <p><span class="text-indigo-300 font-bold">ভার্সনিং:</span> প্রতি AnsiVersion-এর জন্য আলাদা Constants সেট।
               </p>
             </div>
@@ -2339,6 +2381,38 @@ ConsonantGroups? "RaPhalas" গ্রুপ নেই → No
         c.style.maxHeight = d.classList.contains('open') ? c.scrollHeight + 'px' : '0px';
         if (d.classList.contains('open')) c.style.maxHeight = 'none';
       });
+
+      document.querySelectorAll('details.premium-card details').forEach(d => {
+        const c = d.querySelector(':scope > :not(summary)');
+        const s = d.querySelector('summary');
+        if (!c || !s) return;
+
+        function onOpenEnd(e) {
+          if (e.propertyName !== 'max-height') return;
+          c.removeEventListener('transitionend', onOpenEnd);
+          if (d.classList.contains('open')) c.style.maxHeight = 'none';
+        }
+
+        s.addEventListener('click', e => {
+          e.preventDefault();
+          if (d.classList.contains('open')) {
+            c.style.maxHeight = c.offsetHeight + 'px';
+            void c.offsetHeight;
+            d.classList.remove('open');
+            c.style.maxHeight = '0px';
+          } else {
+            d.classList.add('open');
+            const h = c.scrollHeight;
+            c.style.maxHeight = '0px';
+            void c.offsetHeight;
+            c.style.maxHeight = h + 'px';
+            c.addEventListener('transitionend', onOpenEnd);
+          }
+        });
+
+        c.style.maxHeight = d.classList.contains('open') ? c.scrollHeight + 'px' : '0px';
+        if (d.classList.contains('open')) c.style.maxHeight = 'none';
+      });
     }
 
     // Initial state
@@ -2347,6 +2421,8 @@ ConsonantGroups? "RaPhalas" গ্রুপ নেই → No
     setupSubTabListeners();
     renderAll();
     initDetails();
+
+
   </script>
 
 </body>
