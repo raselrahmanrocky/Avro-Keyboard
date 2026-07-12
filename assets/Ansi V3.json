@@ -1133,36 +1133,6 @@
       "Comment": "স্ত্ব"
     },
     {
-      "Key": "#$0021",
-      "Value": "#$E6",
-      "Comment": "!"
-    },
-    {
-      "Key": "#$002A",
-      "Value": "#$A0",
-      "Comment": "*"
-    },
-    {
-      "Key": "#$003B",
-      "Value": "#$2014",
-      "Comment": ";"
-    },
-    {
-      "Key": "#$002C",
-      "Value": "#$2013",
-      "Comment": ","
-    },
-    {
-      "Key": "#$003F",
-      "Value": "#$DA",
-      "Comment": "?"
-    },
-    {
-      "Key": "#$003A",
-      "Value": "#$AD",
-      "Comment": ":"
-    },
-    {
       "Key": "#$0997#$09CD#$09B0",
       "Value": "#$40#$F9#$CC",
       "Comment": "গ্র"
@@ -1330,6 +1300,36 @@
       "Key": "#$09CD#$0964",
       "Value": "#$FF",
       "Comment": "্। থেকে সরাসরি ব্যাকস্ল্যাশ"
+    },
+    {
+      "Key": "#$0021",
+      "Value": "#$E6",
+      "Comment": "!"
+    },
+    {
+      "Key": "#$002A",
+      "Value": "#$A0",
+      "Comment": "*"
+    },
+    {
+      "Key": "#$003B",
+      "Value": "#$2014",
+      "Comment": ";"
+    },
+    {
+      "Key": "#$002C",
+      "Value": "#$2013",
+      "Comment": ","
+    },
+    {
+      "Key": "#$003F",
+      "Value": "#$DA",
+      "Comment": "?"
+    },
+    {
+      "Key": "#$003A",
+      "Value": "#$AD",
+      "Comment": ":"
     }
   ],
   "PostReplacements": [
@@ -1482,6 +1482,7 @@
   "VowelRules": {
     "#$09C1": {
       "default": "#{A_UKar1}",
+      "toggle": "both",
       "mappings": [
         {
           "consonants": "#$09B0",
@@ -1509,6 +1510,7 @@
     },
     "#$09C2": {
       "default": "#{A_UUKar1}",
+      "toggle": "both",
       "mappings": [
         {
           "consonants": "#$09B0",
