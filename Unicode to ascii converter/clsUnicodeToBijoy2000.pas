@@ -16,6 +16,24 @@ uses
   System.Generics.Collections;
 
 type
+  TVowelRuleMapping = record
+    Consonants: string;
+    Value: string;
+    Alt: string;
+    ToggleOnBackspace: Boolean;
+    ToggleOnRepeat: Boolean;
+  end;
+
+  TVowelRule = record
+    KarChar: string;
+    DefaultVal: string;
+    Toggle: string;
+    ToggleOnBackspace: Boolean;
+    ToggleOnRepeat: Boolean;
+    Mappings: TArray<TVowelRuleMapping>;
+  end;
+
+type
   TUnicodeToBijoy2000 = class
     private
       fUniText:       string;
@@ -41,6 +59,9 @@ type
       function IsVowel(C: Char): Boolean;
       function GetToggleState(const Key: string): Boolean;
       procedure SetToggleState(const Key: string; Value: Boolean);
+      function RuleHasAnyToggle(const Rule: TVowelRule): Boolean;
+      function FindMappingToggle(const Rule: TVowelRule; const ConsonantPart: string;
+        out MappingToggleOnBackspace, MappingToggleOnRepeat: Boolean): Boolean;
       procedure ApplyRuleForKar(const KarChar: string);
     public
       destructor Destroy; override;
@@ -61,22 +82,6 @@ type
     Ptr: Pointer;
     DefaultVal: string;
     BengaliChar: string;
-  end;
-
-type
-  TVowelRuleMapping = record
-    Consonants: string;
-    Value: string;
-    Alt: string;
-  end;
-
-  TVowelRule = record
-    KarChar: string;
-    DefaultVal: string;
-    Toggle: string;
-    ToggleOnBackspace: Boolean;
-    ToggleOnRepeat: Boolean;
-    Mappings: TArray<TVowelRuleMapping>;
   end;
 
 var
@@ -861,6 +866,8 @@ var
   HasTrailingHasanta: Boolean;
   Rule: TVowelRule;
   ConsonantPart: string;
+  MapToggleBack: Boolean;
+  MapToggleRepeat: Boolean;
 begin
   if UniText = '' then
   begin
@@ -882,20 +889,38 @@ begin
 
   for Rule in VowelRules do
   begin
-    if not (Rule.ToggleOnBackspace or Rule.ToggleOnRepeat) then
+    if not RuleHasAnyToggle(Rule) then
       Continue;
 
-    if Rule.ToggleOnBackspace and (fLastUniText <> '') then
+    if fLastUniText <> '' then
     begin
       ConsonantPart := UniText;
       if (Length(fLastUniText) = Length(ConsonantPart) + Length(Rule.KarChar)) and
          (Copy(fLastUniText, 1, Length(ConsonantPart)) = ConsonantPart) and
          (Copy(fLastUniText, Length(ConsonantPart) + 1, Length(Rule.KarChar)) = Rule.KarChar) then
-        SetToggleState(Rule.KarChar, not GetToggleState(Rule.KarChar));
+      begin
+        // A backspace removed the kar: resolve the per-mapping toggle configuration
+        FindMappingToggle(Rule, ConsonantPart, MapToggleBack, MapToggleRepeat);
+        if MapToggleBack then
+          SetToggleState(Rule.KarChar, not GetToggleState(Rule.KarChar));
+      end;
     end;
 
-    if Rule.ToggleOnRepeat and (UniText = fLastUniText) and (UniText <> '') then
-      SetToggleState(Rule.KarChar, not GetToggleState(Rule.KarChar));
+    if (UniText = fLastUniText) and (UniText <> '') then
+    begin
+      // Extract consonant part prior to the vowel kar on key repeat
+      ConsonantPart := UniText;
+      if (Length(ConsonantPart) >= Length(Rule.KarChar)) and
+         (Copy(ConsonantPart, Length(ConsonantPart) - Length(Rule.KarChar) + 1, Length(Rule.KarChar)) = Rule.KarChar) then
+      begin
+        ConsonantPart := Copy(ConsonantPart, 1, Length(ConsonantPart) - Length(Rule.KarChar));
+      end;
+
+      // A repeat of identical text: resolve the per-mapping toggle configuration
+      FindMappingToggle(Rule, ConsonantPart, MapToggleBack, MapToggleRepeat);
+      if MapToggleRepeat then
+        SetToggleState(Rule.KarChar, not GetToggleState(Rule.KarChar));
+    end;
   end;
 
   fLastUniText := UniText;
@@ -1266,6 +1291,8 @@ begin
   I := 1;
   while I <= Length(Result) do
   begin
+    if (I < Length(Result)) and (Result[I] = '#') and (Result[I + 1] = '#') then // Fallback to handle possible syntax anomalies
+      Inc(I);
     if (I < Length(Result)) and (Result[I] = '#') and (Result[I + 1] = '{') then
     begin
       J := I + 2;
@@ -1458,6 +1485,73 @@ begin
   fConvertedText := ReplaceStr(fConvertedText, b_OI, A_OI);
   fConvertedText := ReplaceStr(fConvertedText, b_O, A_O);
   fConvertedText := ReplaceStr(fConvertedText, b_OU, A_OU);
+end;
+
+{ =============================================================================== }
+
+function TUnicodeToBijoy2000.RuleHasAnyToggle(const Rule: TVowelRule): Boolean;
+var
+  M: TVowelRuleMapping;
+begin
+  Result := Rule.ToggleOnBackspace or Rule.ToggleOnRepeat;
+  if not Result then
+    for M in Rule.Mappings do
+      if M.ToggleOnBackspace or M.ToggleOnRepeat then
+      begin
+        Result := True;
+        Exit;
+      end;
+end;
+
+function TUnicodeToBijoy2000.FindMappingToggle(const Rule: TVowelRule;
+  const ConsonantPart: string; out MappingToggleOnBackspace, MappingToggleOnRepeat: Boolean): Boolean;
+var
+  Mapping: TVowelRuleMapping;
+  LastC: string;
+  ActualConsonantPart: string;
+  Len: Integer;
+begin
+  // Fallback to the rule-level (global) toggle settings when no specific
+  // mapping matches the current consonant context.
+  MappingToggleOnBackspace := Rule.ToggleOnBackspace;
+  MappingToggleOnRepeat := Rule.ToggleOnRepeat;
+  Result := False;
+
+  if ConsonantPart = '' then
+    Exit;
+
+  ActualConsonantPart := ConsonantPart;
+  Len := Length(ActualConsonantPart);
+
+  // If the cluster ends with b_Hasanta + b_z (Unicode representation of Z-fola/য-ফলা),
+  // safely strip it to accurately find the preceding base consonant.
+  if (Len >= 2) and 
+     (Copy(ActualConsonantPart, Len, 1) = b_z) and 
+     (Copy(ActualConsonantPart, Len - 1, 1) = b_Hasanta) then
+  begin
+    ActualConsonantPart := Copy(ActualConsonantPart, 1, Len - 2);
+    Len := Length(ActualConsonantPart);
+  end;
+
+  if ActualConsonantPart = '' then
+    Exit;
+
+  // Use Copy/Length (RTL-safe for Delphi 2007/XE+) instead of newer helpers.
+  LastC := Copy(ActualConsonantPart, Len, 1);
+
+  for Mapping in Rule.Mappings do
+  begin
+    if Mapping.Consonants = '' then
+      Continue;
+    if (LastC = Mapping.Consonants) or
+       MatchesGroup(ActualConsonantPart, Len, Mapping.Consonants) then
+    begin
+      MappingToggleOnBackspace := Mapping.ToggleOnBackspace;
+      MappingToggleOnRepeat := Mapping.ToggleOnRepeat;
+      Result := True;
+      Exit;
+    end;
+  end;
 end;
 
 { =============================================================================== }
@@ -1947,7 +2041,7 @@ procedure LoadAnsiMapping(const Path: string; ErrorLog: TStringList = nil);
 var
   JSON: string;
   P: Integer;
-  Key, ConstName, ConstValue, CatName, FieldName: string;
+  Key, ConstName, ConstValue, CatName, FieldName, ToggleVal: string;
   Rec: TAnsiVarRec;
   Lines: TStringList;
   Items: TList<string>;
@@ -2311,6 +2405,8 @@ begin
                       Consonants := '';
                       Value := '';
                       Alt := '';
+                      ToggleOnBackspace := False;
+                      ToggleOnRepeat := False;
                       while P <= Length(JSON) do
                       begin
                         JSkipWS(JSON, P);
@@ -2325,6 +2421,12 @@ begin
                           Value := JReadString(JSON, P)
                         else if FieldName = 'alt' then
                           Alt := JReadString(JSON, P)
+                        else if FieldName = 'toggle' then
+                        begin
+                          ToggleVal := JReadString(JSON, P);
+                          ToggleOnBackspace := (ToggleVal = 'backspace') or (ToggleVal = 'both');
+                          ToggleOnRepeat := (ToggleVal = 'repeat') or (ToggleVal = 'both');
+                        end
                         else
                           JSkipValue(JSON, P);
                       end;
