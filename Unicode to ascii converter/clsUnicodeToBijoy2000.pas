@@ -57,8 +57,8 @@ type
       function BaseLineRightCharacter(const wC: string): Boolean;
       function WideStuffString(Source: string; Start, Len: Integer; SubString: string): string;
       function IsVowel(C: Char): Boolean;
-      function GetToggleState(const Key: string): Boolean;
-      procedure SetToggleState(const Key: string; Value: Boolean);
+      function GetToggleState(const Context, Key: string; OccurrenceIndex: Integer): Boolean;
+      procedure SetToggleState(const Context, Key: string; OccurrenceIndex: Integer; Value: Boolean);
       function RuleHasAnyToggle(const Rule: TVowelRule): Boolean;
       function FindMappingToggle(const Rule: TVowelRule; const ConsonantPart: string;
         out MappingToggleOnBackspace, MappingToggleOnRepeat: Boolean): Boolean;
@@ -327,6 +327,45 @@ var
 { ============================================================================= }
 { Registry Initialization }
 { ============================================================================= }
+
+function CountOccurrences(const SubStr, S: string): Integer;
+var
+  PosIdx: Integer;
+begin
+  Result := 0;
+  if (SubStr = '') or (S = '') then Exit;
+  PosIdx := Pos(SubStr, S);
+  while PosIdx > 0 do
+  begin
+    Inc(Result);
+    PosIdx := PosEx(SubStr, S, PosIdx + Length(SubStr));
+  end;
+end;
+
+// Resolves the effective preceding consonant for a kar at KarPos within Text.
+// Mirrors the Z-fola-aware context logic used inside ApplyRuleForKar so that
+// the toggle key stays identical between the Set (Convert) and Get (ApplyRuleForKar) sides.
+function ResolveContextChar(const Text: string; KarPos: Integer): string;
+var
+  PrecedingChar: string;
+  ContextEnd: Integer;
+  IsZfola: Boolean;
+begin
+  if KarPos - 1 < 1 then
+    Exit('');
+  PrecedingChar := Text[KarPos - 1];
+  ContextEnd := KarPos - 1;
+  IsZfola := (PrecedingChar = b_z) and (KarPos - 2 >= 1) and (Text[KarPos - 2] = b_Hasanta);
+  if IsZfola then
+  begin
+    ContextEnd := KarPos - 3;
+    if ContextEnd >= 1 then
+      PrecedingChar := Text[ContextEnd]
+    else
+      PrecedingChar := '';
+  end;
+  Result := PrecedingChar;
+end;
 
 procedure InitializeAnsiRegistry;
 
@@ -843,19 +882,26 @@ begin
   inherited;
 end;
 
-function TUnicodeToBijoy2000.GetToggleState(const Key: string): Boolean;
+function TUnicodeToBijoy2000.GetToggleState(const Context, Key: string; OccurrenceIndex: Integer): Boolean;
+var
+  CombinedKey: string;
 begin
+  // Contextual key: Consonant + Index + KarChar (e.g. র_1_#$09C1)
+  CombinedKey := Context + '_' + IntToStr(OccurrenceIndex) + '_' + Key;
   if fToggleStates = nil then
     fToggleStates := TDictionary<string, Boolean>.Create;
-  if not fToggleStates.TryGetValue(Key, Result) then
+  if not fToggleStates.TryGetValue(CombinedKey, Result) then
     Result := False;
 end;
 
-procedure TUnicodeToBijoy2000.SetToggleState(const Key: string; Value: Boolean);
+procedure TUnicodeToBijoy2000.SetToggleState(const Context, Key: string; OccurrenceIndex: Integer; Value: Boolean);
+var
+  CombinedKey: string;
 begin
+  CombinedKey := Context + '_' + IntToStr(OccurrenceIndex) + '_' + Key;
   if fToggleStates = nil then
     fToggleStates := TDictionary<string, Boolean>.Create;
-  fToggleStates.AddOrSetValue(Key, Value);
+  fToggleStates.AddOrSetValue(CombinedKey, Value);
 end;
 
 { =============================================================================== }
@@ -868,6 +914,8 @@ var
   ConsonantPart: string;
   MapToggleBack: Boolean;
   MapToggleRepeat: Boolean;
+  KarPos: Integer;
+  Context: string;
 begin
   if UniText = '' then
   begin
@@ -902,7 +950,12 @@ begin
         // A backspace removed the kar: resolve the per-mapping toggle configuration
         FindMappingToggle(Rule, ConsonantPart, MapToggleBack, MapToggleRepeat);
         if MapToggleBack then
-          SetToggleState(Rule.KarChar, not GetToggleState(Rule.KarChar));
+        begin
+          KarPos := Length(fLastUniText) - Length(Rule.KarChar) + 1;
+          Context := ResolveContextChar(fLastUniText, KarPos);
+          SetToggleState(Context, Rule.KarChar, CountOccurrences(Rule.KarChar, fLastUniText),
+            not GetToggleState(Context, Rule.KarChar, CountOccurrences(Rule.KarChar, fLastUniText)));
+        end;
       end;
     end;
 
@@ -919,7 +972,12 @@ begin
       // A repeat of identical text: resolve the per-mapping toggle configuration
       FindMappingToggle(Rule, ConsonantPart, MapToggleBack, MapToggleRepeat);
       if MapToggleRepeat then
-        SetToggleState(Rule.KarChar, not GetToggleState(Rule.KarChar));
+      begin
+        KarPos := Length(UniText) - Length(Rule.KarChar) + 1;
+        Context := ResolveContextChar(UniText, KarPos);
+        SetToggleState(Context, Rule.KarChar, CountOccurrences(Rule.KarChar, UniText),
+          not GetToggleState(Context, Rule.KarChar, CountOccurrences(Rule.KarChar, UniText)));
+      end;
     end;
   end;
 
@@ -1348,6 +1406,8 @@ var
   UseAlt: Boolean;
   Found: Boolean;
   Resolved: string;
+  Context: string;
+  OccurrenceIndex: Integer;
 begin
   Found := False;
   for Rule in VowelRules do
@@ -1360,12 +1420,16 @@ begin
   if not Found then
     Exit;
 
-  UseAlt := GetToggleState(KarChar);
+  OccurrenceIndex := 0;
 
   repeat
     I := Pos(KarChar, fConvertedText);
     if I <= 0 then
       Break;
+
+    Inc(OccurrenceIndex);
+    Context := ResolveContextChar(fConvertedText, I);
+    UseAlt := GetToggleState(Context, KarChar, OccurrenceIndex);
 
     if I - 1 >= 1 then
     begin
@@ -1546,8 +1610,19 @@ begin
     if (LastC = Mapping.Consonants) or
        MatchesGroup(ActualConsonantPart, Len, Mapping.Consonants) then
     begin
-      MappingToggleOnBackspace := Mapping.ToggleOnBackspace;
-      MappingToggleOnRepeat := Mapping.ToggleOnRepeat;
+      // If the mapping explicitly defines its own toggle settings, use them.
+      // Otherwise inherit the rule-level "toggle" (e.g. "both") so mappings that
+      // only specify value/alt still participate in backspace/repeat toggling.
+      if Mapping.ToggleOnBackspace or Mapping.ToggleOnRepeat then
+      begin
+        MappingToggleOnBackspace := Mapping.ToggleOnBackspace;
+        MappingToggleOnRepeat := Mapping.ToggleOnRepeat;
+      end
+      else
+      begin
+        MappingToggleOnBackspace := Rule.ToggleOnBackspace;
+        MappingToggleOnRepeat := Rule.ToggleOnRepeat;
+      end;
       Result := True;
       Exit;
     end;
