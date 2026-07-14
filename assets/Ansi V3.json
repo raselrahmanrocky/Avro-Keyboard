@@ -1497,57 +1497,79 @@
   "VowelRules": {
     "#$09C1": {
       "default": "#{A_UKar1}",
-      "toggle": "both",
       "mappings": [
         {
           "consonants": "#$09B0",
           "value": "#{A_UKar4}",
-          "alt": "#{A_UKar2}"
+          "alt": "#{A_UKar2}",
+          "toggle": "backspace",
+          "process": "pre",
+          "matchMode": 1
         },
         {
           "consonants": "BelowBaseVariant",
-          "value": "#$0024"
+          "value": "#$0024",
+          "process": "pre",
+          "matchMode": 0
         },
         {
           "consonants": "RuClusters",
           "value": "#{A_UKar4}",
-          "alt": "#{A_UKar1}"
+          "alt": "#{A_UKar1}",
+          "toggle": "backspace",
+          "process": "pre",
+          "matchMode": 0
         },
         {
           "consonants": "RaPhalas",
-          "value": "#{A_UKar2}"
+          "value": "#{A_UKar2}",
+          "process": "post",
+          "matchMode": 0
         },
         {
           "consonants": "BaseLineRight",
-          "value": "#{A_UKar1}"
+          "value": "#{A_UKar1}",
+          "process": "post",
+          "matchMode": 1
         }
       ]
     },
     "#$09C2": {
       "default": "#{A_UUKar1}",
-      "toggle": "both",
       "mappings": [
         {
           "consonants": "#$09B0",
           "value": "#{A_UUKar3}",
-          "alt": "#{A_UUKar2}"
+          "alt": "#{A_UUKar2}",
+          "toggle": "backspace",
+          "process": "pre",
+          "matchMode": 1
         },
         {
           "consonants": "BelowBaseVariant",
-          "value": "#$0028"
+          "value": "#$0028",
+          "process": "pre",
+          "matchMode": 0
         },
         {
           "consonants": "RuClusters",
           "value": "#{A_UUKar3}",
-          "alt": "#{A_UUKar1}"
+          "alt": "#{A_UUKar1}",
+          "toggle": "backspace",
+          "process": "pre",
+          "matchMode": 0
         },
         {
           "consonants": "RaPhalas",
-          "value": "#{A_UUKar2}"
+          "value": "#{A_UUKar2}",
+          "process": "post",
+          "matchMode": 0
         },
         {
           "consonants": "BaseLineRight",
-          "value": "#{A_UUKar1}"
+          "value": "#{A_UUKar1}",
+          "process": "post",
+          "matchMode": 1
         }
       ]
     },
@@ -1556,19 +1578,27 @@
       "mappings": [
         {
           "consonants": "RuClusters",
-          "value": "#{A_RRIKar1}"
+          "value": "#{A_RRIKar1}",
+          "process": "pre",
+          "matchMode": 0
         },
         {
           "consonants": "RaPhalas",
-          "value": "#{A_RRIKar1}"
+          "value": "#{A_RRIKar1}",
+          "process": "post",
+          "matchMode": 0
         },
         {
           "consonants": "BaseLineRight",
-          "value": "#{A_RRIKar1}"
+          "value": "#{A_RRIKar1}",
+          "process": "post",
+          "matchMode": 1
         },
         {
           "consonants": "BelowBaseVariant",
-          "value": "#{A_RRIKar2}"
+          "value": "#{A_RRIKar2}",
+          "process": "pre",
+          "matchMode": 0
         }
       ]
     }
