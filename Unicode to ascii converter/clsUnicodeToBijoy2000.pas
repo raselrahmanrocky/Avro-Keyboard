@@ -60,6 +60,7 @@ type
       function RuleHasAnyToggle(const Rule: TVowelRule): Boolean;
       function FindMappingToggle(const Rule: TVowelRule; const ConsonantPart: string;
         out MappingToggleOnBackspace: Boolean): Boolean;
+        out MappingToggleOnBackspace: Boolean): Boolean;
       procedure ApplyRuleForKar(const KarChar: string);
     public
       destructor Destroy; override;
@@ -946,6 +947,7 @@ begin
       begin
         // A backspace removed the kar: resolve the per-mapping toggle configuration
         FindMappingToggle(Rule, ConsonantPart, MapToggleBack);
+        FindMappingToggle(Rule, ConsonantPart, MapToggleBack);
         if MapToggleBack then
         begin
           KarPos := Length(fLastUniText) - Length(Rule.KarChar) + 1;
@@ -1352,17 +1354,31 @@ end;
 // literal blocks (block-based matching — never character-by-character).
 function MatchGroupLength(const FullText: string; CharIndex: Integer;
   const GroupName: string): Integer;
+// Returns the length of the longest group entry that matches ending at
+// CharIndex, or 0 if no entry matches.  Groups are compared as atomic
+// literal blocks (block-based matching — never character-by-character).
+function MatchGroupLength(const FullText: string; CharIndex: Integer;
+  const GroupName: string): Integer;
 var
   Arr: TArray<string>;
   S: string;
   SLen: Integer;
+  SLen: Integer;
 begin
+  Result := 0;
   Result := 0;
   if (CharIndex < 1) or (CharIndex > Length(FullText)) then Exit;
   if ConsonantGroupMap <> nil then
   begin
     if ConsonantGroupMap.TryGetValue(GroupName, Arr) then
       for S in Arr do
+      begin
+        SLen := Length(S);
+        if (SLen <= CharIndex) and
+           (Copy(FullText, CharIndex - SLen + 1, SLen) = S) then
+          if SLen > Result then
+            Result := SLen;
+      end;
       begin
         SLen := Length(S);
         if (SLen <= CharIndex) and
@@ -1382,6 +1398,13 @@ begin
           if SLen > Result then
             Result := SLen;
       end;
+      begin
+        SLen := Length(S);
+        if (SLen <= CharIndex) and
+           (Copy(FullText, CharIndex - SLen + 1, SLen) = S) then
+          if SLen > Result then
+            Result := SLen;
+      end;
   end;
 end;
 
@@ -1389,6 +1412,8 @@ procedure TUnicodeToBijoy2000.ApplyRuleForKar(const KarChar: string);
 var
   I, ContextEnd: Integer;
   Rule: TVowelRule;
+  BestMapping, Mapping: TVowelRuleMapping;
+  BestMatchLen, MatchLen: Integer;
   BestMapping, Mapping: TVowelRuleMapping;
   BestMatchLen, MatchLen: Integer;
   PrecedingChar: string;
@@ -1443,6 +1468,14 @@ begin
       BestMapping.Alt := '';
       BestMapping.ToggleOnBackspace := False;
 
+      // Best-match: scan ALL mappings, pick the longest match.
+      // JSON order is irrelevant for different-length matches.
+      BestMatchLen := 0;
+      BestMapping.Consonants := '';
+      BestMapping.Value := '';
+      BestMapping.Alt := '';
+      BestMapping.ToggleOnBackspace := False;
+
       for Mapping in Rule.Mappings do
       begin
         if Mapping.Consonants = '' then
@@ -1458,12 +1491,40 @@ begin
           MatchLen := MatchGroupLength(fConvertedText, ContextEnd, Mapping.Consonants);
 
         if MatchLen > BestMatchLen then
+
+        MatchLen := 0;
+
+        // Direct single-character consonant match
+        if (PrecedingChar <> '') and (PrecedingChar = Mapping.Consonants) then
+          MatchLen := Length(Mapping.Consonants)
+        // Block-based group match (ConsonantGroupMap / AnsiGroupMap)
+        else if (ContextEnd >= 1) then
+          MatchLen := MatchGroupLength(fConvertedText, ContextEnd, Mapping.Consonants);
+
+        if MatchLen > BestMatchLen then
         begin
+          BestMatchLen := MatchLen;
+          BestMapping := Mapping;
           BestMatchLen := MatchLen;
           BestMapping := Mapping;
         end;
       end;
 
+      if BestMatchLen > 0 then
+      begin
+        // Strict mapping isolation: only the best-match mapping's toggle
+        // setting is consulted.  Other mappings' configurations are ignored.
+        if BestMapping.ToggleOnBackspace then
+          UseAlt := GetToggleState(Context, KarChar, OccurrenceIndex)
+        else
+          UseAlt := False;
+
+        if UseAlt and (BestMapping.Alt <> '') then
+          Resolved := ResolveValue(BestMapping.Alt)
+        else
+          Resolved := ResolveValue(BestMapping.Value);
+      end
+      else
       if BestMatchLen > 0 then
       begin
         // Strict mapping isolation: only the best-match mapping's toggle
@@ -1574,8 +1635,10 @@ var
   M: TVowelRuleMapping;
 begin
   Result := Rule.ToggleOnBackspace;
+  Result := Rule.ToggleOnBackspace;
   if not Result then
     for M in Rule.Mappings do
+      if M.ToggleOnBackspace then
       if M.ToggleOnBackspace then
       begin
         Result := True;
@@ -1585,14 +1648,18 @@ end;
 
 function TUnicodeToBijoy2000.FindMappingToggle(const Rule: TVowelRule;
   const ConsonantPart: string; out MappingToggleOnBackspace: Boolean): Boolean;
+  const ConsonantPart: string; out MappingToggleOnBackspace: Boolean): Boolean;
 var
   Mapping: TVowelRuleMapping;
+  BestMapping: TVowelRuleMapping;
+  BestMatchLen, MatchLen: Integer;
   BestMapping: TVowelRuleMapping;
   BestMatchLen, MatchLen: Integer;
   LastC: string;
   ActualConsonantPart: string;
   Len: Integer;
 begin
+  // Default: fall back to rule-level toggle when no mapping matches at all.
   // Default: fall back to rule-level toggle when no mapping matches at all.
   MappingToggleOnBackspace := Rule.ToggleOnBackspace;
   Result := False;
@@ -1605,6 +1672,8 @@ begin
 
   // If the cluster ends with b_Hasanta + b_z (Unicode representation of Z-fola/য-ফলা),
   // safely strip it to accurately find the preceding base consonant.
+  if (Len >= 2) and
+     (Copy(ActualConsonantPart, Len, 1) = b_z) and
   if (Len >= 2) and
      (Copy(ActualConsonantPart, Len, 1) = b_z) and
      (Copy(ActualConsonantPart, Len - 1, 1) = b_Hasanta) then
@@ -1624,10 +1693,38 @@ begin
   BestMapping.Consonants := '';
   BestMapping.ToggleOnBackspace := False;
 
+  // Best-match: scan ALL mappings, pick the longest match.
+  BestMatchLen := 0;
+  BestMapping.Consonants := '';
+  BestMapping.ToggleOnBackspace := False;
+
   for Mapping in Rule.Mappings do
   begin
     if Mapping.Consonants = '' then
       Continue;
+
+    MatchLen := 0;
+
+    // Direct single-character consonant match
+    if LastC = Mapping.Consonants then
+      MatchLen := Length(Mapping.Consonants)
+    // Block-based group match
+    else
+      MatchLen := MatchGroupLength(ActualConsonantPart, Len, Mapping.Consonants);
+
+    if MatchLen > BestMatchLen then
+    begin
+      BestMatchLen := MatchLen;
+      BestMapping := Mapping;
+    end;
+  end;
+
+  if BestMatchLen > 0 then
+  begin
+    // Strict mapping isolation: use ONLY the best-match mapping's toggle
+    // setting.  No fallback to other mappings or the rule-level toggle.
+    MappingToggleOnBackspace := BestMapping.ToggleOnBackspace;
+    Result := True;
 
     MatchLen := 0;
 
