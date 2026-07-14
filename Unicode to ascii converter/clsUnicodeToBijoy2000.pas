@@ -21,6 +21,8 @@ type
     Value: string;
     Alt: string;
     ToggleOnBackspace: Boolean;
+    MatchMode: Integer;       // 0 = Full Cluster (default), 1 = Last Char only
+    ProcessPhase: string;     // 'pre' or 'post' (empty = main, existing behavior)
   end;
 
   TVowelRule = record
@@ -70,7 +72,7 @@ type
         out MappingToggleOnBackspace: Boolean; out MatchedCluster: string): Boolean;
       function FindBestClusterMatch(const Text: string; KarPos: Integer;
         const Rule: TVowelRule): TClusterMatchInfo;
-      procedure ApplyRuleForKar(const KarChar: string);
+      procedure ApplyRuleForKar(const KarChar: string; const Phase: string = '');
     public
       destructor Destroy; override;
       function Convert(const UniText: string): string;
@@ -751,6 +753,13 @@ begin
   fConvertedText := ReplaceStr(fConvertedText, b_y, A_Y);
   fConvertedText := ReplaceStr(fConvertedText, b_rr, A_RR);
   fConvertedText := ReplaceStr(fConvertedText, b_rrh, A_RRH);
+
+  // --- Special consonants and symbols (codepoint constants, encoding-safe) ---
+  fConvertedText := ReplaceStr(fConvertedText, b_Khandatta, A_Khandata);
+  fConvertedText := ReplaceStr(fConvertedText, b_Anushar, A_Anushar);
+  fConvertedText := ReplaceStr(fConvertedText, b_Bisharga, A_Bisharga);
+  fConvertedText := ReplaceStr(fConvertedText, b_Chandra, A_Chandra);
+  fConvertedText := ReplaceStr(fConvertedText, b_Dari, A_Dari);
 end;
 
 { =============================================================================== }
@@ -967,7 +976,12 @@ begin
   end;
 
   fLastUniText := UniText;
-  
+
+  // === Phase A: Pre-phase vowel rule pass (raw Unicode text) ===
+  ApplyRuleForKar(b_Ukar, 'pre');
+  ApplyRuleForKar(b_UUKar, 'pre');
+  ApplyRuleForKar(b_Rrikar, 'pre');
+
   // Clean start
   DeNormalize;
   
@@ -1017,7 +1031,12 @@ begin
   SecondHalfForms;
   Consonants;
   FinalTouch;
-  
+
+  // === Phase C: Post-phase vowel rule pass (ANSI-converted text) ===
+  ApplyRuleForKar(b_Ukar, 'post');
+  ApplyRuleForKar(b_UUKar, 'post');
+  ApplyRuleForKar(b_Rrikar, 'post');
+
   Result := fConvertedText;
 end;
 
@@ -1394,7 +1413,7 @@ begin
   end;
 end;
 
-procedure TUnicodeToBijoy2000.ApplyRuleForKar(const KarChar: string);
+procedure TUnicodeToBijoy2000.ApplyRuleForKar(const KarChar: string; const Phase: string = '');
 var
   I: Integer;
   Rule: TVowelRule;
@@ -1430,15 +1449,26 @@ begin
 
       if ClusterInfo.BestMatchLen > 0 then
       begin
-        if ClusterInfo.BestMapping.ToggleOnBackspace then
-          UseAlt := GetToggleState(ClusterInfo.MatchedCluster, KarChar, OccurrenceIndex)
+        // Phase filtering: skip mappings not intended for this phase
+        if (Phase <> '') and
+           (ClusterInfo.BestMapping.ProcessPhase <> '') and
+           (ClusterInfo.BestMapping.ProcessPhase <> Phase) then
+        begin
+          // This mapping doesn't belong to this phase — use default
+          Resolved := ResolveValue(Rule.DefaultVal);
+        end
         else
-          UseAlt := False;
+        begin
+          if ClusterInfo.BestMapping.ToggleOnBackspace then
+            UseAlt := GetToggleState(ClusterInfo.MatchedCluster, KarChar, OccurrenceIndex)
+          else
+            UseAlt := False;
 
-        if UseAlt and (ClusterInfo.BestMapping.Alt <> '') then
-          Resolved := ResolveValue(ClusterInfo.BestMapping.Alt)
-        else
-          Resolved := ResolveValue(ClusterInfo.BestMapping.Value);
+          if UseAlt and (ClusterInfo.BestMapping.Alt <> '') then
+            Resolved := ResolveValue(ClusterInfo.BestMapping.Alt)
+          else
+            Resolved := ResolveValue(ClusterInfo.BestMapping.Value);
+        end;
       end
       else
         Resolved := ResolveValue(Rule.DefaultVal);
@@ -1468,6 +1498,8 @@ begin
   Result.BestMapping.Value := '';
   Result.BestMapping.Alt := '';
   Result.BestMapping.ToggleOnBackspace := False;
+  Result.BestMapping.MatchMode := 0;
+  Result.BestMapping.ProcessPhase := '';
 
   if KarPos - 1 < 1 then
     Exit;
@@ -1498,12 +1530,20 @@ begin
 
     MatchLen := 0;
 
-    // Direct single-character consonant match
-    if (PrecedingChar <> '') and (PrecedingChar = Mapping.Consonants) then
-      MatchLen := Length(Mapping.Consonants)
-    // Block-based group match (ConsonantGroupMap / AnsiGroupMap)
+    if Mapping.MatchMode = 1 then
+    begin
+      // MatchMode 1: Only check the single character at ContextEnd
+      if (PrecedingChar <> '') and (PrecedingChar = Mapping.Consonants) then
+        MatchLen := 1;
+    end
     else
-      MatchLen := MatchGroupLength(Text, Result.ContextEnd, Mapping.Consonants);
+    begin
+      // MatchMode 0: Standard full-cluster longest-match
+      if (PrecedingChar <> '') and (PrecedingChar = Mapping.Consonants) then
+        MatchLen := Length(Mapping.Consonants)
+      else
+        MatchLen := MatchGroupLength(Text, Result.ContextEnd, Mapping.Consonants);
+    end;
 
     if MatchLen > Result.BestMatchLen then
     begin
@@ -1652,6 +1692,8 @@ begin
   BestMatchLen := 0;
   BestMapping.Consonants := '';
   BestMapping.ToggleOnBackspace := False;
+  BestMapping.MatchMode := 0;
+  BestMapping.ProcessPhase := '';
 
   for Mapping in Rule.Mappings do
   begin
@@ -1660,12 +1702,20 @@ begin
 
     MatchLen := 0;
 
-    // Direct single-character consonant match
-    if LastC = Mapping.Consonants then
-      MatchLen := Length(Mapping.Consonants)
-    // Block-based group match
+    if Mapping.MatchMode = 1 then
+    begin
+      // MatchMode 1: Only check the single character at position Len
+      if LastC = Mapping.Consonants then
+        MatchLen := 1;
+    end
     else
-      MatchLen := MatchGroupLength(ActualConsonantPart, Len, Mapping.Consonants);
+    begin
+      // MatchMode 0: Standard full-cluster longest-match
+      if LastC = Mapping.Consonants then
+        MatchLen := Length(Mapping.Consonants)
+      else
+        MatchLen := MatchGroupLength(ActualConsonantPart, Len, Mapping.Consonants);
+    end;
 
     if MatchLen > BestMatchLen then
     begin
@@ -2536,30 +2586,36 @@ begin
                       Consonants := '';
                       Value := '';
                       Alt := '';
-                        ToggleOnBackspace := False;
-                        while P <= Length(JSON) do
+                      ToggleOnBackspace := False;
+                      MatchMode := 0;
+                      ProcessPhase := '';
+                      while P <= Length(JSON) do
+                      begin
+                        JSkipWS(JSON, P);
+                        if (P > Length(JSON)) or (JSON[P] = '}') then begin Inc(P); Break; end;
+                        if JSON[P] = ',' then begin Inc(P); Continue; end;
+                        FieldName := JReadString(JSON, P);
+                        JSkipWS(JSON, P); if JSON[P] = ':' then Inc(P);
+                        JSkipWS(JSON, P);
+                        if FieldName = 'consonants' then
+                          Consonants := JReadString(JSON, P)
+                        else if FieldName = 'value' then
+                          Value := JReadString(JSON, P)
+                        else if FieldName = 'alt' then
+                          Alt := JReadString(JSON, P)
+                        else if FieldName = 'toggle' then
                         begin
-                          JSkipWS(JSON, P);
-                          if (P > Length(JSON)) or (JSON[P] = '}') then begin Inc(P); Break; end;
-                          if JSON[P] = ',' then begin Inc(P); Continue; end;
-                          FieldName := JReadString(JSON, P);
-                          JSkipWS(JSON, P); if JSON[P] = ':' then Inc(P);
-                          JSkipWS(JSON, P);
-                          if FieldName = 'consonants' then
-                            Consonants := JReadString(JSON, P)
-                          else if FieldName = 'value' then
-                            Value := JReadString(JSON, P)
-                          else if FieldName = 'alt' then
-                            Alt := JReadString(JSON, P)
-                          else if FieldName = 'toggle' then
-                          begin
-                            ToggleVal := JReadString(JSON, P);
-                            // Only "backspace" enables backspace-to-toggle.
-                            ToggleOnBackspace := (ToggleVal = 'backspace');
-                          end
-                          else
-                            JSkipValue(JSON, P);
-                        end;
+                          ToggleVal := JReadString(JSON, P);
+                          // Only "backspace" enables backspace-to-toggle.
+                          ToggleOnBackspace := (ToggleVal = 'backspace');
+                        end
+                        else if FieldName = 'matchMode' then
+                          MatchMode := StrToIntDef(JReadString(JSON, P), 0)
+                        else if FieldName = 'process' then
+                          ProcessPhase := LowerCase(JReadString(JSON, P))
+                        else
+                          JSkipValue(JSON, P);
+                      end;
                       Consonants := ProcessHexAndUnicode(Consonants);
                     end;
                   end
