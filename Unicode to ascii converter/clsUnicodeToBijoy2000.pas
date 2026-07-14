@@ -31,6 +31,14 @@ type
     Mappings: TArray<TVowelRuleMapping>;
   end;
 
+  TClusterMatchInfo = record
+    MatchedCluster: string;
+    BestMapping: TVowelRuleMapping;
+    BestMatchLen: Integer;
+    ContextEnd: Integer;
+    IsZfola: Boolean;
+  end;
+
 type
   TUnicodeToBijoy2000 = class
     private
@@ -59,7 +67,9 @@ type
       procedure SetToggleState(const Context, Key: string; OccurrenceIndex: Integer; Value: Boolean);
       function RuleHasAnyToggle(const Rule: TVowelRule): Boolean;
       function FindMappingToggle(const Rule: TVowelRule; const ConsonantPart: string;
-        out MappingToggleOnBackspace: Boolean): Boolean;
+        out MappingToggleOnBackspace: Boolean; out MatchedCluster: string): Boolean;
+      function FindBestClusterMatch(const Text: string; KarPos: Integer;
+        const Rule: TVowelRule): TClusterMatchInfo;
       procedure ApplyRuleForKar(const KarChar: string);
     public
       destructor Destroy; override;
@@ -340,9 +350,9 @@ begin
   end;
 end;
 
-// Resolves the effective preceding consonant for a kar at KarPos within Text.
-// Mirrors the Z-fola-aware context logic used inside ApplyRuleForKar so that
-// the toggle key stays identical between the Set (Convert) and Get (ApplyRuleForKar) sides.
+// DEPRECATED: Use FindBestClusterMatch instead. This function is kept only for
+// backward compatibility. It returns a single character which causes toggle key
+// collisions between different clusters ending in the same letter.
 function ResolveContextChar(const Text: string; KarPos: Integer): string;
 var
   PrecedingChar: string;
@@ -911,8 +921,7 @@ var
   Rule: TVowelRule;
   ConsonantPart: string;
   MapToggleBack: Boolean;
-  KarPos: Integer;
-  Context: string;
+  MatchedCluster: string;
 begin
   if UniText = '' then
   begin
@@ -945,13 +954,13 @@ begin
          (Copy(fLastUniText, Length(ConsonantPart) + 1, Length(Rule.KarChar)) = Rule.KarChar) then
       begin
         // A backspace removed the kar: resolve the per-mapping toggle configuration
-        FindMappingToggle(Rule, ConsonantPart, MapToggleBack);
+        FindMappingToggle(Rule, ConsonantPart, MapToggleBack, MatchedCluster);
         if MapToggleBack then
         begin
-          KarPos := Length(fLastUniText) - Length(Rule.KarChar) + 1;
-          Context := ResolveContextChar(fLastUniText, KarPos);
-          SetToggleState(Context, Rule.KarChar, CountOccurrences(Rule.KarChar, fLastUniText),
-            not GetToggleState(Context, Rule.KarChar, CountOccurrences(Rule.KarChar, fLastUniText)));
+          SetToggleState(MatchedCluster, Rule.KarChar,
+            CountOccurrences(Rule.KarChar, fLastUniText),
+            not GetToggleState(MatchedCluster, Rule.KarChar,
+              CountOccurrences(Rule.KarChar, fLastUniText)));
         end;
       end;
     end;
@@ -1387,17 +1396,13 @@ end;
 
 procedure TUnicodeToBijoy2000.ApplyRuleForKar(const KarChar: string);
 var
-  I, ContextEnd: Integer;
+  I: Integer;
   Rule: TVowelRule;
-  BestMapping, Mapping: TVowelRuleMapping;
-  BestMatchLen, MatchLen: Integer;
-  PrecedingChar: string;
-  IsZfola: Boolean;
   UseAlt: Boolean;
   Found: Boolean;
   Resolved: string;
-  Context: string;
   OccurrenceIndex: Integer;
+  ClusterInfo: TClusterMatchInfo;
 begin
   Found := False;
   for Rule in VowelRules do
@@ -1418,65 +1423,22 @@ begin
       Break;
 
     Inc(OccurrenceIndex);
-    Context := ResolveContextChar(fConvertedText, I);
 
     if I - 1 >= 1 then
     begin
-      PrecedingChar := fConvertedText[I - 1];
-      ContextEnd := I - 1;
-      IsZfola := (PrecedingChar = b_z) and (I - 2 >= 1) and (fConvertedText[I - 2] = b_Hasanta);
+      ClusterInfo := FindBestClusterMatch(fConvertedText, I, Rule);
 
-      if IsZfola then
+      if ClusterInfo.BestMatchLen > 0 then
       begin
-        ContextEnd := I - 3;
-        if ContextEnd >= 1 then
-          PrecedingChar := fConvertedText[ContextEnd]
-        else
-          PrecedingChar := '';
-      end;
-
-      // Best-match: scan ALL mappings, pick the longest match.
-      // JSON order is irrelevant for different-length matches.
-      BestMatchLen := 0;
-      BestMapping.Consonants := '';
-      BestMapping.Value := '';
-      BestMapping.Alt := '';
-      BestMapping.ToggleOnBackspace := False;
-
-      for Mapping in Rule.Mappings do
-      begin
-        if Mapping.Consonants = '' then
-          Continue;
-
-        MatchLen := 0;
-
-        // Direct single-character consonant match
-        if (PrecedingChar <> '') and (PrecedingChar = Mapping.Consonants) then
-          MatchLen := Length(Mapping.Consonants)
-        // Block-based group match (ConsonantGroupMap / AnsiGroupMap)
-        else if (ContextEnd >= 1) then
-          MatchLen := MatchGroupLength(fConvertedText, ContextEnd, Mapping.Consonants);
-
-        if MatchLen > BestMatchLen then
-        begin
-          BestMatchLen := MatchLen;
-          BestMapping := Mapping;
-        end;
-      end;
-
-      if BestMatchLen > 0 then
-      begin
-        // Strict mapping isolation: only the best-match mapping's toggle
-        // setting is consulted.  Other mappings' configurations are ignored.
-        if BestMapping.ToggleOnBackspace then
-          UseAlt := GetToggleState(Context, KarChar, OccurrenceIndex)
+        if ClusterInfo.BestMapping.ToggleOnBackspace then
+          UseAlt := GetToggleState(ClusterInfo.MatchedCluster, KarChar, OccurrenceIndex)
         else
           UseAlt := False;
 
-        if UseAlt and (BestMapping.Alt <> '') then
-          Resolved := ResolveValue(BestMapping.Alt)
+        if UseAlt and (ClusterInfo.BestMapping.Alt <> '') then
+          Resolved := ResolveValue(ClusterInfo.BestMapping.Alt)
         else
-          Resolved := ResolveValue(BestMapping.Value);
+          Resolved := ResolveValue(ClusterInfo.BestMapping.Value);
       end
       else
         Resolved := ResolveValue(Rule.DefaultVal);
@@ -1489,6 +1451,71 @@ begin
       fConvertedText := WideStuffString(fConvertedText, I, 1, Resolved);
     end;
   until I <= 0;
+end;
+
+function TUnicodeToBijoy2000.FindBestClusterMatch(const Text: string;
+  KarPos: Integer; const Rule: TVowelRule): TClusterMatchInfo;
+var
+  PrecedingChar: string;
+  Mapping: TVowelRuleMapping;
+  MatchLen: Integer;
+begin
+  Result.MatchedCluster := '';
+  Result.BestMatchLen := 0;
+  Result.ContextEnd := 0;
+  Result.IsZfola := False;
+  Result.BestMapping.Consonants := '';
+  Result.BestMapping.Value := '';
+  Result.BestMapping.Alt := '';
+  Result.BestMapping.ToggleOnBackspace := False;
+
+  if KarPos - 1 < 1 then
+    Exit;
+
+  // Z-fola-aware context resolution
+  PrecedingChar := Text[KarPos - 1];
+  Result.ContextEnd := KarPos - 1;
+  Result.IsZfola := (PrecedingChar = b_z) and (KarPos - 2 >= 1) and
+                     (Text[KarPos - 2] = b_Hasanta);
+
+  if Result.IsZfola then
+  begin
+    Result.ContextEnd := KarPos - 3;
+    if Result.ContextEnd >= 1 then
+      PrecedingChar := Text[Result.ContextEnd]
+    else
+      PrecedingChar := '';
+  end;
+
+  if Result.ContextEnd < 1 then
+    Exit;
+
+  // Best-match search: scan ALL mappings, pick the longest match.
+  for Mapping in Rule.Mappings do
+  begin
+    if Mapping.Consonants = '' then
+      Continue;
+
+    MatchLen := 0;
+
+    // Direct single-character consonant match
+    if (PrecedingChar <> '') and (PrecedingChar = Mapping.Consonants) then
+      MatchLen := Length(Mapping.Consonants)
+    // Block-based group match (ConsonantGroupMap / AnsiGroupMap)
+    else
+      MatchLen := MatchGroupLength(Text, Result.ContextEnd, Mapping.Consonants);
+
+    if MatchLen > Result.BestMatchLen then
+    begin
+      Result.BestMatchLen := MatchLen;
+      Result.BestMapping := Mapping;
+    end;
+  end;
+
+  // Extract exact matched string from the text
+  if Result.BestMatchLen > 0 then
+    Result.MatchedCluster := Copy(Text, Result.ContextEnd - Result.BestMatchLen + 1,
+                                  Result.BestMatchLen);
 end;
 
 procedure TUnicodeToBijoy2000.ApplyKarInclusiveFullForms;
@@ -1584,7 +1611,8 @@ begin
 end;
 
 function TUnicodeToBijoy2000.FindMappingToggle(const Rule: TVowelRule;
-  const ConsonantPart: string; out MappingToggleOnBackspace: Boolean): Boolean;
+  const ConsonantPart: string; out MappingToggleOnBackspace: Boolean;
+  out MatchedCluster: string): Boolean;
 var
   Mapping: TVowelRuleMapping;
   BestMapping: TVowelRuleMapping;
@@ -1596,6 +1624,7 @@ begin
   // Default: fall back to rule-level toggle when no mapping matches at all.
   MappingToggleOnBackspace := Rule.ToggleOnBackspace;
   Result := False;
+  MatchedCluster := '';
 
   if ConsonantPart = '' then
     Exit;
@@ -1650,6 +1679,8 @@ begin
     // Strict mapping isolation: use ONLY the best-match mapping's toggle
     // setting.  No fallback to other mappings or the rule-level toggle.
     MappingToggleOnBackspace := BestMapping.ToggleOnBackspace;
+    // Extract exact matched cluster from the consonant part
+    MatchedCluster := Copy(ActualConsonantPart, Len - BestMatchLen + 1, BestMatchLen);
     Result := True;
   end;
 end;
