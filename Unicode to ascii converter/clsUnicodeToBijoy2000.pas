@@ -1,4 +1,4 @@
-﻿{
+{
   =============================================================================
   This Source Code Form is subject to the terms of the Mozilla Public
   License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -21,7 +21,6 @@ type
     Value: string;
     Alt: string;
     ToggleOnBackspace: Boolean;
-    ToggleOnRepeat: Boolean;
   end;
 
   TVowelRule = record
@@ -29,7 +28,6 @@ type
     DefaultVal: string;
     Toggle: string;
     ToggleOnBackspace: Boolean;
-    ToggleOnRepeat: Boolean;
     Mappings: TArray<TVowelRuleMapping>;
   end;
 
@@ -61,7 +59,7 @@ type
       procedure SetToggleState(const Context, Key: string; OccurrenceIndex: Integer; Value: Boolean);
       function RuleHasAnyToggle(const Rule: TVowelRule): Boolean;
       function FindMappingToggle(const Rule: TVowelRule; const ConsonantPart: string;
-        out MappingToggleOnBackspace, MappingToggleOnRepeat: Boolean): Boolean;
+        out MappingToggleOnBackspace: Boolean): Boolean;
       procedure ApplyRuleForKar(const KarChar: string);
     public
       destructor Destroy; override;
@@ -913,7 +911,6 @@ var
   Rule: TVowelRule;
   ConsonantPart: string;
   MapToggleBack: Boolean;
-  MapToggleRepeat: Boolean;
   KarPos: Integer;
   Context: string;
 begin
@@ -948,7 +945,7 @@ begin
          (Copy(fLastUniText, Length(ConsonantPart) + 1, Length(Rule.KarChar)) = Rule.KarChar) then
       begin
         // A backspace removed the kar: resolve the per-mapping toggle configuration
-        FindMappingToggle(Rule, ConsonantPart, MapToggleBack, MapToggleRepeat);
+        FindMappingToggle(Rule, ConsonantPart, MapToggleBack);
         if MapToggleBack then
         begin
           KarPos := Length(fLastUniText) - Length(Rule.KarChar) + 1;
@@ -956,27 +953,6 @@ begin
           SetToggleState(Context, Rule.KarChar, CountOccurrences(Rule.KarChar, fLastUniText),
             not GetToggleState(Context, Rule.KarChar, CountOccurrences(Rule.KarChar, fLastUniText)));
         end;
-      end;
-    end;
-
-    if (UniText = fLastUniText) and (UniText <> '') then
-    begin
-      // Extract consonant part prior to the vowel kar on key repeat
-      ConsonantPart := UniText;
-      if (Length(ConsonantPart) >= Length(Rule.KarChar)) and
-         (Copy(ConsonantPart, Length(ConsonantPart) - Length(Rule.KarChar) + 1, Length(Rule.KarChar)) = Rule.KarChar) then
-      begin
-        ConsonantPart := Copy(ConsonantPart, 1, Length(ConsonantPart) - Length(Rule.KarChar));
-      end;
-
-      // A repeat of identical text: resolve the per-mapping toggle configuration
-      FindMappingToggle(Rule, ConsonantPart, MapToggleBack, MapToggleRepeat);
-      if MapToggleRepeat then
-      begin
-        KarPos := Length(UniText) - Length(Rule.KarChar) + 1;
-        Context := ResolveContextChar(UniText, KarPos);
-        SetToggleState(Context, Rule.KarChar, CountOccurrences(Rule.KarChar, UniText),
-          not GetToggleState(Context, Rule.KarChar, CountOccurrences(Rule.KarChar, UniText)));
       end;
     end;
   end;
@@ -1371,28 +1347,41 @@ begin
   end;
 end;
 
-function MatchesGroup(const FullText: string; CharIndex: Integer; const GroupName: string): Boolean;
+// Returns the length of the longest group entry that matches ending at
+// CharIndex, or 0 if no entry matches.  Groups are compared as atomic
+// literal blocks (block-based matching — never character-by-character).
+function MatchGroupLength(const FullText: string; CharIndex: Integer;
+  const GroupName: string): Integer;
 var
   Arr: TArray<string>;
   S: string;
+  SLen: Integer;
 begin
-  Result := False;
+  Result := 0;
   if (CharIndex < 1) or (CharIndex > Length(FullText)) then Exit;
   if ConsonantGroupMap <> nil then
   begin
     if ConsonantGroupMap.TryGetValue(GroupName, Arr) then
       for S in Arr do
-        if (Length(S) <= CharIndex) and
-           (Copy(FullText, CharIndex - Length(S) + 1, Length(S)) = S) then
-          Exit(True);
+      begin
+        SLen := Length(S);
+        if (SLen <= CharIndex) and
+           (Copy(FullText, CharIndex - SLen + 1, SLen) = S) then
+          if SLen > Result then
+            Result := SLen;
+      end;
   end;
   if AnsiGroupMap <> nil then
   begin
     if AnsiGroupMap.TryGetValue(GroupName, Arr) then
       for S in Arr do
-        if (Length(S) <= CharIndex) and
-           (Copy(FullText, CharIndex - Length(S) + 1, Length(S)) = S) then
-          Exit(True);
+      begin
+        SLen := Length(S);
+        if (SLen <= CharIndex) and
+           (Copy(FullText, CharIndex - SLen + 1, SLen) = S) then
+          if SLen > Result then
+            Result := SLen;
+      end;
   end;
 end;
 
@@ -1400,7 +1389,8 @@ procedure TUnicodeToBijoy2000.ApplyRuleForKar(const KarChar: string);
 var
   I, ContextEnd: Integer;
   Rule: TVowelRule;
-  Mapping: TVowelRuleMapping;
+  BestMapping, Mapping: TVowelRuleMapping;
+  BestMatchLen, MatchLen: Integer;
   PrecedingChar: string;
   IsZfola: Boolean;
   UseAlt: Boolean;
@@ -1429,7 +1419,6 @@ begin
 
     Inc(OccurrenceIndex);
     Context := ResolveContextChar(fConvertedText, I);
-    UseAlt := GetToggleState(Context, KarChar, OccurrenceIndex);
 
     if I - 1 >= 1 then
     begin
@@ -1446,23 +1435,50 @@ begin
           PrecedingChar := '';
       end;
 
-      Resolved := '';
+      // Best-match: scan ALL mappings, pick the longest match.
+      // JSON order is irrelevant for different-length matches.
+      BestMatchLen := 0;
+      BestMapping.Consonants := '';
+      BestMapping.Value := '';
+      BestMapping.Alt := '';
+      BestMapping.ToggleOnBackspace := False;
+
       for Mapping in Rule.Mappings do
       begin
         if Mapping.Consonants = '' then
           Continue;
-        if ((PrecedingChar <> '') and (PrecedingChar = Mapping.Consonants)) or
-           ((ContextEnd >= 1) and MatchesGroup(fConvertedText, ContextEnd, Mapping.Consonants)) then
+
+        MatchLen := 0;
+
+        // Direct single-character consonant match
+        if (PrecedingChar <> '') and (PrecedingChar = Mapping.Consonants) then
+          MatchLen := Length(Mapping.Consonants)
+        // Block-based group match (ConsonantGroupMap / AnsiGroupMap)
+        else if (ContextEnd >= 1) then
+          MatchLen := MatchGroupLength(fConvertedText, ContextEnd, Mapping.Consonants);
+
+        if MatchLen > BestMatchLen then
         begin
-          if UseAlt and (Mapping.Alt <> '') then
-            Resolved := ResolveValue(Mapping.Alt)
-          else
-            Resolved := ResolveValue(Mapping.Value);
-          Break;
+          BestMatchLen := MatchLen;
+          BestMapping := Mapping;
         end;
       end;
 
-      if Resolved = '' then
+      if BestMatchLen > 0 then
+      begin
+        // Strict mapping isolation: only the best-match mapping's toggle
+        // setting is consulted.  Other mappings' configurations are ignored.
+        if BestMapping.ToggleOnBackspace then
+          UseAlt := GetToggleState(Context, KarChar, OccurrenceIndex)
+        else
+          UseAlt := False;
+
+        if UseAlt and (BestMapping.Alt <> '') then
+          Resolved := ResolveValue(BestMapping.Alt)
+        else
+          Resolved := ResolveValue(BestMapping.Value);
+      end
+      else
         Resolved := ResolveValue(Rule.DefaultVal);
 
       fConvertedText := WideStuffString(fConvertedText, I, 1, Resolved);
@@ -1557,10 +1573,10 @@ function TUnicodeToBijoy2000.RuleHasAnyToggle(const Rule: TVowelRule): Boolean;
 var
   M: TVowelRuleMapping;
 begin
-  Result := Rule.ToggleOnBackspace or Rule.ToggleOnRepeat;
+  Result := Rule.ToggleOnBackspace;
   if not Result then
     for M in Rule.Mappings do
-      if M.ToggleOnBackspace or M.ToggleOnRepeat then
+      if M.ToggleOnBackspace then
       begin
         Result := True;
         Exit;
@@ -1568,17 +1584,17 @@ begin
 end;
 
 function TUnicodeToBijoy2000.FindMappingToggle(const Rule: TVowelRule;
-  const ConsonantPart: string; out MappingToggleOnBackspace, MappingToggleOnRepeat: Boolean): Boolean;
+  const ConsonantPart: string; out MappingToggleOnBackspace: Boolean): Boolean;
 var
   Mapping: TVowelRuleMapping;
+  BestMapping: TVowelRuleMapping;
+  BestMatchLen, MatchLen: Integer;
   LastC: string;
   ActualConsonantPart: string;
   Len: Integer;
 begin
-  // Fallback to the rule-level (global) toggle settings when no specific
-  // mapping matches the current consonant context.
+  // Default: fall back to rule-level toggle when no mapping matches at all.
   MappingToggleOnBackspace := Rule.ToggleOnBackspace;
-  MappingToggleOnRepeat := Rule.ToggleOnRepeat;
   Result := False;
 
   if ConsonantPart = '' then
@@ -1589,8 +1605,8 @@ begin
 
   // If the cluster ends with b_Hasanta + b_z (Unicode representation of Z-fola/য-ফলা),
   // safely strip it to accurately find the preceding base consonant.
-  if (Len >= 2) and 
-     (Copy(ActualConsonantPart, Len, 1) = b_z) and 
+  if (Len >= 2) and
+     (Copy(ActualConsonantPart, Len, 1) = b_z) and
      (Copy(ActualConsonantPart, Len - 1, 1) = b_Hasanta) then
   begin
     ActualConsonantPart := Copy(ActualConsonantPart, 1, Len - 2);
@@ -1603,29 +1619,38 @@ begin
   // Use Copy/Length (RTL-safe for Delphi 2007/XE+) instead of newer helpers.
   LastC := Copy(ActualConsonantPart, Len, 1);
 
+  // Best-match: scan ALL mappings, pick the longest match.
+  BestMatchLen := 0;
+  BestMapping.Consonants := '';
+  BestMapping.ToggleOnBackspace := False;
+
   for Mapping in Rule.Mappings do
   begin
     if Mapping.Consonants = '' then
       Continue;
-    if (LastC = Mapping.Consonants) or
-       MatchesGroup(ActualConsonantPart, Len, Mapping.Consonants) then
+
+    MatchLen := 0;
+
+    // Direct single-character consonant match
+    if LastC = Mapping.Consonants then
+      MatchLen := Length(Mapping.Consonants)
+    // Block-based group match
+    else
+      MatchLen := MatchGroupLength(ActualConsonantPart, Len, Mapping.Consonants);
+
+    if MatchLen > BestMatchLen then
     begin
-      // If the mapping explicitly defines its own toggle settings, use them.
-      // Otherwise inherit the rule-level "toggle" (e.g. "both") so mappings that
-      // only specify value/alt still participate in backspace/repeat toggling.
-      if Mapping.ToggleOnBackspace or Mapping.ToggleOnRepeat then
-      begin
-        MappingToggleOnBackspace := Mapping.ToggleOnBackspace;
-        MappingToggleOnRepeat := Mapping.ToggleOnRepeat;
-      end
-      else
-      begin
-        MappingToggleOnBackspace := Rule.ToggleOnBackspace;
-        MappingToggleOnRepeat := Rule.ToggleOnRepeat;
-      end;
-      Result := True;
-      Exit;
+      BestMatchLen := MatchLen;
+      BestMapping := Mapping;
     end;
+  end;
+
+  if BestMatchLen > 0 then
+  begin
+    // Strict mapping isolation: use ONLY the best-match mapping's toggle
+    // setting.  No fallback to other mappings or the rule-level toggle.
+    MappingToggleOnBackspace := BestMapping.ToggleOnBackspace;
+    Result := True;
   end;
 end;
 
@@ -2445,7 +2470,6 @@ begin
             DefaultVal := '';
             Toggle := 'none';
             ToggleOnBackspace := False;
-            ToggleOnRepeat := False;
             SetLength(Mappings, 0);
             while P <= Length(JSON) do
             begin
@@ -2460,8 +2484,9 @@ begin
               else if FieldName = 'toggle' then
               begin
                 Toggle := JReadString(JSON, P);
+                // Only "backspace" (and the legacy "both") enable backspace-to-toggle.
+                // "none", "repeat", and any unknown value are treated as fixed (none).
                 ToggleOnBackspace := (Toggle = 'backspace') or (Toggle = 'both');
-                ToggleOnRepeat := (Toggle = 'repeat') or (Toggle = 'both');
               end
               else if FieldName = 'mappings' then
               begin
@@ -2480,31 +2505,31 @@ begin
                       Consonants := '';
                       Value := '';
                       Alt := '';
-                      ToggleOnBackspace := False;
-                      ToggleOnRepeat := False;
-                      while P <= Length(JSON) do
-                      begin
-                        JSkipWS(JSON, P);
-                        if (P > Length(JSON)) or (JSON[P] = '}') then begin Inc(P); Break; end;
-                        if JSON[P] = ',' then begin Inc(P); Continue; end;
-                        FieldName := JReadString(JSON, P);
-                        JSkipWS(JSON, P); if JSON[P] = ':' then Inc(P);
-                        JSkipWS(JSON, P);
-                        if FieldName = 'consonants' then
-                          Consonants := JReadString(JSON, P)
-                        else if FieldName = 'value' then
-                          Value := JReadString(JSON, P)
-                        else if FieldName = 'alt' then
-                          Alt := JReadString(JSON, P)
-                        else if FieldName = 'toggle' then
+                        ToggleOnBackspace := False;
+                        while P <= Length(JSON) do
                         begin
-                          ToggleVal := JReadString(JSON, P);
-                          ToggleOnBackspace := (ToggleVal = 'backspace') or (ToggleVal = 'both');
-                          ToggleOnRepeat := (ToggleVal = 'repeat') or (ToggleVal = 'both');
-                        end
-                        else
-                          JSkipValue(JSON, P);
-                      end;
+                          JSkipWS(JSON, P);
+                          if (P > Length(JSON)) or (JSON[P] = '}') then begin Inc(P); Break; end;
+                          if JSON[P] = ',' then begin Inc(P); Continue; end;
+                          FieldName := JReadString(JSON, P);
+                          JSkipWS(JSON, P); if JSON[P] = ':' then Inc(P);
+                          JSkipWS(JSON, P);
+                          if FieldName = 'consonants' then
+                            Consonants := JReadString(JSON, P)
+                          else if FieldName = 'value' then
+                            Value := JReadString(JSON, P)
+                          else if FieldName = 'alt' then
+                            Alt := JReadString(JSON, P)
+                          else if FieldName = 'toggle' then
+                          begin
+                            ToggleVal := JReadString(JSON, P);
+                            // Only "backspace" (and legacy "both") enable
+                            // backspace-to-toggle. "repeat" maps to none.
+                            ToggleOnBackspace := (ToggleVal = 'backspace') or (ToggleVal = 'both');
+                          end
+                          else
+                            JSkipValue(JSON, P);
+                        end;
                       Consonants := ProcessHexAndUnicode(Consonants);
                     end;
                   end
