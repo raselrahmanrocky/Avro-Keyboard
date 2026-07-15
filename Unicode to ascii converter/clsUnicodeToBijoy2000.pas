@@ -768,8 +768,8 @@ procedure TUnicodeToBijoy2000.FinalTouch;
 var
   Len: Integer;
   I: Integer;
-  CleanedText: string;
   C: Char;
+  SB: TStringBuilder; // TStringBuilder ডিক্লেয়ার করা হলো
 begin
   fConvertedText := ReplaceStr(fConvertedText, string(b_Hasanta) + string(zwnj), string(A_Hasanta));
   
@@ -816,36 +816,35 @@ begin
   fConvertedText := ReplaceStr(fConvertedText, string(A_Reph) + string(A_UKar2), string(A_UKar2) + string(A_Reph));
   fConvertedText := ReplaceStr(fConvertedText, string(A_Reph) + string(A_UKar3), string(A_UKar3) + string(A_Reph));
   fConvertedText := ReplaceStr(fConvertedText, string(A_Reph) + string(A_UKar4), string(A_UKar4) + string(A_Reph));
-  // This makes the U-kar "hang" lower so it doesn't clash with the Reph.
   fConvertedText := ReplaceStr(fConvertedText, string(A_UKar1) + string(A_Reph), string(A_UKar2) + string(A_Reph));
 
   // Reorder Reph and all variants of UU-Kar glyphs
   fConvertedText := ReplaceStr(fConvertedText, string(A_Reph) + string(A_UUKar1), string(A_UUKar1) + string(A_Reph));
   fConvertedText := ReplaceStr(fConvertedText, string(A_Reph) + string(A_UUKar2), string(A_UUKar2) + string(A_Reph));
   fConvertedText := ReplaceStr(fConvertedText, string(A_Reph) + string(A_UUKar3), string(A_UUKar3) + string(A_Reph));
-  // If UU-Kar1 and Reph are together, you might want to use UU-Kar2
   fConvertedText := ReplaceStr(fConvertedText, string(A_UUKar1) + string(A_Reph), string(A_UUKar2) + string(A_Reph));
 
-  { =========================================================================
-    ডাইনামিক পোস্ট-প্রসেসিং কারেকশন (জেসন ফাইল অনুযায়ী কাজ করবে)
-    ========================================================================= }
+  // Dynamic Post-processing Corrections
   fConvertedText := ReplaceStr(fConvertedText, string(A_T) + string(A_UKar1), string(A_T) + string(A_UKar2));
   fConvertedText := ReplaceStr(fConvertedText, string(A_T) + string(A_UUKar1), string(A_T) + string(A_UUKar2));
   fConvertedText := ReplaceStr(fConvertedText, string(A_RR) + string(A_UUKar1), string(A_RR) + string(A_UUKar2));
   fConvertedText := ReplaceStr(fConvertedText, string(A_RRH) + string(A_UUKar1), string(A_RRH) + string(A_UUKar2));
   fConvertedText := ReplaceStr(fConvertedText, string(A_R) + string(A_UUKar1), string(A_R) + string(A_UUKar2));
-  { ========================================================================= }
   
-  // --- STRICT SANITIZATION FOR ANSI OUTPUT ---
-  CleanedText := '';
-  for I := 1 to Length(fConvertedText) do
-  begin
-    C := fConvertedText[I];
-    if (Ord(C) >= $0980) and (Ord(C) <= $09FF) then Continue;
-    if ((Ord(C) >= $200B) and (Ord(C) <= $200F)) or (Ord(C) = $FEFF) then Continue;
-    CleanedText := CleanedText + C;
+  // --- STRICT SANITIZATION FOR ANSI OUTPUT (Optimized with TStringBuilder) ---
+  SB := TStringBuilder.Create; 
+  try
+    for I := 1 to Length(fConvertedText) do
+    begin
+      C := fConvertedText[I];
+      if (Ord(C) >= $0980) and (Ord(C) <= $09FF) then Continue;
+      if ((Ord(C) >= $200B) and (Ord(C) <= $200F)) or (Ord(C) = $FEFF) then Continue;
+      SB.Append(C); // সরাসরি বাফারে যোগ হচ্ছে, কপি হবে না
+    end;
+    fConvertedText := SB.ToString;
+  finally
+    SB.Free; // মেমোরি মুক্ত করা হলো
   end;
-  fConvertedText := CleanedText;
 
   // Applying dynamic post-processing fixes (LAST)
   for I := 0 to Length(CustomPostReplacements) - 1 do
