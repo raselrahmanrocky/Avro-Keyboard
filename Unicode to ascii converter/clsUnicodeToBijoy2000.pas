@@ -2045,8 +2045,9 @@ begin
   ExcludedNames := TDictionary<string, Boolean>.Create;
   UniqueMap := TDictionary<string, string>.Create;
   try
-    // 1. Load default mappings from AnsiRegistry
-    for Rec in AnsiRegistry do
+    // FIX: Loop through AnsiRegistryMap.Values instead of AnsiRegistry list
+    // This ensures we use the updated BengaliChar (UnicodeKey) loaded from JSON
+    for Rec in AnsiRegistryMap.Values do
     begin
       if Rec.BengaliChar = '' then
         Continue;
@@ -2092,15 +2093,11 @@ begin
       UniqueMap.AddOrSetValue(Key, Val);
     end;
 
-    // 2. Merge custom full-form overrides (same Key overwrites default value)
+    // 2. Merge custom full-form overrides
     for I := 0 to Length(CustomFullForms) - 1 do
       UniqueMap.AddOrSetValue(CustomFullForms[I].Key, CustomFullForms[I].Value);
 
-    // 3. Populate ActiveReplacements (non kar-inclusive) and
-    //    KarInclusiveReplacements (keys that already encode a U/UU/RRI kar,
-    //    e.g. ক্রু/ক্রূ/ক্রৃ) from the deduplicated map.
-    //    Kar-inclusive entries must run BEFORE the vowel-rule pass so the
-    //    explicit full forms are not defeated by generic kar handling.
+    // 3. Populate ActiveReplacements and KarInclusiveReplacements
     SetLength(ActiveReplacements, 0);
     SetLength(KarInclusiveReplacements, 0);
     for Key in UniqueMap.Keys do
@@ -2222,7 +2219,7 @@ procedure LoadAnsiMapping(const Path: string; ErrorLog: TStringList = nil);
 var
   JSON: string;
   P: Integer;
-  Key, ConstName, ConstValue, CatName, FieldName, ToggleVal: string;
+  Key, ConstName, ConstValue, UnicodeKeyValue, CatName, FieldName, ToggleVal: string;
   Rec: TAnsiVarRec;
   Lines: TStringList;
   Items: TList<string>;
@@ -2294,7 +2291,7 @@ begin
           JSkipWS(JSON, P);
           if (P <= Length(JSON)) and (JSON[P] = '{') then
           begin
-            Inc(P); ConstValue := '';
+            Inc(P); ConstValue := ''; UnicodeKeyValue := '';
             while P <= Length(JSON) do
             begin
               JSkipWS(JSON, P);
@@ -2304,6 +2301,8 @@ begin
               JSkipWS(JSON, P); if JSON[P] = ':' then Inc(P);
               if FieldName = 'Value' then
                 ConstValue := JReadString(JSON, P)
+              else if FieldName = 'UnicodeKey' then
+                UnicodeKeyValue := ResolveValue(JReadString(JSON, P))
               else
                 JSkipValue(JSON, P);
             end;
@@ -2325,6 +2324,14 @@ begin
                   PString(Rec.Ptr)^ := ConstValue;
               end;
             end;
+            if UnicodeKeyValue <> '' then
+            begin
+              if AnsiRegistryMap.TryGetValue(ConstName, Rec) then
+              begin
+                Rec.BengaliChar := UnicodeKeyValue;
+                AnsiRegistryMap.AddOrSetValue(ConstName, Rec);
+              end;
+            end;
           end
           else JSkipValue(JSON, P);
         end;
@@ -2343,7 +2350,7 @@ begin
         JSkipWS(JSON, P);
         if (P <= Length(JSON)) and (JSON[P] = '{') then
         begin
-          Inc(P); ConstValue := '';
+          Inc(P); ConstValue := ''; UnicodeKeyValue := '';
           while P <= Length(JSON) do
           begin
             JSkipWS(JSON, P);
@@ -2353,6 +2360,8 @@ begin
             JSkipWS(JSON, P); if JSON[P] = ':' then Inc(P);
             if FieldName = 'Value' then
               ConstValue := JReadString(JSON, P)
+            else if FieldName = 'UnicodeKey' then
+              UnicodeKeyValue := ResolveValue(JReadString(JSON, P))
             else
               JSkipValue(JSON, P);
           end;
@@ -2372,6 +2381,14 @@ begin
               end
               else
                 PString(Rec.Ptr)^ := ConstValue;
+            end;
+          end;
+          if UnicodeKeyValue <> '' then
+          begin
+            if AnsiRegistryMap.TryGetValue(ConstName, Rec) then
+            begin
+              Rec.BengaliChar := UnicodeKeyValue;
+              AnsiRegistryMap.AddOrSetValue(ConstName, Rec);
             end;
           end;
         end
@@ -2391,7 +2408,7 @@ begin
         JSkipWS(JSON, P);
         if (P <= Length(JSON)) and (JSON[P] = '{') then
         begin
-          Inc(P); ConstValue := '';
+          Inc(P); ConstValue := ''; UnicodeKeyValue := '';
           while P <= Length(JSON) do
           begin
             JSkipWS(JSON, P);
@@ -2401,6 +2418,8 @@ begin
             JSkipWS(JSON, P); if JSON[P] = ':' then Inc(P);
             if FieldName = 'Value' then
               ConstValue := JReadString(JSON, P)
+            else if FieldName = 'UnicodeKey' then
+              UnicodeKeyValue := ResolveValue(JReadString(JSON, P))
             else
               JSkipValue(JSON, P);
           end;
@@ -2420,6 +2439,14 @@ begin
               end
               else
                 PString(Rec.Ptr)^ := ConstValue;
+            end;
+          end;
+          if UnicodeKeyValue <> '' then
+          begin
+            if AnsiRegistryMap.TryGetValue(ConstName, Rec) then
+            begin
+              Rec.BengaliChar := UnicodeKeyValue;
+              AnsiRegistryMap.AddOrSetValue(ConstName, Rec);
             end;
           end;
         end
@@ -2439,7 +2466,7 @@ begin
         JSkipWS(JSON, P);
         if (P <= Length(JSON)) and (JSON[P] = '{') then
         begin
-          Inc(P); ConstValue := '';
+          Inc(P); ConstValue := ''; UnicodeKeyValue := '';
           while P <= Length(JSON) do
           begin
             JSkipWS(JSON, P);
@@ -2449,6 +2476,8 @@ begin
             JSkipWS(JSON, P); if JSON[P] = ':' then Inc(P);
             if FieldName = 'Value' then
               ConstValue := JReadString(JSON, P)
+            else if FieldName = 'UnicodeKey' then
+              UnicodeKeyValue := ResolveValue(JReadString(JSON, P))
             else
               JSkipValue(JSON, P);
           end;
@@ -2470,6 +2499,14 @@ begin
                 PString(Rec.Ptr)^ := ConstValue;
             end;
           end;
+          if UnicodeKeyValue <> '' then
+          begin
+            if AnsiRegistryMap.TryGetValue(ConstName, Rec) then
+            begin
+              Rec.BengaliChar := UnicodeKeyValue;
+              AnsiRegistryMap.AddOrSetValue(ConstName, Rec);
+            end;
+          end;
         end
         else JSkipValue(JSON, P);
       end;
@@ -2487,7 +2524,7 @@ begin
         JSkipWS(JSON, P);
         if (P <= Length(JSON)) and (JSON[P] = '{') then
         begin
-          Inc(P); ConstValue := '';
+          Inc(P); ConstValue := ''; UnicodeKeyValue := '';
           while P <= Length(JSON) do
           begin
             JSkipWS(JSON, P);
@@ -2497,6 +2534,8 @@ begin
             JSkipWS(JSON, P); if JSON[P] = ':' then Inc(P);
             if FieldName = 'Value' then
               ConstValue := JReadString(JSON, P)
+            else if FieldName = 'UnicodeKey' then
+              UnicodeKeyValue := ResolveValue(JReadString(JSON, P))
             else
               JSkipValue(JSON, P);
           end;
@@ -2516,6 +2555,14 @@ begin
               end
               else
                 PString(Rec.Ptr)^ := ConstValue;
+            end;
+          end;
+          if UnicodeKeyValue <> '' then
+          begin
+            if AnsiRegistryMap.TryGetValue(ConstName, Rec) then
+            begin
+              Rec.BengaliChar := UnicodeKeyValue;
+              AnsiRegistryMap.AddOrSetValue(ConstName, Rec);
             end;
           end;
         end
