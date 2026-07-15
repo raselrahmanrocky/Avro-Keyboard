@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="bn">
 
 <head>
@@ -642,83 +642,84 @@
     <div class="tab-content hidden" id="tab-docs">
       <div class="space-y-5 max-w-4xl mx-auto py-4">
 
-        <!-- 1. ANSI Mapping কী -->
+        <!-- 1. ANSI Mapping কী? -->
         <details class="premium-card elevation-1 group" open>
           <summary class="font-bold text-white flex items-center justify-between p-5">
             <div class="flex items-center gap-3"><span
-                class="material-symbols-outlined text-indigo-400">language</span><span>১. ANSI ম্যাপিং কী?</span></div>
+                class="material-symbols-outlined text-indigo-400">language</span><span>১. ANSI Mapping কী?</span></div>
             <span class="material-symbols-outlined transition-transform">expand_more</span>
           </summary>
           <div class="details-content text-zinc-400 leading-relaxed space-y-3">
-            <p>আপনি যখন বাংলায় টাইপ করেন — যেমন "সালাম" — আপনার কম্পিউটার ইউনিকোড (Unicode) ব্যবহার করে। কিন্তু পুরনো
-              ফন্ট গুলো যেহেতু অনেক আগে তৈরি করা হয়েছে তখন (Unicode Encoding) বলতে কোন কিছু ছিল না। ইংরেজি অক্ষরের উপর
-              বাংলা অক্ষরকে বসিয়ে ফন্ট গুলো তৈরি করা হতো। যাকে (ANSI Encoding) বলা হয়। </p>
-            <p>এই JSON ফাইলটি হল সেই <strong class="text-white">অনুবাদক</strong> — এটি বলে দেয় প্রতিটি ইউনিকোড বর্ণের
-              জন্য কোন ANSI কোড ব্যবহার করতে হবে। যেমন:</p>
-            <pre class="bg-black/40 p-3 rounded-lg text-zinc-300 text-md">স (ইউনিকোড) &#x2192; #$A2 (ANSI কোড)
-া (ইউনিকোড) &#x2192; #$79 (ANSI কোড)
-ল (ইউনিকোড) &#x2192; #$0153 (ANSI কোড)
-া (ইউনিকোড) &#x2192; #$79 (ANSI কোড)
-ম (ইউনিকোড) &#x2192; #$203A (ANSI কোড)</pre>
-            <p>ফলাফল: <code>সালাম</code> (ইউনিকোড) &#x2192; <code>‡yv</code> (ANSI সোটনমিজে)</p>
+            <p>আপনি যখন বাংলায় টাইপ করেন — যেমন "সালাম" — আপনার কম্পিউটার <strong class="text-white">Unicode</strong>
+              ব্যবহার করে। কিন্তু পুরনো ফন্টগুলো (যেমন SutonnyMJ) অনেক আগে তৈরি করা হয়েছে — তখন Unicode Encoding ছিল
+              না। তাই ইংরেজি কীবোর্ডের অক্ষরের উপর বাংলা Glyph বসিয়ে ফন্ট তৈরি করা হতো। একে <strong
+                class="text-white">ANSI Encoding</strong> বলা হয়।</p>
+            <p>এই JSON ফাইলটি হল সেই <strong class="text-white">অনুবাদক (Mapping)</strong> — এটি ইঞ্জিনকে বলে দেয়
+              প্রতিটি Unicode বর্ণের জন্য কোন ANSI Hex Code ব্যবহার করতে হবে। যেমন:</p>
+            <pre class="bg-black/40 p-3 rounded-lg text-zinc-300 text-md">স (Unicode)   &#x2192; #$A2 (ANSI Hex Code)
+া (Unicode)   &#x2192; #$79 (ANSI Hex Code)
+ল (Unicode)   &#x2192; #$0153 (ANSI Hex Code)
+ম (Unicode)   &#x2192; #$203A (ANSI Hex Code)</pre>
+            <p>ফলাফল: <code>সালাম</code> (Unicode) &#x2192; <code>&#x2021;yv</code> (ANSI SutonnyMJ)</p>
+            <div class="bg-amber-900/20 border border-amber-800/30 p-3 rounded-lg text-md">
+              <p><strong class="text-white">মনে রাখুন:</strong> এই কনভার্সন শুধু বর্ণ পরিবর্তন নয় — এটি জটিল Cluster,
+                যুক্তাক্ষর, কারচিহ্ন এবং রেফ/ফলার অর্ডারও পরিবর্তন করে। তাই একটি সাধারণ "find-and-replace" দিয়ে এই কাজ
+                হয় না।</p>
+            </div>
           </div>
         </details>
 
-        <!-- 2. JSON ফাইলের গঠন -->
+        <!-- 2. JSON ফাইলের গঠন (V3) -->
         <details class="premium-card elevation-1 group" open>
           <summary class="font-bold text-white flex items-center justify-between p-5">
             <div class="flex items-center gap-3"><span
-                class="material-symbols-outlined text-indigo-400">account_tree</span><span>২. JSON ফাইলের গঠন</span>
-            </div>
+                class="material-symbols-outlined text-indigo-400">account_tree</span><span>২. JSON ফাইলের গঠন
+                (V3)</span></div>
             <span class="material-symbols-outlined transition-transform">expand_more</span>
           </summary>
           <div class="details-content text-zinc-400 leading-relaxed space-y-3">
-            <p>JSON ফাইলটি ৭টি প্রধান অংশে বিভক্ত:</p>
+            <p>JSON ফাইলটি <strong class="text-white">৭টি প্রধান সেকশনে</strong> বিভক্ত:</p>
             <pre class="bg-black/40 p-3 rounded-lg text-zinc-300 text-md">{
-  "Constants":           // বর্ণ ও গ্লিফের সংজ্ঞা
-  "FullFormReplacements":   // পূর্ণ যুক্তাক্ষরের তালিকা
-  "PreReplacements":     // আগাম প্রতিস্থাপন
-  "PostReplacements":    // পশ্চাৎ প্রতিস্থাপন (সবার শেষে)
-  "VowelRules":          // স্বরবর্ণের গ্লিফ নির্বাচনের নিয়ম
-  "ConsonantGroups":     // ইউনিকোড ব্যঞ্জনবর্ণের গ্রুপ
-  "AnsiGroups":          // ANSI কোডপয়েন্টের গ্রুপ (RaPhalas, Connectors)
+  "Constants":             // বর্ণ ও Glyph-এর সংজ্ঞা (৭টি উপ-ক্যাটাগরি)
+  "FullFormReplacements":  // পূর্ণ যুক্তাক্ষরের তালিকা
+  "PreReplacements":       // Pre-processing প্রতিস্থাপন
+  "PostReplacements":      // Post-processing প্রতিস্থাপন (সবার শেষে)
+  "VowelRules":            // স্বরবর্ণ-কার Glyph নির্বাচনের নিয়ম
+  "ConsonantGroups":       // Unicode ব্যঞ্জনবর্ণের গ্রুপ
+  "AnsiGroups":            // ANSI কোডপয়েন্টের গ্রুপ (RaPhalas, Connectors)
 }</pre>
             <details open>
-              <summary class="font-semibold text-indigo-300 cursor-pointer text-md">Constants &#x2192; ৭টি উপবিভাগ
+              <summary class="font-semibold text-indigo-300 cursor-pointer text-md">Constants &#x2192; ৭টি উপ-ক্যাটাগরি
               </summary>
               <div class="mt-2 space-y-2 pl-4">
-                <p><strong class="text-white">Numbers</strong> (০-৯): অঙ্কের ANSI ম্যাপিং — <code
-                    class="text-md">"A_0": { "Value": "#$0030", "Comment": "০" }</code></p>
-                <p><strong class="text-white">VowelsAndKars</strong>: স্বরবর্ণ ও কারচিহ্ন — <code
-                    class="text-md">"A_AAKar": { "Value": "#$0079", "Comment": "া" }</code></p>
-                <p><strong class="text-white">Symbols</strong>: যতি ও প্রতীক — <code
-                    class="text-md">"A_Hasanta": { "Value": "#$E4", "Comment": "্" }</code></p>
-                <p><strong class="text-white">Consonants</strong>: ব্যঞ্জনবর্ণ — <code
-                    class="text-md">"A_K": { "Value": "#$201E#$FE", "Comment": "ক" }</code></p>
-                <p><strong class="text-white">FullForms</strong>: যুক্তাক্ষর — <code
-                    class="text-md">"A_K_K": { "Value": "#$45#$FE", "Comment": "ক্ক" }</code></p>
-                <p><strong class="text-white">FirstHalfForms</strong>: বর্ণের প্রথম খন্ড — <code
-                    class="text-md">"A_Reph": { "Value": "#$C5", "Comment": "র-এর রেফ" }</code></p>
-                <p><strong class="text-white">SecondHalfForms</strong>: বর্ণের দ্বিতীয় খন্ড — <code
-                    class="text-md">"A_ZFola": { "Value": "#$C4", "Comment": "য-ফলা" }</code></p>
+                <p><strong class="text-white">Numbers</strong> (০-৯): অঙ্কের ANSI Mapping</p>
+                <p><strong class="text-white">VowelsAndKars</strong>: স্বরবর্ণ ও কারচিহ্ন (ি, ী, ু, ূ, ৃ, ে, ৈ, া
+                  ইত্যাদি)</p>
+                <p><strong class="text-white">Symbols</strong>: যতি, প্রতীক ও বিশেষ চিহ্ন (্, ৎ, ং, ঃ, ঁ)</p>
+                <p><strong class="text-white">Consonants</strong>: ব্যঞ্জনবর্ণ (ক, খ, গ, ঘ...)</p>
+                <p><strong class="text-white">FullForms</strong>: যুক্তাক্ষরের পূর্ণ Glyph (ক্ক, ক্ট, ক্ত ইত্যাদি)</p>
+                <p><strong class="text-white">FirstHalfForms</strong>: যুক্তাক্ষরের বাম পাশ (রেফ, ম-এর প্রথম খন্ড
+                  ইত্যাদি)</p>
+                <p><strong class="text-white">SecondHalfForms</strong>: যুক্তাক্ষরের ডান পাশ (য-ফলা, র-ফলা, ল-এর
+                  দ্বিতীয় খন্ড ইত্যাদি)</p>
               </div>
             </details>
             <details open>
-              <summary class="font-semibold text-indigo-300 cursor-pointer text-md">ConsonantGroups &#x2192; ব্যঞ্জনবর্ণ
-                গ্রুপ</summary>
+              <summary class="font-semibold text-indigo-300 cursor-pointer text-md">ConsonantGroups &#x2192; Unicode
+                ব্যঞ্জনবর্ণ গ্রুপ</summary>
               <div class="mt-2 pl-4">
-                <p>ব্যঞ্জনবর্ণের গ্রুপিং — প্রতিটি গ্রুপের নামের অধীনে ইউনিকোড বর্ণের তালিকা। VowelRules-এ গ্রুপ নাম
-                  রেফারেন্স করা যায়।</p>
+                <p>Unicode বর্ণের গ্রুপিং — VowelRules-এ গ্রুপের নাম রেফারেন্স করা যায়। কনভার্সনের <strong
+                    class="text-white">আগে</strong> কাজ করে।</p>
                 <pre
-                  class="bg-black/40 p-2 rounded-lg text-zinc-300 text-md mt-1">"BaseLineRight": ["খ", "গ", "ঘ", "ন", "প", "ব", "ম", "ল", "স", "হ"]</pre>
+                  class="bg-black/40 p-2 rounded-lg text-zinc-300 text-md mt-1">"BaseLineRight": ["খ", "গ", "ঘ", "ণ", "থ", "দ", "ধ", "ন", "প", "ব", "ম", "ল", "স", "হ"]</pre>
               </div>
             </details>
             <details open>
-              <summary class="font-semibold text-indigo-300 cursor-pointer text-md">AnsiGroups &#x2192; ANSI কোডপয়েন্ট
+              <summary class="font-semibold text-indigo-300 cursor-pointer text-md">AnsiGroups &#x2192; ANSI কোডপয়েন্ট
                 গ্রুপ</summary>
               <div class="mt-2 pl-4">
-                <p>ANSI কোডপয়েন্টের গ্রুপিং — ConsonantGroups-এর মতোই, কিন্তু ইউনিকোড বর্ণের পরিবর্তে ANSI হেক্স কোড
-                  ব্যবহার হয়। VowelRules ও FinalTouch উভয় ক্ষেত্রেই ব্যবহার করা যায়।</p>
+                <p>ANSI কোডপয়েন্টের গ্রুপিং — কনভার্সনের <strong class="text-white">পরে</strong> কাজ করে। VowelRules ও
+                  FinalTouch উভয় ক্ষেত্রেই ব্যবহার হয়।</p>
                 <pre
                   class="bg-black/40 p-2 rounded-lg text-zinc-300 text-md mt-1">"RaPhalas": ["#$C6", "#$C8", "#$C9", "#$CA", "#$CB", "#$CC"]</pre>
               </div>
@@ -726,495 +727,514 @@
           </div>
         </details>
 
-        <!-- 3. Processing Pipeline -->
+        <!-- 3. কনভার্সন পাইপলাইন ও ফেজ (বিস্তারিত) -->
         <details class="premium-card elevation-1 group" open>
           <summary class="font-bold text-white flex items-center justify-between p-5">
             <div class="flex items-center gap-3"><span
-                class="material-symbols-outlined text-indigo-400">alt_route</span><span>৩. কনভার্সন প্রক্রিয়া: ধাপে
-                ধাপে</span></div>
+                class="material-symbols-outlined text-indigo-400">alt_route</span><span>৩. কনভার্সন পাইপলাইন ও ফেজ
+                (বিস্তারিত)</span></div>
             <span class="material-symbols-outlined transition-transform">expand_more</span>
           </summary>
           <div class="details-content text-zinc-400 leading-relaxed space-y-3">
-            <p>ইউনিকোড থেকে ANSI-তে রূপান্তর একটি নির্দিষ্ট ক্রমে ঘটে। নিচে প্রতিটি ধাপ বর্ণনা করা হলো:</p>
-            <pre class="bg-black/40 p-4 rounded-lg text-zinc-300 text-md text-center leading-loose">
-<span class="text-white font-bold">সালাম (ইউনিকোড)</span>
-    &#x2193;
-<span class="text-indigo-300 font-semibold">&#x2776; FullFormReplacements</span>
-    &#x2193;
-<span class="text-indigo-300 font-semibold">&#x2777; PreReplacements</span>
-    &#x2193;
-<span class="text-indigo-300 font-semibold">&#x2778; ReplaceFullForms</span> (FirstHalf + SecondHalf)
-    &#x2193;
-<span class="text-indigo-300 font-semibold">&#x2779; ReplaceKarsVowels</span> (VowelRules দ্বারা)
-    &#x2193;
-<span class="text-indigo-300 font-semibold">&#x277A; PostReplacements</span> (#{Var} সম্প্রসারণ)
-    &#x2193;
-<span class="text-indigo-300 font-semibold">&#x277B; FinalTouch</span> (গ্লিফ পুনর্বিন্যাস + ANSI পরিশোধন)
-    &#x2193;
-<span class="text-white font-bold">‡yv (ANSI আউটপুট)</span></pre>
+            <p>Unicode থেকে ANSI-তে রূপান্তর <strong class="text-white">তিনটি ফেজে (Phase)</strong> ঘটে। প্রতিটি ফেজের
+              ভিতরে নির্দিষ্ট ক্রমে ধাপগুলো চলে। এই Phased Approach প্রয়োজন কারণ — বাংলার জটিল যুক্তাক্ষর, রেফ, ফলা এবং
+              কারচিহ্নের অর্ডার এমনভাবে জটিল যে একটি একক pass দিয়ে সব কাজ সম্ভব নয়।</p>
+
+            <pre class="bg-black/40 p-4 rounded-lg text-zinc-300 text-md leading-loose">
+<span class="text-indigo-300 font-bold">═══ Phase A: Pre-phase (কাঁচা Unicode টেক্সট) ═══</span>
+  <span class="text-white font-bold">১.</span> ApplyRuleForKar(উ-কার, <span class="text-green-400">'pre'</span>)
+  <span class="text-white font-bold">২.</span> ApplyRuleForKar(ঊ-কার, <span class="text-green-400">'pre'</span>)
+  <span class="text-white font-bold">৩.</span> ApplyRuleForKar(ঋ-কার, <span class="text-green-400">'pre'</span>)
+
+<span class="text-indigo-300 font-bold">═══ Phase B: Main Conversion ═══</span>
+  <span class="text-white font-bold">৪.</span> DeNormalize (Z+Nukta&#x2192;Y, তিগুণ হসন্ত ফিক্স)
+  <span class="text-white font-bold">৫.</span> CustomPreReplacements
+  <span class="text-white font-bold">৬.</span> ReArrangeKars (I/E/OI-কার পুনর্বিন্যাস)
+  <span class="text-white font-bold">৭.</span> ReArrangeReph (রেফ পুনর্বিন্যাস)
+  <span class="text-white font-bold">৮.</span> ApplyKarInclusiveFullForms (ক্রু/ক্রূ/ক্রৃ ইত্যাদি)
+  <span class="text-white font-bold">৯.</span> ApplyVowelKars (U/UU/RRI মূল পাস)
+  <span class="text-white font-bold">১০.</span> ReplaceFullForms (যুক্তাক্ষর)
+  <span class="text-white font-bold">১১.</span> ReplaceKarsVowels (সাধারণ স্বর/কার)
+  <span class="text-white font-bold">১২.</span> ConvertRFola_ZFola_Hasanta
+  <span class="text-white font-bold">১৩.</span> FirstHalfForms &#x2192; SecondHalfForms
+  <span class="text-white font-bold">১৪.</span> Consonants (ব্যঞ্জনবর্ণ)
+  <span class="text-white font-bold">১৫.</span> FinalTouch (পরিশোধন + ApplyGenericGlyphSwaps)
+
+<span class="text-indigo-300 font-bold">═══ Phase C: Post-phase (ANSI-রূপান্তরিত টেক্সট) ═══</span>
+  <span class="text-white font-bold">১৬.</span> ApplyRuleForKar(উ-কার, <span class="text-green-400">'post'</span>)
+  <span class="text-white font-bold">১৭.</span> ApplyRuleForKar(ঊ-কার, <span class="text-green-400">'post'</span>)
+  <span class="text-white font-bold">১৮.</span> ApplyRuleForKar(ঋ-কার, <span class="text-green-400">'post'</span>)
+            </pre>
+
+            <div class="space-y-4 mt-4">
+              <div class="bg-indigo-900/20 border-l-4 border-indigo-500 p-4 rounded-r-lg">
+                <h4 class="text-indigo-300 font-bold mb-2 flex items-center gap-2">
+                  <span class="material-symbols-outlined text-md">fiber_manual_record</span>
+                  Phase A: Pre-phase (Raw Unicode Analysis)
+                </h4>
+                <p class="text-md">এটি কনভার্সনের একদম শুরুতে চলে। যখন টেক্সটটি এখনো সম্পূর্ণ <strong
+                    class="text-white">Unicode</strong> থাকে। এখানে মূলত উ, ঊ এবং ঋ-কারের বিশেষ রূপগুলো নির্বাচন করা হয়
+                  কারণ এই সময়ে Unicode Cluster-এর পূর্ণ রূপটি পাওয়া যায়।</p>
+              </div>
+
+              <div class="bg-zinc-800/50 border-l-4 border-zinc-500 p-4 rounded-r-lg">
+                <h4 class="text-white font-bold mb-2 flex items-center gap-2">
+                  <span class="material-symbols-outlined text-md">fiber_manual_record</span>
+                  Phase B: Main Conversion (The Core)
+                </h4>
+                <p class="text-md">এখানে মূল রূপান্তর ঘটে। এর ধাপগুলো হলো: <br>
+                  <span class="text-zinc-300">Normalization (DeNormalize) $\rightarrow$ কার ও রেফের স্থান পরিবর্তন
+                    $\rightarrow$ পূর্ণ যুক্তবর্ণ প্রতিস্থাপন $\rightarrow$ সাধারণ বর্ণ ও কার প্রতিস্থাপন $\rightarrow$
+                    First/Second Half ফর্ম তৈরি $\rightarrow$ FinalTouch (Santiation)।</span>
+                </p>
+              </div>
+
+              <div class="bg-green-900/20 border-l-4 border-green-500 p-4 rounded-r-lg">
+                <h4 class="text-green-300 font-bold mb-2 flex items-center gap-2">
+                  <span class="material-symbols-outlined text-md">fiber_manual_record</span>
+                  Phase C: Post-phase (ANSI Polishing)
+                </h4>
+                <p class="text-md">এটি সবশেষে চলে, যখন টেক্সটটি ইতিমধ্যে <strong class="text-white">ANSI</strong>-তে
+                  রূপান্তরিত হয়ে গেছে। এখন ইঞ্জিন শুধু দেখে যে কোন ANSI কোডপয়েন্টের পর কোন কার বসবে। এটি মূলত <strong
+                    class="text-white">AnsiGroups</strong>-এর উপর ভিত্তি করে কাজ করে।</p>
+              </div>
+            </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+            <div class="bg-amber-900/20 border border-amber-800/30 p-3 rounded-lg text-md">
+              <p><strong class="text-white">কেন ৩ ফেজ?</strong> VowelRules-এ প্রতিটি Mapping-এ <code>"process"</code>
+                ফিল্ড থাকে। "pre" মানে কাঁচা Unicode-তে (Phase A) প্রয়োগ হবে, "post" মানে ANSI-তে রূপান্তরের পর (Phase
+                C) প্রয়োগ হবে, এবং ফাঁকা মানে Phase B (মূল কনভার্সন) তে প্রয়োগ হবে। এই পৃথকীকরণ প্রয়োজন কারণ কিছু
+                কার-কম্বিনেশন শুধু Unicode পর্যায়েই সঠিকভাবে নির্ধারণ করা যায় (যেমন BelowBaseVariant, RuClusters),
+                আবার কিছু শুধু ANSI পর্যায়েই (যেমন RaPhalas)।</p>
+              <p><strong class="text-white">কেন এই জটিলতা?</strong> কিছু ক্ষেত্রে আমরা জানি বর্ণটি ইউনিকোডে কী ছিল,
+                কিন্তু রূপান্তরের পর সেটি কোন গ্লিফ হয়ে গেল তা জানতে হয়। এজন্য Pre এবং Post ফেজের মাধ্যমে আমরা দুই
+                স্তরেই কন্ট্রোল রাখতে পারি।</p>
+
+            </div>
 
             <details open>
-              <summary class="font-semibold text-indigo-300 cursor-pointer text-md">&#x2776; FullFormReplacements —
-                বিস্তারিত</summary>
+              <summary class="font-semibold text-indigo-300 cursor-pointer text-md">Phase A: Pre-phase — কাঁচা
+                Unicode-তে কার নির্বাচন</summary>
               <div class="mt-2 pl-4 space-y-2">
-                <p>সবচেয়ে আগে চলে। যুক্তাক্ষর পুরো আকারে ANSI-তে রূপান্তরিত হয়। Key-গুলো দীর্ঘ থেকে ক্ষুদ্র ক্রমে সাজানো
-                  থাকে।</p>
-                <pre class="bg-black/40 p-2 rounded-lg text-zinc-300 text-md">ন্ত্ব &#x2192; #$67#$73#$FE
-ন্ত   &#x2192; #$68#$73#$FE</pre>
+                <p><strong class="text-white">DeNormalize-এর আগে</strong> চলে। এখনো টেক্সট সম্পূর্ণ Unicode — তাই
+                  ConsonantGroups (Unicode) দিয়ে ম্যাচ করা যায়।</p>
+                <pre class="bg-black/40 p-2 rounded-lg text-zinc-300 text-md">ApplyRuleForKar(b_Ukar, 'pre');    // উ-কার — process:"pre" Mapping প্রয়োগ
+ApplyRuleForKar(b_UUKar, 'pre');   // ঊ-কার
+ApplyRuleForKar(b_Rrikar, 'pre');  // ঋ-কার</pre>
+                <p><strong class="text-white">কেন আলাদা ফেজে?</strong> কারণ কিছু Mapping <code>"process": "pre"</code>
+                  সেট করা আছে — যেমন BelowBaseVariant, RuClusters। এগুলো মূল কনভার্সনের আগে প্রয়োগ করতে হয়। যেমন,
+                  "ট্রু" লিখলে "ট্র" ক্লাস্টারটি Unicode অবস্থায় BelowBaseVariant গ্রুপে ম্যাচ হয়ে সঠিক উ-কার (#$0024
+                  — ছাতা উ-কার) নির্বাচিত হয়। যদি এটি Phase B-তে করা হতো, তাহলে DeNormalize এবং ReArrangeKars-এর
+                  পরিবর্তনের পর মূল ক্লাস্টার আর সনাক্ত করা যেত না।</p>
               </div>
             </details>
+
             <details open>
-              <summary class="font-semibold text-indigo-300 cursor-pointer text-md">&#x2777; PreReplacements — বিস্তারিত
-              </summary>
-              <div class="mt-2 pl-4">
-                <p class="mb-1">ক্যারেক্টার প্রসেসিংয়ের আগে বিশেষ প্রতিস্থাপন। যেমন হসন্ত+দাঁড়ি &#x2192; ব্যাকস্ল্যাশ।
+              <summary class="font-semibold text-indigo-300 cursor-pointer text-md">Phase B: Main Conversion — মূল
+                রূপান্তর</summary>
+              <div class="mt-2 pl-4 space-y-2">
+                <p>Phase B হলো মূল কনভার্সন পাইপলাইন। এখানে ধাপগুলো নির্দিষ্ট ক্রমে চলে:</p>
+
+                <p><strong class="text-indigo-300">DeNormalize:</strong> Unicode টেক্সটকে সাধারণ রূপে আনে। Z+Nukta থেকে
+                  য়, ড়, ঢ় তৈরি করে এবং তিগুণ হসন্ত কমিয়ে দ্বিগুণ করে।</p>
+                <pre class="bg-black/40 p-2 rounded-lg text-zinc-300 text-md">Z + Nukta &#x2192; Y (য়)
+DD + Nukta &#x2192; RR (ড়)
+DDH + Nukta &#x2192; RRH (ঢ়)
+তিগুণ হসন্ত &#x2192; দ্বিগুণ</pre>
+
+                <p><strong class="text-indigo-300">ReArrangeKars:</strong> I-কার (ি), E-কার (ে), OI-কার (ৈ) Unicode-তে
+                  বর্ণের <em>পরে</em> থাকে, কিন্তু ANSI ফন্টে এগুলো বর্ণের <em>আগে</em> বসে। এই ধাপে এদের স্থান পরিবর্তন
+                  করে। এছাড়া O-কার ও OU-কার ভেঙে E-কার + AA-কার এবং E-কার + LengthMark-এ পরিণত করে।</p>
+
+                <p><strong class="text-indigo-300">ReArrangeReph:</strong> রেফ (্র) ANSI-তে বর্ণের <em>পরে</em> বসে। এই
+                  ধাপে <code>r + Hasanta</code> প্যাটার্ন সনাক্ত করে রেফকে সঠিক স্থানে (পরবর্তী বর্ণের পরে) নিয়ে যায়।
+                  তবে যদি পূর্ববর্তী বর্ণের আগেই Hasanta থাকে (যেমন mrya, krya), তাহলে সেটি রেফ নয়, র-ফলা — তাই এটি
+                  স্কিপ করে।</p>
+
+                <p><strong class="text-indigo-300">ApplyKarInclusiveFullForms:</strong> এই ধাপে সেসব যুক্তাক্ষর
+                  প্রক্রিয়া করা হয় যাদের ভেতরে কারচিহ্ন রয়েছে — যেমন ক্রু (ক+র+উ-কার), জ্ঞু (জ+ঞ+উ-কার)।
+                  <code>KarInclusiveReplacements</code> তালিকা দীর্ঘতম ম্যাচ আগে বসিয়ে সাজানো থাকে।
                 </p>
-                <pre class="bg-black/40 p-2 rounded-lg text-zinc-300 text-md">&#x09CD;&#x0964; &#x2192; #$FF</pre>
+
+                <p><strong class="text-indigo-300">ApplyVowelKars:</strong> U-কার, UU-কার, এবং RRI-কার এর জন্য সাধারণ
+                  পাস। এখানে <code>ApplyRuleForKar</code> ফেজ প্যারামিটার ছাড়া ডাকা হয়, তাই শুধুমাত্র process ফাঁকা
+                  Mapping-গুলো প্রয়োগ হয়। এছাড়া বিশেষ ক্লাস্টার যেমন গ+উ-কার&#x2192;গু, শ+উ-কার&#x2192;শু,
+                  হ+উ-কার&#x2192;হু সরাসরি প্রতিস্থাপন করা হয়।</p>
+
+                <p><strong class="text-indigo-300">ReplaceFullForms:</strong> <code>ActiveReplacements</code> তালিকা
+                  থেকে সব পূর্ণ যুক্তাক্ষর প্রতিস্থাপন করে। তালিকাটি Key Length Descending ক্রমে সাজানো, তাই দীর্ঘতম
+                  ম্যাচ আগে হয়।</p>
+
+                <p><strong class="text-indigo-300">ReplaceKarsVowels:</strong> E-কার, OI-কার, এবং অন্যান্য সাধারণ
+                  কার/স্বরবর্ণ প্রতিস্থাপন করে। E-কার ও OI-কার পরীক্ষা করে — বর্ণের আগে থাকলে "সাধারণ" গ্লিফ, নাহলে
+                  "ঝুলন্ত" গ্লিফ ব্যবহার করে।</p>
+
+                <p><strong class="text-indigo-300">ConvertRFola_ZFola_Hasanta:</strong> য-ফলা (Hasanta+য), র-ফলা
+                  (Hasanta+র) এবং হসন্ত গ্লিফে রূপান্তর করে। র-ফলার ক্ষেত্রে পূর্ববর্তী বর্ণের উপর নির্ভর করে বিভিন্ন
+                  গ্লিফ নির্বাচন করে (যেমন প/গ/শ+র-ফলা, ভ+র-ফলা, ক/ত+র-ফলা)।</p>
+
+                <p><strong class="text-indigo-300">FirstHalfForms &#x2192; SecondHalfForms &#x2192; Consonants:</strong>
+                  যুক্তাক্ষরের বাম ও ডান খণ্ড এবং সাধারণ ব্যঞ্জনবর্ণ প্রতিস্থাপন করে।</p>
+
+                <p><strong class="text-indigo-300">FinalTouch:</strong> সর্বশেষ ধাপে একাধিক পরিশোধন কাজ হয় —
+                  হসন্ত/ZWJ/ZWNJ পরিষ্কার, কার-অর্ডার সুয়াপ, Unicode স্যানিটাইজেশন এবং ApplyGenericGlyphSwaps।</p>
               </div>
             </details>
+
             <details open>
-              <summary class="font-semibold text-indigo-300 cursor-pointer text-md">&#x2778; ReplaceFullForms —
-                বিস্তারিত</summary>
-              <div class="mt-2 pl-4">
-                <p>FirstHalfForms ও SecondHalfForms ব্যবহার করে যুক্তাক্ষর তৈরি। যেমন র-এর রেফ + প = র্প।</p>
-              </div>
-            </details>
-            <details open>
-              <summary class="font-semibold text-indigo-300 cursor-pointer text-md">&#x2779; ReplaceKarsVowels —
-                বিস্তারিত</summary>
-              <div class="mt-2 pl-4">
-                <p>সবচেয়ে জটিল ধাপ। কারচিহ্ন (ু, ূ, ৃ) বসানোর জন্য VowelRules ব্যবহার করে। নিচে বিস্তারিত দেখুন।</p>
-              </div>
-            </details>
-            <details open>
-              <summary class="font-semibold text-indigo-300 cursor-pointer text-md">&#x277A; PostReplacements —
-                বিস্তারিত</summary>
+              <summary class="font-semibold text-indigo-300 cursor-pointer text-md">Phase C: Post-phase — ANSI-তে
+                রূপান্তরের পর কার নির্বাচন</summary>
               <div class="mt-2 pl-4 space-y-2">
-                <p>সব গ্লিফ বসানোর পর অর্ডারিং ফিক্স। এখানে <code>#{VariableName}</code> ব্যবহার করা যায়।</p>
-                <pre
-                  class="bg-black/40 p-2 rounded-lg text-zinc-300 text-md">"Key": "#$FE#{A_UKar1}", "Value": "#{A_UKar1}#$FE"</pre>
+                <p>Phase C Phase A-এর পরিপূরক। এখনো টেক্সট ANSI-তে রূপান্তরিত হয়ে গেছে — তাই <strong
+                    class="text-white">AnsiGroups (ANSI কোডপয়েন্ট)</strong> দিয়ে ম্যাচ করা যায়।</p>
+                <pre class="bg-black/40 p-2 rounded-lg text-zinc-300 text-md">ApplyRuleForKar(b_Ukar, 'post');    // উ-কার — process:"post" Mapping প্রয়োগ
+ApplyRuleForKar(b_UUKar, 'post');   // ঊ-কার
+ApplyRuleForKar(b_Rrikar, 'post');  // ঋ-কার</pre>
+                <p><strong class="text-white">কেন আলাদা ফেজে?</strong> কারণ কিছু Mapping <code>"process": "post"</code>
+                  সেট করা আছে — যেমন RaPhalas, BaseLineRight। যেমন, ক্রু লিখলে Phase B-তে র-ফলা ANSI কোডপয়েন্ট #$C6-তে
+                  রূপান্তরিত হয়। Phase C-তে ApplyRuleForKar দেখে যে পূর্ববর্তী ক্যারেক্টার #$C6, যা
+                  AnsiGroups.RaPhalas-এ আছে — তাই A_UKar2 (ঝুলন্ত উ-কার) নির্বাচিত হয়।</p>
               </div>
             </details>
+
             <details open>
-              <summary class="font-semibold text-indigo-300 cursor-pointer text-md">&#x277B; FinalTouch — বিস্তারিত
-              </summary>
-              <div class="mt-2 pl-4 space-y-1">
-                <p>সর্বশেষ ধাপে পুনর্বিন্যাস ও পরিষ্কারকরণ:</p>
-                <ul class="list-disc list-inside text-md space-y-1">হসন্ত, ZWJ, ZWNJ সরানো</ul>
-                <ul class="list-disc list-inside text-md space-y-1">ApplyGenericGlyphSwaps — AnsiGroups থেকে মডিফায়ার
-                  (RaPhalas, Connectors) লোড করে প্রতিটি মডিফায়ার×প্রতি কার-এর জন্য modifier+kar → kar+modifier সুয়াপ
-                </ul>
-                <ul class="list-disc list-inside text-md space-y-1">লিগ্যাসি Default-ভার্সন কারেকশন (ট-কার, র-কার
-                  বিশেষケース)</ul>
+              <summary class="font-semibold text-indigo-300 cursor-pointer text-md">ফেজ ভিত্তিক প্রক্রিয়া — কেন
+                প্রয়োজন?</summary>
+              <div class="mt-2 pl-4 space-y-2">
+                <p>বাংলা ভাষার জটিলতা কারণে এই Phased Approach অপরিহার্য:</p>
+                <ol class="list-decimal list-inside text-md space-y-1">
+                  <li><strong class="text-white">Unicode বনাম ANSI পরিচিতি:</strong> কিছু ক্লাস্টার (যেমন ট্র, ড্র) শুধু
+                    Unicode অবস্থায় চেনা যায় (ConsonantGroups), আবার কিছু (যেমন র-ফলা #$C6) শুধু ANSI অবস্থায়
+                    (AnsiGroups)।</li>
+                  <li><strong class="text-white">অর্ডার সংবেদনশীলতা:</strong> DeNormalize ও ReArrangeKars টেক্সটের
+                    অর্ডার পরিবর্তন করে। Phase A এই পরিবর্তনের আগে কাজ করে, Phase C পরে।</li>
+                  <li><strong class="text-white">ফলব্যাক ব্যবস্থাপনা:</strong> যদি Phase A কোনো Mapping-এ ম্যাচ না পায়,
+                    তাহলে ApplyRuleForKar Phase B-তে ডিফল্ট মান ব্যবহার করে। Phase C তখন সেই ডিফল্টের উপর পুনরায় ম্যাচ
+                    চেষ্টা করে।</li>
+                </ol>
               </div>
             </details>
           </div>
         </details>
 
-        <!-- 4. VowelRules বিস্তারিত -->
+        <!-- 4. VowelRules: স্বরবর্ণ-কার Glyph নির্বাচন (বিস্তারিত) -->
         <details class="premium-card elevation-1 group" open>
           <summary class="font-bold text-white flex items-center justify-between p-5">
             <div class="flex items-center gap-3"><span
-                class="material-symbols-outlined text-indigo-400">rule</span><span>৪. VowelRules: স্বরবর্ণের গ্লিফ
-                নির্বাচন</span></div>
+                class="material-symbols-outlined text-indigo-400">rule</span><span>৪. VowelRules: স্বরবর্ণ-কার Glyph
+                নির্বাচন (বিস্তারিত)</span></div>
             <span class="material-symbols-outlined transition-transform">expand_more</span>
           </summary>
           <div class="details-content text-zinc-400 leading-relaxed space-y-3">
-            <p>VowelRules নির্ধারণ করে — একটি কারচিহ্ন (ু, ূ, ৃ) কোন ব্যঞ্জনবর্ণের পরে বসলে <strong
-                class="text-white">কোন ANSI গ্লিফ</strong> ব্যবহার করবে।</p>
+            <p>VowelRules হলো এই সিস্টেমের সবচেয়ে গুরুত্বপূর্ণ ও জটিল অংশ। এটি নির্ধারণ করে — একটি কারচিহ্ন (ু, ূ, ৃ)
+              কোন ব্যঞ্জনবর্ণের পরে বসলে <strong class="text-white">কোন ANSI Glyph</strong> ব্যবহার করবে।</p>
 
-            <h4 class="text-white font-semibold mt-4">JSON ফরম্যাট</h4>
-            <pre class="bg-black/40 p-3 rounded-lg text-zinc-300 text-md">"#$09C1": {                    // কী: ইউনিকোড উ-কার (U+09C1)
-  "default": "#{A_UKar1}",    // ডিফল্ট মান (কোনো ম্যাপিং না মিললে)
-  "toggle": "both",           // টগল মোড: none | backspace | repeat | both
-  "mappings": [              // শর্তাধীন ম্যাপিং তালিকা (উপর থেকে নিচে চেক করে)
+            <h4 class="text-white font-semibold mt-4">JSON ফরম্যাট (V3)</h4>
+            <pre class="bg-black/40 p-3 rounded-lg text-zinc-300 text-md">"#$09C1": {                          // কী: Unicode উ-কার (U+09C1)
+  "default": "#{A_UKar1}",          // ডিফল্ট মান (কোনো Mapping না মিললে)
+  "mappings": [
     {
-      "consonants": "#$09B0",  // সরাসরি ইউনিকোড বর্ণ (র)
-      "value": "#{A_UKar4}",   // কাঙ্ক্ষিত ANSI গ্লিফ (টগল বন্ধ থাকলে)
-      "alt": "#{A_UKar2}"      // টগল চালু থাকলে এই মান ব্যবহার হয় (optional)
+      "consonants": "#$09B0",        // Direct Unicode Char (র)
+      "value": "#{A_UKar4}",         // কাঙ্ক্ষিত ANSI Glyph
+      "alt": "#{A_UKar2}",           // Toggle ON থাকলে এই মান
+      "toggle": "backspace",         // &#x2190; Mapping-level Toggle
+      "matchMode": 1,                // &#x2190; ১ = শুধু শেষ বর্ণ চেক
+      "process": "pre"               // &#x2190; Pre-phase এ প্রয়োগ
     },
     {
       "consonants": "BelowBaseVariant",  // ConsonantGroups নাম
-      "value": "#$0024"
+      "value": "#$0024",
+      "matchMode": 0,                     // &#x2190; ০ = পূর্ণ Cluster Match (ডিফল্ট)
+      "process": "pre"
     },
     {
-      "consonants": "RaPhalas",          // AnsiGroups নাম
-      "value": "#{A_UKar2}"
+      "consonants": "RuClusters",
+      "value": "#{A_UKar4}",
+      "alt": "#{A_UKar1}",
+      "toggle": "backspace",
+      "matchMode": 0,
+      "process": "pre"
     },
     {
-      "consonants": "BaseLineRight",     // ConsonantGroups নাম
-      "value": "#{A_UKar1}"
+      "consonants": "RaPhalas",      // AnsiGroups নাম
+      "value": "#{A_UKar2}",
+      "process": "post"               // &#x2190; Post-phase এ প্রয়োগ
+    },
+    {
+      "consonants": "BaseLineRight",
+      "value": "#{A_UKar1}",
+      "matchMode": 1,                 // &#x2190; শুধু শেষ বর্ণ চেক
+      "process": "post"
     }
   ]
 }</pre>
 
-            <h4 class="text-white font-semibold mt-4">কিভাবে ম্যাচিং হয় (Priority)</h4>
+            <h4 class="text-white font-semibold mt-4">Mapping-Level ফিল্ডসমূহ</h4>
+            <div class="overflow-x-auto">
+              <table class="table-md">
+                <thead>
+                  <tr>
+                    <th>ফিল্ড</th>
+                    <th>মান</th>
+                    <th>ব্যাখ্যা</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="font-mono text-indigo-300">process</td>
+                    <td><code>"pre"</code> / <code>"post"</code> / <em>(ফাঁকা)</em></td>
+                    <td>কোন ফেজে এই Mapping প্রয়োগ হবে। "pre" = Phase A, "post" = Phase C, ফাঁকা = Phase B (মূল)</td>
+                  </tr>
+                  <tr>
+                    <td class="font-mono text-indigo-300">matchMode</td>
+                    <td><code>0</code> / <code>1</code></td>
+                    <td>০ = পূর্ণ Cluster দীর্ঘতম Match (ডিফল্ট)। ১ = কারের ঠিক আগের একটি বর্ণ মাত্র</td>
+                  </tr>
+                  <tr>
+                    <td class="font-mono text-indigo-300">toggle</td>
+                    <td><code>"backspace"</code> / <em>(ফাঁকা)</em></td>
+                    <td>এই Mapping-এ Toggle সক্রিয় করবে কিনা। "backspace" = ব্যাকস্পেসে State ফ্লিপ</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h4 class="text-white font-semibold mt-6">MatchMode: ক্লাস্টার বনাম ক্যারেক্টার ম্যাচ</h4>
+            <div class="space-y-3">
+              <div class="flex gap-3">
+                <span class="bg-indigo-600 text-white px-2 py-1 rounded text-xs font-bold">Mode 0</span>
+                <p class="text-md"><strong class="text-white">Full Cluster Longest Match:</strong> কারের আগের পুরো অংশটি
+                  চেক করে। যদি 'ট্র' একটি গ্রুপে থাকে, তবে সেটি দীর্ঘতম ম্যাচ হিসেবে প্রাধান্য পাবে।</p>
+              </div>
+              <div class="flex gap-3">
+                <span class="bg-indigo-600 text-white px-2 py-1 rounded text-xs font-bold">Mode 1</span>
+                <p class="text-md"><strong class="text-white">Last Char Only:</strong> পুরো ক্লাস্টার না দেখে শুধুমাত্র
+                  শেষের অক্ষর বা বর্ণটিি বর্ণটি চেক করে।</p>
+              </div>
+            </div>
             <div class="bg-black/30 p-4 rounded-lg space-y-3 text-md">
-              <p><span class="text-indigo-300 font-bold">স্তর ১ — Direct Unicode Char:</span>
-                <code>"consonants"</code>-এর মান যদি একটি ইউনিকোড বর্ণ হয় (যেমন <code>"#$09B0"</code> বা
-                <code>"র"</code>), তাহলে পূর্ববর্তী বর্ণের সাথে সরাসরি তুলনা করা হয়। মিললে <code>value</code> ব্যবহার
-                হয়।
-              </p>
-              <p><span class="text-indigo-300 font-bold">স্তর ২ — ConsonantGroups (Unicode):</span> যদি
-                <code>"consonants"</code> ConsonantGroups সেকশনের একটি গ্রুপের নাম হয় (যেমন
-                <code>"BaseLineRight"</code>, <code>"BelowBaseVariant"</code>, <code>"RuClusters"</code>), তাহলে গ্রুপের তালিকায় পূর্ববর্তী বর্ণ আছে
-                কিনা চেক করা হয়।
-              </p>
-              <p><span class="text-indigo-300 font-bold">স্তর ৩ — AnsiGroups (ANSI):</span> যদি গ্রুপটি AnsiGroups
-                সেকশনে থাকে (যেমন <code>"RaPhalas"</code>), তাহলে ANSI কোডপয়েন্টের সাথে ম্যাচ করা হয়।</p>
-              <p><span class="text-indigo-300 font-bold">সর্বশেষ — Default:</span> উপরের কোনোটাই না মিললে
-                <code>"default"</code> মান ব্যবহার হয়।
-              </p>
+              <p><code>FindBestClusterMatch</code> ফাংশন সব Mapping স্ক্যান করে এবং <strong class="text-white">দীর্ঘতম
+                  Match</strong> বেছে নেয়। MatchMode-এর উপর নির্ভর করে ম্যাচিংয়ের পদ্ধতি ভিন্ন হয়:</p>
+
+              <p><span class="text-indigo-300 font-bold">MatchMode ০ (পূর্ণ Cluster Match — ডিফল্ট):</strong></p>
+              <p>কারের অবস্থান থেকে পিছনে Scan করে। প্রথমে ConsonantGroupMap ও AnsiGroupMap-এর তালিকায় দীর্ঘতম Match
+                খুঁজে। <code>MatchGroupLength</code> ফাংশন Block-based Matching ব্যবহার করে — character-by-character
+                নয়, বরং পুরো গ্রুপ এন্ট্রিকে একটি Block হিসেবে পূর্ববর্তী টেক্সটের সাথে তুলনা করে।</p>
+              <pre class="bg-black/40 p-2 rounded-lg text-zinc-300 text-md">উদাহরণ: "ট্রু" — কারের আগে "ট্র"
+&#x2192; RuClusters-এ "ট্র" আছে (দৈর্ঘ্য ২)
+&#x2192; MatchLen = 2 &#x2192; <strong class="text-green-400">value = #$0024 (ছাতা উ-কার)</strong></pre>
+
+              <p><span class="text-indigo-300 font-bold">MatchMode ১ (শুধু শেষ বর্ণ):</strong></p>
+              <p>শুধু কারের ঠিক আগের একটি বর্ণের সাথে Direct Char Match করে। পুরো Cluster দেখে না।</p>
+              <pre class="bg-black/40 p-2 rounded-lg text-zinc-300 text-md">উদাহরণ: "রু" — কারের আগে "র" (#$09B0)
+&#x2192; Direct Match: consonants = "#$09B0" = "র"
+&#x2192; <strong class="text-green-400">value = A_UKar4 (রেফ-স্টাইল উ-কার)</strong></pre>
+
+              <p><span class="text-indigo-300 font-bold">অগ্রাধিকার (Priority):</strong></p>
+              <p>সব Mapping-এর মধ্যে যেটি দীর্ঘতম MatchLen দেয়, সেটি বেছে নেওয়া হয়। একই MatchLen হলে প্রথমে পাওয়া
+                Mapping-টি ব্যবহার হয়।</p>
             </div>
 
-            <h4 class="text-white font-semibold mt-4">Toggle অপশন বিস্তারিত</h4>
-            <p><code>toggle</code> হল VowelRules-এর একটি <strong class="text-white">রুল-লেভেল</strong> ফিল্ড
-              (<code>default</code> ও <code>mappings</code>-এর সহোদর)। এটি নির্ধারণ করে কোন শর্তে <code>alt</code> মানটি
-              সক্রিয় হবে। ইঞ্জিন প্রতিটি কার-এর (যেমন <code>#$09C1</code>) জন্য আলাদা একটি on/off স্টেট রাখে — স্টেট ON হলে
-              ম্যাপিং-এর <code>alt</code> ব্যবহার হয়, OFF হলে <code>value</code>।</p>
-
-            <h4 class="text-white font-semibold mt-3">toggle-এর ৪টি মান</h4>
+            <h4 class="text-white font-semibold mt-4">Best-Match অ্যালগরিদম — কিভাবে কাজ করে</h4>
             <div class="bg-black/30 p-4 rounded-lg space-y-2 text-md">
-              <p><span class="text-indigo-300 font-bold">none</span> (বা ফিল্ডটি বাদ দিলে): টগল বন্ধ — <code>alt</code> সবসময়
-                উপেক্ষিত, শুধু <code>value</code> ব্যবহার হয়।</p>
-              <p><span class="text-indigo-300 font-bold">backspace</span>: একই কার ব্যাকস্পেস করে আবার টাইপ করলে স্টেট ফ্লিপ করে।</p>
-              <p><span class="text-indigo-300 font-bold">repeat</span>: একই সিকোয়েন্স বারবার টাইপ করলে স্টেট ফ্লিপ করে।</p>
-              <p><span class="text-indigo-300 font-bold">both</span>: উপরের দুটি ট্রিগারের যেকোনোটি স্টেট ফ্লিপ করতে পারে।</p>
+              <p><code>FindBestClusterMatch</code> ফাংশনটি নিম্নরূপ কাজ করে:</p>
+              <ol class="list-decimal list-inside space-y-1">
+                <li>কারের ঠিক আগের ক্যারেক্টার সনাক্ত করে (Z-fola--aware: যদি আগে Hasanta+য থাকে, তাহলে তা বাদ দিয়ে মূল
+                  বর্ণ খুঁজে)</li>
+                <li>সব Mapping-এর উপর Loop চালায়</li>
+                <li>MatchMode ০ হলে <code>MatchGroupLength</code> দিয়ে ConsonantGroupMap ও AnsiGroupMap-এ খুঁজে</li>
+                <li>MatchMode ১ হলে শুধু Direct Char Match করে</li>
+                <li>সবচেয়ে বড় MatchLen এর Mapping সংরক্ষণ করে</li>
+                <li>ফলাফল হিসেবে MatchedCluster, BestMapping, BestMatchLen, ContextEnd, IsZfola ফেরত দেয়</li>
+              </ol>
             </div>
 
-            <h4 class="text-white font-semibold mt-3">ইঞ্জিন মেকানিজম (সংক্ষেপে)</h4>
-            <p class="text-md">প্রতি কনভার্শনের আগে ইঞ্জিন চেক করে: <code>backspace</code>/<code>both</code> হলে, আগের ইনপুট যদি
-              ঠিক এই বর্ণ + কার হয় (অর্থাৎ কারটি ব্যাকস্পেস করে মোছা হয়েছে) তবে স্টেট উল্টে দেয়; <code>repeat</code>/<code>both</code>
-              হলে একই সিকোয়েন্স বারবার এলে স্টেট উল্টে দেয়। এরপর <code>GetVowelGlyph</code> চলার সময়
-              <code>UseAlt</code> স্টেট অনুযায়ী <code>alt</code> বা <code>value</code> বেছে নেয়।</p>
+            <h4 class="text-white font-semibold mt-4">Toggle মেকানিজম (V3 — Mapping-Level)</h4>
+            <div class="bg-black/30 p-4 rounded-lg space-y-3 text-md">
+              <p>V3-তে <code>toggle</code> ফিল্ড প্রতিটি <strong class="text-white">Mapping-এর ভিতরে</strong> থাকে
+                (Rule-level নয়)। এটি নির্ধারণ করে সেই নির্দিষ্ট Mapping-এর <code>alt</code> মান কখন সক্রিয় হবে।</p>
 
-            <h4 class="text-white font-semibold mt-3">রাখলে কি হবে (toggle সেট করলে)</h4>
-            <p class="text-md"><code>alt</code> ফিল্ড সক্রিয় হয় — ইউজার টাইপিংয়ের ছন্দে একই কারের জন্য <strong class="text-white">দুইটি ভিন্ন
-              ANSI গ্লিফের</strong> মাঝে সুইচ করতে পারে। যেমন <code>#$09C1</code> (ই-কার) এ <code>toggle: "both"</code> আছে:</p>
-            <ul class="list-disc list-inside text-md space-y-1">
-              <li>র (র + ই-কার): <code>value = A_UKar4</code> (রেফ/ওপরে উ-কার) ↔ <code>alt = A_UKar2</code> (ঝুলন্ত/নিচে)</li>
-              <li>RuClusters: <code>value = A_UKar4</code> (রু-ফলা রেফ) ↔ <code>alt = A_UKar1</code> (সাধারণ উ-কার)</li>
-            </ul>
+              <p><strong class="text-white">Toggle State Storage:</strong></p>
+              <pre class="bg-black/40 p-2 rounded-lg text-zinc-300 text-md">fToggleStates Dictionary Key: MatchedCluster + '_' + OccurrenceIndex + '_' + KarChar
+যেমন: "গ্র_1_#$09C1" = "গ্র" Cluster-এ ১ম উ-কারের Toggle State</pre>
 
-            <h4 class="text-white font-semibold mt-3">না রাখলে কী হবে (ফিল্ড বাদ দিলে / "none")</h4>
-            <p class="text-md"><code>alt</code> সম্পূর্ণ নিষ্ক্রিয় থাকে — কারটি সবসময় <code>value</code> অনুযায়ী একই ফর্মে কনভার্ট হয়।
-              আউটপুট ডিটারমিনিস্টিক ও সহজ। যদি আপনার একটি কারের জন্য শুধু একটি নির্দিষ্ট ফর্মই দরকার, তবে <code>toggle</code>
-              রাখবেন না। উদাহরণ: <code>#$09C3</code> (ঋ-কার) এ কোনো <code>toggle</code> নেই, তাই এটি সবসময় <code>value</code> দেয়।</p>
+              <p><strong class="text-white">Backspace Detection:</strong> আগের ইনপুট <code>fLastUniText</code> এবং
+                বর্তমান ইনপুট তুলনা করে। যদি বর্তমান = আগের − কার, তাহলে সেই নির্দিষ্ট Cluster-এর OccurrenceIndex খুঁজে
+                Toggle State ফ্লিপ করে।</p>
 
-            <div class="bg-amber-900/20 border border-amber-800/30 p-3 rounded-lg text-md">
-              <p><strong class="text-white">গুরুত্বপূর্ণ:</strong> <code>default</code> মানের কোনো <code>alt</code> নেই, তাই
-                টগল <code>default</code>-কে কখনোই প্রভাবিত করে না — টগল শুধু <code>mappings</code>-এর <code>alt</code>-কে
-                স্পর্শ করে। আর কোনো ম্যাপিং-এ <code>alt</code> ফাঁকা রাখলে ঐ ম্যাপিংটি টগলের প্রভাবে অপরিবর্তিত থাকে।</p>
+              <p><strong class="text-white">Best-Match Toggle Resolution:</strong> <code>FindMappingToggle</code> ফাংশন
+                সব Mapping স্ক্যান করে, দীর্ঘতম Match-এর Mapping-এর <code>ToggleOnBackspace</code> সেটিং ফেরত দেয়। এটি
+                নিশ্চিত করে যে শুধু সেই Mapping-টি Toggle-এর প্রভাবে পরিবর্তিত হয় যেটি সত্যিই Match হয়েছে।</p>
+
+              <p><strong class="text-white">Toggle-এর ফলাফল:</strong></p>
+              <pre class="bg-black/40 p-2 rounded-lg text-zinc-300 text-md">Toggle OFF (Default): value = A_UKar4 (#$26 — রেফ-স্টাইল)
+Toggle ON (Backspace): alt = A_UKar2 (#$24 — ঝুলন্ত)
+ব্যাকস্পেস চাপলে: উভয়ের মধ্যে টগল হয়</pre>
+            </div>
+
+            <h4 class="text-white font-semibold mt-4">Matching Priority — কোন ক্রমে খোঁজা হয়</h4>
+            <div class="bg-black/30 p-4 rounded-lg space-y-2 text-md">
+              <p><code>FindBestClusterMatch</code> নিম্নলিখিত ক্রমে ম্যাচ খুঁজে:</p>
+              <ol class="list-decimal list-inside space-y-1">
+                <li><strong class="text-indigo-300">Direct Char Match:</strong> Mapping-এর <code>consonants</code> কী
+                  সরাসরি ক্যারেক্টারের সাথে মিলে (যেমন "#$09B0" = "র")</li>
+                <li><strong class="text-indigo-300">ConsonantGroups Match:</strong> ConsonantGroupMap-এ গ্রুপের নাম
+                  দিয়ে খোঁজা হয় (যেমন "RuClusters", "BelowBaseVariant")</li>
+                <li><strong class="text-indigo-300">AnsiGroups Match:</strong> AnsiGroupMap-এ গ্রুপের নাম দিয়ে খোঁজা
+                  হয় (যেমন "RaPhalas") — শুধু Phase C তে</li>
+                <li><strong class="text-indigo-300">Default:</strong> কোনো Mapping না মিললে <code>default</code> মান
+                  ব্যবহার হয়</li>
+              </ol>
+              <div class="bg-amber-900/20 border border-amber-800/30 p-3 rounded-lg text-md mt-2">
+                <p><strong class="text-white">গুরুত্বপূর্ণ:</strong> <code>default</code> মানের কোনো <code>alt</code>
+                  নেই, তাই Toggle কখনোই <code>default</code>-কে প্রভাবিত করে না। Mapping-এ <code>alt</code> ফাঁকা রাখলে
+                  ঐ Mapping-টি Toggle-এর প্রভাবে অপরিবর্তিত থাকে।</p>
+              </div>
             </div>
 
             <h4 class="text-white font-semibold mt-4">বাস্তব উদাহরণ</h4>
-            <div class="bg-indigo-900/20 border border-indigo-800/30 p-3 rounded-lg">
-              <p><strong class="text-white">রু (র + উ-কার):</strong> পূর্ববর্তী বর্ণ <code>#$09B0</code> (র) — সরাসরি
-                ম্যাচ (স্তর ১) &#x2192; <code>value = A_UKar4</code> (রেফ)। <code>toggle: "both"</code> থাকায় ব্যাকস্পেস করে
-                আবার টাইপ করলে স্টেট ফ্লিপ করে <code>alt = A_UKar2</code> (ঝুলন্ত) দেয়।</p>
-            </div>
-            <div class="bg-indigo-900/20 border border-indigo-800/30 p-3 rounded-lg">
-              <p><strong class="text-white">টু (ট + উ-কার):</strong> 'ট' BelowBaseVariant গ্রুপে আছে (স্তর ২) &#x2192;
-                <code>value = #$0024</code> (নিচে বসা উ-কার)।
-              </p>
-            </div>
-            <div class="bg-indigo-900/20 border border-indigo-800/30 p-3 rounded-lg">
-              <p><strong class="text-white">ক্রু (ক্র + উ-কার):</strong> 'ক্র'-এর ANSI-তে র-ফলা <code>#$C6</code> থাকে —
-                RaPhalas গ্রুপে আছে (স্তর ৩) &#x2192; <code>value = A_UKar2</code>।</p>
-            </div>
-            <div class="bg-indigo-900/20 border border-indigo-800/30 p-3 rounded-lg">
-              <p><strong class="text-white">গু (গ + উ-কার):</strong> 'গ' BaseLineRight গ্রুপে (স্তর ২) &#x2192;
-                <code>A_UKar1</code> (সাধারণ উ-কার)।
-              </p>
-            </div>
-            <div class="bg-indigo-900/20 border border-indigo-800/30 p-3 rounded-lg">
-              <p><strong class="text-white">ড়ু (ড় + উ-কার):</strong> 'ড়' কোনো গ্রুপেই নেই &#x2192;
-                <code>default = A_UKar1</code>।
-              </p>
-            </div>
-
-            <div class="mt-6 bg-black/40 p-4 rounded-lg border border-indigo-900/30">
-              <h4 class="text-white font-semibold mb-2">&#x2776; মূল সমস্যা: কেন এই গ্রুপিং প্রয়োজন?</h4>
-              <p class="text-md text-zinc-400">বাংলা লেখার সময় ব্যঞ্জনবর্ণের নিচে যখন উ-কার (ু), ঊ-কার (ূ), ঋ-কার (ৃ)
-                কিংবা র-ফলা (্র) বসে, তখন সব বর্ণের নিচে এগুলো একই রকম দেখায় না। বর্ণের নিচের অংশের আকৃতির ওপর ভিত্তি
-                করে এদের আকৃতি ও বসার স্থান বদলে যায়। যেমন:</p>
-              <ul class="list-disc list-inside text-md space-y-1 mt-2 text-zinc-400">
-                <li><strong class="text-white">র + ু</strong> লিখলে হয় <strong class="text-white">রু</strong> (এখানে
-                  উ-কারটি নিচে না বসে পাশে বসে)</li>
-                <li><strong class="text-white">ট + ্র + ু</strong> লিখলে হয় <strong class="text-white">ট্রু</strong>
-                  (উ-কারটি র-ফলার সাথে লেগে নিচে বিশেষ আকৃতি নেয়)</li>
-                <li><strong class="text-white">গ + ু</strong> লিখলে হয় <strong class="text-white">গু</strong> (ফন্টের
-                  সৌন্দর্য রক্ষায় উ-কারটি ঝুলে থাকে)</li>
-              </ul>
-            </div>
-
-            <div class="mt-4 bg-black/40 p-4 rounded-lg border border-indigo-900/30">
-              <h4 class="text-white font-semibold mb-2">&#x2777; VowelRules-এ ConsonantGroups-এর ব্যবহার</h4>
-              <p class="text-md text-zinc-400">VowelRules-এর <code>"consonants"</code> ফিল্ডে ConsonantGroups-এর নাম
-                উল্লেখ করলে ইঞ্জিন গ্রুপের তালিকা চেক করে:</p>
-              <pre class="bg-black/40 p-2 rounded-lg text-zinc-300 text-md mt-2">"mappings": [
-  {
-    "consonants": "BelowBaseVariant",  // গ্রুপের নাম
-    "value": "#$0024"                  // ট্র, ড্র, ঢ্র → বিশেষ উ-কার গ্লিফ
-  },
-  {
-    "consonants": "RuClusters",        // গ্রুপের নাম
-    "value": "#{A_UKar4}"             // গ্র, ত্র, দ্র → র-ফলার সাথে মানানসই উ-কার
-  },
-  {
-    "consonants": "BaseLineRight",     // গ্রুপের নাম
-    "value": "#{A_UKar1}"             // খ, গ, ঘ, প → সাধারণ ঝুলন্ত উ-কার
-  }
-]</pre>
-              <p class="text-md text-zinc-400 mt-2">ইঞ্জিন VowelRulesList লুপ করে → প্রতিটি Rule.Vowel ম্যাচ করে →
-                Mappings-এ <code>ConsonantGroupsMap.TryGetValue(Map.Consonants, GroupList)</code> কল করে →
-                <code>GroupList.Contains(AConsonant)</code> দিয়ে বর্ণটি গ্রুপে আছে কিনা চেক করে। ম্যাচ পেলে
-                <code>value</code> ব্যবহার করে, না পেলে <code>default</code>।
-              </p>
-            </div>
-
-            <div class="mt-4 bg-black/40 p-4 rounded-lg border border-indigo-900/30">
-              <h4 class="text-white font-semibold mb-2">&#x2778; VowelRules-এ AnsiGroups-এর ব্যবহার (স্তর ৩)</h4>
-              <p class="text-md text-zinc-400">যখন কোনো বর্ণ রূপান্তরের পরে ANSI-তে কনভার্ট হয়ে যায় (যেমন র-ফলা গ্লিফ
-                <code>#$C6</code>), তখন ConsonantGroups (ইউনিকোড) দিয়ে ম্যাচ করা যায় না — কারণ ইউনিকোড বর্ণটি আর নেই।
-                সেক্ষেত্রে AnsiGroups ব্যবহার করা হয়:
-              </p>
-              <pre class="bg-black/40 p-2 rounded-lg text-zinc-300 text-md mt-2">"mappings": [
-  {
-    "consonants": "RaPhalas",    // AnsiGroups নাম
-    "value": "#{A_UKar2}"       // র-ফলার পরে ঝুলন্ত উ-কার
-  }
-]</pre>
-              <p class="text-md text-zinc-400 mt-2">ইঞ্জিন চেক করে: প্রথমে ConsonantGroupsMap-এ গ্রুপ খোঁজে → না পেলে
-                AnsiGroupsMap-এ খোঁজে → <code>AnsiGroupsMap.TryGetValue(Map.Consonants, GroupList)</code> কল করে → ANSI
-                কোডপয়েন্ট ম্যাচ করলে <code>value</code> ব্যবহার করে।</p>
-              <p class="text-md text-zinc-400 mt-2"><strong class="text-white">এর কারণেই</strong> BaseLineRight গ্রুপে
-                শুধু বর্ণ ও যুক্তবর্ণ (র-ফলা ছাড়া) রাখতে হবে — র-ফলার পরে উ-কার বসালে AnsiGroups স্বয়ংক্রিয়ভাবে হ্যান্ডল
-                করে।</p>
-            </div>
-
-            <div class="mt-4 bg-black/40 p-4 rounded-lg border border-indigo-900/30">
-              <h4 class="text-white font-semibold mb-2">&#x2779; GetVowelGlyph — ভেতরে কী হয়?</h4>
-              <p class="text-md text-zinc-400">VowelRules প্রক্রিয়াকরণের সময়
-                <code>GetVowelGlyph(AVowel, AConsonant, UseAlt)</code> ফাংশনটি নিচের ধাপগুলো সম্পন্ন করে:
-              </p>
-               <pre class="bg-black/40 p-2 rounded-lg text-zinc-300 text-md mt-2">1. VowelRulesList = nil? → সরাসরি A_UKar1/A_UUKar1/A_RRIKar2 রিটার্ন করে (fallback)
-2. VowelRulesList লুপ → Rule.Vowel = AVowel (যেমন #$09C1 = উ-কার) খোঁজে
-3. UseAlt = GetToggleState(AVowel)   // Rule.toggle (backspace/repeat/both) অনুযায়ী স্টেট
-4. প্রতিটি Mappings-এ:
-   a. ConsonantGroupsMap-এ গ্রুপ খোঁজে → GroupList.Contains(AConsonant)
-   b. না পেলে AnsiGroupsMap-এ গ্রুপ খোঁজে → GroupList.Contains(AConsonant)
-   c. না পেলে সরাসরি Map.Consonants = AConsonant চেক (Direct char match)
-   d. ম্যাচ পেলে UseAlt? → Map.AltValue : Map.Value
-5. কোনোটাই না মিললে Rule.DefaultVal রিটার্ন</pre>
-              <p class="text-md text-zinc-400 mt-2"><strong class="text-white">গুরুত্বপূর্ণ:</strong>
-                ReplaceFullForms-এর পর চলে, তাই পূর্ববর্তী বর্ণ ANSI-তে কনভার্ট হয়ে যেতে পারে —
-                <code>ContainsBengaliChar</code> চেক করে না পেলে <code>fUniText</code> (মূল ইউনিকোড) ব্যবহার করে
-                পূর্ববর্তী বর্ণ বের করে।
+            <div class="bg-indigo-900/20 border border-indigo-800/30 p-3 rounded-lg space-y-2">
+              <p><strong class="text-white">রু (র + উ-কার):</strong> পূর্ববর্তী বর্ণ <code>#$09B0</code> (র) — Direct
+                Match, matchMode=1, process="pre" &#x2192; <code>value = A_UKar4</code> (রেফ-স্টাইল)। toggle="backspace"
+                থাকায় <code>alt = A_UKar2</code> (ঝুলন্ত) এ ফ্লিপ করে।</p>
+              <p><strong class="text-white">ট্রু (ট + র + উ-কার):</strong> "ট্র" BelowBaseVariant গ্রুপে আছে,
+                matchMode=০ &#x2192; <code>value = #$0024</code> (ছাতা উ-কার)।</p>
+              <p><strong class="text-white">ক্রু (ক + র + উ-কার):</strong> ANSI-তে রূপান্তরের পর র (#$C6) — RaPhalas
+                (AnsiGroups), process="post" &#x2192; <code>value = A_UKar2</code> (ঝুলন্ত)।</p>
+              <p><strong class="text-white">গু (গ + উ-কার):</strong> "গ" BaseLineRight গ্রুপে, matchMode=১ &#x2192;
+                <code>A_UKar1</code> (সাধারণ)।
               </p>
             </div>
           </div>
         </details>
 
-        <!-- 5. ConsonantGroups বিস্তারিত -->
+        <!-- 5. ConsonantGroups: Unicode ব্যঞ্জনবর্ণ গ্রুপিং -->
         <details class="premium-card elevation-1 group" open>
           <summary class="font-bold text-white flex items-center justify-between p-5">
             <div class="flex items-center gap-3"><span
-                class="material-symbols-outlined text-indigo-400">group_work</span><span>৫. ConsonantGroups: ব্যঞ্জনবর্ণ
-                গ্রুপিং</span></div>
+                class="material-symbols-outlined text-indigo-400">group_work</span><span>৫. ConsonantGroups: Unicode
+                ব্যঞ্জনবর্ণ গ্রুপিং</span></div>
             <span class="material-symbols-outlined transition-transform">expand_more</span>
           </summary>
           <div class="details-content text-zinc-400 leading-relaxed space-y-3">
-            <p>ConsonantGroups হল ইউনিকোড ব্যঞ্জনবর্ণের একটি গ্রুপিং সিস্টেম। VowelRules-এ একটি গ্রুপের নাম উল্লেখ করলে,
-              সেই গ্রুপের সব বর্ণের জন্য একই VowelRules প্রযোজ্য হয় — আলাদা আলাদা করে প্রতিটি বর্ণের জন্য mapping লিখতে
-              হয় না।</p>
+            <div class="bg-indigo-900/20 border border-indigo-800/30 p-3 rounded-lg text-md">
+              <strong class="text-white">মূল পার্থক্য:</strong> ConsonantGroups Unicode বর্ণ গ্রুপ করে — কনভার্সনের
+              <strong class="text-white">আগে</strong> কাজ করে। VowelRules-এ <code>"BelowBaseVariant"</code> রেফারেন্স
+              করলে 'ট্র', 'ড্র', 'ঢ্র'-এর সাথে ম্যাচ করে। এই গ্রুপগুলো শুধুমাত্র Phase A (Pre-phase) এবং Phase B-র
+              ApplyVowelKars-এ কার্যকর — কারণ সেই সময়ে টেক্সট এখনো Unicode-তে থাকে।
+            </div>
 
             <h4 class="text-white font-semibold mt-4">JSON গঠন</h4>
             <pre class="bg-black/40 p-3 rounded-lg text-zinc-300 text-md">"ConsonantGroups": {
-  "BelowBaseVariant": [     // নিচের অংশ গোল — র-ফলাসহ (ট্র, ড্র, ঢ্র)
+  "BelowBaseVariant": [     // নিচের অংশ গোল — র-ফলাসহ
     "ট্র", "ড্র", "ঢ্র"
   ],
-  "RuClusters": [           // র-ফলা যুক্ত ক্লাস্টার (ইউনিকোড)
+  "RuClusters": [           // র-ফলা যুক্ত Cluster (Unicode Hex)
     "#$0997#$09CD#$09B0",   // গ্র
-    "#$0998#$09CD#$09B0",   // ঘ্র
     "#$09A4#$09CD#$09B0",   // ত্র
     "#$09A6#$09CD#$09B0",   // দ্র
-    "#$09A7#$09CD#$09B0",   // ধ্র
-    "#$09A8#$09CD#$09B0",   // ন্র
-    "#$09AA#$09CD#$09B0",   // প্র
-    "#$09AC#$09CD#$09B0",   // ব্র
-    "#$09AD#$09CD#$09B0",   // ভ্র
-    "#$09AE#$09CD#$09B0",   // ম্র
-    "#$09B6#$09CD#$09B0",   // শ্র
-    "#$09B7#$09CD#$09B0",   // ষ্র
-    "#$09B8#$09CD#$09B0",   // স্র
-    "#$09B9#$09CD#$09B0"    // হ্র
+    ...                     // মোট ১৪টি এন্ট্রি
   ],
-  "BaseLineRight": [        // ডানপাশে স্টেম যুক্ত বর্ণ/যুক্তবর্ণ (র-ফলা ছাড়া)
+  "BaseLineRight": [        // ডানপাশে Stem যুক্ত বর্ণ (র-ফলা ছাড়া)
     "খ", "গ", "ঘ", "ণ", "থ", "দ", "ধ", "ন", "প", "ব", "ম",
-    "য", "র", "ল", "শ", "ষ", "স", "হ", "য়",
-    "#{A_K_Ss_M}", "#{A_K_M}", "#{A_K_Ss}", "#{A_K_S}",
-    "#{A_G_G}", "#{A_G_D}", "#{A_G_Dh}", "#{A_NGA_G}",
-    "#{A_T_Th}", "#{A_T_M}", "#{A_D_D}", "#{A_D_Dh}",
-    "#{A_D_B}", "#{A_D_M}", "#{A_N_Tth}", "#{A_N_Dh}",
-    "#{A_N_S}", "#{A_P_P}", "#{A_P_S}", "#{A_B_D}",
-    "#{A_B_Dh}", "#{A_Bh_R}", "#{A_M_N}", "#{A_L_G}",
-    "#{A_L_P}", "#{A_Ss_Nn}", "#{A_S_Kh}", "#{A_S_N}",
-    "#{A_H_N}", "#{A_H_M}", "#{A_Rr_G}"
+    "য", "র", "ল", "শ", "ষ", "স", "হ", "য়",
+    "#{A_K_Ss_M}", "#{A_K_M}", ...  // যুক্তবর্ণও যোগ করা যায়
   ]
 }</pre>
 
-            <h4 class="text-white font-semibold mt-4">VowelRules-এ ব্যবহার</h4>
-            <p>VowelRules-এর <code>"consonants"</code> ফিল্ডে গ্রুপের নাম দিন:</p>
-            <pre class="bg-black/40 p-2 rounded-lg text-zinc-300 text-md">"mappings": [
-  { "consonants": "BelowBaseVariant", "value": "#$0024" },     // ট্র, ড্র, ঢ্র → বিশেষ উ-কার গ্লিফ
-  { "consonants": "RuClusters",       "value": "#{A_UKar4}" }, // গ্র, ত্র, দ্র → র-ফলার সাথে মানানসই উ-কার
-  { "consonants": "BaseLineRight",    "value": "#{A_UKar1}" }  // খ, গ, ঘ, ... → সাধারণ ঝুলন্ত উ-কার
-]</pre>
-
-            <h4 class="text-white font-semibold mt-4">গ্রুপ না থাকলে কী হয়?</h4>
-            <p>JSON ফাইলে <code>ConsonantGroups</code> সেকশন না থাকলেও ইঞ্জিন স্বয়ংক্রিয়ভাবে <code>BaseLineRight</code>
-              গ্রুপ তৈরি করে (<code>InitializeDefaultConsonantGroups</code> ফাংশনের মাধ্যমে)। আপনি চাইলে এই গ্রুপটি
-              ওভাররাইড করতে পারেন। অন্যান্য গ্রুপ শুধু তখনই কাজ করবে যখন আপনি সেগুলো JSON-এ সংজ্ঞায়িত করবেন।</p>
-
-            <h4 class="text-white font-semibold mt-4">কেন ConsonantGroups ব্যবহার করবেন?</h4>
-            <ul class="list-disc list-inside text-md space-y-1">পুনরাবৃত্তি কমায় — ২০টি বর্ণের জন্য ২০টি mapping লেখার
-              বদলে ১টি গ্রুপ mapping</ul>
-            <ul class="list-disc list-inside text-md space-y-1">কেন্দ্রীয় নিয়ন্ত্রণ — এক জায়গায় বর্ণ যোগ/বাদ দিন, সব
-              VowelRules আপডেট হবে</ul>
-            <ul class="list-disc list-inside text-md space-y-1">পড়তে সহজ — <code>"BaseLineRight"</code> বোঝা সহজ, ২০টি
-              আলাদা বর্ণের চেয়ে</ul>
-
-            <div class="mt-6 bg-black/40 p-4 rounded-lg border border-indigo-900/30">
-              <h4 class="text-white font-semibold mb-2">&#x2776; ব্যঞ্জনবর্ণের ৩টি দল</h4>
-              <p class="text-md text-zinc-400">বর্ণগুলোর নিচের অংশের ডিজাইনের ওপর ভিত্তি করে এদের ৩টি দলে ভাগ করা হয়েছে:
-              </p>
-
-              <div class="mt-3 bg-black/20 p-3 rounded-lg">
-                <p><strong class="text-indigo-300">BelowBaseVariant</strong> <span class="text-zinc-500">— নিচের অংশ গোল
-                    বা সোজা</span></p>
-                <p class="text-md text-zinc-400">যেসব বর্ণের নিচে সাধারণ র-ফলা ঝুলে না থেকে সোজা বা ছাতার মতো বসে। Ansi V3.json-এ এই
-                  গ্রুপে আছে: <code>ট্র</code>, <code>ড্র</code>, <code>ঢ্র</code>।
-                </p>
-                <p class="text-md text-zinc-400 mt-1">কেন আলাদা: এদের নিচে উ-কার দিলে সেটি সাধারণ উ-কারের মতো না হয়ে
-                  ফন্টের ভেতরে থাকা একটি বিশেষ গ্লিফ (যেমন <code>#$0024</code> বা <code>$</code>) ব্যবহার করতে হয়।</p>
+            <h4 class="text-white font-semibold mt-4">৩টি গ্রুপের বিস্তারিত ব্যাখ্যা</h4>
+            <div class="details-content text-zinc-400 leading-relaxed space-y-3">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="bg-black/30 p-4 rounded-lg border border-indigo-500/20">
+                  <h5 class="text-indigo-300 font-bold mb-2">ConsonantGroups (Unicode)</h5>
+                  <p class="text-md">এটি কনভার্সনের <strong class="text-white">আগে</strong> কাজ করে। যখন ইঞ্জিন জানে
+                    বর্ণটি ইউনিকোডে কী, তখন এই গ্রুপ ব্যবহার করে।</p>
+                  <p class="text-xs mt-2 italic">উদাহরণ: <code>"BelowBaseVariant": ["ট্র", "ড্র"]</code></p>
+                </div>
+                <div class="bg-black/30 p-4 rounded-lg border border-green-500/20">
+                  <h5 class="text-green-300 font-bold mb-2">AnsiGroups (ANSI)</h5>
+                  <p class="text-md">এটি কনভার্সনের <strong class="text-white">পরে</strong> কাজ করে। যখন বর্ণটি ইতিমধ্যে
+                    ANSI হেক্স কোডে পরিণত হয়েছে, তখন এই গ্রুপ ব্যবহৃত হয়।</p>
+                  <p class="text-xs mt-2 italic">উদাহরণ: <code>"RaPhalas": ["#$C6", "#$C8"]</code></p>
+                </div>
               </div>
+              <p class="mt-4 text-md">এই দ্বৈত পদ্ধতির ফলে আমরা অনেক জটিল গ্লিফ হ্যান্ডেল করতে পারি। যেমন: 'ক' এর পরে
+                'র-ফলা' বসলে সেটি ইউনিকোড থেকে ANSI-তে রূপান্তর হয়ে <code>#$C6</code> হয়ে যায়। এখন যদি তার পরে 'উ-কার'
+                আসে, তবে ইঞ্জিন <code>AnsiGroups.RaPhalas</code> দেখে বুঝতে পারে যে এখানে বিশেষ গ্লিফ বসাতে হবে।</p>
+            </div>
+            <div class="bg-black/30 p-4 rounded-lg space-y-3 text-md">
+              <p><strong class="text-indigo-300">BelowBaseVariant:</strong> এমন যুক্তবর্ণ যাদের নিচে র-ফলা ঝুলে না থেকে
+                সোজা বা ছাতার মতো বসে। যেমন "ট্র", "ড্র", "ঢ্র" — এদের নিচে উ-কার দিলে বিশেষ Glyph (#$0024 — ছাতা উ-কার)
+                ব্যবহার করতে হয়। MatchMode ০ ব্যবহার করে পুরো Cluster Match করে।</p>
 
-              <div class="mt-3 bg-black/20 p-3 rounded-lg">
-                <p><strong class="text-indigo-300">RuClusters</strong> <span class="text-zinc-500">— র-ফলা যুক্ত
-                    ক্লাস্টার</span></p>
-                <p class="text-md text-zinc-400">যেসব বর্ণের সাথে র-ফলা যুক্ত হওয়ার পর তারা দেখতে অনেকটা 'র' বর্ণের মতো
-                  আচরণ করে। যেমন: <code>গ্র</code>, <code>ঘ্র</code>, <code>ত্র</code>, <code>দ্র</code> ইত্যাদি।</p>
-                <p class="text-md text-zinc-400 mt-1">কেন আলাদা: এদের নিচে যখন উ-কার (ু) বসে, তখন সেটি যেন র-ফলার সাথে
-                  সংঘর্ষ (clash) না করে, সেজন্য বিশেষ উ-কার (যেমন <code>A_UKar4</code> বা <code>A_UKar3</code>) ব্যবহার
-                  করা হয়।</p>
-              </div>
+              <p><strong class="text-indigo-300">RuClusters:</strong> র-ফলা যুক্ত Cluster (গ্র, ত্র, দ্র, ন্র, প্র, ব্র,
+                ভ্র, ম্র, শ্র, ষ্র, স্র, হ্র)। এদের নিচে উ-কার দিলে র-ফলার সাথে সংঘর্ষ এড়াতে বিশেষ উ-কার (A_UKar4 —
+                রেফ-স্টাইল) ব্যবহার করা হয়। Toggle সাপোর্টেড — ব্যাকস্পেসে A_UKar1 (সাধারণ) এ ফ্লিপ করা যায়। MatchMode
+                ০ ব্যবহার করে।</p>
 
-              <div class="mt-3 bg-black/20 p-3 rounded-lg">
-                <p><strong class="text-indigo-300">BaseLineRight</strong> <span class="text-zinc-500">— ডানপাশে খাড়া দাগ
-                    বা স্টেম যুক্ত বর্ণ</span></p>
-                <p class="text-md text-zinc-400">যেসব বর্ণের ডানপাশে খাড়া টান আছে এবং নিচে ডান কোণায় র-ফলা বা উ-কার বসে।
-                  যেমন: <code>খ</code>, <code>গ</code>, <code>ঘ</code>, <code>ণ</code>, <code>থ</code>, <code>দ</code>,
-                  <code>ধ</code>, <code>ন</code>, <code>প</code> ইত্যাদি এবং এদের দিয়ে তৈরি যুক্তবর্ণ।
-                </p>
-                <p class="text-md text-zinc-400 mt-1">কেন আলাদা: এদের নিচে সাধারণ ঝুলন্ত উ-কার (<code>A_UKar1</code>)
-                  বসে।</p>
-              </div>
+              <p><strong class="text-indigo-300">BaseLineRight:</strong> ডানপাশে খাড়া Stem যুক্ত বর্ণ ও যুক্তবর্ণ। এদের
+                নিচে সাধারণ ঝুলন্ত উ-কার (A_UKar1) বসে। <strong class="text-white">র-ফলাসহ Cluster এখানে লাগে
+                  না</strong> — AnsiGroups.RaPhalas স্বয়ংক্রিয়ভাবে হ্যান্ডল করে। MatchMode ১ ব্যবহার করে — শুধু শেষ
+                বর্ণ চেক করে। Phase C (Post-phase) তে কাজ করে।</p>
             </div>
 
-            <div class="mt-4 bg-black/40 p-4 rounded-lg border border-indigo-900/30">
-              <h4 class="text-white font-semibold mb-2">&#x2777; একক ব্যঞ্জনবর্ণ + র-ফলা — গ্রুপিং গাইড</h4>
-              <p class="text-md text-zinc-400">একক ব্যঞ্জনবর্ণের সাথে র-ফলা যুক্ত হলে সেগুলোকে নিচের গ্রুপে বসাতে হবে:
-              </p>
-              <p class="text-md text-zinc-400 mt-2"><strong class="text-indigo-300">BelowBaseVariant</strong> গ্রুপে
-                যাবে (নিচের অংশ গোল):</p>
-              <pre class="bg-black/40 p-2 rounded-lg text-zinc-300 text-md mt-1">"ট্র", "ড্র", "ঢ্র"</pre>
-              <p class="text-md text-zinc-400 mt-2"><strong class="text-indigo-300">RuClusters</strong> গ্রুপে যাবে বাকি
-                সবগুলো (র-ফলা ক্লাস্টার):</p>
-              <pre class="bg-black/40 p-2 rounded-lg text-zinc-300 text-md mt-1">"গ্র", "ঘ্র", "ত্র", "দ্র", "ধ্র", "ন্র", "প্র", "ব্র",
-"ভ্র", "ম্র", "শ্র", "ষ্র", "স্র", "হ্র"</pre>
-              <p class="text-md text-zinc-400 mt-2"><strong class="text-indigo-300">দ্রষ্টব্য:</strong> ক্র, খ্র, চ্র, ছ্র,
-                জ্র, ঝ্র, থ্র, য্র, ল্র, ড়্র, ঢ়্র ইত্যাদি সরাসরি RuClusters-এ নেই — এদের র-ফলা ANSI-তে
-                <code>#$C6</code> হয়ে যায়, তাই VowelRules-এ <code>RaPhalas</code> (AnsiGroups) দিয়ে স্বয়ংক্রিয়ভাবে
-                হ্যান্ডল হয়।</p>
-            </div>
-
-            <div class="mt-4 bg-black/40 p-4 rounded-lg border border-indigo-900/30">
-              <h4 class="text-white font-semibold mb-2">&#x2778; যুক্তবর্ণ + র-ফলা — গ্রুপিং গাইড</h4>
-              <p class="text-md text-zinc-400"><strong class="text-white">Ansi V3.json-এর ConsonantGroups</strong> শুধু
-                একক ব্যঞ্জনবর্ণ + র-ফলা ক্লাস্টার (ট্র, ড্র, ঢ্র এবং RuClusters-এর ১৪টি এন্ট্রি) ধারণ করে। তিন-বর্ণের ক্লাস্টার
-                (যেমন ক্ট্র, ণ্ট্র, ন্ত্র, ক্ত্র, ম্প্র ইত্যাদি) <code>FullFormReplacements</code>-এর মাধ্যমে তৈরি হয় এবং
-                তাদের র-ফলা ANSI-তে <code>#$C6</code> (RaPhalas) হয়ে যায় — তাই VowelRules-এ <code>RaPhalas</code>
-                (AnsiGroups) দিয়ে স্বয়ংক্রিয়ভাবে হ্যান্ডল হয়, আলাদা গ্রুপে রাখার দরকার নেই।</p>
-              <p class="text-md text-zinc-400 mt-2">উদাহরণস্বরূপ <code>FullFormReplacements</code>-এ:
-                <code>ক্ট্র → #$51#$C9</code>, <code>ন্ত্র → #$73#$FE#$66</code>, <code>ম্প্র → #$C1#$B1</code> ইত্যাদি।
-              </p>
-            </div>
-
-            <div class="mt-4 bg-black/40 p-4 rounded-lg border border-indigo-900/30">
-              <h4 class="text-white font-semibold mb-2">&#x2779; টেবিল — কনফিগারেশন ফাইলে বসানোর নিয়ম</h4>
-              <div class="overflow-x-auto">
-                <table class="table-md">
-                  <thead>
-                    <tr>
-                      <th>গ্রুপের নাম</th>
-                      <th>কিভাবে বসাবেন?</th>
-                      <th>উদাহরণ</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td class="font-mono text-indigo-300">BelowBaseVariant</td>
-                      <td><strong class="text-white">র-ফলাসহ</strong></td>
-                      <td><code>"ট্র"</code>, <code>"ড্র"</code>, <code>"ঢ্র"</code></td>
-                    </tr>
-                    <tr>
-                      <td class="font-mono text-indigo-300">RuClusters</td>
-                      <td><strong class="text-white">র-ফলাসহ</strong></td>
-                      <td><code>"গ্র"</code>, <code>"ত্র"</code>, <code>"দ্র"</code>, <code>"ধ্র"</code></td>
-                    </tr>
-                    <tr>
-                      <td class="font-mono text-indigo-300">BaseLineRight</td>
-                      <td><strong class="text-white">শুধু বর্ণ/যুক্তবর্ণ (র-ফলা ছাড়া)</strong></td>
-                      <td><code>"খ"</code>, <code>"গ"</code>, <code>"স্ক"</code>, <code>"স্প"</code></td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            <div class="mt-4 bg-black/40 p-4 rounded-lg border border-indigo-900/30">
-              <h4 class="text-white font-semibold mb-2">&#x277A; কেন এই নিয়ম?</h4>
-              <p class="text-md text-zinc-400">BelowBaseVariant এবং RuClusters গ্রুপে র-ফলাসহ বর্ণ বসানোর কারণ: র-ফলা
-                বসার পর উ-কার বা ঊ-কারের রূপ সম্পূর্ণ বদলে যায়। ইঞ্জিনকে চেনানোর জন্য এদের র-ফলাসহ লিখতে হয়।</p>
-              <p class="text-md text-zinc-400 mt-2">অন্যদিকে, BaseLineRight গ্রুপে শুধু বর্ণ ও যুক্তবর্ণ (র-ফলা ছাড়া)
-                বসে। কারণ:</p>
-              <pre class="bg-black/40 p-2 rounded-lg text-zinc-300 text-md mt-1">"খু" → উ-কারের আগে "খ" → BaseLineRight → সাধারণ ঝুলন্ত উ-কার ✓
-"খ্রু" → কনভার্টার আগে র-ফলা ANSI গ্লিফে রূপান্তর করে
-       → উ-কারের আগে #$C6 (র-ফলা) → AnsiGroups.RaPhalas ডিটেক্ট করে
-       → ঝুলন্ত উ-কার (A_UKar2) স্বয়ংক্রিয়ভাবে বসে ✓
-       → BaseLineRight-এ "খ্র" লেখার প্রয়োজন নেই!</pre>
-              <p class="text-md text-zinc-400 mt-2">AnsiGroups-এর RaPhalas নিয়মের কারণে ইঞ্জিন স্বয়ংক্রিয়ভাবেই বুঝতে
-                পারে যে র-ফলার পর কোন উ-কার বসাতে হবে। তাই BaseLineRight গ্রুপে র-ফলাসহ বর্ণ বসানোর দরকার নেই।</p>
+            <h4 class="text-white font-semibold mt-4">কোন গ্রুপে কোন ক্যারেক্টার যোগ করবেন</h4>
+            <div class="overflow-x-auto">
+              <table class="table-md">
+                <thead>
+                  <tr>
+                    <th>গ্রুপ</th>
+                    <th>যোগ করুন যখন</th>
+                    <th>উদাহরণ</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="font-mono text-indigo-300">BelowBaseVariant</td>
+                    <td>যুক্তবর্ণের নিচে র-ফলা "ছাতার" মতো বসে</td>
+                    <td>ট্র, ড্র, ঢ্র</td>
+                  </tr>
+                  <tr>
+                    <td class="font-mono text-indigo-300">RuClusters</td>
+                    <td>Unicode Hex-এ র-ফলা যুক্ত Cluster (process="pre")</td>
+                    <td>গ্র, ত্র, দ্র</td>
+                  </tr>
+                  <tr>
+                    <td class="font-mono text-indigo-300">BaseLineRight</td>
+                    <td>বর্ণ বা যুক্তবর্ণের ডানপাশে Stem আছে এবং র-ফলা নেই (process="post")</td>
+                    <td>খ, গ, ক্ষ, গ্গ</td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </div>
         </details>
 
-        <!-- 6. AnsiGroups বিস্তারিত -->
+        <!-- 6. AnsiGroups: ANSI কোডপয়েন্ট গ্রুপিং -->
         <details class="premium-card elevation-1 group" open>
           <summary class="font-bold text-white flex items-center justify-between p-5">
             <div class="flex items-center gap-3"><span
-                class="material-symbols-outlined text-indigo-400">group_work</span><span>৬. AnsiGroups: ANSI কোডপয়েন্ট
+                class="material-symbols-outlined text-indigo-400">group_work</span><span>৬. AnsiGroups: ANSI কোডপয়েন্ট
                 গ্রুপিং</span></div>
             <span class="material-symbols-outlined transition-transform">expand_more</span>
           </summary>
           <div class="details-content text-zinc-400 leading-relaxed space-y-3">
             <div class="bg-indigo-900/20 border border-indigo-800/30 p-3 rounded-lg text-md">
-              <strong class="text-white">ConsonantGroups vs AnsiGroups:</strong>
-              ConsonantGroups ইউনিকোড বর্ণ গ্রুপ করে — VowelRules-এ <code>"BelowBaseVariant"</code> রেফারেন্স করলে 'ট্র',
-              'ড্র', 'ঢ্র'-এর সাথে ম্যাচ করে।
-              AnsiGroups ANSI কোডপয়েন্ট গ্রুপ করে — রূপান্তরের <strong class="text-white">পরে</strong> কাজ করে, যখন
-              টেক্সট ইতিমধ্যে ANSI-তে কনভার্ট হয়ে গেছে।
+              <strong class="text-white">মূল পার্থক্য:</strong> AnsiGroups ANSI কোডপয়েন্ট গ্রুপ করে — কনভার্সনের
+              <strong class="text-white">পরে</strong> কাজ করে। এটি <strong class="text-white">দুই জায়গায়</strong>
+              ব্যবহার হয়: (১) VowelRules Level-৩ ম্যাচিং (Phase C) (২) FinalTouch-এর ApplyGenericGlyphSwaps।
             </div>
 
             <h4 class="text-white font-semibold mt-4">JSON গঠন</h4>
@@ -1223,312 +1243,293 @@
   "Connectors": ["#$FE", "#$E9"]
 }</pre>
 
-            <h4 class="text-white font-semibold mt-4">দুই জায়গায় ব্যবহার হয়</h4>
-
+            <h4 class="text-white font-semibold mt-4">RaPhalas — রেফ সনাক্তকরণ</h4>
             <div class="bg-black/30 p-4 rounded-lg space-y-2 text-md">
-              <p><strong class="text-indigo-300">১. VowelRules-এ (স্তর ৩ ম্যাচিং):</strong></p>
-              <p>উদাহরণ: <code>"consonants": "RaPhalas"</code> — পূর্ববর্তী বর্ণ ANSI-তে কনভার্ট হওয়ার পর যদি র-ফলা
-                (যেমন <code>#$C6</code>) থাকে, তাহলে ম্যাচ করবে।</p>
-              <pre class="bg-black/40 p-2 rounded-lg text-zinc-300 text-md">ক্র + ু  →  প্রক্রিয়ায়: ক + ্ + র-ফলা(#$C6) + উ-কার
-→ GetVowelGlyph: পূর্ববর্তী ANSI = #$C6 → RaPhalas গ্রুপে আছে → A_UKar2</pre>
-            </div>
-
-            <div class="bg-black/30 p-4 rounded-lg space-y-2 text-md">
-              <p><strong class="text-indigo-300">২. FinalTouch-এ (ApplyGenericGlyphSwaps):</strong></p>
-              <p>সব গ্লিফ বসানোর পর, মডিফায়ার (RaPhalas, Connectors) কার-এর (ু/ূ/ৃ) আগে থাকলে অর্ডার সুয়াপ করে:</p>
-              <pre
-                class="bg-black/40 p-2 rounded-lg text-zinc-300 text-md">আগে: র-ফলা(#$C6) + উ-কার(#$25)  →  পরে: উ-কার(#$25) + র-ফলা(#$C6)</pre>
-            </div>
-
-            <h4 class="text-white font-semibold mt-4">গ্রুপগুলো কী কী?</h4>
-            <p><strong class="text-white">RaPhalas</strong> — র-ফলা সম্পর্কিত ANSI কোডপয়েন্ট:</p>
-            <ul class="list-disc list-inside text-md space-y-1">
-              <li><code>#$C6</code> — র-ফলা ১</li>
-              <li><code>#$C8</code> — ম-ফলা</li>
-              <li><code>#$C9</code> — ন-ফলা</li>
-              <li><code>#$CA</code> — ল-ফলা</li>
-              <li><code>#$CB</code> — স-ফলা</li>
-              <li><code>#$CC</code> — হ-মি</li>
-            </ul>
-            <p class="mt-2"><strong class="text-white">Connectors</strong> — যুক্তি সেতু হিসেবে কাজ করে এমন কোডপয়েন্ট:
-            </p>
-            <ul class="list-disc list-inside text-md space-y-1">
-              <li><code>#$FE</code> — হসন্ত (যুক্তি সেতু)</li>
-              <li><code>#$E9</code> — ে + া (ক্ষিণ)</li>
-            </ul>
-
-            <h4 class="text-white font-semibold mt-4">ApplyGenericGlyphSwaps — ডায়নামিক পুনর্বিন্যাস</h4>
-            <p>FinalTouch শেষ ধাপে <code>ApplyGenericGlyphSwaps</code> ফাংশন চলে:</p>
-            <pre class="bg-black/40 p-3 rounded-lg text-zinc-300 text-md">১. সব কার গ্লিফ কালেক্ট করে: A_UKar1-4, A_UUKar1-3, A_RRIKar1-2
-২. AnsiGroups থেকে মডিফায়ার লোড করে (RaPhalas + Connectors)
-৩. ফলব্যাক: JSON-এ AnsiGroups না থাকলে RFola, ZFola, Reph, RR, R, RRH
-৪. Nested loop: প্রতিটি মডিফায়ার × প্রতিটি কার
-৫. ReplaceStr(Modif + Kar, Kar + Modif) — অর্ডার সুয়াপ</pre>
-            <p>এর ফলে ৩৩টির বেশি হার্ডকোডেড <code>ReplaceStr</code> লাইনের প্রয়োজন হয় না — শুধু গ্রুপে নতুন কোডপয়েন্ট
-              যোগ করলেই স্বয়ংক্রিয়ভাবে নতুন কম্বিনেশন হ্যান্ডল হয়।</p>
-
-            <div class="mt-6 bg-black/40 p-4 rounded-lg border border-indigo-900/30">
-              <h4 class="text-white font-semibold mb-2">&#x2776; RaPhalas গ্রুপ — র-ফলা চেনার জন্য</h4>
-              <p class="text-md text-zinc-400">অ্যানসি ফন্টে র-ফলার বিভিন্ন রূপের জন্য আলাদা আলাদা কোড থাকে (যেমন র-ফলা
-                ১, র-ফলা ২ ইত্যাদি)। ইঞ্জিন যেন বুঝতে পারে এগুলো সব র-ফলা, তাই এদের এক গ্রুপে রাখা হয়েছে:</p>
-              <pre
-                class="bg-black/40 p-2 rounded-lg text-zinc-300 text-md mt-2">"RaPhalas": ["#$C6", "#$C8", "#$C9", "#$CA", "#$CB", "#$CC"]</pre>
-              <ul class="list-disc list-inside text-md space-y-1 mt-2 text-zinc-400">
-                <li><code>#$C6</code> — র-ফলা ১</li>
-                <li><code>#$C8</code> — ম-ফলা</li>
-                <li><code>#$C9</code> — ন-ফলা</li>
-                <li><code>#$CA</code> — ল-ফলা</li>
-                <li><code>#$CB</code> — স-ফলা</li>
-                <li><code>#$CC</code> — হ-মি</li>
-              </ul>
-              <p class="text-md text-zinc-400 mt-2">VowelRules-এ <code>"consonants": "RaPhalas"</code> রেফারেন্স করলে —
-                পূর্ববর্তী ANSI কোড RaPhalas গ্রুপে আছে কিনা চেক করে। FinalTouch-এ <code>ApplyGenericGlyphSwaps</code>
-                RaPhalas গ্রুপ থেকে মডিফায়ার লোড করে কার অর্ডার সুয়াপ করে।</p>
-            </div>
-
-            <div class="mt-4 bg-black/40 p-4 rounded-lg border border-indigo-900/30">
-              <h4 class="text-white font-semibold mb-2">&#x2777; Connectors গ্রুপ — যুক্তবর্ণের সেতু</h4>
-              <p class="text-md text-zinc-400">যুক্তবর্ণ তৈরি করার জন্য ফন্টের ভেতরে যে সংযোগকারী গ্লিফগুলো ব্যবহার হয়:
+              <p><strong class="text-white">কেন RaPhalas AnsiGroups-এ?</strong> রেফ মূল Unicode অবস্থায়
+                <code>r + Hasanta</code> প্যাটার্ন। কিন্তু Phase B-তে <code>ReArrangeReph</code> এবং
+                <code>Consonants</code> ধাপে এটি ANSI Glyph-এ রূপান্তরিত হয় — যেমন ট্ট (#$C6), ণ্ট (#$C8), ণ্ঠ (#$C9)।
+                এই ANSI Glyph-গুলো শুধু ANSI পরিবেশেই সনাক্ত করা যায়।
               </p>
-              <pre class="bg-black/40 p-2 rounded-lg text-zinc-300 text-md mt-2">"Connectors": ["#$FE", "#$E9"]</pre>
-              <ul class="list-disc list-inside text-md space-y-1 mt-2 text-zinc-400">
-                <li><code>#$FE</code> — হসন্ত (যুক্তি সেতু)</li>
-                <li><code>#$E9</code> — ে + া (ক্ষিণ)</li>
-              </ul>
-              <p class="text-md text-zinc-400 mt-2"><code>ApplyGenericGlyphSwaps</code>-এ Connectors গ্রুপ থেকেও
-                মডিফায়ার লোড হয় — কার-এর সাথে অর্ডার সুয়াপ করার জন্য।</p>
+              <pre class="bg-black/40 p-2 rounded-lg text-zinc-300 text-md">Phase B এর পর: ক্র → ক + র-ফলা(#$C6)
+Phase C: ApplyRuleForKar(উ-কার, 'post')
+&#x2192; FindBestClusterMatch: পূর্ববর্তী ANSI = #$C6
+&#x2192; AnsiGroups.RaPhalas-এ #$C6 আছে → ম্যাচ!
+&#x2192; <strong class="text-green-400">value = A_UKar2 (ঝুলন্ত উ-কার)</strong></pre>
             </div>
 
-            <div class="mt-4 bg-black/40 p-4 rounded-lg border border-indigo-900/30">
-              <h4 class="text-white font-semibold mb-2">&#x2778; কেন AnsiGroups আলাদা?</h4>
-              <p class="text-md text-zinc-400">ConsonantGroups ইউনিকোড বর্ণ গ্রুপ করে — কনভার্টের <strong
-                  class="text-white">আগে</strong> কাজ করে। AnsiGroups ANSI কোডপয়েন্ট গ্রুপ করে — কনভার্টের <strong
-                  class="text-white">পরে</strong> কাজ করে, যখন টেক্সট ইতিমধ্যে ANSI-তে কনভার্ট হয়ে গেছে।</p>
-              <p class="text-md text-zinc-400 mt-2">VowelRules উভয়কেই ব্যবহার করতে পারে:</p>
-              <ul class="list-disc list-inside text-md space-y-1 mt-2 text-zinc-400">
-                <li><strong class="text-white">স্তর ২ (ConsonantGroups):</strong> পূর্ববর্তী বর্ণ ইউনিকোডে থাকলে — যেমন
-                  "গ" + উ-কার → "গু"</li>
-                <li><strong class="text-white">স্তর ৩ (AnsiGroups):</strong> পূর্ববর্তী বর্ণ ANSI-তে কনভার্ট হয়ে গেলে —
-                  যেমন র-ফলা <code>#$C6</code> + উ-কার</li>
-              </ul>
-              <p class="text-md text-zinc-400 mt-2">এই দ্বৈত পদ্ধতির কারণেই BaseLineRight গ্রুপে র-ফলা ছাড়া বর্ণ রাখা
-                যায় — AnsiGroups স্বয়ংক্রিয়ভাবে র-ফলা+উ-কার হ্যান্ডল করে।</p>
-            </div>
-          </div>
-        </details>
-
-        <!-- 7. কাস্টম ফন্ট ম্যাপিং গাইড -->
-        <details class="premium-card elevation-1 group" open>
-          <summary class="font-bold text-white flex items-center justify-between p-5">
-            <div class="flex items-center gap-3"><span
-                class="material-symbols-outlined text-indigo-400">build</span><span>৭. কাস্টম ফন্ট ম্যাপিং করার
-                নিয়ম</span></div>
-            <span class="material-symbols-outlined transition-transform">expand_more</span>
-          </summary>
-          <div class="details-content text-zinc-400 leading-relaxed space-y-3">
-            <p>আপনার নিজের কাস্টম ANSI ফন্টের জন্য ম্যাপিং তৈরি করতে নিচের ধাপগুলো অনুসরণ করুন:</p>
-
-            <h4 class="text-white font-semibold mt-4">&#x2776; Character Map দিয়ে ফন্টের হেক্স কোড বের করা</h4>
-            <ol class="list-decimal list-inside text-md space-y-2 text-zinc-400">
-              <li>উইন্ডোজ <strong class="text-white">Character Map</strong> (charmap.exe) খুলুন</li>
-              <li>আপনার ফন্টটি সিলেক্ট করুন (যেমন SutonnyMJ)</li>
-              <li>"রু", "ঝুলন্ত উ-কার", "সাধারণ উ-কার", "ছাতা উ-কার (যেমন ট্রু-তে যা ব্যবহৃত হয়)" — এগুলোর হেক্স কোড
-                (Hex Code) নোট করুন</li>
-            </ol>
-            <pre class="bg-black/40 p-2 rounded-lg text-zinc-300 text-md mt-2">উদাহরণ:
-  সাধারণ উ-কার → #$25
-  ঝুলন্ত উ-কার → #$24
-  ছাতা উ-কার  → #$0024 (বা অন্য কোনো কোড)</pre>
-
-            <h4 class="text-white font-semibold mt-4">&#x2777; Constants-এ মান বসানো</h4>
-            <p class="text-md text-zinc-400">JSON ফাইলের <code>Constants → VowelsAndKars</code> সেকশনে আপনার ফন্টের
-              হেক্স কোড বসান:</p>
-            <pre class="bg-black/40 p-2 rounded-lg text-zinc-300 text-md mt-2">"A_UKar1": { "Value": "#$25",  "Comment": "সাধারণ উ-কার (১)" },
-"A_UKar2": { "Value": "#$24",  "Comment": "ঝুলন্ত উ-কার (২)" },
-"A_UKar3": { "Value": "#$59",  "Comment": "উ-কার ৩ (ড়ু/ঢ়ু)" },
-"A_UKar4": { "Value": "#$26",  "Comment": "উ-কার ৪ (রু)" }</pre>
-
-            <h4 class="text-white font-semibold mt-4">&#x2778; ConsonantGroups-এ গ্রুপিং</h4>
-            <p class="text-md text-zinc-400">আপনার ফন্টের ট্র, ড্র, ক্র, গ্র ইত্যাদি যুক্তবর্ণগুলো নিচের টেবিল অনুযায়ী
-              গ্রুপে বসান:</p>
-            <div class="overflow-x-auto mt-2">
-              <table class="table-md">
-                <thead>
-                  <tr>
-                    <th>গ্রুপের নাম</th>
-                    <th>কিভাবে বসাবেন?</th>
-                    <th>উদাহরণ</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td class="font-mono text-indigo-300">BelowBaseVariant</td>
-                    <td><strong class="text-white">র-ফলাসহ</strong></td>
-                    <td><code>"ট্র"</code>, <code>"ড্র"</code>, <code>"ণ্ট্র"</code>, <code>"ষ্ট্র"</code></td>
-                  </tr>
-                  <tr>
-                    <td class="font-mono text-indigo-300">RuClusters</td>
-                    <td><strong class="text-white">র-ফলাসহ</strong></td>
-                    <td><code>"গ্র"</code>, <code>"ত্র"</code>, <code>"দ্র"</code>, <code>"ধ্র"</code></td>
-                  </tr>
-                  <tr>
-                    <td class="font-mono text-indigo-300">BaseLineRight</td>
-                    <td><strong class="text-white">শুধু বর্ণ/যুক্তবর্ণ (র-ফলা ছাড়া)</strong></td>
-                    <td><code>"খ"</code>, <code>"গ"</code>, <code>"স্ক"</code>, <code>"স্প"</code></td>
-                  </tr>
-                </tbody>
-              </table>
+            <h4 class="text-white font-semibold mt-4">Connectors — কার-অর্ডার সুয়াপ</h4>
+            <div class="bg-black/30 p-4 rounded-lg space-y-2 text-md">
+              <p><strong class="text-white">Connectors কী?</strong> এগুলো হলো সেসব ANSI Glyph যারা অন্যান্য Glyph-এর
+                সাথে সংযুক্ত হয়ে কাজ করে — যেমন র-ফলা, য-ফলা, রেফ, এবং বিশেষ যুক্তবর্ণের Connector বাইট (#$FE, #$E9)।
+              </p>
+              <pre class="bg-black/40 p-2 rounded-lg text-zinc-300 text-md">Connectors: [#$FE, #$E9]</pre>
+              <p>এগুলো FinalTouch-এর ApplyGenericGlyphSwaps-এ ব্যবহার হয় — Modifier + Kar অর্ডার ঠিক করতে।</p>
             </div>
 
-            <h4 class="text-white font-semibold mt-4">&#x2779; VowelRules-এ Mapping তৈরি</h4>
-            <p class="text-md text-zinc-400">প্রতিটি গ্রুপের জন্য <code>mappings</code>-এ এন্ট্রি যোগ করুন:</p>
-            <pre class="bg-black/40 p-2 rounded-lg text-zinc-300 text-md mt-2">"#$09C1": {  // উ-কার
-  "default": "#{A_UKar1}",
-  "mappings": [
-    { "consonants": "BelowBaseVariant", "value": "#$0024" },
-    { "consonants": "RuClusters",       "value": "#{A_UKar4}" },
-    { "consonants": "RaPhalas",         "value": "#{A_UKar2}" },
-    { "consonants": "BaseLineRight",    "value": "#{A_UKar1}" }
-  ]
-}</pre>
+            <h4 class="text-white font-semibold mt-4">ApplyGenericGlyphSwaps — ডায়নামিক পুনর্বিন্যাস</h4>
+            <pre class="bg-black/40 p-3 rounded-lg text-zinc-300 text-md">১. সব কার Glyph কালেক্ট: A_UKar1-4, A_UUKar1-3, A_RRIKar1-2
+২. AnsiGroups থেকে Modifier লোড: RaPhalas + Connectors
+৩. ফলব্যাক (JSON-ে AnsiGroups না থাকলে): RFola, ZFola, Reph, RR, R, RRH
+৪. Nested Loop: প্রতিটি Modifier × প্রতিটি কার
+৫. ReplaceStr(Modifier + Kar, Kar + Modifier) — অর্ডার সুয়াপ</pre>
+            <p><strong class="text-white">শক্তি:</strong> একটি নতুন Hex Code AnsiGroups-এ যোগ করলেই স্বয়ংক্রিয়ভাবে সব
+              কারের সাথে কম্বিনেশন হ্যান্ডল হয়।</p>
 
-            <h4 class="text-white font-semibold mt-4">&#x277A; সম্পূর্ণ গাইডলাইন টেবিল</h4>
+            <h4 class="text-white font-semibold mt-4">কোন গ্রুপে কোন কোডপয়েন্ট যোগ করবেন</h4>
             <div class="overflow-x-auto">
               <table class="table-md">
                 <thead>
                   <tr>
-                    <th>গ্রুপের নাম</th>
-                    <th>কিভাবে বসাবেন?</th>
+                    <th>গ্রুপ</th>
+                    <th>যোগ করুন যখন</th>
                     <th>উদাহরণ</th>
-                    <th>VowelRules value</th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr>
-                    <td class="font-mono text-indigo-300">BelowBaseVariant</td>
-                    <td>র-ফলাসহ</td>
-                    <td><code>"ট্র"</code>, <code>"ড্র"</code>, <code>"ঢ্র"</code></td>
-                    <td><code>#$0024</code> (ছাতা উ-কার)</td>
+                    <td class="font-mono text-indigo-300">RaPhalas</td>
+                    <td>ANSI Glyph-এর উপর Reph/রেফ বসে এবং এটি Phase C এ VowelRules-এ ম্যাচ দরকার</td>
+                    <td>ট্ট (#$C6), ণ্ট (#$C8)</td>
                   </tr>
                   <tr>
-                    <td class="font-mono text-indigo-300">RuClusters</td>
-                    <td>র-ফলাসহ</td>
-                    <td><code>"গ্র"</code>, <code>"ত্র"</code>, <code>"দ্র"</code></td>
-                    <td><code>A_UKar4</code> (বিশেষ উ-কার)</td>
-                  </tr>
-                  <tr>
-                    <td class="font-mono text-indigo-300">RaPhalas (AnsiGroups)</td>
-                    <td>ANSI কোডপয়েন্ট</td>
-                    <td><code>#$C6</code>, <code>#$C8</code>-<code>#$CC</code></td>
-                    <td><code>A_UKar2</code> (ঝুলন্ত)</td>
-                  </tr>
-                  <tr>
-                    <td class="font-mono text-indigo-300">BaseLineRight</td>
-                    <td>র-ফলা ছাড়া</td>
-                    <td><code>"খ"</code>, <code>"গ"</code>, <code>"স্ক"</code></td>
-                    <td><code>A_UKar1</code> (সাধারণ)</td>
-                  </tr>
-                  <tr>
-                    <td class="font-mono text-indigo-300">Direct Char</td>
-                    <td>সরাসরি ইউনিকোড</td>
-                    <td><code>"#$09B0"</code> (র)</td>
-                    <td><code>A_UKar4</code> (বিশেষ)</td>
+                    <td class="font-mono text-indigo-300">Connectors</td>
+                    <td>ANSI Glyph-এর সাথে কারচিহ্নের অর্ডার সুয়াপ দরকার (FinalTouch)</td>
+                    <td>#$FE, #$E9</td>
                   </tr>
                 </tbody>
               </table>
             </div>
-            <p class="text-md text-zinc-400 mt-2">এই নিয়মটি অনুসরণ করলে আপনার কনভার্টার ইঞ্জিনটি উ-কার, ঊ-কার ও র-ফলার
-              পজিশন নিখুঁতভাবে নির্ধারণ করতে পারবে।</p>
           </div>
         </details>
 
-        <!-- 8. Variable Expansion -->
+        <!-- 7. FinalTouch ও ApplyGenericGlyphSwaps -->
         <details class="premium-card elevation-1 group" open>
           <summary class="font-bold text-white flex items-center justify-between p-5">
             <div class="flex items-center gap-3"><span
-                class="material-symbols-outlined text-indigo-400">variables</span><span>৮. #{VariableName} — ভ্যারিয়েবল
+                class="material-symbols-outlined text-indigo-400">swap_horiz</span><span>৭. FinalTouch ও
+                ApplyGenericGlyphSwaps</span></div>
+            <span class="material-symbols-outlined transition-transform">expand_more</span>
+          </summary>
+          <div class="details-content text-zinc-400 leading-relaxed space-y-3">
+            <p>FinalTouch হলো Phase B-এর শেষ ধাপ। এটি একাধিক পরিশোধন কাজ সম্পন্ন করে:</p>
+
+            <h4 class="text-white font-semibold mt-4">১. হসন্ত, ZWJ ও ZWNJ পরিষ্কার</h4>
+            <div class="bg-black/30 p-4 rounded-lg text-md">
+              <p>বাকি থাকা Unicode Hasanta, ZWJ (Zero Width Joiner), এবং ZWNJ (Zero Width Non-Joiner) Glyph-গুলো সরিয়ে
+                ANSI Hasanta-তে রূপান্তর করে।</p>
+            </div>
+
+            <h4 class="text-white font-semibold mt-4">২. কার-অর্ডার সুয়াপ</h4>
+            <div class="bg-black/30 p-4 rounded-lg text-md space-y-2">
+              <p>ANSI ফন্টে কিছু কম্বিনেশনে কারচিহ্ন বর্ণের আগে বসে (যেমন র-ফলা + উ-কার), কিন্তু সঠিক অর্ডার হলো কার +
+                র-ফলা। FinalTouch এই সমস্যা সমাধান করে:</p>
+              <pre class="bg-black/40 p-2 rounded-lg text-zinc-300 text-md">ZFola + UKar → UKar + ZFola
+RFola + UKar → UKar + RFola
+Reph + UKar → UKar + Reph
+Reph + UUKar → UUKar + Reph</pre>
+            </div>
+
+            <h4 class="text-white font-semibold mt-4">৩. পোস্ট-প্রসেসিং কারেকশন</h4>
+            <div class="bg-black/30 p-4 rounded-lg text-md">
+              <p>নির্দিষ্ট বর্ণ + কার কম্বিনেশনের জন্য বিশেষ সংশোধন:</p>
+              <pre class="bg-black/40 p-2 rounded-lg text-zinc-300 text-md">ট + উ-কার১ → ট + উ-কার২ (ঝুলন্ত)
+ঊ-কার১ + ড় → ঊ-কার২ + ড়
+ঊ-কার১ + র → ঊ-কার২ + র</pre>
+            </div>
+
+            <h4 class="text-white font-semibold mt-4">৪. Unicode স্যানিটাইজেশন</h4>
+            <div class="bg-black/30 p-4 rounded-lg text-md">
+              <p>আউটপুট থেকে সব Unicode Bengali ক্যারেক্টার (U+0980–U+09FF) এবং অদৃশ্য ক্যারেক্টার (ZWJ, ZWNJ) সরিয়ে
+                দেয়। এটি নিশ্চিত করে যে চূড়ান্ত আউটপুট শুধুমাত্র ANSI কোডপয়েন্ট ধারণ করে।</p>
+            </div>
+
+            <h4 class="text-white font-semibold mt-4">৫. ApplyGenericGlyphSwaps — স্বয়ংক্রিয় অর্ডার সংশোধন</h4>
+            <div class="bg-black/30 p-4 rounded-lg space-y-2 text-md">
+              <p>এটি FinalTouch-এর সবচেয়ে শক্তিশালী ফিচার। এটি সম্পূর্ণভাবে স্বয়ংক্রিয় — ব্যবহারকারীকে প্রতিটি
+                কম্বিনেশনের জন্য আলাদা নিয়ম লিখতে হয় না।</p>
+              <ol class="list-decimal list-inside space-y-1">
+                <li><strong class="text-white">Modifier Collection:</strong> AnsiGroups থেকে সব Modifier Glyph লোড করে
+                  (RaPhalas + Connectors)। ফলব্যাক হিসেবে RFola, ZFola, Reph, RR, R, RRH ব্যবহার করে।</li>
+                <li><strong class="text-white">Kar Collection:</strong> সব কার Glyph লোড করে — A_UKar1-4, A_UUKar1-3,
+                  A_RRIKar1-2।</li>
+                <li><strong class="text-white">Nested Loop:</strong> প্রতিটি Modifier-এর জন্য প্রতিটি কার-এর সাথে
+                  ReplaceStr চালায়।</li>
+                <li><strong class="text-white">Swap:</strong> যদি Modifier + Kar প্যাটার্ন পাওয়া যায়, তাহলে Kar +
+                  Modifier-এ পরিবর্তন করে।</li>
+              </ol>
+              <pre class="bg-black/40 p-2 rounded-lg text-zinc-300 text-md">উদাহরণ: র-ফলা(#$C6) + উ-কার(#$25)
+&#x2192; ReplaceStr ম্যাচ করে
+&#x2192; ফলাফল: উ-কার(#$25) + র-ফলা(#$C6) &#x2192; <strong class="text-green-400">সঠিক অর্ডার</strong></pre>
+              <p><strong class="text-white">শক্তি:</strong> AnsiGroups-এ একটি নতুন Hex Code যোগ করলেই স্বয়ংক্রিয়ভাবে
+                সব কারের সাথে কম্বিনেশন হ্যান্ডল হয়। প্রতিটি কম্বিনেশনের জন্য আলাদা নিয়ম লিখার প্রয়োজন নেই।</p>
+            </div>
+
+            <h4 class="text-white font-semibold mt-4">৬. CustomPostReplacements</h4>
+            <div class="bg-black/30 p-4 rounded-lg text-md">
+              <p>সব শেষে PostReplacements তালিকা থেকে ব্যবহারকারী-সংজ্ঞায়িত প্রতিস্থাপন প্রয়োগ করে। এটি নতুন
+                পরিস্থিতির জন্য ফলব্যাক হিসেবে কাজ করে।</p>
+            </div>
+          </div>
+          <div class="details-content text-zinc-400 leading-relaxed space-y-3">
+            <h4 class="text-white font-semibold mt-4">আপনার নিজস্ব ফন্টের জন্য ম্যাপিং তৈরির ধাপ:</h4>
+            <div class="space-y-3">
+              <div class="flex gap-4 p-3 bg-black/20 rounded-lg">
+                <span
+                  class="bg-indigo-600 text-white w-6 h-6 flex items-center justify-center rounded-full text-xs font-bold">১</span>
+                <p class="text-md"><strong>Character Map</strong> ব্যবহার করে আপনার ফন্টের বিশেষ গ্লিফগুলোর Hex Code বের
+                  করুন।</p>
+              </div>
+              <div class="flex gap-4 p-3 bg-black/20 rounded-lg">
+                <span
+                  class="bg-indigo-600 text-white w-6 h-6 flex items-center justify-center rounded-full text-xs font-bold">২</span>
+                <p class="text-md">Constants সেকশনে ভ্যারিয়েবল হিসেবে সেগুলো ডিফাইন করুন (যেমন:
+                  <code>A_UKar_Special</code>)।
+                </p>
+              </div>
+              <div class="flex gap-4 p-3 bg-black/20 rounded-lg">
+                <span
+                  class="bg-indigo-600 text-white w-6 h-6 flex items-center justify-center rounded-full text-xs font-bold">৩</span>
+                <p class="text-md">যদি বিশেষ কোনো ক্লাস্টারের জন্য হয়, তবে <code>ConsonantGroups</code>-এ ওই ক্লাস্টার
+                  যোগ করুন।</p>
+              </div>
+              <div class="flex gap-4 p-3 bg-black/20 rounded-lg">
+                <span
+                  class="bg-indigo-600 text-white w-6 h-6 flex items-center justify-center rounded-full text-xs font-bold">৪</span>
+                <p class="text-md"><code>VowelRules</code>-এ গিয়ে সঠিক <code>process</code> (pre/post) এবং
+                  <code>matchMode</code> সেট করে Mapping যোগ করুন।
+                </p>
+              </div>
+            </div>
+          </div>
+        </details>
+
+        <!-- 8. কাস্টম ফন্ট ম্যাপিং গাইড -->
+        <details class="premium-card elevation-1 group" open>
+          <summary class="font-bold text-white flex items-center justify-between p-5">
+            <div class="flex items-center gap-3"><span
+                class="material-symbols-outlined text-indigo-400">build</span><span>৮. কাস্টম ফন্ট ম্যাপিং গাইড</span>
+            </div>
+            <span class="material-symbols-outlined transition-transform">expand_more</span>
+          </summary>
+          <div class="details-content text-zinc-400 leading-relaxed space-y-3">
+            <h4 class="text-white font-semibold mt-4">নতুন Glyph যোগ করার ধাপে ধাপে প্রক্রিয়া</h4>
+            <div class="bg-black/30 p-4 rounded-lg space-y-3 text-md">
+              <p><strong class="text-indigo-300">ধাপ ১ — Cluster চিহ্নিতকরণ:</strong> Unicode Cluster চিহ্নিত করুন। যেমন
+                "শু" = শ + উ-কার, "ক্রু" = ক + র + উ-কার।</p>
+              <p><strong class="text-indigo-300">ধাপ ২ — Hex Code খোঁজা:</strong> Character Map (charmap.exe) ব্যবহার
+                করে ফন্টের সঠিক ANSI Hex Code খুঁজে বের করুন।</p>
+              <p><strong class="text-indigo-300">ধাপ ৩ — Constants যোগ:</strong> নতুন ভ্যারিয়েবল দরকার হলে Constants-এ
+                যোগ করুন। "Hex &amp; Tools" ট্যাব থেকে Hex Translator ব্যবহার করুন।</p>
+              <p><strong class="text-indigo-300">ধাপ ৪ — ConsonantGroups যোগ:</strong> নতুন Unicode Cluster গ্রুপ দরকার
+                হলে ConsonantGroups-এ যোগ করুন।</p>
+              <p><strong class="text-indigo-300">ধাপ ৫ — AnsiGroups যোগ:</strong> ANSI-ভিত্তিক Modifier হলে AnsiGroups-এ
+                যোগ করুন।</p>
+              <p><strong class="text-indigo-300">ধাপ ৬ — VowelRules Mapping:</strong> VowelRules-এ Mapping যোগ/আপডেট
+                করুন। সঠিক process, matchMode, toggle নিশ্চিত করুন।</p>
+              <p><strong class="text-indigo-300">ধাপ ৭ — পরীক্ষা:</strong> Editor-এ পরীক্ষা করুন। সব ফেজ (Pre, Main,
+                Post) ধাপে সঠিকভাবে কাজ করছে কিনা দেখুন।</p>
+            </div>
+
+            <h4 class="text-white font-semibold mt-4">VowelRules Mapping — কখন কোন ফিল্ড ব্যবহার করবেন</h4>
+            <div class="overflow-x-auto">
+              <table class="table-md">
+                <thead>
+                  <tr>
+                    <th>পরিস্থিতি</th>
+                    <th>process</th>
+                    <th>matchMode</th>
+                    <th>toggle</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>পূর্ণ Cluster Unicode-তে ম্যাচ (যেমন "গ্র")</td>
+                    <td><code>"pre"</code> বা ফাঁকা</td>
+                    <td><code>0</code></td>
+                    <td>দরকার মতো</td>
+                  </tr>
+                  <tr>
+                    <td>শুধু একটি বর্ণ ম্যাচ (যেমন "র")</td>
+                    <td><code>"pre"</code></td>
+                    <td><code>1</code></td>
+                    <td>দরকার মতো</td>
+                  </tr>
+                  <tr>
+                    <td>ANSI-তে কনভার্ট হওয়ার পর ম্যাচ (যেমন #$C6)</td>
+                    <td><code>"post"</code></td>
+                    <td><code>0</code></td>
+                    <td>সাধারণত ফাঁকা</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </details>
+
+        <!-- 9. #{VariableName} — ভ্যারিয়েবল এক্সপ্যানশন -->
+        <details class="premium-card elevation-1 group" open>
+          <summary class="font-bold text-white flex items-center justify-between p-5">
+            <div class="flex items-center gap-3"><span
+                class="material-symbols-outlined text-indigo-400">variables</span><span>৯. #{VariableName} — ভ্যারিয়েবল
                 এক্সপ্যানশন</span></div>
             <span class="material-symbols-outlined transition-transform">expand_more</span>
           </summary>
           <div class="details-content text-zinc-400 leading-relaxed space-y-3">
-            <p>সরাসরি হেক্স কোডের পরিবর্তে <code>#{A_UKar1}</code> ব্যবহার করতে পারেন। ইঞ্জিন JSON লোড করার সময়
-              Constants থেকে রেজল্ভ করে।</p>
-            <div class="bg-black/30 p-4 rounded-lg text-md space-y-2">
-              <p><span class="text-indigo-300 font-bold">সংগতি:</span> এক জায়গায় পরিবর্তন করুন, সব জায়গায় আপডেট হবে।</p>
-              <p><span class="text-indigo-300 font-bold">পাঠযোগ্যতা:</span> <code>#{A_UKar2}</code> বোঝা সহজ,
-                <code>#$25</code> বোঝা কঠিন।
-              </p>
-              <p><span class="text-indigo-300 font-bold">ভার্সনিং:</span> প্রতি AnsiVersion-এর জন্য আলাদা Constants সেট।
-              </p>
-            </div>
+            <p>সরাসরি Hex Code-এর পরিবর্তে <code>#{A_UKar1}</code> সিনট্যাক্স ব্যবহার করতে পারেন। ইঞ্জিন JSON লোড করার
+              সময় <code>ResolveValue</code> ফাংশনের মাধ্যমে Constants থেকে রেজল্ভ করে।</p>
             <pre class="bg-black/40 p-3 rounded-lg text-zinc-300 text-md">উদাহরণ: #$FE#{A_UKar1}
-&#x2192; #{A_UKar1} রেজল্ভ হয় #$25-এ
-&#x2192; ফলে #$FE#$25 = দুটি ANSI বাইট</pre>
+&#x2192; #{A_UKar1} রেজল্ভ হয় #$25-এ
+&#x2192; ফলাফল: #$FE#$25 = দুটি ANSI বাইট</pre>
+            <p>এটি পুনর্ব্যবহারযোগ্যতা বৃদ্ধি করে — একটি Hex Code পরিবর্তন করলেই সব জায়গায় প্রভাব পড়ে।</p>
           </div>
         </details>
 
-        <!-- 9. ফাংশন ব্যাখ্যা -->
+        <!-- 10. মূল ফাংশনসমূহ -->
         <details class="premium-card elevation-1 group" open>
           <summary class="font-bold text-white flex items-center justify-between p-5">
             <div class="flex items-center gap-3"><span
-                class="material-symbols-outlined text-indigo-400">code</span><span>৯. প্রতিটি ফাংশন কিভাবে কাজ
-                করে</span></div>
+                class="material-symbols-outlined text-indigo-400">code</span><span>১০. মূল ফাংশনসমূহ</span></div>
             <span class="material-symbols-outlined transition-transform">expand_more</span>
           </summary>
           <div class="details-content text-zinc-400 leading-relaxed space-y-4">
             <div class="bg-black/30 p-4 rounded-lg">
-              <h4 class="text-white font-semibold mb-2">ExpandVarRefs</h4>
-              <p class="mb-2">ইনপুট স্ট্রিং-এ <code>#{VarName}</code> প্যাটার্ন খুঁজে Constants থেকে মান এনে বসায়।</p>
-              <pre
-                class="text-zinc-500 text-md">লজিক: Pos('#{') &#x2192; PosEx('}') &#x2192; AnsiRegistryMap খুঁজে &#x2192; মান বসায় &#x2192; আবার খোঁজে</pre>
+              <h4 class="text-white font-semibold mb-2">ApplyRuleForKar(KarChar, Phase)</h4>
+              <p>নির্দিষ্ট কারের জন্য সব VowelRules Mapping স্ক্যান করে। <code>FindBestClusterMatch</code> দিয়ে দীর্ঘতম
+                ম্যাচ খুঁজে। Phase Filter: Mapping-এর <code>ProcessPhase</code> যদি Phase Parameter-এর সাথে না মিলে,
+                Default মান ব্যবহার করে। Toggle State চেক করে Alt মান নির্ধারণ করে।</p>
             </div>
             <div class="bg-black/30 p-4 rounded-lg">
-              <h4 class="text-white font-semibold mb-2">ResolveStringValue</h4>
-              <p class="mb-2">ExpandVarRefs + ProcessHexAndUnicode একসাথে করে।</p>
-              <pre
-                class="text-zinc-500 text-md">"#$FE#{A_UKar1}" &#x2192; ExpandVarRefs &#x2192; "#$FE#$25" &#x2192; ProcessHexAndUnicode &#x2192; দুটি ক্যারেক্টার</pre>
+              <h4 class="text-white font-semibold mb-2">FindBestClusterMatch(Text, KarPos, Rule)</h4>
+              <p>Z-fola-aware Context Resolution করে। সব Mapping স্ক্যান করে, MatchMode অনুযায়ী ম্যাচ করে।
+                <code>MatchGroupLength</code> দিয়ে ConsonantGroupMap ও AnsiGroupMap-এ খুঁজে। দীর্ঘতম MatchLen বেছে
+                নেয়। ফেরত দেয়: MatchedCluster, BestMapping, BestMatchLen, ContextEnd, IsZfola।
+              </p>
             </div>
             <div class="bg-black/30 p-4 rounded-lg">
-              <h4 class="text-white font-semibold mb-2">GetVowelGlyph</h4>
-              <p class="mb-2">3-স্তরের ম্যাচিং প্রায়োরিটি: <code>mappings</code>-এ Direct Unicode Char &#x2192;
-                ConsonantGroups &#x2192; AnsiGroups &#x2192; <code>default</code>। টগল চালু থাকলে <code>alt</code> মান
-                ব্যবহার করে।</p>
-              <pre
-                class="text-zinc-500 text-md">VowelRulesList লুপ → Rule.Vowel = AVowel খোঁজে → Mappings লুপ → GroupList.Contains বা সরাসরি তুলনা → ম্যাচ পেলে Exit(Value/AltValue)</pre>
+              <h4 class="text-white font-semibold mb-2">FindMappingToggle(Rule, ConsonantPart)</h4>
+              <p>Backspace Toggle Detection-এ ব্যবহার। সব Mapping স্ক্যান করে, দীর্ঘতম Match-এর Mapping-এর
+                <code>ToggleOnBackspace</code> সেটিং ফেরত দেয়। MatchedClusterও ফেরত দেয়।
+              </p>
             </div>
             <div class="bg-black/30 p-4 rounded-lg">
               <h4 class="text-white font-semibold mb-2">ApplyGenericGlyphSwaps</h4>
-              <p class="mb-2">ANSI আউটপুটে মডিফায়ার+কার অর্ডার ঠিক করে। AnsiGroups থেকে মডিফায়ার লোড করে, সব কারের সাথে
-                Nested loop চালিয়ে <code>ReplaceStr(Modif+Kar, Kar+Modif)</code> করে।</p>
-              <pre
-                class="text-zinc-500 text-md">RaPhalas + Connectors → Modifiers List → UKar1-4 + UUKar1-3 + RRIKar1-2 → Kars List → for Modif in Modifiers do for Kar in Kars do ReplaceStr(Modif+Kar, Kar+Modif)</pre>
+              <p>ANSI আউটপুটে Modifier+Kar অর্ডার ঠিক করে। AnsiGroups থেকে Modifier লোড করে, Nested Loop চালিয়ে
+                <code>ReplaceStr(Modif+Kar, Kar+Modif)</code> করে।
+              </p>
             </div>
             <div class="bg-black/30 p-4 rounded-lg">
-              <h4 class="text-white font-semibold mb-2">BaseLineRightCharacter</h4>
-              <p class="mb-2">ব্যঞ্জনবর্ণ বেসলাইনে বসে কিনা পরীক্ষা করে। বেসলাইনে বসা বর্ণ: খ, গ, ঘ, ণ, থ, দ, ধ, ন, প,
-                ব, ম, য, র, ল, শ, ষ, স, হ, য়।</p>
-            </div>
-            <div class="bg-black/30 p-4 rounded-lg">
-              <h4 class="text-white font-semibold mb-2">ReplaceKarsVowels</h4>
-              <p>উ-কার, ঊ-কার, ঋ-কার প্রক্রিয়া করে। Pos দিয়ে কার খুঁজে &#x2192; পূর্ববর্তী ক্যারেক্টার বের করে &#x2192;
-                GetVowelGlyph ডাকে &#x2192; WideStuffString দিয়ে প্রতিস্থাপন করে। <strong
-                  class="text-white">গুরুত্বপূর্ণ:</strong> ReplaceFullForms-এর পর চলে, তাই পূর্ববর্তী বর্ণ ANSI-তে
-                কনভার্ট হয়ে যেতে পারে — ContainsBengaliChar চেক করে না পেলে fUniText (মূল ইউনিকোড) ব্যবহার করে।</p>
-            </div>
-            <div class="bg-black/30 p-4 rounded-lg">
-              <h4 class="text-white font-semibold mb-2">FinalTouch</h4>
-              <p>সর্বশেষ ধাপ: হসন্ত গ্লিফ ফিক্স, <strong class="text-white">ApplyGenericGlyphSwaps</strong> (AnsiGroups
-                থেকে মডিফায়ার লোড করে কার অর্ডার ঠিক করে), লিগ্যাসি Default-ভার্সন কারেকশন, ANSI পরিশোধন (শুধু
-                0x00-0xFF) রাখে।</p>
+              <h4 class="text-white font-semibold mb-2">MatchGroupLength(FullText, CharIndex, GroupName)</h4>
+              <p>ConsonantGroupMap ও AnsiGroupMap-এ গ্রুপের তালিকা চেক করে। CharIndex-এ শেষ হওয়া দীর্ঘতম ম্যাচিং
+                এন্ট্রির দৈর্ঘ্য ফেরত দেয়। Block-based Matching — character-by-character নয়।</p>
             </div>
           </div>
         </details>
 
-        <!-- 10. কখন কী এডিট করবেন -->
+        <!-- 11. কখন কী এডিট করবেন -->
         <details class="premium-card elevation-1 group" open>
           <summary class="font-bold text-white flex items-center justify-between p-5">
             <div class="flex items-center gap-3"><span
-                class="material-symbols-outlined text-indigo-400">help</span><span>১০. কখন কী এডিট করবেন?</span></div>
+                class="material-symbols-outlined text-indigo-400">help</span><span>১১. কখন কী এডিট করবেন</span></div>
             <span class="material-symbols-outlined transition-transform">expand_more</span>
           </summary>
           <div class="details-content text-zinc-400 leading-relaxed">
@@ -1542,7 +1543,7 @@
               <tbody>
                 <tr>
                   <td class="font-mono text-indigo-300">Constants</td>
-                  <td>কোনো বর্ণ বা গ্লিফের ANSI আউটপুট পরিবর্তন করতে</td>
+                  <td>কোনো বর্ণ বা Glyph-এর ANSI আউটপুট পরিবর্তন করতে</td>
                 </tr>
                 <tr>
                   <td class="font-mono text-indigo-300">FullFormReplacements</td>
@@ -1550,69 +1551,77 @@
                 </tr>
                 <tr>
                   <td class="font-mono text-indigo-300">PreReplacements</td>
-                  <td>Vowel প্রক্রিয়ার আগে বিশেষ ফিক্স দরকার হলে</td>
+                  <td>মূল প্রক্রিয়ার আগে বিশেষ ফিক্স দরকার হলে</td>
                 </tr>
                 <tr>
                   <td class="font-mono text-indigo-300">PostReplacements</td>
-                  <td>গ্লিফ বসানোর পর অর্ডার ঠিক করতে</td>
+                  <td>সব Glyph বসানোর পর অর্ডার ঠিক করতে</td>
                 </tr>
                 <tr>
                   <td class="font-mono text-indigo-300">VowelRules</td>
-                  <td>কোন ব্যঞ্জনের পর কোন কার-গ্লিফ বসবে সেটা নিয়ন্ত্রণে</td>
+                  <td>কোন ব্যঞ্জনের পর কোন কার-Glyph বসবে সেটা নিয়ন্ত্রণে (process, matchMode, toggle সহ)</td>
                 </tr>
                 <tr>
                   <td class="font-mono text-indigo-300">ConsonantGroups</td>
-                  <td>ইউনিকোড বর্ণের গ্রুপ সংজ্ঞায়িত/পরিবর্তন করতে (BelowBaseVariant, RuClusters, BaseLineRight ইত্যাদি)
-                  </td>
+                  <td>Unicode বর্ণের গ্রুপ সংজ্ঞায়িত/পরিবর্তন করতে — Phase A/B এর জন্য</td>
                 </tr>
                 <tr>
                   <td class="font-mono text-indigo-300">AnsiGroups</td>
-                  <td>ANSI কোডপয়েন্ট গ্রুপ সংজ্ঞায়িত করতে (RaPhalas, Connectors) — VowelRules ম্যাচিং ও FinalTouch গ্লিফ
-                    সুয়াপ উভয়ের জন্য</td>
+                  <td>ANSI কোডপয়েন্ট গ্রুপ সংজ্ঞায়িত করতে — Phase C VowelRules ম্যাচিং ও FinalTouch Glyph Swap উভয়ের
+                    জন্য</td>
                 </tr>
               </tbody>
             </table>
           </div>
         </details>
 
-        <!-- 11. পূর্ণ উদাহরণ -->
+        <!-- 12. পূর্ণ উদাহরণ: "ক্রু" -->
         <details class="premium-card elevation-1 group" open>
           <summary class="font-bold text-white flex items-center justify-between p-5">
             <div class="flex items-center gap-3"><span
-                class="material-symbols-outlined text-indigo-400">preview</span><span>১১. পূর্ণ উদাহরণ: "ক্রু"
-                (ক্র+উ-কার) থেকে ANSI</span></div>
+                class="material-symbols-outlined text-indigo-400">preview</span><span>১২. পূর্ণ উদাহরণ: "ক্রু" (ক + র +
+                উ-কার)</span></div>
             <span class="material-symbols-outlined transition-transform">expand_more</span>
           </summary>
           <div class="details-content text-zinc-400 leading-relaxed space-y-3">
-            <p>ক্র = ক + ্ + র-ফলা। ধাপে ধাপে &#x0995;&#x09CD;&#x09B0;&#x09C1; (ক্র+উ-কার) কিভাবে ANSI-তে রূপান্তরিত হয়:
-            </p>
-            <div class="bg-black/30 p-4 rounded-lg space-y-2 text-md">
-              <p><strong class="text-white">&#x2776; শুরু:</strong> ইনপুট = &#x0995; (ক) + &#x09CD; (হসন্ত) + &#x09B0;
-                (র) + &#x09C1; (উ-কার)</p>
-              <p><strong class="text-white">&#x2777; FullFormReplacements:</strong> &#x0995;&#x09CD;&#x09B0; (ক্র) এর
-                এন্ট্রি নেই &#x2192; skip</p>
-              <p><strong class="text-white">&#x2778; ReplaceFullForms:</strong> &#x0995; + &#x09CD; + &#x09B0; &#x2192;
-                ক + র-ফলা (&#x09B0;-এর দ্বিতীয় খন্ড)</p>
-              <p><strong class="text-white">&#x2779; ReplaceKarsVowels:</strong> পূর্ববর্তী বর্ণ = র-ফলা (#$C6) &#x2192;
-                GetVowelGlyph ডাকে</p>
-              <p><strong class="text-white">&#x277A; GetVowelGlyph ম্যাচিং:</strong> &#x09C1; (উ-কার) এর VowelRules-এ:
+            <p>ধাপে ধাপে &#x0995;&#x09CD;&#x09B0;&#x09C1; (ক্র + উ-কার) কিভাবে ANSI-তে রূপান্তরিত হয় — সব ফেজ ধরে:</p>
+            <div class="bg-black/30 p-4 rounded-lg space-y-3 text-md">
+
+              <p class="text-indigo-300 font-bold">═══ Phase A (Pre-phase) ═══</p>
+              <p>১. ApplyRuleForKar(উ-কার, 'pre') — ক্লাস্টার এখনো Unicode: ক+Hasanta+র+উ-কার। RuClusters-এ "ক্র" নেই
+                (শুধু র-ফলা যুক্ত Cluster আছে), BaseLineRight-এ "র" আছে কিন্তু process="post"। কোনো process="pre"
+                Mapping ম্যাচ করেনি &#x2192; <code>default = A_UKar1</code> ব্যবহার হয়।</p>
+
+              <p class="text-indigo-300 font-bold">═══ Phase B (Main Conversion) ═══</p>
+              <p>২. DeNormalize — কোনো পরিবর্তন নেই</p>
+              <p>৩. ReArrangeKars — I/E/OI-কার নেই</p>
+              <p>৪. ReArrangeReph — "র+Hasanta" প্যাটার্ন, কিন্তু Hasanta-র আগে Hasanta নেই (krya pattern নয়) &#x2192;
+                রেফ হিসেবে সনাক্ত হয়, পরবর্তী বর্ণের পরে Reph (#$A9) বসানো হয়</p>
+              <p>৫. ApplyKarInclusiveFullForms — "ক্রু" (#$0995#$09CD#$09B0#$09C1) FullFormReplacements-এ আছে &#x2192;
+                <strong class="text-green-400">"e%«" (ক্র-এর ANSI + উ-কার)</strong>
               </p>
-              <pre class="bg-black/40 p-2 rounded-lg text-zinc-300 text-md">Direct char match? #$C6 নয় → No
-ConsonantGroups? "RaPhalas" গ্রুপ নেই → No
-<strong class="text-green-400">AnsiGroups? "RaPhalas"-এ #$C6 আছে → Yes → value = A_UKar2</strong></pre>
-              <p><strong class="text-white">&#x277B; ফলাফল:</strong> ক + র-ফলা(#$C6) + উ-কার(A_UKar2 = #$24)</p>
-              <p><strong class="text-white">&#x277C; FinalTouch ApplyGenericGlyphSwaps:</strong> র-ফলা(#$C6) +
-                উ-কার(#$24) &#x2192; উ-কার(#$24) + র-ফলা(#$C6)</p>
-              <p class="text-white font-bold text-base mt-2">শেষ ফলাফল: ক + #$24 + #$C6 = ক্রু (ANSI)</p>
+              <p>৬. ReplaceFullForms — ক্র আগেই প্রতিস্থাপিত হয়েছে</p>
+              <p>৭. Consonants — বাকি ব্যঞ্জনবর্ণ প্রতিস্থাপিত</p>
+              <p>৮. FinalTouch — ApplyGenericGlyphSwaps</p>
+
+              <p class="text-indigo-300 font-bold">═══ Phase C (Post-phase) ═══</p>
+              <p>৯. ApplyRuleForKar(উ-কার, 'post') — এখন টেক্সট ANSI-তে কনভার্ট হয়ে গেছে। কিন্তু KarInclusiveFullForms
+                "ক্রু"-কে আগেই সম্পূর্ণ রূপান্তরিত করে দিয়েছে, তাই এখানে আর উ-কার নেই।</p>
+
+              <p class="text-indigo-300 font-bold">═══ FinalTouch ApplyGenericGlyphSwaps ═══</p>
+              <p>১০. Connector/Modifier + Kar অর্ডার সুয়াপ প্রয়োগ হয়</p>
+
+              <pre class="bg-black/40 p-2 rounded-lg text-zinc-300 text-md mt-2">শেষ ফলাফল: ক্রু (ANSI SutonnyMJ)
+Unicode: &#x0995;&#x09CD;&#x09B0;&#x09C1; &#x2192; ANSI: e%«</pre>
             </div>
           </div>
         </details>
 
-        <!-- 12. ANSI Glyph Reference -->
+        <!-- 13. ANSI Glyph রেফারেন্স -->
         <details class="premium-card elevation-1 group" open>
           <summary class="font-bold text-white flex items-center justify-between p-5">
             <div class="flex items-center gap-3"><span
-                class="material-symbols-outlined text-indigo-400">grid_view</span><span>১২. ANSI গ্লিফ রেফারেন্স</span>
+                class="material-symbols-outlined text-indigo-400">grid_view</span><span>১৩. ANSI Glyph রেফারেন্স</span>
             </div>
             <span class="material-symbols-outlined transition-transform">expand_more</span>
           </summary>
@@ -1634,6 +1643,8 @@ ConsonantGroups? "RaPhalas" গ্রুপ নেই → No
 
       </div>
     </div>
+
+
     <!-- Live JSON Preview -->
     <div class="mt-12">
       <div class="flex items-center justify-between mb-4 px-2">
@@ -1850,404 +1861,404 @@ ConsonantGroups? "RaPhalas" গ্রুপ নেই → No
     const REPL_KEYS = ['FullFormReplacements', 'PreReplacements', 'PostReplacements'];
 
     const SAMPLE = {
-  "Constants": {
-    "Numbers": {
-      "A_0": { "Value": "#$0030", "Comment": "০" },
-      "A_1": { "Value": "#$0031", "Comment": "১" },
-      "A_2": { "Value": "#$0032", "Comment": "২" },
-      "A_3": { "Value": "#$0033", "Comment": "৩" },
-      "A_4": { "Value": "#$0034", "Comment": "৪" },
-      "A_5": { "Value": "#$0035", "Comment": "৫" },
-      "A_6": { "Value": "#$0036", "Comment": "৬" },
-      "A_7": { "Value": "#$0037", "Comment": "৭" },
-      "A_8": { "Value": "#$0038", "Comment": "৮" },
-      "A_9": { "Value": "#$0039", "Comment": "৯" }
-    },
-    "VowelsAndKars": {
-      "A_A": { "Value": "#$0078", "Comment": "অ" },
-      "A_AA": { "Value": "#$0078#$0079", "Comment": "আ" },
-      "A_AAKar": { "Value": "#$0079", "Comment": "া (আ-কার)" },
-      "A_I": { "Value": "#$A3#$7A", "Comment": "ই" },
-      "A_IKar": { "Value": "#$21", "Comment": "ি (ই-কার)" },
-      "A_II": { "Value": "#$007B", "Comment": "ঈ" },
-      "A_IIKar": { "Value": "#$23", "Comment": "ী (ঈ-কার)" },
-      "A_U": { "Value": "#$0076#$00FE#$007A", "Comment": "উ" },
-      "A_UKar2": { "Value": "#$24", "Comment": "ু (উ-কার ২ - ঝুলন্ত)" },
-      "A_UKar1": { "Value": "#$25", "Comment": "ু (উ-কার ১ - সাধারণ)" },
-      "A_UKar3": { "Value": "#$59", "Comment": "ু (উ-কার ৩ - ড়ু/ঢ়ু)" },
-      "A_UKar4": { "Value": "#$26", "Comment": "ু (উ-কার ৪ - রু)" },
-      "A_UU": { "Value": "#$7C", "Comment": "ঊ" },
-      "A_UUKar2": { "Value": "#$28", "Comment": "ূ (ঊ-কার ২ - ঝুলন্ত)" },
-      "A_UUKar1": { "Value": "#$29", "Comment": "ূ (ঊ-কার ১ - সাধারণ)" },
-      "A_UUKar3": { "Value": "#$2A", "Comment": "ূ (ঊ-কার ৩ - রূ)" },
-      "A_RRI": { "Value": "#$007D", "Comment": "ঋ" },
-      "A_RRIKar1": { "Value": "#$2C", "Comment": "ৃ (ঋ-কার ১)" },
-      "A_RRIKar2": { "Value": "#$2B", "Comment": "ৃ (ঋ-কার ২)" },
-      "A_E": { "Value": "#$007E", "Comment": "এ" },
-      "A_EKar1": { "Value": "#$F6", "Comment": "ে (এ-কার ১ - সাধারণ)" },
-      "A_EKar2": { "Value": "#$F6#$EC", "Comment": "ে (এ-কার ২ - ঝুলন্ত)" },
-      "A_OI": { "Value": "#$00FA", "Comment": "ঐ" },
-      "A_OIKar1": { "Value": "#$F7", "Comment": "ৈ (ঐ-কার ১ - সাধারণ)" },
-      "A_OIKar2": { "Value": "#$F7#$EC", "Comment": "ৈ (ঐ-কার ২ - ঝুলন্ত)" },
-      "A_O": { "Value": "#$00E7", "Comment": "ও" },
-      "A_OU": { "Value": "#$00E8", "Comment": "ঔ" },
-      "A_OUKar": { "Value": "#$EF", "Comment": "ৌ (ঔ-কার)" }
-    },
-    "Symbols": {
-      "A_Taka": { "Value": "", "Comment": "৳ (টাকা)" },
-      "A_Dari": { "Value": "#$D0", "Comment": "। (দাঁড়ি)" },
-      "A_DoubleDanda": { "Value": "", "Comment": "॥ (দ্বিত্ব দাঁড়ি)" },
-      "A_Hasanta": { "Value": "#$E4", "Comment": "্ (হসন্ত)" },
-      "A_StartDoubleQuote": { "Value": "#$F2#$F2", "Comment": "\" (উদ্ধৃতি শুরু)" },
-      "A_EndDoubleQuote": { "Value": "#$F3#$F3", "Comment": "\" (উদ্ধৃতি শেষ)" },
-      "A_StartSingleQuote": { "Value": "#$F2", "Comment": "' (একক উদ্ধৃতি শুরু)" },
-      "A_EndSingleQuote": { "Value": "#$F3", "Comment": "' (একক উদ্ধৃতি শেষ)" }
-    },
-    "Consonants": {
-      "A_K": { "Value": "#$201E#$FE", "Comment": "ক" },
-      "A_Kh": { "Value": "#$2026", "Comment": "খ" },
-      "A_G": { "Value": "#$2020", "Comment": "গ" },
-      "A_Gh": { "Value": "#$2021", "Comment": "ঘ" },
-      "A_NGA": { "Value": "#$02C6", "Comment": "ঙ" },
-      "A_C": { "Value": "#$2030#$00FE", "Comment": "চ" },
-      "A_Ch": { "Value": "#$0160#$00E9", "Comment": "ছ" },
-      "A_J": { "Value": "#$2039", "Comment": "জ" },
-      "A_Jh": { "Value": "#$0047#$00FE", "Comment": "ঝ" },
-      "A_NYA": { "Value": "#$007E#$0152", "Comment": "ঞ" },
-      "A_Tt": { "Value": "#$00DD#$00FE", "Comment": "ট" },
-      "A_Tth": { "Value": "#$00E0#$00FE", "Comment": "ঠ" },
-      "A_Dd": { "Value": "#$0076#$00FE", "Comment": "ড" },
-      "A_Ddh": { "Value": "#$2018#$00FE", "Comment": "ঢ" },
-      "A_Nn": { "Value": "#$2019", "Comment": "ণ" },
-      "A_T": { "Value": "#$201C#$00FE", "Comment": "ত" },
-      "A_Th": { "Value": "#$00ED", "Comment": "থ" },
-      "A_D": { "Value": "#$201D", "Comment": "দ" },
-      "A_Dh": { "Value": "#$2022", "Comment": "ধ" },
-      "A_N": { "Value": "#$02DC", "Comment": "ন" },
-      "A_P": { "Value": "#$00FE#$2122", "Comment": "প" },
-      "A_Ph": { "Value": "#$0161#$00FE", "Comment": "ফ" },
-      "A_B": { "Value": "#$00EE", "Comment": "ব" },
-      "A_Bh": { "Value": "#$00A6#$00FE", "Comment": "ভ" },
-      "A_M": { "Value": "#$203A", "Comment": "ম" },
-      "A_Z": { "Value": "#$00EB", "Comment": "য" },
-      "A_R": { "Value": "#$00EE#$00FB", "Comment": "র" },
-      "A_L": { "Value": "#$0153", "Comment": "ল" },
-      "A_Sh": { "Value": "#$0178", "Comment": "শ" },
-      "A_SS": { "Value": "#$00A1#$00EC", "Comment": "ষ" },
-      "A_S": { "Value": "#$00A2", "Comment": "স" },
-      "A_H": { "Value": "#$00A3", "Comment": "হ" },
-      "A_RR": { "Value": "#$0076#$00FE#$00FC", "Comment": "ড়" },
-      "A_RRH": { "Value": "#$2018#$00FE#$00FC", "Comment": "ঢ়" },
-      "A_Y": { "Value": "#$00EB#$00FB", "Comment": "য়" },
-      "A_Khandata": { "Value": "#$00EA", "Comment": "ৎ" },
-      "A_Anushar": { "Value": "#$201A", "Comment": "ং" },
-      "A_Bisharga": { "Value": "#$0192", "Comment": "ঃ" },
-      "A_Chandra": { "Value": "#$00A4", "Comment": "ঁ" }
-    },
-    "FullForms": {
-      "A_K_K": { "Value": "#$45#$FE", "Comment": "ক্ক" },
-      "A_K_Tt": { "Value": "#$51", "Comment": "ক্ট" },
-      "A_K_Ss_M": { "Value": "#$3A#$E4#$203A", "Comment": "ক্স্ম" },
-      "A_K_T": { "Value": "#$5F#$AB", "Comment": "ক্ত" },
-      "A_K_M": { "Value": "#$A9", "Comment": "ক্ম" },
-      "A_K_R": { "Value": "#$65#$AB", "Comment": "ক্র" },
-      "A_K_Ss": { "Value": "#$C7#$FE", "Comment": "ক্ষ" },
-      "A_K_S": { "Value": "#$3A", "Comment": "ক্স" },
-      "A_G_Ukar": { "Value": "#$3D", "Comment": "গু" },
-      "A_G_G": { "Value": "#$3E", "Comment": "গ্গ" },
-      "A_G_D": { "Value": "#$40#$201D", "Comment": "গ্দ" },
-      "A_G_Dh": { "Value": "#$3F#$FE", "Comment": "গ্ধ" },
-      "A_NGA_K": { "Value": "#$42#$FE", "Comment": "ঙ্ক" },
-      "A_NGA_G": { "Value": "#$44", "Comment": "ঙ্গ" },
-      "A_J_J": { "Value": "#$49", "Comment": "জ্জ" },
-      "A_J_Jh": { "Value": "#$4A", "Comment": "জ্ঝ" },
-      "A_J_NYA": { "Value": "#$4B#$FE", "Comment": "জ্ঞ" },
-      "A_NYA_C": { "Value": "#$4D#$FE", "Comment": "ঞ্চ" },
-      "A_NYA_CH": { "Value": "#$4E#$FE", "Comment": "ঞ্ছ" },
-      "A_NYA_J": { "Value": "#$4F", "Comment": "ঞ্জ" },
-      "A_NYA_Jh": { "Value": "#$50", "Comment": "ঞ্ঝ" },
-      "A_Tt_Tt": { "Value": "#$52", "Comment": "ট্ট" },
-      "A_Dd_Dd": { "Value": "#$55#$FE", "Comment": "ড্ড" },
-      "A_Nn_Tt": { "Value": "#$5E#$F9#$DD#$FE", "Comment": "ণ্ট" },
-      "A_Nn_Tth": { "Value": "#$5A#$FE", "Comment": "ণ্ঠ" },
-      "A_NN_Dd": { "Value": "#$5B#$FE", "Comment": "ণ্ড" },
-      "A_T_T": { "Value": "#$5F", "Comment": "ত্ত" },
-      "A_T_Th": { "Value": "#$61", "Comment": "ত্থ" },
-      "A_T_M": { "Value": "#$64", "Comment": "ত্ম" },
-      "A_T_R": { "Value": "#$65", "Comment": "ত্র" },
-      "A_D_D": { "Value": "#$6A", "Comment": "দ্দ" },
-      "A_D_Dh": { "Value": "#$6B#$FE", "Comment": "দ্ধ" },
-      "A_D_B": { "Value": "#$6D", "Comment": "দ্ব" },
-      "A_D_M": { "Value": "#$70", "Comment": "দ্ম" },
-      "A_N_Tth": { "Value": "#$73#$FE#$69", "Comment": "ন্থ" },
-      "A_N_Dd": { "Value": "#$75#$FE", "Comment": "ন্ড" },
-      "A_N_Dh": { "Value": "#$F5#$FE", "Comment": "ন্ধ" },
-      "A_N_S": { "Value": "#$AA", "Comment": "ন্স" },
-      "A_P_Tt": { "Value": "#$B2#$57#$7A", "Comment": "প্ট" },
-      "A_P_T": { "Value": "#$AE", "Comment": "প্ত" },
-      "A_P_P": { "Value": "#$AF", "Comment": "প্প" },
-      "A_P_S": { "Value": "#$B0", "Comment": "প্স" },
-      "A_B_J": { "Value": "#$B6", "Comment": "ব্জ" },
-      "A_B_D": { "Value": "#$B7#$2219", "Comment": "ব্দ" },
-      "A_B_Dh": { "Value": "#$B8#$FE", "Comment": "ব্ধ" },
-      "A_Bh_R": { "Value": "#$BC", "Comment": "ভ্র" },
-      "A_M_N": { "Value": "#$C1#$AC", "Comment": "ম্ন" },
-      "A_M_Ph": { "Value": "#$C1#$B3#$FE", "Comment": "ম্ফ" },
-      "A_L_K": { "Value": "#$CD#$F1", "Comment": "ল্ক" },
-      "A_L_G": { "Value": "#$D1", "Comment": "ল্গ" },
-      "A_L_Tt": { "Value": "#$CE#$DD#$FE", "Comment": "ল্ট" },
-      "A_L_Dd": { "Value": "#$D3#$FE", "Comment": "ল্ড" },
-      "A_L_P": { "Value": "#$D2", "Comment": "ল্প" },
-      "A_L_Ph": { "Value": "#$CD#$B3#$FE", "Comment": "ল্ফ" },
-      "A_Sh_UKar": { "Value": "#$D6", "Comment": "শু" },
-      "A_Sh_C": { "Value": "#$D8#$FE", "Comment": "শ্চ" },
-      "A_Sh_Ch": { "Value": "#$D9#$0160#$E9", "Comment": "শ্ছ" },
-      "A_Ss_Nn": { "Value": "#$A1#$0152", "Comment": "ষ্ণ" },
-      "A_Ss_Tt": { "Value": "#$DC#$54", "Comment": "ষ্ট" },
-      "A_Ss_Tth": { "Value": "#$DB#$FE", "Comment": "ষ্ঠ" },
-      "A_Ss_Ph": { "Value": "#$DF#$FE#$B3#$FE", "Comment": "স্ফ" },
-      "A_S_Kh": { "Value": "#$DF#$FE#$3C", "Comment": "স্খ" },
-      "A_S_Tt": { "Value": "#$DE#$DD#$FE", "Comment": "স্ট" },
-      "A_S_N": { "Value": "#$DF#$FE#$AC", "Comment": "স্ন" },
-      "A_S_Ph": { "Value": "#$DF#$FE#$B3#$FE", "Comment": "স্ফ" },
-      "A_H_UKar": { "Value": "#$FD", "Comment": "হু" },
-      "A_H_RRIKar": { "Value": "#$A3#$2A", "Comment": "হৃ" },
-      "A_H_N": { "Value": "#$A3#$AB", "Comment": "হ্ন" },
-      "A_H_M": { "Value": "#$E1#$FE", "Comment": "হ্ম" },
-      "A_Rr_G": { "Value": "#$2020#$C5", "Comment": "র্গ" }
-    },
-    "FirstHalfForms": {
-      "A_Reph": { "Value": "#$C5", "Comment": "(র-এর রেফ)" },
-      "A_M_1H": { "Value": "#$C1", "Comment": "ম-এর প্রথম খন্ড" },
-      "A_Ss_1H": { "Value": "#$DC", "Comment": "ষ-এর প্রথম খন্ড" },
-      "A_S_1H_1": { "Value": "#$DF", "Comment": "স-এর প্রথম খন্ড ১" },
-      "A_N_1H_1": { "Value": "#$A7", "Comment": "ন-এর প্রথম খন্ড ১" },
-      "A_S_1H_2": { "Value": "", "Comment": "স-এর প্রথম খন্ড ২" },
-      "A_D_1H_1": { "Value": "#$E5", "Comment": "দ-এর প্রথম খন্ড ১" },
-      "A_C_1H": { "Value": "#$46", "Comment": "চ-এর প্রথম খন্ড" },
-      "A_NGA_1H": { "Value": "#$41", "Comment": "ঙ-এর প্রথম খন্ড" },
-      "A_N_1H_2": { "Value": "#$72", "Comment": "ন-এর প্রথম খন্ড ২" },
-      "A_D_1H_2": { "Value": "#$E5", "Comment": "দ-এর প্রথম খন্ড ২" }
-    },
-    "SecondHalfForms": {
-      "A_B_2H_1": { "Value": "#$BA", "Comment": "ব-এর দ্বিতীয় খন্ড ১" },
-      "A_B_2H_2": { "Value": "#$B5", "Comment": "ব-এর দ্বিতীয় খন্ড ২" },
-      "A_BH_2H": { "Value": "#$E4#$A6#$FE", "Comment": "ভ-এর দ্বিতীয় খন্ড" },
-      "A_BH_R_2H": { "Value": "", "Comment": "ভ্র-এর দ্বিতীয় খন্ড" },
-      "A_M_2H_1": { "Value": "#$C3", "Comment": "ম-এর দ্বিতীয় খন্ড ১" },
-      "A_B_2H_3": { "Value": "#$B4", "Comment": "ব-এর দ্বিতীয় খন্ড ৩" },
-      "A_M_2H_2": { "Value": "#$BF", "Comment": "ম-এর দ্বিতীয় খন্ড ২" },
-      "A_ZFola": { "Value": "#$C4", "Comment": "য-ফলা" },
-      "A_RFola_1": { "Value": "#$C9", "Comment": "র-ফলা ১" },
-      "A_RFola_2": { "Value": "#$CA", "Comment": "র-ফলা ২" },
-      "A_L_2H_1": { "Value": "#$D4", "Comment": "ল-এর দ্বিতীয় খন্ড ১" },
-      "A_L_2H_2": { "Value": "#$CD", "Comment": "ল-এর দ্বিতীয় খন্ড ২" },
-      "A_T_R_2H": { "Value": "", "Comment": "ত্র-এর দ্বিতীয় খন্ড" },
-      "A_RFola_3": { "Value": "#$D6", "Comment": "র-ফলা ৩" },
-      "A_Nn_2H_1": { "Value": "#$E4#$2019", "Comment": "ণ-এর দ্বিতীয় খন্ড ১" },
-      "A_K_R_2H": { "Value": "", "Comment": "ক্র-এর দ্বিতীয় খন্ড" },
-      "A_Nn_2H_2": { "Value": "#$AC", "Comment": "ণ-এর দ্বিতীয় খন্ড ২" },
-      "A_B_2H_4": { "Value": "#$B9", "Comment": "ব-এর দ্বিতীয় খন্ড ৪" },
-      "A_T_2H": { "Value": "#$201C#$00FE", "Comment": "ত-এর দ্বিতীয় খন্ড" },
-      "A_T_UKar_2H": { "Value": "", "Comment": "তু-এর দ্বিতীয় খন্ড" },
-      "A_Th_2H": { "Value": "", "Comment": "থ-এর দ্বিতীয় খন্ড" },
-      "A_K_2H": { "Value": "#$F1", "Comment": "ক-এর দ্বিতীয় খন্ড" },
-      "A_L_2H_3": { "Value": "#$CF", "Comment": "ল-এর দ্বিতীয় খন্ড ৩" }
-    }
-  },
-  "FullFormReplacements": [
-    { "Key": "#$09A8#$09CD#$09A4", "Value": "#$68#$73#$FE", "Comment": "ন্ত" },
-    { "Key": "#$09A8#$09CD#$09A5#$09CD#$09B0", "Value": "#$73#$FE#$69#$C9", "Comment": "ন্থ্র" },
-    { "Key": "#$09A8#$09CD#$09A7#$09CD#$09B0", "Value": "#$F5#$C9#$FE", "Comment": "ন্ধ্র" },
-    { "Key": "#$09B7#$09CD#$0995#$09CD#$09B0", "Value": "#$DC#$FE#$3B#$FE#$F9", "Comment": "ষ্ক্র" },
-    { "Key": "ক্রু", "Value": "e%«", "Comment": "ক্রু" },
-    { "Key": "ক্রূ", "Value": "e)«", "Comment": "ক্রূ" },
-    { "Key": "ক্রৃ", "Value": "e,«", "Comment": "ক্রৃ" },
-    { "Key": "#$099C#$09CD#$099E#$09C1", "Value": "#$4B#$FE#$25", "Comment": "জ্ঞু" },
-    { "Key": "#$099C#$09CD#$099E#$09C2", "Value": "#$4B#$FE#$29", "Comment": "জ্ঞূ" },
-    { "Key": "#$099C#$09CD#$099E#$09C3", "Value": "#$4B#$FE#$2C", "Comment": "জ্ঞৃ" },
-    { "Key": "#$09B8#$09CD#$09AC", "Value": "#$DF#$FE#$BA", "Comment": "স্ব" },
-    { "Key": "#$09B8#$09CD#$09AE", "Value": "#$DF#$FE#$BF", "Comment": "স্ম" },
-    { "Key": "#$09B8#$09CD#$09B0", "Value": "#$DF#$FE#$CB", "Comment": "স্র" },
-    { "Key": "#$09B8#$09CD#$09B2", "Value": "#$DF#$FE#$D4", "Comment": "স্ল" },
-    { "Key": "#$09DC#$09CD#$0997", "Value": "#$58#$2020", "Comment": "ড়্গ" },
-    { "Key": "#$09A8#$09CD#$09A4#$09CD#$09AC", "Value": "#$67#$73#$FE", "Comment": "ন্ত্ব" },
-    { "Key": "#$09B6#$09CD#$09B2", "Value": "#$D9#$D5", "Comment": "শ্ল" },
-    { "Key": "#$09B8#$09CD#$0995", "Value": "#$DF#$FE#$F1", "Comment": "স্ক" },
-    { "Key": "#$09B7#$09CD#$09AA", "Value": "#$DC#$2122", "Comment": "ষ্প" },
-    { "Key": "#$09B7#$09CD#$09AA#$09CD#$09B0", "Value": "#$DC#$B1", "Comment": "ষ্প্র" },
-    { "Key": "#$09B7#$09CD#$09AB", "Value": "#$DC#$B3#$FE", "Comment": "ষ্ফ" },
-    { "Key": "#$09AB#$09CD#$09B0", "Value": "#$0161#$CA#$FE", "Comment": "ফ্র" },
-    { "Key": "#$09B6#$09CD#$09A8", "Value": "#$D9#$C0", "Comment": "শ্ন" },
-    { "Key": "#$09AB#$09CD#$09B2", "Value": "#$0161#$CF#$FE", "Comment": "ফ্ল" },
-    { "Key": "#$09AD#$09CD#$09AC", "Value": "#$A6#$E4#$FE#$EE", "Comment": "ভ্ব" },
-    { "Key": "#$09AE#$09CD#$09AA#$09CD#$09B0", "Value": "#$C1#$B1", "Comment": "ম্প্র" },
-    { "Key": "#$09A8#$09CD#$09A4#$09CD#$09B0", "Value": "#$73#$FE#$66", "Comment": "ন্ত্র" },
-    { "Key": "#$099A#$09CD#$099B#$09CD#$09B0", "Value": "#$46#$0160#$E9#$C9", "Comment": "চ্ছ্র" },
-    { "Key": "#$099A#$09CD#$09AC", "Value": "#$2030#$B4#$FE", "Comment": "চ্ব" },
-    { "Key": "#$099F#$09CD#$09AC", "Value": "#$DD#$B4#$FE", "Comment": "ট্ব" },
-    { "Key": "#$099F#$09CD#$09B0", "Value": "#$DD#$FE#$C6", "Comment": "ট্র" },
-    { "Key": "#$09AE#$09CD#$09B0", "Value": "#$C1#$CB", "Comment": "ম্র" },
-    { "Key": "#$09A1#$09CD#$09AC", "Value": "#$76#$E4#$FE#$EE", "Comment": "ড্ব" },
-    { "Key": "#$09A1#$09CD#$09B0", "Value": "#$76#$C8#$FE", "Comment": "ড্র" },
-    { "Key": "#$09A8#$09CD#$09A1#$09CD#$09B0", "Value": "#$75#$C8#$FE", "Comment": "ন্ড্র" },
-    { "Key": "#$09B6#$09CD#$09AC", "Value": "#$D9#$BB", "Comment": "শ্ব" },
-    { "Key": "#$09B6#$09CD#$09AE", "Value": "#$D9#$C2", "Comment": "শ্ম" },
-    { "Key": "#$09A2#$09CD#$09B0", "Value": "#$2018#$FE#$C6", "Comment": "ঢ্র" },
-    { "Key": "#$09A8#$09CD#$099F", "Value": "#$72#$DD#$FE", "Comment": "ন্ট" },
-    { "Key": "#$09A8#$09CD#$09AE", "Value": "#$A7#$C3", "Comment": "ন্ম" },
-    { "Key": "#$09A4#$09CD#$09A4#$09CD#$09AC", "Value": "#$5F#$B4", "Comment": "ত্ত্ব" },
-    { "Key": "#$09A5#$09CD#$09AC", "Value": "#$ED#$B4", "Comment": "থ্ব" },
-    { "Key": "#$09A6#$0998", "Value": "#$E5#$2021", "Comment": "দঘ" },
-    { "Key": "ঘ্ন", "Value": "‡ø", "Comment": "ঘ্ন" },
-    { "Key": "#$09A3#$09CD#$09A2", "Value": "#$5E#$E9#$57", "Comment": "ণ্ঢ" },
-    { "Key": "#$09A8#$09CD#$09A0#$09CD#$09AF", "Value": "#$74#$FE#$C4", "Comment": "ন্ঠ্য" },
-    { "Key": "#$0995#$09CD#$09B2", "Value": "#$201E#$CF#$FE", "Comment": "ক্ল" },
-    { "Key": "#$0995#$09CD#$09B2#$09C1", "Value": "#$201E#$CF#$24#$FE", "Comment": "ক্লু" },
-    { "Key": "#$09B2#$09CD#$09AC", "Value": "#$CD#$BA", "Comment": "ল্ব" },
-    { "Key": "ল্ল", "Value": "#$CD#$D4", "Comment": "ল্ল" },
-    { "Key": "#$0999#$09CD#$0995#$09CD#$09A4", "Value": "#$02C6#$E4#$5F#$AB", "Comment": "ঙ্ক্ত" },
-    { "Key": "#$0999#$09CD#$0995#$09CD#$09AF", "Value": "#$42#$FE#$C4", "Comment": "ঙ্ক্য" },
-    { "Key": "#$09B8#$09CD#$09AA#$09CD#$09B0", "Value": "#$DF#$FE#$B1", "Comment": "স্প্র" },
-    { "Key": "#$0999#$09CD#$0995#$09CD#$09B7", "Value": "#$41#$C7#$FE", "Comment": "ঙ্ক্ষ" },
-    { "Key": "#$099A#$09CD#$099B#$09CD#$09AC", "Value": "#$46#$0160#$B4#$E9", "Comment": "চ্ছ্ব" },
-    { "Key": "#$0995#$09CD#$09B7#$09CD#$09A3", "Value": "#$C7#$F8#$FE", "Comment": "ক্ষ্ণ" },
-    { "Key": "#$0997#$09CD#$09A8", "Value": "#$40#$C0", "Comment": "গ্ন" },
-    { "Key": "#$09A3#$09CD#$09AC", "Value": "#$5E#$E9#$BB", "Comment": "ণ্ব" },
-    { "Key": "#$09A8#$09CD#$09A8", "Value": "#$A7#$AC", "Comment": "ন্ন" },
-    { "Key": "#$09AA#$09CD#$09A8", "Value": "#$B2#$C0", "Comment": "প্ন" },
-    { "Key": "#$09B2#$09CD#$09AE", "Value": "#$CD#$C3", "Comment": "ল্ম" },
-    { "Key": "#$09A8#$09CD#$09AC", "Value": "#$A7#$BA", "Comment": "ন্ব" },
-    { "Key": "#$0997#$09CD#$09AC", "Value": "#$40#$BB", "Comment": "গ্ব" },
-    { "Key": "#$0997#$09CD#$09AE", "Value": "#$40#$C2", "Comment": "গ্ম" },
-    { "Key": "#$0997#$09CD#$09B2", "Value": "#$40#$D5", "Comment": "গ্ল" },
-    { "Key": "#$0995#$09CD#$09B7#$09CD#$09A8", "Value": "#$C7#$E4#$FE#$02DC", "Comment": "ক্ষ্ন" },
-    { "Key": "#$0995#$09CD#$09B7#$09CD#$09AC", "Value": "#$C7#$B4#$FE", "Comment": "ক্ষ্ব" },
-    { "Key": "#$0995#$09CD#$09B7#$09CD#$09AE", "Value": "#$22", "Comment": "ক্ষ্ম" },
-    { "Key": "#$0997#$09CD#$09A3", "Value": "#$2020#$E4#$2019", "Comment": "গ্ণ" },
-    { "Key": "#$0997#$09CD#$09A7#$09CD#$09AF", "Value": "#$3F#$FE#$C4", "Comment": "গ্ধ্য" },
-    { "Key": "#$09B8#$09CD#$09A4#$09CD#$09B0", "Value": "#$DF#$FE#$66", "Comment": "স্ত্র" },
-    { "Key": "#$0995#$09CD#$099F#$09CD#$09B0", "Value": "#$51#$C9", "Comment": "ক্ট্র" },
-    { "Key": "#$09B8#$09CD#$09A4#$09C1", "Value": "#$6C#$DF#$FE", "Comment": "স্তু" },
-    { "Key": "#$09B8#$09CD#$09A4", "Value": "#$68#$DF#$FE", "Comment": "স্ত" },
-    { "Key": "#$09B8#$09CD#$09A4#$09CD#$09AC", "Value": "#$67#$DF#$FE", "Comment": "স্ত্ব" },
-    { "Key": "#$0997#$09CD#$09B0", "Value": "#$40#$F9#$CC", "Comment": "গ্র" },
-    { "Key": "#$09AA#$09CD#$09B0", "Value": "#$B2#$CC", "Comment": "প্র" },
-    { "Key": "#$09B8#$09CD#$09A5", "Value": "#$DF#$FE#$69", "Comment": "স্থ" },
-    { "Key": "#$099E#$09C1", "Value": "#$7E#$25#$0152", "Comment": "ঞু" },
-    { "Key": "#$0999#$09CD#$09AE", "Value": "#$2D", "Comment": "ঙ্ম → #$2D" },
-    { "Key": "#$0999#$09CD#$0996", "Value": "#$43", "Comment": "ঙ্খ → #$43" },
-    { "Key": "#$099C#$09CD#$09B0", "Value": "#$4C", "Comment": "জ্র → #$4C" },
-    { "Key": "#$09BC#$09C1", "Value": "#$59", "Comment": "়ু → #$59" },
-    { "Key": "#$09A3#$09CD#$09A1#$09CD#$09B0", "Value": "#$5B#$C8#$FE", "Comment": "ণ্ড্র" },
-    { "Key": "#$09A3#$09CD#$09A3", "Value": "#$5D", "Comment": "ণ্ণ → #$5D" },
-    { "Key": "#$0995#$09CD#$09A4#$09CD#$09B0", "Value": "#$60", "Comment": "ক্ত্র → #$60" },
-    { "Key": "#$09A4#$09CD#$09A8", "Value": "#$62", "Comment": "ত্ন → #$62" },
-    { "Key": "#$09A4#$09CD#$09AC", "Value": "#$63", "Comment": "ত্ব → #$63" },
-    { "Key": "#$09A6#$09CD#$09AD", "Value": "#$71", "Comment": "দ্ভ → #$71" },
-    { "Key": "#$09A8#$09CD#$09A0", "Value": "#$74#$FE", "Comment": "ন্ঠ → #$74" },
-    { "Key": "#$09A8#$09CD#$09A6#$09CD#$09B0", "Value": "#$77", "Comment": "ন্দ্র → #$77" },
-    { "Key": "#$09B2#$09CD#$0997#$09C1", "Value": "#$20AC", "Comment": "ল্গু → #$20AC" },
-    { "Key": "#$09AB#$09CD#$099F", "Value": "#$81", "Comment": "ফ্ট → #$81" },
-    { "Key": "#$09AC#$09CD#$09AD", "Value": "#$8D", "Comment": "ব্ভ → #$8D" },
-    { "Key": "#$099A#$09CD#$099E", "Value": "#$8E", "Comment": "চ্ঞ → #$8E" },
-    { "Key": "#$099F#$09CD#$09AE", "Value": "#$8F", "Comment": "ট্ম → #$8F" },
-    { "Key": "#$09A7#$09CD#$09AE", "Value": "#$90", "Comment": "ধ্ম → #$90" },
-    { "Key": "ধ্ন", "Value": "•ø", "Comment": "ধ্ন" },
-    { "Key": "ধ্র", "Value": "•Ê", "Comment": "ধ্র" },
-    { "Key": "#$09A6#$09CD#$09AD#$09CD#$09B0", "Value": "#$9E", "Comment": "দ্ভ্র → #$9E" },
-    { "Key": "দ্র", "Value": "#$6F", "Comment": "দ্র" },
-    { "Key": "#$09AC#$09CD#$09A6", "Value": "#$2219", "Comment": "ব্দ → #$2219" },
-    { "Key": "#$09AE#$09CD#$09AD", "Value": "#$BD", "Comment": "ম্ভ → #$BD" },
-    { "Key": "#$09AE#$09CD#$09AD#$09CD#$09B0", "Value": "#$BE", "Comment": "ম্ভ্র → #$BE" },
-    { "Key": "#$09B6#$09CD#$09B0", "Value": "#$D7", "Comment": "শ্র → #$D7" },
-    { "Key": "#$09B9#$09CD#$09B2", "Value": "#$E2", "Comment": "হ্ল → #$E2" },
-    { "Key": "#$09B9#$09CD#$09A3", "Value": "#$E3", "Comment": "হ্ণ → #$E3" },
-    { "Key": "#$0995#$09CD#$09AC", "Value": "#$F0", "Comment": "ক্ব → #$F0" }
-  ],
-  "PreReplacements": [
-    { "Key": "#$09CD#$0964", "Value": "#$FF", "Comment": "্। থেকে সরাসরি ব্যাকস্ল্যাশ" },
-    { "Key": "#$0021", "Value": "#$E6", "Comment": "!" },
-    { "Key": "#$002A", "Value": "#$A0", "Comment": "*" },
-    { "Key": "#$003B", "Value": "#$2014", "Comment": ";" },
-    { "Key": "#$002C", "Value": "#$2013", "Comment": "," },
-    { "Key": "#$003F", "Value": "#$DA", "Comment": "?" },
-    { "Key": "#$003A", "Value": "#$AD", "Comment": ":" }
-  ],
-  "PostReplacements": [
-    { "Key": "#$FE#{A_UKar1}", "Value": "#{A_UKar1}#$FE", "Comment": "FE কানেক্টর + উ-কার ১ → আদর্শ ক্রম" },
-    { "Key": "#$FE#{A_UKar2}", "Value": "#{A_UKar2}#$FE", "Comment": "FE কানেক্টর + উ-কার ২ → আদর্শ ক্রম" },
-    { "Key": "#$FE#{A_UKar4}", "Value": "#{A_UKar4}#$FE", "Comment": "FE কানেক্টর + উ-কার ৪ → আদর্শ ক্রম" },
-    { "Key": "#$FE#{A_UUKar1}", "Value": "#{A_UUKar1}#$FE", "Comment": "FE কানেক্টর + ঊ-কার ১ → আদর্শ ক্রম" },
-    { "Key": "#$FE#{A_UUKar2}", "Value": "#{A_UUKar2}#$FE", "Comment": "FE কানেক্টর + ঊ-কার ২ → আদর্শ ক্রম" },
-    { "Key": "#$FE#{A_UUKar3}", "Value": "#{A_UUKar3}#$FE", "Comment": "FE কানেক্টর + ঊ-কার ৩ → আদর্শ ক্রম" },
-    { "Key": "#$E9#{A_UKar1}", "Value": "#{A_UKar1}#$E9", "Comment": "E9 কানেক্টর + উ-কার ১ → আদর্শ ক্রম" },
-    { "Key": "#$E9#{A_UKar2}", "Value": "#{A_UKar2}#$E9", "Comment": "E9 কানেক্টর + উ-কার ২ → আদর্শ ক্রম" },
-    { "Key": "#$E9#{A_UKar4}", "Value": "#{A_UKar4}#$E9", "Comment": "E9 কানেক্টর + উ-কার ৪ → আদর্শ ক্রম" },
-    { "Key": "#$E9#{A_UUKar1}", "Value": "#{A_UUKar1}#$E9", "Comment": "E9 কানেক্টর + ঊ-কার ১ → আদর্শ ক্রম" },
-    { "Key": "#$E9#{A_UUKar2}", "Value": "#{A_UUKar2}#$E9", "Comment": "E9 কানেক্টর + ঊ-কার ২ → আদর্শ ক্রম" },
-    { "Key": "#$E9#{A_UUKar3}", "Value": "#{A_UUKar3}#$E9", "Comment": "E9 কানেক্টর + ঊ-কার ৩ → আদর্শ ক্রম" },
-    { "Key": "#$FE#{A_RRIKar1}", "Value": "#{A_RRIKar1}#$FE", "Comment": "FE কানেক্টর + ঋ-কার → আদর্শ ক্রম" },
-    { "Key": "#$E9#{A_RRIKar1}", "Value": "#{A_RRIKar1}#$E9", "Comment": "E9 কানেক্টর + ঋ-কার → আদর্শ ক্রম" },
-    { "Key": "#{A_RFola_2}#{A_UKar2}", "Value": "#{A_UKar2}#{A_RFola_2}", "Comment": "AB কানেক্টর + উ-কার ১ও২ → আদর্শ ক্রম" },
-    { "Key": "#{A_RFola_2}#{A_UUKar2}", "Value": "#{A_UUKar2}#{A_RFola_2}", "Comment": "AB কানেক্টর + ঊ-কার ১ও২ → আদর্শ ক্রম" },
-    { "Key": "#{A_D_D}#{A_UKar2}", "Value": "#{A_UKar2}#{A_D_D}", "Comment": "CF কানেক্টর + উ-কার ১ও২ → আদর্শ ক্রম" },
-    { "Key": "þÅ,", "Value": ",þÅ", "Comment": "Thron+Reph+Ree → Ree+Thron+Reph" },
-    { "Key": "Èþ#$2C", "Value": "Èþ$2B", "Comment": "" },
-    { "Key": "þ$2B", "Value": "$2Bþ", "Comment": "" },
-    { "Key": "Ï%", "Value": "Ï$", "Comment": "" },
-    { "Key": "È%þ", "Value": "Èþ$", "Comment": "" },
-    { "Key": "È)þ", "Value": "Èþ(", "Comment": "" },
-    { "Key": "Èþ,", "Value": "Èþ+", "Comment": "" },
-    { "Key": "#$C8#$24#$FE", "Value": "#$C8#$FE#$24", "Comment": "Ere+Reph+Ree → Ree+Ere+Reph" },
-    { "Key": "È(þ", "Value": "Èþ(", "Comment": "" },
-    { "Key": "È,þ", "Value": "Èþ,", "Comment": "" },
-    { "Key": "#$C6#$25", "Value": "#$C6#$24", "Comment": "Æ% → Æ$ (BelowBaseVariant Ukar fix)" },
-    { "Key": "#$C6#$29", "Value": "#$C6#$28", "Comment": "Æ) → Æ( (BelowBaseVariant UUKar fix)" }
-  ],
-  "VowelRules": {
-    "#$09C1": {
-      "default": "#{A_UKar1}",
-      "toggle": "both",
-      "mappings": [
-        { "consonants": "#$09B0", "value": "#{A_UKar4}", "alt": "#{A_UKar2}" },
-        { "consonants": "BelowBaseVariant", "value": "#$0024" },
-        { "consonants": "RuClusters", "value": "#{A_UKar4}", "alt": "#{A_UKar1}" },
-        { "consonants": "RaPhalas", "value": "#{A_UKar2}" },
-        { "consonants": "BaseLineRight", "value": "#{A_UKar1}" }
-      ]
-    },
-    "#$09C2": {
-      "default": "#{A_UUKar1}",
-      "toggle": "both",
-      "mappings": [
-        { "consonants": "#$09B0", "value": "#{A_UUKar3}", "alt": "#{A_UUKar2}" },
-        { "consonants": "BelowBaseVariant", "value": "#$0028" },
-        { "consonants": "RuClusters", "value": "#{A_UUKar3}", "alt": "#{A_UUKar1}" },
-        { "consonants": "RaPhalas", "value": "#{A_UUKar2}" },
-        { "consonants": "BaseLineRight", "value": "#{A_UUKar1}" }
-      ]
-    },
-    "#$09C3": {
-      "default": "#{A_RRIKar1}",
-      "mappings": [
-        { "consonants": "RuClusters", "value": "#{A_RRIKar1}" },
-        { "consonants": "RaPhalas", "value": "#{A_RRIKar1}" },
-        { "consonants": "BaseLineRight", "value": "#{A_RRIKar1}" },
-        { "consonants": "BelowBaseVariant", "value": "#{A_RRIKar2}" }
-      ]
-    }
-  },
-  "AnsiGroups": {
-    "RaPhalas": ["#$C6", "#$C8", "#$C9", "#$CA", "#$CB", "#$CC"],
-    "Connectors": ["#$FE", "#$E9"]
-  },
-  "ConsonantGroups": {
-    "BelowBaseVariant": ["ট্র", "ড্র", "ঢ্র"],
-    "RuClusters": ["#$0997#$09CD#$09B0", "#$0998#$09CD#$09B0", "#$09A4#$09CD#$09B0", "#$09A6#$09CD#$09B0", "#$09A7#$09CD#$09B0", "#$09A8#$09CD#$09B0", "#$09AA#$09CD#$09B0", "#$09AC#$09CD#$09B0", "#$09AD#$09CD#$09B0", "#$09AE#$09CD#$09B0", "#$09B6#$09CD#$09B0", "#$09B7#$09CD#$09B0", "#$09B8#$09CD#$09B0", "#$09B9#$09CD#$09B0"],
-    "BaseLineRight": ["খ", "গ", "ঘ", "ণ", "থ", "দ", "ধ", "ন", "প", "ব", "ম", "য", "র", "ল", "শ", "ষ", "স", "হ", "য়", "#{A_K_Ss_M}", "#{A_K_M}", "#{A_K_Ss}", "#{A_K_S}", "#{A_G_G}", "#{A_G_D}", "#{A_G_Dh}", "#{A_NGA_G}", "#{A_T_Th}", "#{A_T_M}", "#{A_D_D}", "#{A_D_Dh}", "#{A_D_B}", "#{A_D_M}", "#{A_N_Tth}", "#{A_N_Dh}", "#{A_N_S}", "#{A_P_P}", "#{A_P_S}", "#{A_B_D}", "#{A_B_Dh}", "#{A_Bh_R}", "#{A_M_N}", "#{A_L_G}", "#{A_L_P}", "#{A_Ss_Nn}", "#{A_S_Kh}", "#{A_S_N}", "#{A_H_N}", "#{A_H_M}", "#{A_Rr_G}"]
-  }
-};
+      "Constants": {
+        "Numbers": {
+          "A_0": { "Value": "#$0030", "Comment": "০" },
+          "A_1": { "Value": "#$0031", "Comment": "১" },
+          "A_2": { "Value": "#$0032", "Comment": "২" },
+          "A_3": { "Value": "#$0033", "Comment": "৩" },
+          "A_4": { "Value": "#$0034", "Comment": "৪" },
+          "A_5": { "Value": "#$0035", "Comment": "৫" },
+          "A_6": { "Value": "#$0036", "Comment": "৬" },
+          "A_7": { "Value": "#$0037", "Comment": "৭" },
+          "A_8": { "Value": "#$0038", "Comment": "৮" },
+          "A_9": { "Value": "#$0039", "Comment": "৯" }
+        },
+        "VowelsAndKars": {
+          "A_A": { "Value": "#$0078", "Comment": "অ" },
+          "A_AA": { "Value": "#$0078#$0079", "Comment": "আ" },
+          "A_AAKar": { "Value": "#$0079", "Comment": "া (আ-কার)" },
+          "A_I": { "Value": "#$A3#$7A", "Comment": "ই" },
+          "A_IKar": { "Value": "#$21", "Comment": "ি (ই-কার)" },
+          "A_II": { "Value": "#$007B", "Comment": "ঈ" },
+          "A_IIKar": { "Value": "#$23", "Comment": "ী (ঈ-কার)" },
+          "A_U": { "Value": "#$0076#$00FE#$007A", "Comment": "উ" },
+          "A_UKar2": { "Value": "#$24", "Comment": "ু (উ-কার ২ - ঝুলন্ত)" },
+          "A_UKar1": { "Value": "#$25", "Comment": "ু (উ-কার ১ - সাধারণ)" },
+          "A_UKar3": { "Value": "#$59", "Comment": "ু (উ-কার ৩ - ড়ু/ঢ়ু)" },
+          "A_UKar4": { "Value": "#$26", "Comment": "ু (উ-কার ৪ - রু)" },
+          "A_UU": { "Value": "#$7C", "Comment": "ঊ" },
+          "A_UUKar2": { "Value": "#$28", "Comment": "ূ (ঊ-কার ২ - ঝুলন্ত)" },
+          "A_UUKar1": { "Value": "#$29", "Comment": "ূ (ঊ-কার ১ - সাধারণ)" },
+          "A_UUKar3": { "Value": "#$2A", "Comment": "ূ (ঊ-কার ৩ - রূ)" },
+          "A_RRI": { "Value": "#$007D", "Comment": "ঋ" },
+          "A_RRIKar1": { "Value": "#$2C", "Comment": "ৃ (ঋ-কার ১)" },
+          "A_RRIKar2": { "Value": "#$2B", "Comment": "ৃ (ঋ-কার ২)" },
+          "A_E": { "Value": "#$007E", "Comment": "এ" },
+          "A_EKar1": { "Value": "#$F6", "Comment": "ে (এ-কার ১ - সাধারণ)" },
+          "A_EKar2": { "Value": "#$F6#$EC", "Comment": "ে (এ-কার ২ - ঝুলন্ত)" },
+          "A_OI": { "Value": "#$00FA", "Comment": "ঐ" },
+          "A_OIKar1": { "Value": "#$F7", "Comment": "ৈ (ঐ-কার ১ - সাধারণ)" },
+          "A_OIKar2": { "Value": "#$F7#$EC", "Comment": "ৈ (ঐ-কার ২ - ঝুলন্ত)" },
+          "A_O": { "Value": "#$00E7", "Comment": "ও" },
+          "A_OU": { "Value": "#$00E8", "Comment": "ঔ" },
+          "A_OUKar": { "Value": "#$EF", "Comment": "ৌ (ঔ-কার)" }
+        },
+        "Symbols": {
+          "A_Taka": { "Value": "", "Comment": "৳ (টাকা)" },
+          "A_Dari": { "Value": "#$D0", "Comment": "। (দাঁড়ি)" },
+          "A_DoubleDanda": { "Value": "", "Comment": "॥ (দ্বিত্ব দাঁড়ি)" },
+          "A_Hasanta": { "Value": "#$E4", "Comment": "্ (হসন্ত)" },
+          "A_StartDoubleQuote": { "Value": "#$F2#$F2", "Comment": "\" (উদ্ধৃতি শুরু)" },
+          "A_EndDoubleQuote": { "Value": "#$F3#$F3", "Comment": "\" (উদ্ধৃতি শেষ)" },
+          "A_StartSingleQuote": { "Value": "#$F2", "Comment": "' (একক উদ্ধৃতি শুরু)" },
+          "A_EndSingleQuote": { "Value": "#$F3", "Comment": "' (একক উদ্ধৃতি শেষ)" }
+        },
+        "Consonants": {
+          "A_K": { "Value": "#$201E#$FE", "Comment": "ক" },
+          "A_Kh": { "Value": "#$2026", "Comment": "খ" },
+          "A_G": { "Value": "#$2020", "Comment": "গ" },
+          "A_Gh": { "Value": "#$2021", "Comment": "ঘ" },
+          "A_NGA": { "Value": "#$02C6", "Comment": "ঙ" },
+          "A_C": { "Value": "#$2030#$00FE", "Comment": "চ" },
+          "A_Ch": { "Value": "#$0160#$00E9", "Comment": "ছ" },
+          "A_J": { "Value": "#$2039", "Comment": "জ" },
+          "A_Jh": { "Value": "#$0047#$00FE", "Comment": "ঝ" },
+          "A_NYA": { "Value": "#$007E#$0152", "Comment": "ঞ" },
+          "A_Tt": { "Value": "#$00DD#$00FE", "Comment": "ট" },
+          "A_Tth": { "Value": "#$00E0#$00FE", "Comment": "ঠ" },
+          "A_Dd": { "Value": "#$0076#$00FE", "Comment": "ড" },
+          "A_Ddh": { "Value": "#$2018#$00FE", "Comment": "ঢ" },
+          "A_Nn": { "Value": "#$2019", "Comment": "ণ" },
+          "A_T": { "Value": "#$201C#$00FE", "Comment": "ত" },
+          "A_Th": { "Value": "#$00ED", "Comment": "থ" },
+          "A_D": { "Value": "#$201D", "Comment": "দ" },
+          "A_Dh": { "Value": "#$2022", "Comment": "ধ" },
+          "A_N": { "Value": "#$02DC", "Comment": "ন" },
+          "A_P": { "Value": "#$00FE#$2122", "Comment": "প" },
+          "A_Ph": { "Value": "#$0161#$00FE", "Comment": "ফ" },
+          "A_B": { "Value": "#$00EE", "Comment": "ব" },
+          "A_Bh": { "Value": "#$00A6#$00FE", "Comment": "ভ" },
+          "A_M": { "Value": "#$203A", "Comment": "ম" },
+          "A_Z": { "Value": "#$00EB", "Comment": "য" },
+          "A_R": { "Value": "#$00EE#$00FB", "Comment": "র" },
+          "A_L": { "Value": "#$0153", "Comment": "ল" },
+          "A_Sh": { "Value": "#$0178", "Comment": "শ" },
+          "A_SS": { "Value": "#$00A1#$00EC", "Comment": "ষ" },
+          "A_S": { "Value": "#$00A2", "Comment": "স" },
+          "A_H": { "Value": "#$00A3", "Comment": "হ" },
+          "A_RR": { "Value": "#$0076#$00FE#$00FC", "Comment": "ড়" },
+          "A_RRH": { "Value": "#$2018#$00FE#$00FC", "Comment": "ঢ়" },
+          "A_Y": { "Value": "#$00EB#$00FB", "Comment": "য়" },
+          "A_Khandata": { "Value": "#$00EA", "Comment": "ৎ" },
+          "A_Anushar": { "Value": "#$201A", "Comment": "ং" },
+          "A_Bisharga": { "Value": "#$0192", "Comment": "ঃ" },
+          "A_Chandra": { "Value": "#$00A4", "Comment": "ঁ" }
+        },
+        "FullForms": {
+          "A_K_K": { "Value": "#$45#$FE", "Comment": "ক্ক" },
+          "A_K_Tt": { "Value": "#$51", "Comment": "ক্ট" },
+          "A_K_Ss_M": { "Value": "#$3A#$E4#$203A", "Comment": "ক্স্ম" },
+          "A_K_T": { "Value": "#$5F#$AB", "Comment": "ক্ত" },
+          "A_K_M": { "Value": "#$A9", "Comment": "ক্ম" },
+          "A_K_R": { "Value": "#$65#$AB", "Comment": "ক্র" },
+          "A_K_Ss": { "Value": "#$C7#$FE", "Comment": "ক্ষ" },
+          "A_K_S": { "Value": "#$3A", "Comment": "ক্স" },
+          "A_G_Ukar": { "Value": "#$3D", "Comment": "গু" },
+          "A_G_G": { "Value": "#$3E", "Comment": "গ্গ" },
+          "A_G_D": { "Value": "#$40#$201D", "Comment": "গ্দ" },
+          "A_G_Dh": { "Value": "#$3F#$FE", "Comment": "গ্ধ" },
+          "A_NGA_K": { "Value": "#$42#$FE", "Comment": "ঙ্ক" },
+          "A_NGA_G": { "Value": "#$44", "Comment": "ঙ্গ" },
+          "A_J_J": { "Value": "#$49", "Comment": "জ্জ" },
+          "A_J_Jh": { "Value": "#$4A", "Comment": "জ্ঝ" },
+          "A_J_NYA": { "Value": "#$4B#$FE", "Comment": "জ্ঞ" },
+          "A_NYA_C": { "Value": "#$4D#$FE", "Comment": "ঞ্চ" },
+          "A_NYA_CH": { "Value": "#$4E#$FE", "Comment": "ঞ্ছ" },
+          "A_NYA_J": { "Value": "#$4F", "Comment": "ঞ্জ" },
+          "A_NYA_Jh": { "Value": "#$50", "Comment": "ঞ্ঝ" },
+          "A_Tt_Tt": { "Value": "#$52", "Comment": "ট্ট" },
+          "A_Dd_Dd": { "Value": "#$55#$FE", "Comment": "ড্ড" },
+          "A_Nn_Tt": { "Value": "#$5E#$F9#$DD#$FE", "Comment": "ণ্ট" },
+          "A_Nn_Tth": { "Value": "#$5A#$FE", "Comment": "ণ্ঠ" },
+          "A_NN_Dd": { "Value": "#$5B#$FE", "Comment": "ণ্ড" },
+          "A_T_T": { "Value": "#$5F", "Comment": "ত্ত" },
+          "A_T_Th": { "Value": "#$61", "Comment": "ত্থ" },
+          "A_T_M": { "Value": "#$64", "Comment": "ত্ম" },
+          "A_T_R": { "Value": "#$65", "Comment": "ত্র" },
+          "A_D_D": { "Value": "#$6A", "Comment": "দ্দ" },
+          "A_D_Dh": { "Value": "#$6B#$FE", "Comment": "দ্ধ" },
+          "A_D_B": { "Value": "#$6D", "Comment": "দ্ব" },
+          "A_D_M": { "Value": "#$70", "Comment": "দ্ম" },
+          "A_N_Tth": { "Value": "#$73#$FE#$69", "Comment": "ন্থ" },
+          "A_N_Dd": { "Value": "#$75#$FE", "Comment": "ন্ড" },
+          "A_N_Dh": { "Value": "#$F5#$FE", "Comment": "ন্ধ" },
+          "A_N_S": { "Value": "#$AA", "Comment": "ন্স" },
+          "A_P_Tt": { "Value": "#$B2#$57#$7A", "Comment": "প্ট" },
+          "A_P_T": { "Value": "#$AE", "Comment": "প্ত" },
+          "A_P_P": { "Value": "#$AF", "Comment": "প্প" },
+          "A_P_S": { "Value": "#$B0", "Comment": "প্স" },
+          "A_B_J": { "Value": "#$B6", "Comment": "ব্জ" },
+          "A_B_D": { "Value": "#$B7#$2219", "Comment": "ব্দ" },
+          "A_B_Dh": { "Value": "#$B8#$FE", "Comment": "ব্ধ" },
+          "A_Bh_R": { "Value": "#$BC", "Comment": "ভ্র" },
+          "A_M_N": { "Value": "#$C1#$AC", "Comment": "ম্ন" },
+          "A_M_Ph": { "Value": "#$C1#$B3#$FE", "Comment": "ম্ফ" },
+          "A_L_K": { "Value": "#$CD#$F1", "Comment": "ল্ক" },
+          "A_L_G": { "Value": "#$D1", "Comment": "ল্গ" },
+          "A_L_Tt": { "Value": "#$CE#$DD#$FE", "Comment": "ল্ট" },
+          "A_L_Dd": { "Value": "#$D3#$FE", "Comment": "ল্ড" },
+          "A_L_P": { "Value": "#$D2", "Comment": "ল্প" },
+          "A_L_Ph": { "Value": "#$CD#$B3#$FE", "Comment": "ল্ফ" },
+          "A_Sh_UKar": { "Value": "#$D6", "Comment": "শু" },
+          "A_Sh_C": { "Value": "#$D8#$FE", "Comment": "শ্চ" },
+          "A_Sh_Ch": { "Value": "#$D9#$0160#$E9", "Comment": "শ্ছ" },
+          "A_Ss_Nn": { "Value": "#$A1#$0152", "Comment": "ষ্ণ" },
+          "A_Ss_Tt": { "Value": "#$DC#$54", "Comment": "ষ্ট" },
+          "A_Ss_Tth": { "Value": "#$DB#$FE", "Comment": "ষ্ঠ" },
+          "A_Ss_Ph": { "Value": "#$DF#$FE#$B3#$FE", "Comment": "স্ফ" },
+          "A_S_Kh": { "Value": "#$DF#$FE#$3C", "Comment": "স্খ" },
+          "A_S_Tt": { "Value": "#$DE#$DD#$FE", "Comment": "স্ট" },
+          "A_S_N": { "Value": "#$DF#$FE#$AC", "Comment": "স্ন" },
+          "A_S_Ph": { "Value": "#$DF#$FE#$B3#$FE", "Comment": "স্ফ" },
+          "A_H_UKar": { "Value": "#$FD", "Comment": "হু" },
+          "A_H_RRIKar": { "Value": "#$A3#$2A", "Comment": "হৃ" },
+          "A_H_N": { "Value": "#$A3#$AB", "Comment": "হ্ন" },
+          "A_H_M": { "Value": "#$E1#$FE", "Comment": "হ্ম" },
+          "A_Rr_G": { "Value": "#$2020#$C5", "Comment": "র্গ" }
+        },
+        "FirstHalfForms": {
+          "A_Reph": { "Value": "#$C5", "Comment": "(র-এর রেফ)" },
+          "A_M_1H": { "Value": "#$C1", "Comment": "ম-এর প্রথম খন্ড" },
+          "A_Ss_1H": { "Value": "#$DC", "Comment": "ষ-এর প্রথম খন্ড" },
+          "A_S_1H_1": { "Value": "#$DF", "Comment": "স-এর প্রথম খন্ড ১" },
+          "A_N_1H_1": { "Value": "#$A7", "Comment": "ন-এর প্রথম খন্ড ১" },
+          "A_S_1H_2": { "Value": "", "Comment": "স-এর প্রথম খন্ড ২" },
+          "A_D_1H_1": { "Value": "#$E5", "Comment": "দ-এর প্রথম খন্ড ১" },
+          "A_C_1H": { "Value": "#$46", "Comment": "চ-এর প্রথম খন্ড" },
+          "A_NGA_1H": { "Value": "#$41", "Comment": "ঙ-এর প্রথম খন্ড" },
+          "A_N_1H_2": { "Value": "#$72", "Comment": "ন-এর প্রথম খন্ড ২" },
+          "A_D_1H_2": { "Value": "#$E5", "Comment": "দ-এর প্রথম খন্ড ২" }
+        },
+        "SecondHalfForms": {
+          "A_B_2H_1": { "Value": "#$BA", "Comment": "ব-এর দ্বিতীয় খন্ড ১" },
+          "A_B_2H_2": { "Value": "#$B5", "Comment": "ব-এর দ্বিতীয় খন্ড ২" },
+          "A_BH_2H": { "Value": "#$E4#$A6#$FE", "Comment": "ভ-এর দ্বিতীয় খন্ড" },
+          "A_BH_R_2H": { "Value": "", "Comment": "ভ্র-এর দ্বিতীয় খন্ড" },
+          "A_M_2H_1": { "Value": "#$C3", "Comment": "ম-এর দ্বিতীয় খন্ড ১" },
+          "A_B_2H_3": { "Value": "#$B4", "Comment": "ব-এর দ্বিতীয় খন্ড ৩" },
+          "A_M_2H_2": { "Value": "#$BF", "Comment": "ম-এর দ্বিতীয় খন্ড ২" },
+          "A_ZFola": { "Value": "#$C4", "Comment": "য-ফলা" },
+          "A_RFola_1": { "Value": "#$C9", "Comment": "র-ফলা ১" },
+          "A_RFola_2": { "Value": "#$CA", "Comment": "র-ফলা ২" },
+          "A_L_2H_1": { "Value": "#$D4", "Comment": "ল-এর দ্বিতীয় খন্ড ১" },
+          "A_L_2H_2": { "Value": "#$CD", "Comment": "ল-এর দ্বিতীয় খন্ড ২" },
+          "A_T_R_2H": { "Value": "", "Comment": "ত্র-এর দ্বিতীয় খন্ড" },
+          "A_RFola_3": { "Value": "#$D6", "Comment": "র-ফলা ৩" },
+          "A_Nn_2H_1": { "Value": "#$E4#$2019", "Comment": "ণ-এর দ্বিতীয় খন্ড ১" },
+          "A_K_R_2H": { "Value": "", "Comment": "ক্র-এর দ্বিতীয় খন্ড" },
+          "A_Nn_2H_2": { "Value": "#$AC", "Comment": "ণ-এর দ্বিতীয় খন্ড ২" },
+          "A_B_2H_4": { "Value": "#$B9", "Comment": "ব-এর দ্বিতীয় খন্ড ৪" },
+          "A_T_2H": { "Value": "#$201C#$00FE", "Comment": "ত-এর দ্বিতীয় খন্ড" },
+          "A_T_UKar_2H": { "Value": "", "Comment": "তু-এর দ্বিতীয় খন্ড" },
+          "A_Th_2H": { "Value": "", "Comment": "থ-এর দ্বিতীয় খন্ড" },
+          "A_K_2H": { "Value": "#$F1", "Comment": "ক-এর দ্বিতীয় খন্ড" },
+          "A_L_2H_3": { "Value": "#$CF", "Comment": "ল-এর দ্বিতীয় খন্ড ৩" }
+        }
+      },
+      "FullFormReplacements": [
+        { "Key": "#$09A8#$09CD#$09A4", "Value": "#$68#$73#$FE", "Comment": "ন্ত" },
+        { "Key": "#$09A8#$09CD#$09A5#$09CD#$09B0", "Value": "#$73#$FE#$69#$C9", "Comment": "ন্থ্র" },
+        { "Key": "#$09A8#$09CD#$09A7#$09CD#$09B0", "Value": "#$F5#$C9#$FE", "Comment": "ন্ধ্র" },
+        { "Key": "#$09B7#$09CD#$0995#$09CD#$09B0", "Value": "#$DC#$FE#$3B#$FE#$F9", "Comment": "ষ্ক্র" },
+        { "Key": "ক্রু", "Value": "e%«", "Comment": "ক্রু" },
+        { "Key": "ক্রূ", "Value": "e)«", "Comment": "ক্রূ" },
+        { "Key": "ক্রৃ", "Value": "e,«", "Comment": "ক্রৃ" },
+        { "Key": "#$099C#$09CD#$099E#$09C1", "Value": "#$4B#$FE#$25", "Comment": "জ্ঞু" },
+        { "Key": "#$099C#$09CD#$099E#$09C2", "Value": "#$4B#$FE#$29", "Comment": "জ্ঞূ" },
+        { "Key": "#$099C#$09CD#$099E#$09C3", "Value": "#$4B#$FE#$2C", "Comment": "জ্ঞৃ" },
+        { "Key": "#$09B8#$09CD#$09AC", "Value": "#$DF#$FE#$BA", "Comment": "স্ব" },
+        { "Key": "#$09B8#$09CD#$09AE", "Value": "#$DF#$FE#$BF", "Comment": "স্ম" },
+        { "Key": "#$09B8#$09CD#$09B0", "Value": "#$DF#$FE#$CB", "Comment": "স্র" },
+        { "Key": "#$09B8#$09CD#$09B2", "Value": "#$DF#$FE#$D4", "Comment": "স্ল" },
+        { "Key": "#$09DC#$09CD#$0997", "Value": "#$58#$2020", "Comment": "ড়্গ" },
+        { "Key": "#$09A8#$09CD#$09A4#$09CD#$09AC", "Value": "#$67#$73#$FE", "Comment": "ন্ত্ব" },
+        { "Key": "#$09B6#$09CD#$09B2", "Value": "#$D9#$D5", "Comment": "শ্ল" },
+        { "Key": "#$09B8#$09CD#$0995", "Value": "#$DF#$FE#$F1", "Comment": "স্ক" },
+        { "Key": "#$09B7#$09CD#$09AA", "Value": "#$DC#$2122", "Comment": "ষ্প" },
+        { "Key": "#$09B7#$09CD#$09AA#$09CD#$09B0", "Value": "#$DC#$B1", "Comment": "ষ্প্র" },
+        { "Key": "#$09B7#$09CD#$09AB", "Value": "#$DC#$B3#$FE", "Comment": "ষ্ফ" },
+        { "Key": "#$09AB#$09CD#$09B0", "Value": "#$0161#$CA#$FE", "Comment": "ফ্র" },
+        { "Key": "#$09B6#$09CD#$09A8", "Value": "#$D9#$C0", "Comment": "শ্ন" },
+        { "Key": "#$09AB#$09CD#$09B2", "Value": "#$0161#$CF#$FE", "Comment": "ফ্ল" },
+        { "Key": "#$09AD#$09CD#$09AC", "Value": "#$A6#$E4#$FE#$EE", "Comment": "ভ্ব" },
+        { "Key": "#$09AE#$09CD#$09AA#$09CD#$09B0", "Value": "#$C1#$B1", "Comment": "ম্প্র" },
+        { "Key": "#$09A8#$09CD#$09A4#$09CD#$09B0", "Value": "#$73#$FE#$66", "Comment": "ন্ত্র" },
+        { "Key": "#$099A#$09CD#$099B#$09CD#$09B0", "Value": "#$46#$0160#$E9#$C9", "Comment": "চ্ছ্র" },
+        { "Key": "#$099A#$09CD#$09AC", "Value": "#$2030#$B4#$FE", "Comment": "চ্ব" },
+        { "Key": "#$099F#$09CD#$09AC", "Value": "#$DD#$B4#$FE", "Comment": "ট্ব" },
+        { "Key": "#$099F#$09CD#$09B0", "Value": "#$DD#$FE#$C6", "Comment": "ট্র" },
+        { "Key": "#$09AE#$09CD#$09B0", "Value": "#$C1#$CB", "Comment": "ম্র" },
+        { "Key": "#$09A1#$09CD#$09AC", "Value": "#$76#$E4#$FE#$EE", "Comment": "ড্ব" },
+        { "Key": "#$09A1#$09CD#$09B0", "Value": "#$76#$C8#$FE", "Comment": "ড্র" },
+        { "Key": "#$09A8#$09CD#$09A1#$09CD#$09B0", "Value": "#$75#$C8#$FE", "Comment": "ন্ড্র" },
+        { "Key": "#$09B6#$09CD#$09AC", "Value": "#$D9#$BB", "Comment": "শ্ব" },
+        { "Key": "#$09B6#$09CD#$09AE", "Value": "#$D9#$C2", "Comment": "শ্ম" },
+        { "Key": "#$09A2#$09CD#$09B0", "Value": "#$2018#$FE#$C6", "Comment": "ঢ্র" },
+        { "Key": "#$09A8#$09CD#$099F", "Value": "#$72#$DD#$FE", "Comment": "ন্ট" },
+        { "Key": "#$09A8#$09CD#$09AE", "Value": "#$A7#$C3", "Comment": "ন্ম" },
+        { "Key": "#$09A4#$09CD#$09A4#$09CD#$09AC", "Value": "#$5F#$B4", "Comment": "ত্ত্ব" },
+        { "Key": "#$09A5#$09CD#$09AC", "Value": "#$ED#$B4", "Comment": "থ্ব" },
+        { "Key": "#$09A6#$0998", "Value": "#$E5#$2021", "Comment": "দঘ" },
+        { "Key": "ঘ্ন", "Value": "‡ø", "Comment": "ঘ্ন" },
+        { "Key": "#$09A3#$09CD#$09A2", "Value": "#$5E#$E9#$57", "Comment": "ণ্ঢ" },
+        { "Key": "#$09A8#$09CD#$09A0#$09CD#$09AF", "Value": "#$74#$FE#$C4", "Comment": "ন্ঠ্য" },
+        { "Key": "#$0995#$09CD#$09B2", "Value": "#$201E#$CF#$FE", "Comment": "ক্ল" },
+        { "Key": "#$0995#$09CD#$09B2#$09C1", "Value": "#$201E#$CF#$24#$FE", "Comment": "ক্লু" },
+        { "Key": "#$09B2#$09CD#$09AC", "Value": "#$CD#$BA", "Comment": "ল্ব" },
+        { "Key": "ল্ল", "Value": "#$CD#$D4", "Comment": "ল্ল" },
+        { "Key": "#$0999#$09CD#$0995#$09CD#$09A4", "Value": "#$02C6#$E4#$5F#$AB", "Comment": "ঙ্ক্ত" },
+        { "Key": "#$0999#$09CD#$0995#$09CD#$09AF", "Value": "#$42#$FE#$C4", "Comment": "ঙ্ক্য" },
+        { "Key": "#$09B8#$09CD#$09AA#$09CD#$09B0", "Value": "#$DF#$FE#$B1", "Comment": "স্প্র" },
+        { "Key": "#$0999#$09CD#$0995#$09CD#$09B7", "Value": "#$41#$C7#$FE", "Comment": "ঙ্ক্ষ" },
+        { "Key": "#$099A#$09CD#$099B#$09CD#$09AC", "Value": "#$46#$0160#$B4#$E9", "Comment": "চ্ছ্ব" },
+        { "Key": "#$0995#$09CD#$09B7#$09CD#$09A3", "Value": "#$C7#$F8#$FE", "Comment": "ক্ষ্ণ" },
+        { "Key": "#$0997#$09CD#$09A8", "Value": "#$40#$C0", "Comment": "গ্ন" },
+        { "Key": "#$09A3#$09CD#$09AC", "Value": "#$5E#$E9#$BB", "Comment": "ণ্ব" },
+        { "Key": "#$09A8#$09CD#$09A8", "Value": "#$A7#$AC", "Comment": "ন্ন" },
+        { "Key": "#$09AA#$09CD#$09A8", "Value": "#$B2#$C0", "Comment": "প্ন" },
+        { "Key": "#$09B2#$09CD#$09AE", "Value": "#$CD#$C3", "Comment": "ল্ম" },
+        { "Key": "#$09A8#$09CD#$09AC", "Value": "#$A7#$BA", "Comment": "ন্ব" },
+        { "Key": "#$0997#$09CD#$09AC", "Value": "#$40#$BB", "Comment": "গ্ব" },
+        { "Key": "#$0997#$09CD#$09AE", "Value": "#$40#$C2", "Comment": "গ্ম" },
+        { "Key": "#$0997#$09CD#$09B2", "Value": "#$40#$D5", "Comment": "গ্ল" },
+        { "Key": "#$0995#$09CD#$09B7#$09CD#$09A8", "Value": "#$C7#$E4#$FE#$02DC", "Comment": "ক্ষ্ন" },
+        { "Key": "#$0995#$09CD#$09B7#$09CD#$09AC", "Value": "#$C7#$B4#$FE", "Comment": "ক্ষ্ব" },
+        { "Key": "#$0995#$09CD#$09B7#$09CD#$09AE", "Value": "#$22", "Comment": "ক্ষ্ম" },
+        { "Key": "#$0997#$09CD#$09A3", "Value": "#$2020#$E4#$2019", "Comment": "গ্ণ" },
+        { "Key": "#$0997#$09CD#$09A7#$09CD#$09AF", "Value": "#$3F#$FE#$C4", "Comment": "গ্ধ্য" },
+        { "Key": "#$09B8#$09CD#$09A4#$09CD#$09B0", "Value": "#$DF#$FE#$66", "Comment": "স্ত্র" },
+        { "Key": "#$0995#$09CD#$099F#$09CD#$09B0", "Value": "#$51#$C9", "Comment": "ক্ট্র" },
+        { "Key": "#$09B8#$09CD#$09A4#$09C1", "Value": "#$6C#$DF#$FE", "Comment": "স্তু" },
+        { "Key": "#$09B8#$09CD#$09A4", "Value": "#$68#$DF#$FE", "Comment": "স্ত" },
+        { "Key": "#$09B8#$09CD#$09A4#$09CD#$09AC", "Value": "#$67#$DF#$FE", "Comment": "স্ত্ব" },
+        { "Key": "#$0997#$09CD#$09B0", "Value": "#$40#$F9#$CC", "Comment": "গ্র" },
+        { "Key": "#$09AA#$09CD#$09B0", "Value": "#$B2#$CC", "Comment": "প্র" },
+        { "Key": "#$09B8#$09CD#$09A5", "Value": "#$DF#$FE#$69", "Comment": "স্থ" },
+        { "Key": "#$099E#$09C1", "Value": "#$7E#$25#$0152", "Comment": "ঞু" },
+        { "Key": "#$0999#$09CD#$09AE", "Value": "#$2D", "Comment": "ঙ্ম → #$2D" },
+        { "Key": "#$0999#$09CD#$0996", "Value": "#$43", "Comment": "ঙ্খ → #$43" },
+        { "Key": "#$099C#$09CD#$09B0", "Value": "#$4C", "Comment": "জ্র → #$4C" },
+        { "Key": "#$09BC#$09C1", "Value": "#$59", "Comment": "়ু → #$59" },
+        { "Key": "#$09A3#$09CD#$09A1#$09CD#$09B0", "Value": "#$5B#$C8#$FE", "Comment": "ণ্ড্র" },
+        { "Key": "#$09A3#$09CD#$09A3", "Value": "#$5D", "Comment": "ণ্ণ → #$5D" },
+        { "Key": "#$0995#$09CD#$09A4#$09CD#$09B0", "Value": "#$60", "Comment": "ক্ত্র → #$60" },
+        { "Key": "#$09A4#$09CD#$09A8", "Value": "#$62", "Comment": "ত্ন → #$62" },
+        { "Key": "#$09A4#$09CD#$09AC", "Value": "#$63", "Comment": "ত্ব → #$63" },
+        { "Key": "#$09A6#$09CD#$09AD", "Value": "#$71", "Comment": "দ্ভ → #$71" },
+        { "Key": "#$09A8#$09CD#$09A0", "Value": "#$74#$FE", "Comment": "ন্ঠ → #$74" },
+        { "Key": "#$09A8#$09CD#$09A6#$09CD#$09B0", "Value": "#$77", "Comment": "ন্দ্র → #$77" },
+        { "Key": "#$09B2#$09CD#$0997#$09C1", "Value": "#$20AC", "Comment": "ল্গু → #$20AC" },
+        { "Key": "#$09AB#$09CD#$099F", "Value": "#$81", "Comment": "ফ্ট → #$81" },
+        { "Key": "#$09AC#$09CD#$09AD", "Value": "#$8D", "Comment": "ব্ভ → #$8D" },
+        { "Key": "#$099A#$09CD#$099E", "Value": "#$8E", "Comment": "চ্ঞ → #$8E" },
+        { "Key": "#$099F#$09CD#$09AE", "Value": "#$8F", "Comment": "ট্ম → #$8F" },
+        { "Key": "#$09A7#$09CD#$09AE", "Value": "#$90", "Comment": "ধ্ম → #$90" },
+        { "Key": "ধ্ন", "Value": "•ø", "Comment": "ধ্ন" },
+        { "Key": "ধ্র", "Value": "•Ê", "Comment": "ধ্র" },
+        { "Key": "#$09A6#$09CD#$09AD#$09CD#$09B0", "Value": "#$9E", "Comment": "দ্ভ্র → #$9E" },
+        { "Key": "দ্র", "Value": "#$6F", "Comment": "দ্র" },
+        { "Key": "#$09AC#$09CD#$09A6", "Value": "#$2219", "Comment": "ব্দ → #$2219" },
+        { "Key": "#$09AE#$09CD#$09AD", "Value": "#$BD", "Comment": "ম্ভ → #$BD" },
+        { "Key": "#$09AE#$09CD#$09AD#$09CD#$09B0", "Value": "#$BE", "Comment": "ম্ভ্র → #$BE" },
+        { "Key": "#$09B6#$09CD#$09B0", "Value": "#$D7", "Comment": "শ্র → #$D7" },
+        { "Key": "#$09B9#$09CD#$09B2", "Value": "#$E2", "Comment": "হ্ল → #$E2" },
+        { "Key": "#$09B9#$09CD#$09A3", "Value": "#$E3", "Comment": "হ্ণ → #$E3" },
+        { "Key": "#$0995#$09CD#$09AC", "Value": "#$F0", "Comment": "ক্ব → #$F0" }
+      ],
+      "PreReplacements": [
+        { "Key": "#$09CD#$0964", "Value": "#$FF", "Comment": "্। থেকে সরাসরি ব্যাকস্ল্যাশ" },
+        { "Key": "#$0021", "Value": "#$E6", "Comment": "!" },
+        { "Key": "#$002A", "Value": "#$A0", "Comment": "*" },
+        { "Key": "#$003B", "Value": "#$2014", "Comment": ";" },
+        { "Key": "#$002C", "Value": "#$2013", "Comment": "," },
+        { "Key": "#$003F", "Value": "#$DA", "Comment": "?" },
+        { "Key": "#$003A", "Value": "#$AD", "Comment": ":" }
+      ],
+      "PostReplacements": [
+        { "Key": "#$FE#{A_UKar1}", "Value": "#{A_UKar1}#$FE", "Comment": "FE কানেক্টর + উ-কার ১ → আদর্শ ক্রম" },
+        { "Key": "#$FE#{A_UKar2}", "Value": "#{A_UKar2}#$FE", "Comment": "FE কানেক্টর + উ-কার ২ → আদর্শ ক্রম" },
+        { "Key": "#$FE#{A_UKar4}", "Value": "#{A_UKar4}#$FE", "Comment": "FE কানেক্টর + উ-কার ৪ → আদর্শ ক্রম" },
+        { "Key": "#$FE#{A_UUKar1}", "Value": "#{A_UUKar1}#$FE", "Comment": "FE কানেক্টর + ঊ-কার ১ → আদর্শ ক্রম" },
+        { "Key": "#$FE#{A_UUKar2}", "Value": "#{A_UUKar2}#$FE", "Comment": "FE কানেক্টর + ঊ-কার ২ → আদর্শ ক্রম" },
+        { "Key": "#$FE#{A_UUKar3}", "Value": "#{A_UUKar3}#$FE", "Comment": "FE কানেক্টর + ঊ-কার ৩ → আদর্শ ক্রম" },
+        { "Key": "#$E9#{A_UKar1}", "Value": "#{A_UKar1}#$E9", "Comment": "E9 কানেক্টর + উ-কার ১ → আদর্শ ক্রম" },
+        { "Key": "#$E9#{A_UKar2}", "Value": "#{A_UKar2}#$E9", "Comment": "E9 কানেক্টর + উ-কার ২ → আদর্শ ক্রম" },
+        { "Key": "#$E9#{A_UKar4}", "Value": "#{A_UKar4}#$E9", "Comment": "E9 কানেক্টর + উ-কার ৪ → আদর্শ ক্রম" },
+        { "Key": "#$E9#{A_UUKar1}", "Value": "#{A_UUKar1}#$E9", "Comment": "E9 কানেক্টর + ঊ-কার ১ → আদর্শ ক্রম" },
+        { "Key": "#$E9#{A_UUKar2}", "Value": "#{A_UUKar2}#$E9", "Comment": "E9 কানেক্টর + ঊ-কার ২ → আদর্শ ক্রম" },
+        { "Key": "#$E9#{A_UUKar3}", "Value": "#{A_UUKar3}#$E9", "Comment": "E9 কানেক্টর + ঊ-কার ৩ → আদর্শ ক্রম" },
+        { "Key": "#$FE#{A_RRIKar1}", "Value": "#{A_RRIKar1}#$FE", "Comment": "FE কানেক্টর + ঋ-কার → আদর্শ ক্রম" },
+        { "Key": "#$E9#{A_RRIKar1}", "Value": "#{A_RRIKar1}#$E9", "Comment": "E9 কানেক্টর + ঋ-কার → আদর্শ ক্রম" },
+        { "Key": "#{A_RFola_2}#{A_UKar2}", "Value": "#{A_UKar2}#{A_RFola_2}", "Comment": "AB কানেক্টর + উ-কার ১ও২ → আদর্শ ক্রম" },
+        { "Key": "#{A_RFola_2}#{A_UUKar2}", "Value": "#{A_UUKar2}#{A_RFola_2}", "Comment": "AB কানেক্টর + ঊ-কার ১ও২ → আদর্শ ক্রম" },
+        { "Key": "#{A_D_D}#{A_UKar2}", "Value": "#{A_UKar2}#{A_D_D}", "Comment": "CF কানেক্টর + উ-কার ১ও২ → আদর্শ ক্রম" },
+        { "Key": "þÅ,", "Value": ",þÅ", "Comment": "Thron+Reph+Ree → Ree+Thron+Reph" },
+        { "Key": "Èþ#$2C", "Value": "Èþ$2B", "Comment": "" },
+        { "Key": "þ$2B", "Value": "$2Bþ", "Comment": "" },
+        { "Key": "Ï%", "Value": "Ï$", "Comment": "" },
+        { "Key": "È%þ", "Value": "Èþ$", "Comment": "" },
+        { "Key": "È)þ", "Value": "Èþ(", "Comment": "" },
+        { "Key": "Èþ,", "Value": "Èþ+", "Comment": "" },
+        { "Key": "#$C8#$24#$FE", "Value": "#$C8#$FE#$24", "Comment": "Ere+Reph+Ree → Ree+Ere+Reph" },
+        { "Key": "È(þ", "Value": "Èþ(", "Comment": "" },
+        { "Key": "È,þ", "Value": "Èþ,", "Comment": "" },
+        { "Key": "#$C6#$25", "Value": "#$C6#$24", "Comment": "Æ% → Æ$ (BelowBaseVariant Ukar fix)" },
+        { "Key": "#$C6#$29", "Value": "#$C6#$28", "Comment": "Æ) → Æ( (BelowBaseVariant UUKar fix)" }
+      ],
+      "VowelRules": {
+        "#$09C1": {
+          "default": "#{A_UKar1}",
+          "toggle": "both",
+          "mappings": [
+            { "consonants": "#$09B0", "value": "#{A_UKar4}", "alt": "#{A_UKar2}" },
+            { "consonants": "BelowBaseVariant", "value": "#$0024" },
+            { "consonants": "RuClusters", "value": "#{A_UKar4}", "alt": "#{A_UKar1}" },
+            { "consonants": "RaPhalas", "value": "#{A_UKar2}" },
+            { "consonants": "BaseLineRight", "value": "#{A_UKar1}" }
+          ]
+        },
+        "#$09C2": {
+          "default": "#{A_UUKar1}",
+          "toggle": "both",
+          "mappings": [
+            { "consonants": "#$09B0", "value": "#{A_UUKar3}", "alt": "#{A_UUKar2}" },
+            { "consonants": "BelowBaseVariant", "value": "#$0028" },
+            { "consonants": "RuClusters", "value": "#{A_UUKar3}", "alt": "#{A_UUKar1}" },
+            { "consonants": "RaPhalas", "value": "#{A_UUKar2}" },
+            { "consonants": "BaseLineRight", "value": "#{A_UUKar1}" }
+          ]
+        },
+        "#$09C3": {
+          "default": "#{A_RRIKar1}",
+          "mappings": [
+            { "consonants": "RuClusters", "value": "#{A_RRIKar1}" },
+            { "consonants": "RaPhalas", "value": "#{A_RRIKar1}" },
+            { "consonants": "BaseLineRight", "value": "#{A_RRIKar1}" },
+            { "consonants": "BelowBaseVariant", "value": "#{A_RRIKar2}" }
+          ]
+        }
+      },
+      "AnsiGroups": {
+        "RaPhalas": ["#$C6", "#$C8", "#$C9", "#$CA", "#$CB", "#$CC"],
+        "Connectors": ["#$FE", "#$E9"]
+      },
+      "ConsonantGroups": {
+        "BelowBaseVariant": ["ট্র", "ড্র", "ঢ্র"],
+        "RuClusters": ["#$0997#$09CD#$09B0", "#$0998#$09CD#$09B0", "#$09A4#$09CD#$09B0", "#$09A6#$09CD#$09B0", "#$09A7#$09CD#$09B0", "#$09A8#$09CD#$09B0", "#$09AA#$09CD#$09B0", "#$09AC#$09CD#$09B0", "#$09AD#$09CD#$09B0", "#$09AE#$09CD#$09B0", "#$09B6#$09CD#$09B0", "#$09B7#$09CD#$09B0", "#$09B8#$09CD#$09B0", "#$09B9#$09CD#$09B0"],
+        "BaseLineRight": ["খ", "গ", "ঘ", "ণ", "থ", "দ", "ধ", "ন", "প", "ব", "ম", "য", "র", "ল", "শ", "ষ", "স", "হ", "য়", "#{A_K_Ss_M}", "#{A_K_M}", "#{A_K_Ss}", "#{A_K_S}", "#{A_G_G}", "#{A_G_D}", "#{A_G_Dh}", "#{A_NGA_G}", "#{A_T_Th}", "#{A_T_M}", "#{A_D_D}", "#{A_D_Dh}", "#{A_D_B}", "#{A_D_M}", "#{A_N_Tth}", "#{A_N_Dh}", "#{A_N_S}", "#{A_P_P}", "#{A_P_S}", "#{A_B_D}", "#{A_B_Dh}", "#{A_Bh_R}", "#{A_M_N}", "#{A_L_G}", "#{A_L_P}", "#{A_Ss_Nn}", "#{A_S_Kh}", "#{A_S_N}", "#{A_H_N}", "#{A_H_M}", "#{A_Rr_G}"]
+      }
+    };
 
     function hexToChars(hexStr) {
       if (!hexStr) return '';
@@ -2480,7 +2491,7 @@ ConsonantGroups? "RaPhalas" গ্রুপ নেই → No
         <div class="md-input-container">
           <label class="text-[10px] uppercase font-bold text-zinc-500 mb-1 block">Toggle Mode</label>
           <select class="md-input" onchange="updateVowelRule(${vi},'toggle',this.value)">
-            ${['none','backspace','repeat','both'].map(o=>`<option value="${o}" ${(r.toggle||'none')===o?'selected':''}>${o}</option>`).join('')}
+            ${['none', 'backspace', 'repeat', 'both'].map(o => `<option value="${o}" ${(r.toggle || 'none') === o ? 'selected' : ''}>${o}</option>`).join('')}
           </select>
         </div>
       </div>
