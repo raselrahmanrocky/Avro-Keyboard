@@ -2190,7 +2190,7 @@ Unicode: &#x0995;&#x09CD;&#x09B0;&#x09C1; &#x2192; ANSI: e%«</pre>
       } else {
         redoStack.push({
           kind: 'field', path: entry.path, inputId: entry.inputId, previewId: entry.previewId,
-          oldVal: entry.newVal, newVal: entry.oldVal
+          oldVal: entry.oldVal, newVal: entry.newVal
         });
         applyFieldEdit(entry, 'undo');
       }
@@ -2207,7 +2207,7 @@ Unicode: &#x0995;&#x09CD;&#x09B0;&#x09C1; &#x2192; ANSI: e%«</pre>
       } else {
         undoStack.push({
           kind: 'field', path: entry.path, inputId: entry.inputId, previewId: entry.previewId,
-          oldVal: entry.newVal, newVal: entry.oldVal
+          oldVal: entry.oldVal, newVal: entry.newVal
         });
         applyFieldEdit(entry, 'redo');
       }
@@ -2215,15 +2215,43 @@ Unicode: &#x0995;&#x09CD;&#x09B0;&#x09C1; &#x2192; ANSI: e%«</pre>
     }
 
     function undoAll() {
-      const n = undoStack.length;
-      while (undoStack.length) undo();
-      showToast(n ? 'সব আনডু হয়েছে (' + n + ' step)' : 'আর আনডু নেই');
+      let n = 0;
+      const states = [];
+      while (undoStack.length) {
+        const entry = undoStack.pop();
+        if (entry.kind === 'field') {
+          redoStack.push({
+            kind: 'field', path: entry.path, inputId: entry.inputId, previewId: entry.previewId,
+            oldVal: entry.oldVal, newVal: entry.newVal
+          });
+          applyFieldEdit(entry, 'undo');
+          n++;
+        } else {
+          states.push(entry);
+        }
+      }
+      for (let i = states.length - 1; i >= 0; i--) undoStack.push(states[i]);
+      showToast(n ? 'সব ফিল্ড আনডু হয়েছে (' + n + ' step)' : 'আর আনডু নেই');
     }
 
     function redoAll() {
-      const n = redoStack.length;
-      while (redoStack.length) redo();
-      showToast(n ? 'সব রিডু হয়েছে (' + n + ' step)' : 'আর রিডু নেই');
+      let n = 0;
+      const states = [];
+      while (redoStack.length) {
+        const entry = redoStack.pop();
+        if (entry.kind === 'field') {
+          undoStack.push({
+            kind: 'field', path: entry.path, inputId: entry.inputId, previewId: entry.previewId,
+            oldVal: entry.oldVal, newVal: entry.newVal
+          });
+          applyFieldEdit(entry, 'redo');
+          n++;
+        } else {
+          states.push(entry);
+        }
+      }
+      for (let i = states.length - 1; i >= 0; i--) redoStack.push(states[i]);
+      showToast(n ? 'সব ফিল্ড রিডু হয়েছে (' + n + ' step)' : 'আর রিডু নেই');
     }
 
     function updateSaveIndicator() {
@@ -2724,6 +2752,14 @@ Unicode: &#x0995;&#x09CD;&#x09B0;&#x09C1; &#x2192; ANSI: e%«</pre>
       }
     }
 
+    async function pasteToGroupItem(gk, i) {
+      const text = await navigator.clipboard.readText();
+      if (text) {
+        const converted = autoConvertHexInput(text);
+        updateGroupItem(gk, i, converted);
+      }
+    }
+
     function renderGroups() {
       const container = document.getElementById('groupsContainer');
       const groups = state.ConsonantGroups || {};
@@ -2734,8 +2770,10 @@ Unicode: &#x0995;&#x09CD;&#x09B0;&#x09C1; &#x2192; ANSI: e%«</pre>
       <div class="flex flex-wrap gap-2">
         ${items.map((item, i) => `
           <div class="flex items-center bg-black/20 rounded-md p-1 pl-2 gap-2">
-            <input class="md-input hex-input !w-80" id="grp-${gk}-${i}" value="${escHtml(item)}" onchange="updateGroupItem('${gk}',${i},this.value)">
+            <input class="md-input hex-input !w-70" id="grp-${gk}-${i}" value="${escHtml(item)}" onchange="updateGroupItem('${gk}',${i},this.value)">
             <span class="text-white font-medium text-md" id="grp-preview-${gk}-${i}">${decodeValuePreview(item, state)}</span>
+            <button class="icon-btn !w-6 !h-6" onclick="copyToLocalClipboard('${item}')" title="Copy"><span class="material-symbols-outlined text-[14px]">content_copy</span></button>
+            <button class="icon-btn !w-6 !h-6" onclick="pasteToGroupItem('${gk}',${i})" title="Paste"><span class="material-symbols-outlined text-[14px]">content_paste</span></button>
             <button class="icon-btn !w-6 !h-6" onclick="deleteGroupItem('${gk}',${i})"><span class="material-symbols-outlined text-[14px]">close</span></button>
           </div>
         `).join('')}
@@ -3289,7 +3327,7 @@ Unicode: &#x0995;&#x09CD;&#x09B0;&#x09C1; &#x2192; ANSI: e%«</pre>
     // Initial state
     // Legacy/unversioned autosaves are now ignored by loadAutoSave(), so startup always
     // loads a clean state (imported file or SAMPLE). No stale corruption can reappear.
-    state = loadAutoSave() || JSON.parse(JSON.stringify(SAMPLE));
+    state = loadAutoSave() || convertImportedState(JSON.parse(JSON.stringify(SAMPLE)));
     updateSaveIndicator();
     setupSubTabListeners();
     renderAll();
