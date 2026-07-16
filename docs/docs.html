@@ -458,6 +458,14 @@
             <span class="material-symbols-outlined text-md">content_paste</span>
             <span class="">Paste</span>
           </button>
+          <button class="btn btn-ghost py-2 px-3" onclick="undo()" title="Ctrl+Z">
+            <span class="material-symbols-outlined text-md">undo</span>
+            <span class="">Undo</span>
+          </button>
+          <button class="btn btn-ghost py-2 px-3" onclick="redo()" title="Ctrl+Y">
+            <span class="material-symbols-outlined text-md">redo</span>
+            <span class="">Redo</span>
+          </button>
           <button class="btn btn-ghost py-2 px-3" onclick="copyJSON()">
             <span class="material-symbols-outlined text-md">content_copy</span>
             <span class="">Copy All</span>
@@ -603,7 +611,7 @@
           <p class="text-md text-indigo-200">Configure structural rules for choosing exact vowel-kars (ু, ূ, ৃ)
             dynamically.</p>
         </div>
-        <button class="btn btn-ghost py-1 px-3 text-xs" onclick="pasteVowelRule()">Paste Rule Profile</button>
+        <button class="btn btn-ghost py-1 px-3 text-md" onclick="pasteVowelRule()">Paste Rule Profile</button>
       </div>
       <div class="space-y-6" id="vowelRulesContainer"></div>
       <button class="btn btn-primary mt-8" onclick="addVowelRule()">+ Add Vowel Rule</button>
@@ -754,7 +762,7 @@
           <span class="material-symbols-outlined text-indigo-400">swap_horiz</span>
           <span>লাইভ মিনি-কনভার্টার</span>
         </h3>
-        <p class="text-xs text-zinc-500 mb-4">সরলীকৃত রূপান্তর — FullFormReplacements ও Constants ব্যবহার করে
+        <p class="text-md text-zinc-500 mb-4">সরলীকৃত রূপান্তর — FullFormReplacements ও Constants ব্যবহার করে
           বাস্তব-সময়ের বিকল্প প্রদর্শন।</p>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
@@ -767,7 +775,7 @@
             <label class="text-[14px] uppercase font-bold text-zinc-500 mb-1 block">ANSI আউটপুট</label>
             <div id="miniConverterOutput"
               class="bg-black/40 border border-white/10 rounded p-4 h-24 overflow-auto font-mono text-indigo-300 text-md flex items-center">
-              <span class="text-zinc-600 text-xs">ANSI কোড এখানে দেখাবে...</span>
+              <span class="text-zinc-600 text-md">ANSI কোড এখানে দেখাবে...</span>
             </div>
           </div>
         </div>
@@ -1975,13 +1983,13 @@ Unicode: &#x0995;&#x09CD;&#x09B0;&#x09C1; &#x2192; ANSI: e%«</pre>
       </div>
       <div class="premium-card overflow-hidden elevation-1">
         <div class="flex items-center justify-between px-5 py-3 bg-white/5 border-b border-white/5">
-          <span class="text-xs font-mono text-zinc-400">schema.json</span>
+          <span class="text-md font-mono text-zinc-400">schema.json</span>
           <div class="flex gap-4">
             <button
-              class="text-xs font-bold text-indigo-400 hover:text-indigo-300 transition-colors uppercase tracking-wider"
+              class="text-md font-bold text-indigo-400 hover:text-indigo-300 transition-colors uppercase tracking-wider"
               onclick="togglePasteModal(true)">Paste JSON</button>
             <button
-              class="text-xs font-bold text-indigo-400 hover:text-indigo-300 transition-colors uppercase tracking-wider"
+              class="text-md font-bold text-indigo-400 hover:text-indigo-300 transition-colors uppercase tracking-wider"
               onclick="copyJSON()">Copy Raw</button>
           </div>
         </div>
@@ -2076,7 +2084,7 @@ Unicode: &#x0995;&#x09CD;&#x09B0;&#x09C1; &#x2192; ANSI: e%«</pre>
             class="material-symbols-outlined">close</span></button>
       </div>
       <textarea
-        class="h-64 font-mono text-xs bg-black/40 border border-white/10 rounded-md p-4 w-full focus:border-indigo-500 outline-none transition-all"
+        class="h-64 font-mono text-md bg-black/40 border border-white/10 rounded-md p-4 w-full focus:border-indigo-500 outline-none transition-all"
         id="pasteTextArea" placeholder="{ &quot;Constants&quot;: ... }"></textarea>
       <div class="flex justify-end gap-3 mt-6">
         <button class="btn btn-ghost" onclick="togglePasteModal(false)">Cancel</button>
@@ -2098,11 +2106,12 @@ Unicode: &#x0995;&#x09CD;&#x09B0;&#x09C1; &#x2192; ANSI: e%«</pre>
 
     // ===== AUTO-SAVE (localStorage) =====
     const AUTO_SAVE_KEY = 'avro_ansi_editor_state';
+    const AUTO_SAVE_VERSION = 2; // bumped so legacy (unversioned / corrupted) autosaves are discarded
 
     function autoSave() {
       if (!state) return;
       try {
-        localStorage.setItem(AUTO_SAVE_KEY, JSON.stringify(state));
+        localStorage.setItem(AUTO_SAVE_KEY, JSON.stringify({ __v: AUTO_SAVE_VERSION, state: state }));
         updateSaveIndicator();
       } catch (e) { /* silent fail */ }
     }
@@ -2110,9 +2119,111 @@ Unicode: &#x0995;&#x09CD;&#x09B0;&#x09C1; &#x2192; ANSI: e%«</pre>
     function loadAutoSave() {
       try {
         const saved = localStorage.getItem(AUTO_SAVE_KEY);
-        if (saved) return JSON.parse(saved);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          // Only accept autosaves written by this (or newer) version; legacy/corrupted ones are ignored.
+          if (parsed && parsed.__v === AUTO_SAVE_VERSION && parsed.state) return parsed.state;
+        }
       } catch (e) { /* silent fail */ }
       return null;
+    }
+
+    // ===== UNDO / REDO HISTORY =====
+    // Two entry types on one stack:
+    //  - { kind:'field', path, oldVal, newVal, inputId, previewId }
+    //      single text-field edit -> patched in-place (no full re-render)
+    //  - { kind:'state', snapshot }
+    //      structural change (add/delete row, paste-whole, import) -> full restore
+    const HISTORY_LIMIT = 100;
+    let undoStack = [];
+    let redoStack = [];
+    let historyEnabled = false; // enabled after initial load so startup isn't recorded
+
+    function pushFieldHistory(entry) {
+      if (!historyEnabled || !state) return;
+      entry.kind = 'field';
+      undoStack.push(entry);
+      if (undoStack.length > HISTORY_LIMIT) undoStack.shift();
+      redoStack.length = 0;
+    }
+
+    function pushStateHistory() {
+      if (!historyEnabled || !state) return;
+      undoStack.push({ kind: 'state', snapshot: JSON.parse(JSON.stringify(state)) });
+      if (undoStack.length > HISTORY_LIMIT) undoStack.shift();
+      redoStack.length = 0;
+    }
+
+    // resolve/set a nested value by path array
+    function getByPath(path) {
+      let o = state;
+      for (let i = 0; i < path.length - 1; i++) o = o[path[i]];
+      return o[path[path.length - 1]];
+    }
+    function setByPath(path, val) {
+      let o = state;
+      for (let i = 0; i < path.length - 1; i++) o = o[path[i]];
+      o[path[path.length - 1]] = val;
+    }
+
+    // Apply a field edit in-place: only the one input + its preview change.
+    function applyFieldEdit(entry, dir) {
+      const val = (dir === 'undo') ? entry.oldVal : entry.newVal;
+      setByPath(entry.path, val);
+      const inp = entry.inputId ? document.getElementById(entry.inputId) : null;
+      if (inp) inp.value = (val === undefined || val === null) ? '' : val;
+      if (entry.previewId) {
+        const pv = document.getElementById(entry.previewId);
+        if (pv) pv.textContent = decodeValuePreview(val, state);
+      }
+      renderJSONPreview();
+      autoSave();
+    }
+
+    function undo() {
+      if (!undoStack.length) { showToast('আর আনডু নেই'); return; }
+      const entry = undoStack.pop();
+      if (entry.kind === 'state') {
+        redoStack.push({ kind: 'state', snapshot: JSON.parse(JSON.stringify(state)) });
+        state = JSON.parse(JSON.stringify(entry.snapshot));
+        renderAll();
+      } else {
+        redoStack.push({
+          kind: 'field', path: entry.path, inputId: entry.inputId, previewId: entry.previewId,
+          oldVal: entry.newVal, newVal: entry.oldVal
+        });
+        applyFieldEdit(entry, 'undo');
+      }
+      showToast('Undo করা হয়েছে');
+    }
+
+    function redo() {
+      if (!redoStack.length) { showToast('আর রিডু নেই'); return; }
+      const entry = redoStack.pop();
+      if (entry.kind === 'state') {
+        undoStack.push({ kind: 'state', snapshot: JSON.parse(JSON.stringify(state)) });
+        state = JSON.parse(JSON.stringify(entry.snapshot));
+        renderAll();
+      } else {
+        undoStack.push({
+          kind: 'field', path: entry.path, inputId: entry.inputId, previewId: entry.previewId,
+          oldVal: entry.newVal, newVal: entry.oldVal
+        });
+        applyFieldEdit(entry, 'redo');
+      }
+      showToast('Redo করা হয়েছে');
+    }
+
+    function undoAll() {
+      const n = undoStack.length;
+      while (undoStack.length) undo();
+      showToast(n ? 'সব আনডু হয়েছে (' + n + ' step)' : 'আর আনডু নেই');
+    }
+
+    function redoAll() {
+      const n = redoStack.length;
+      while (redoStack.length) redo();
+      showToast(n ? 'সব রিডু হয়েছে (' + n + ' step)' : 'আর রিডু নেই');
     }
 
     function updateSaveIndicator() {
@@ -2189,22 +2300,22 @@ Unicode: &#x0995;&#x09CD;&#x09B0;&#x09C1; &#x2192; ANSI: e%«</pre>
         "VowelsAndKars": {
           "A_A": { "UnicodeKey": "অ", "Value": "#$0078", "Comment": "অ" },
           "A_AA": { "UnicodeKey": "আ", "Value": "#$0078#$0079", "Comment": "আ" },
-          "A_AAKar": { "UnicodeKey": "া (আ-কার)", "Value": "#$0079", "Comment": "া (আ-কার)" },
+          "A_AAKar": { "UnicodeKey": "া", "Value": "#$0079", "Comment": "া (আ-কার)" },
           "A_I": { "UnicodeKey": "ই", "Value": "#$A3#$7A", "Comment": "ই" },
-          "A_IKar": { "UnicodeKey": "ি (ই-কার)", "Value": "#$21", "Comment": "ি (ই-কার)" },
-          "A_UKar1": { "UnicodeKey": "ু (উ-কার ১)", "Value": "#$25", "Comment": "ু (উ-কার ১)" },
-          "A_UKar2": { "UnicodeKey": "ু (উ-কার ২)", "Value": "#$24", "Comment": "ু (উ-কার ২)" },
-          "A_UKar3": { "UnicodeKey": "ু (উ-কার ৩)", "Value": "#$59", "Comment": "ু (উ-কার ৩)" },
-          "A_UKar4": { "UnicodeKey": "ু (উ-কার ৪)", "Value": "#$26", "Comment": "ু (উ-কার ৪)" },
-          "A_UUKar1": { "UnicodeKey": "ূ (ঊ-কার ১)", "Value": "#$29", "Comment": "ূ (ঊ-কার ১)" },
-          "A_UUKar2": { "UnicodeKey": "ূ (ঊ-কার ২)", "Value": "#$28", "Comment": "ূ (ঊ-কার ২)" },
-          "A_UUKar3": { "UnicodeKey": "ূ (ঊ-কার ৩)", "Value": "#$2A", "Comment": "ূ (ঊ-কার ৩)" },
-          "A_RRIKar1": { "UnicodeKey": "ৃ (ঋ-কার ১)", "Value": "#$2C", "Comment": "ৃ (ঋ-কার ১)" },
-          "A_RRIKar2": { "UnicodeKey": "ৃ (ঋ-কার ২)", "Value": "#$2B", "Comment": "ৃ (ঋ-কার ২)" }
+          "A_IKar": { "UnicodeKey": "ি", "Value": "#$21", "Comment": "ি (ই-কার)" },
+          "A_UKar1": { "UnicodeKey": "ু", "Value": "#$25", "Comment": "ু (উ-কার ১)" },
+          "A_UKar2": { "UnicodeKey": "ু", "Value": "#$24", "Comment": "ু (উ-কার ২)" },
+          "A_UKar3": { "UnicodeKey": "ু", "Value": "#$59", "Comment": "ু (উ-কার ৩)" },
+          "A_UKar4": { "UnicodeKey": "ু", "Value": "#$26", "Comment": "ু (উ-কার ৪)" },
+          "A_UUKar1": { "UnicodeKey": "ূ", "Value": "#$29", "Comment": "ূ (ঊ-কার ১)" },
+          "A_UUKar2": { "UnicodeKey": "ূ", "Value": "#$28", "Comment": "ূ (ঊ-কার ২)" },
+          "A_UUKar3": { "UnicodeKey": "ূ", "Value": "#$2A", "Comment": "ূ (ঊ-কার ৩)" },
+          "A_RRIKar1": { "UnicodeKey": "ৃ", "Value": "#$2C", "Comment": "ৃ (ঋ-কার ১)" },
+          "A_RRIKar2": { "UnicodeKey": "ৃ", "Value": "#$2B", "Comment": "ৃ (ঋ-কার ২)" }
         },
         "Symbols": {
-          "A_Hasanta": { "UnicodeKey": "্ (হসন্ত)", "Value": "#$E4", "Comment": "্ (হসন্ত)" },
-          "A_Dari": { "UnicodeKey": "। (দাঁড়ি)", "Value": "#$D0", "Comment": "। (দাঁড়ি)" }
+          "A_Hasanta": { "UnicodeKey": "্", "Value": "#$E4", "Comment": "্ (হসন্ত)" },
+          "A_Dari": { "UnicodeKey": "।", "Value": "#$D0", "Comment": "। (দাঁড়ি)" }
         },
         "Consonants": {
           "A_K": { "UnicodeKey": "ক", "Value": "#$201E#$FE", "Comment": "ক" },
@@ -2217,12 +2328,12 @@ Unicode: &#x0995;&#x09CD;&#x09B0;&#x09C1; &#x2192; ANSI: e%«</pre>
           "A_K_Ss": { "UnicodeKey": "ক্ষ", "Value": "#$C7#$FE", "Comment": "ক্ষ" }
         },
         "FirstHalfForms": {
-          "A_Reph": { "UnicodeKey": "(র-এর রেফ)", "Value": "#$C5", "Comment": "(র-এর রেফ)" },
-          "A_M_1H": { "UnicodeKey": "ম-এর প্রথম খন্ড", "Value": "#$C1", "Comment": "ম-এর প্রথম খন্ড" }
+          "A_Reph": { "UnicodeKey": "্র", "Value": "#$C5", "Comment": "(র-এর রেফ)" },
+          "A_M_1H": { "UnicodeKey": "ম", "Value": "#$C1", "Comment": "ম-এর প্রথম খন্ড" }
         },
         "SecondHalfForms": {
-          "A_RFola_1": { "UnicodeKey": "র-ফলা ১", "Value": "#$C9", "Comment": "র-ফলা ১" },
-          "A_RFola_2": { "UnicodeKey": "র-ফলা ২", "Value": "#$CA", "Comment": "র-ফলা ২" }
+          "A_RFola_1": { "UnicodeKey": "র", "Value": "#$C9", "Comment": "র-ফলা ১" },
+          "A_RFola_2": { "UnicodeKey": "র", "Value": "#$CA", "Comment": "র-ফলা ২" }
         }
       },
       "FullFormReplacements": [
@@ -2281,6 +2392,34 @@ Unicode: &#x0995;&#x09CD;&#x09B0;&#x09C1; &#x2192; ANSI: e%«</pre>
         return '?';
       });
       return hexToChars(expanded);
+    }
+
+    // Show any value as its #$XXXX codepoint form (no glyph decoding).
+    function toCodepoint(val) {
+      if (!val) return '';
+      return val.replace(/(#\{[^}]+\})|(#\$[0-9A-Fa-f]{1,4})|([\s\S])/g, function(match, varRef, hexRef, ch) {
+        if (varRef) {
+          for (const cat of CONST_CATS) {
+            const c = state.Constants[cat];
+            if (c) {
+              for (const k in c) {
+                if (('#{' + k + '}') === varRef && c[k].Value) return toCodepoint(c[k].Value);
+              }
+            }
+          }
+          return varRef;
+        }
+        if (hexRef) return hexRef;
+        return [...ch].map(function(c) {
+          const cp = c.codePointAt(0);
+          return cp !== undefined ? '#$' + cp.toString(16).toUpperCase().padStart(4, '0') : '';
+        }).join('');
+      });
+    }
+
+    // UnicodeKey may carry a "char (description)" form; show only the leading char's codepoint.
+    function unicodeKeyPreview(v) {
+      return toCodepoint((v || '').split(' ')[0]);
     }
     function _charToHex(ch) {
       const cp = ch.codePointAt(0);
@@ -2395,13 +2534,13 @@ Unicode: &#x0995;&#x09CD;&#x09B0;&#x09C1; &#x2192; ANSI: e%«</pre>
         return `<div class="premium-card p-4 elevation-1">
       <div class="flex items-center justify-between mb-4">
         <span class="text-[15px] font-mono font-bold text-indigo-400 tracking-wider">${k}</span>
-        <span class="preview-char elevation-1">${preview || ''}</span>
+        <span class="preview-char elevation-1" id="preview-${cat}-${k}">${preview || ''}</span>
       </div>
       <div class="space-y-3">
         <div class="flex items-center gap-2">
-          <input class="md-input" id="ukey-${cat}-${k}" value="${escHtml(items[k].UnicodeKey || '')}" onchange="updateConst('${cat}','${k}','UnicodeKey',this.value)" placeholder="UnicodeKey">
+          <input class="md-input" id="ukey-${cat}-${k}" value="${escHtml(unicodeKeyPreview(items[k].UnicodeKey))}" onchange="updateConst('${cat}','${k}','UnicodeKey',this.value)" placeholder="UnicodeKey">
           <div class="flex gap-1">
-            <button class="icon-btn" onclick="copyToLocalClipboard('${items[k].UnicodeKey || ''}')" title="Copy"><span class="material-symbols-outlined text-[18px]">content_copy</span></button>
+            <button class="icon-btn" onclick="copyToLocalClipboard('${unicodeKeyPreview(items[k].UnicodeKey)}')" title="Copy"><span class="material-symbols-outlined text-[18px]">content_copy</span></button>
             <button class="icon-btn" onclick="pasteToConst('${cat}', '${k}', 'UnicodeKey', 'ukey-${cat}-${k}')" title="Paste"><span class="material-symbols-outlined text-[18px]">content_paste</span></button>
           </div>
         </div>
@@ -2444,25 +2583,25 @@ Unicode: &#x0995;&#x09CD;&#x09B0;&#x09C1; &#x2192; ANSI: e%«</pre>
       <td class="text-[14px] text-zinc-500 font-mono">${i + 1}</td>
       <td>
         <div class="flex items-center gap-2">
-          <input class="md-input hex-input" value="${escHtml(item.Key)}" onchange="updateRepl('${key}',${i},'Key',this.value)">
+          <input class="md-input hex-input" id="repl-${key}-${i}-Key" value="${escHtml(item.Key)}" onchange="updateRepl('${key}',${i},'Key',this.value)">
           <div class="flex gap-1">
             <button class="icon-btn" onclick="copyToLocalClipboard('${item.Key}')"><span class="material-symbols-outlined text-[16px]">content_copy</span></button>
             <button class="icon-btn" onclick="pasteToRepl('${key}', ${i}, 'Key')"><span class="material-symbols-outlined text-[16px]">content_paste</span></button>
           </div>
         </div>
-        <div class="mt-1 text-[14px] text-zinc-500 pl-1">Preview: ${decodeValuePreview(item.Key, state)}</div>
+        <div class="mt-1 text-[14px] text-zinc-500 pl-1" id="preview-repl-${key}-${i}-Key">Preview: ${decodeValuePreview(item.Key, state)}</div>
       </td>
       <td>
         <div class="flex items-center gap-2">
-          <input class="md-input hex-input" value="${escHtml(item.Value)}" onchange="updateRepl('${key}',${i},'Value',this.value)">
+          <input class="md-input hex-input" id="repl-${key}-${i}-Value" value="${escHtml(item.Value)}" onchange="updateRepl('${key}',${i},'Value',this.value)">
           <div class="flex gap-1">
             <button class="icon-btn" onclick="copyToLocalClipboard('${item.Value}')"><span class="material-symbols-outlined text-[16px]">content_copy</span></button>
             <button class="icon-btn" onclick="pasteToRepl('${key}', ${i}, 'Value')"><span class="material-symbols-outlined text-[16px]">content_paste</span></button>
           </div>
         </div>
-        <div class="mt-1 text-[14px] text-zinc-500 pl-1">Preview: ${decodeValuePreview(item.Value, state)}</div>
+        <div class="mt-1 text-[14px] text-zinc-500 pl-1" id="preview-repl-${key}-${i}-Value">Preview: ${decodeValuePreview(item.Value, state)}</div>
       </td>
-      <td><input class="md-input" value="${escHtml(item.Comment || '')}" onchange="updateRepl('${key}',${i},'Comment',this.value)"></td>
+          <td><input class="md-input" id="repl-${key}-${i}-Comment" value="${escHtml(item.Comment || '')}" onchange="updateRepl('${key}',${i},'Comment',this.value)"></td>
       <td class="text-center">
         <button class="icon-btn text-red-400 hover:bg-red-500/10 hover:text-red-400" onclick="deleteRepl('${key}',${i})"><span class="material-symbols-outlined">delete</span></button>
       </td>
@@ -2493,14 +2632,14 @@ Unicode: &#x0995;&#x09CD;&#x09B0;&#x09C1; &#x2192; ANSI: e%«</pre>
         <div class="md-input-container">
           <label class="text-[14px] uppercase font-bold text-zinc-500 mb-1 block">Default Mapping</label>
           <div class="flex gap-2">
-            <input class="md-input hex-input" value="${escHtml(r.default)}" onchange="updateVowelRule(${vi},'default',this.value)">
+            <input class="md-input hex-input" id="vr-${vi}-default" value="${escHtml(r.default)}" onchange="updateVowelRule(${vi},'default',this.value)">
             <button class="icon-btn" onclick="copyToLocalClipboard('${r.default}')"><span class="material-symbols-outlined text-[18px]">content_copy</span></button>
             <button class="icon-btn" onclick="pasteToVowelRuleField(${vi}, 'default')"><span class="material-symbols-outlined text-[18px]">content_paste</span></button>
           </div>
         </div>
         <div class="md-input-container">
           <label class="text-[14px] uppercase font-bold text-zinc-500 mb-1 block">Toggle Mode</label>
-          <select class="md-input" onchange="updateVowelRule(${vi},'toggle',this.value)">
+            <select class="md-input" id="vr-${vi}-toggle" onchange="updateVowelRule(${vi},'toggle',this.value)">
             ${['none', 'backspace'].map(o => `<option value="${o}" ${(r.toggle || 'none') === o ? 'selected' : ''}>${o}</option>`).join('')}
           </select>
         </div>
@@ -2517,38 +2656,38 @@ Unicode: &#x0995;&#x09CD;&#x09B0;&#x09C1; &#x2192; ANSI: e%«</pre>
               <!-- Row 1: Text Inputs -->
               <div class="grid grid-cols-1 md:grid-cols-6 gap-3 mb-3">
                 <div class="md:col-span-2">
-                  <label class="text-xs uppercase font-bold text-zinc-500 mb-1 block">Consonants</label>
-                  <input class="md-input" placeholder="Group/Char" value="${escHtml(m.consonants)}" onchange="updateVowelMapping(${vi},${mi},'consonants',this.value)">
+                  <label class="text-md uppercase font-bold text-zinc-500 mb-1 block">Consonants</label>
+                  <input class="md-input" id="vrm-${vi}-${mi}-consonants" placeholder="Group/Char" value="${escHtml(m.consonants)}" onchange="updateVowelMapping(${vi},${mi},'consonants',this.value)">
                 </div>
                 <div class="md:col-span-2">
-                  <label class="text-xs uppercase font-bold text-zinc-500 mb-1 block">Value</label>
-                  <input class="md-input hex-input" placeholder="ANSI Glyph" value="${escHtml(m.value)}" onchange="updateVowelMapping(${vi},${mi},'value',this.value)">
+                  <label class="text-md uppercase font-bold text-zinc-500 mb-1 block">Value</label>
+                  <input class="md-input hex-input" id="vrm-${vi}-${mi}-value" placeholder="ANSI Glyph" value="${escHtml(m.value)}" onchange="updateVowelMapping(${vi},${mi},'value',this.value)">
                 </div>
                 <div class="md:col-span-2">
-                  <label class="text-xs uppercase font-bold text-zinc-500 mb-1 block">Alt</label>
-                  <input class="md-input hex-input" placeholder="Toggle Variant" value="${escHtml(m.alt || '')}" onchange="updateVowelMapping(${vi},${mi},'alt',this.value)">
+                  <label class="text-md uppercase font-bold text-zinc-500 mb-1 block">Alt</label>
+                  <input class="md-input hex-input" id="vrm-${vi}-${mi}-alt" placeholder="Toggle Variant" value="${escHtml(m.alt || '')}" onchange="updateVowelMapping(${vi},${mi},'alt',this.value)">
                 </div>
               </div>
               <!-- Row 2: Dropdowns -->
               <div class="grid grid-cols-3 gap-3 mb-3">
                 <div>
-                  <label class="text-xs uppercase font-bold text-zinc-500 mb-1 block">Toggle</label>
-                  <select class="md-input" onchange="updateVowelMapping(${vi},${mi},'toggle',this.value)">
+                  <label class="text-md uppercase font-bold text-zinc-500 mb-1 block">Toggle</label>
+                  <select class="md-input" id="vrm-${vi}-${mi}-toggle" onchange="updateVowelMapping(${vi},${mi},'toggle',this.value)">
                     <option value="none" ${toggleVal === 'none' ? 'selected' : ''}>none</option>
                     <option value="backspace" ${toggleVal === 'backspace' ? 'selected' : ''}>backspace</option>
                   </select>
                 </div>
                 <div>
-                  <label class="text-xs uppercase font-bold text-zinc-500 mb-1 block">Process</label>
-                  <select class="md-input" onchange="updateVowelMapping(${vi},${mi},'process',this.value)">
+                  <label class="text-md uppercase font-bold text-zinc-500 mb-1 block">Process</label>
+                  <select class="md-input" id="vrm-${vi}-${mi}-process" onchange="updateVowelMapping(${vi},${mi},'process',this.value)">
                     <option value="" ${processVal === '' ? 'selected' : ''}>main</option>
                     <option value="pre" ${processVal === 'pre' ? 'selected' : ''}>pre</option>
                     <option value="post" ${processVal === 'post' ? 'selected' : ''}>post</option>
                   </select>
                 </div>
                 <div>
-                  <label class="text-xs uppercase font-bold text-zinc-500 mb-1 block">MatchMode</label>
-                  <select class="md-input" onchange="updateVowelMapping(${vi},${mi},'matchMode',this.value)">
+                  <label class="text-md uppercase font-bold text-zinc-500 mb-1 block">MatchMode</label>
+                  <select class="md-input" id="vrm-${vi}-${mi}-matchMode" onchange="updateVowelMapping(${vi},${mi},'matchMode',this.value)">
                     <option value="0" ${matchModeVal === '0' ? 'selected' : ''}>0 (Cluster)</option>
                     <option value="1" ${matchModeVal === '1' ? 'selected' : ''}>1 (Char)</option>
                   </select>
@@ -2563,7 +2702,7 @@ Unicode: &#x0995;&#x09CD;&#x09B0;&#x09C1; &#x2192; ANSI: e%«</pre>
             </div>`;
           }).join('')}
         </div>
-        <button class="btn btn-ghost py-1 px-3 mt-3 text-xs" onclick="addVowelMapping(${vi})">+ Add Mapping</button>
+        <button class="btn btn-ghost py-1 px-3 mt-3 text-md" onclick="addVowelMapping(${vi})">+ Add Mapping</button>
       </div>
     </div>`;
       }).join('');
@@ -2595,12 +2734,12 @@ Unicode: &#x0995;&#x09CD;&#x09B0;&#x09C1; &#x2192; ANSI: e%«</pre>
       <div class="flex flex-wrap gap-2">
         ${items.map((item, i) => `
           <div class="flex items-center bg-black/20 rounded-md p-1 pl-2 gap-2">
-            <span class="text-xs font-mono text-zinc-400">${item}</span>
-            <span class="text-white font-medium text-md">${decodeValuePreview(item, state)}</span>
+            <input class="md-input hex-input !w-80" id="grp-${gk}-${i}" value="${escHtml(item)}" onchange="updateGroupItem('${gk}',${i},this.value)">
+            <span class="text-white font-medium text-md" id="grp-preview-${gk}-${i}">${decodeValuePreview(item, state)}</span>
             <button class="icon-btn !w-6 !h-6" onclick="deleteGroupItem('${gk}',${i})"><span class="material-symbols-outlined text-[14px]">close</span></button>
           </div>
         `).join('')}
-        <button class="btn btn-ghost py-1 px-3 text-xs" onclick="addGroupItem('${gk}')">+ Add</button>
+        <button class="btn btn-ghost py-1 px-3 text-md" onclick="addGroupItem('${gk}')">+ Add</button>
       </div>
     </div>`;
       }).join('');
@@ -2612,26 +2751,62 @@ Unicode: &#x0995;&#x09CD;&#x09B0;&#x09C1; &#x2192; ANSI: e%«</pre>
       showToast('মান কপি হয়েছে: ' + val);
     }
 
-    function updateConst(cat, name, field, val) { state.Constants[cat][name][field] = val; renderAll(); }
-    function updateRepl(key, i, field, val) { state[key][i][field] = val; renderAll(); }
-    function addRepl(key) { state[key].push({ Key: '', Value: '', Comment: '' }); renderReplacements(); renderJSONPreview(); }
-    function deleteRepl(key, i) { state[key].splice(i, 1); renderReplacements(); renderJSONPreview(); }
+    function updateConst(cat, name, field, val) {
+      const path = ['Constants', cat, name, field];
+      const oldVal = getByPath(path);
+      const inputId = (field === 'Value') ? 'input-' + cat + '-' + name
+        : (field === 'UnicodeKey') ? 'ukey-' + cat + '-' + name
+        : 'comment-' + cat + '-' + name;
+      // preview span reflects the Value glyph, so only patch it for Value edits
+      const previewId = (field === 'Value') ? 'preview-' + cat + '-' + name : null;
+      pushFieldHistory({ path, oldVal, newVal: val, inputId, previewId });
+      setByPath(path, val);
+      applyFieldEdit({ path, inputId, previewId, newVal: val }, 'redo');
+    }
+    function updateRepl(key, i, field, val) {
+      const path = [key, i, field];
+      const oldVal = getByPath(path);
+      const inputId = 'repl-' + key + '-' + i + '-' + field;
+      pushFieldHistory({ path, oldVal, newVal: val, inputId, previewId: 'preview-' + key + '-' + i + '-' + field });
+      setByPath(path, val);
+      applyFieldEdit({ path, inputId, previewId: 'preview-' + key + '-' + i + '-' + field, newVal: val }, 'redo');
+    }
+    function addRepl(key) { pushStateHistory(); state[key].push({ Key: '', Value: '', Comment: '' }); renderReplacements(); renderJSONPreview(); }
+    function deleteRepl(key, i) { pushStateHistory(); state[key].splice(i, 1); renderReplacements(); renderJSONPreview(); }
+
+    function updateGroupItem(gk, i, val) {
+      const path = ['ConsonantGroups', gk, i];
+      const oldVal = getByPath(path);
+      const inputId = 'grp-' + gk + '-' + i;
+      const previewId = 'grp-preview-' + gk + '-' + i;
+      pushFieldHistory({ path, oldVal, newVal: val, inputId, previewId });
+      setByPath(path, val);
+      applyFieldEdit({ path, inputId, previewId, newVal: val }, 'redo');
+    }
 
     function updateVowelRule(idx, field, val) {
       const keys = Object.keys(state.VowelRules);
-      state.VowelRules[keys[idx]][field] = val;
-      renderAll();
+      const vk = keys[idx];
+      const path = ['VowelRules', vk, field];
+      const oldVal = getByPath(path);
+      const inputId = 'vr-' + idx + '-' + field;
+      pushFieldHistory({ path, oldVal, newVal: val, inputId, previewId: 'preview-vr-' + idx + '-' + field });
+      setByPath(path, val);
+      applyFieldEdit({ path, inputId, previewId: 'preview-vr-' + idx + '-' + field, newVal: val }, 'redo');
     }
     function addVowelRule() {
+      pushStateHistory();
       const name = prompt('Variable name (e.g. #{b_Ukar}):');
       if (name) { state.VowelRules[name] = { default: '', toggle: 'none', mappings: [] }; renderVowelRules(); renderJSONPreview(); }
     }
     function deleteVowelRule(idx) {
+      pushStateHistory();
       const keys = Object.keys(state.VowelRules);
       delete state.VowelRules[keys[idx]];
       renderVowelRules(); renderJSONPreview();
     }
     function addVowelMapping(vIdx) {
+      pushStateHistory();
       const keys = Object.keys(state.VowelRules);
       state.VowelRules[keys[vIdx]].mappings.push({
         consonants: '',
@@ -2645,25 +2820,31 @@ Unicode: &#x0995;&#x09CD;&#x09B0;&#x09C1; &#x2192; ANSI: e%«</pre>
     }
     function updateVowelMapping(vIdx, mIdx, field, val) {
       const keys = Object.keys(state.VowelRules);
-      
+      const vk = keys[vIdx];
+
       // Handle type conversions
       if (field === 'matchMode') {
         val = parseInt(val, 10) || 0;
       } else if (field === 'process' && val === 'main') {
         val = '';  // "main" saves as empty string
       }
-      
-      state.VowelRules[keys[vIdx]].mappings[mIdx][field] = val;
-      renderAll();
+
+      const path = ['VowelRules', vk, 'mappings', mIdx, field];
+      const oldVal = getByPath(path);
+      const inputId = 'vrm-' + vIdx + '-' + mIdx + '-' + field;
+      pushFieldHistory({ path, oldVal, newVal: val, inputId, previewId: 'preview-vrm-' + vIdx + '-' + mIdx + '-' + field });
+      setByPath(path, val);
+      applyFieldEdit({ path, inputId, previewId: 'preview-vrm-' + vIdx + '-' + mIdx + '-' + field, newVal: val }, 'redo');
     }
     function deleteVowelMapping(vIdx, mIdx) {
+      pushStateHistory();
       const keys = Object.keys(state.VowelRules);
       state.VowelRules[keys[vIdx]].mappings.splice(mIdx, 1);
       renderVowelRules(); renderJSONPreview();
     }
 
-    function addGroupItem(gk) { state.ConsonantGroups[gk].push(''); renderGroups(); renderJSONPreview(); }
-    function deleteGroupItem(gk, i) { state.ConsonantGroups[gk].splice(i, 1); renderGroups(); renderJSONPreview(); }
+    function addGroupItem(gk) { pushStateHistory(); state.ConsonantGroups[gk].push(''); renderGroups(); renderJSONPreview(); }
+    function deleteGroupItem(gk, i) { pushStateHistory(); state.ConsonantGroups[gk].splice(i, 1); renderGroups(); renderJSONPreview(); }
 
     // ===== CORE ENGINE =====
     function renderAll() {
@@ -2699,11 +2880,13 @@ Unicode: &#x0995;&#x09CD;&#x09B0;&#x09C1; &#x2192; ANSI: e%«</pre>
     function loadPastedJSON() {
       try {
         const parsed = JSON.parse(document.getElementById('pasteTextArea').value);
+        pushStateHistory();
         state = convertImportedState(parsed);
+        localStorage.removeItem(AUTO_SAVE_KEY); // replace any stale autosave with the imported (clean) state
         renderAll();
         togglePasteModal(false);
         showToast('স্কিমা লোড হয়েছে');
-      } catch (err) { alert('Invalid JSON: ' + err.message); }
+      } catch (err) { alert('Error: ' + err.message); }
     }
 
     function convertImportedState(s) {
@@ -2744,7 +2927,9 @@ Unicode: &#x0995;&#x09CD;&#x09B0;&#x09C1; &#x2192; ANSI: e%«</pre>
       const reader = new FileReader();
       reader.onload = function (ev) {
         try {
+          pushStateHistory();
           state = convertImportedState(JSON.parse(ev.target.result));
+          localStorage.removeItem(AUTO_SAVE_KEY); // replace any stale autosave with the imported (clean) state
           renderAll();
           showToast('ফাইল সফলভাবে লোড হয়েছে');
         } catch (err) { alert('Error: ' + err.message); }
@@ -2759,7 +2944,7 @@ Unicode: &#x0995;&#x09CD;&#x09B0;&#x09C1; &#x2192; ANSI: e%«</pre>
     function hexToChar() {
       const inp = document.getElementById('hexToCharInput').value;
       const ch = hexToChars(inp);
-      document.getElementById('hexToCharResult').innerHTML = ch ? `<span class="preview-char elevation-1">${ch}</span> <span class="text-zinc-500 text-xs font-mono">U+${ch.codePointAt(0).toString(16).toUpperCase()}</span>` : '';
+      document.getElementById('hexToCharResult').innerHTML = ch ? `<span class="preview-char elevation-1">${ch}</span> <span class="text-zinc-500 text-md font-mono">U+${ch.codePointAt(0).toString(16).toUpperCase()}</span>` : '';
     }
     function renderVarBrowser() {
       const search = document.getElementById('varBrowserSearch').value.toLowerCase();
@@ -2863,7 +3048,7 @@ Unicode: &#x0995;&#x09CD;&#x09B0;&#x09C1; &#x2192; ANSI: e%«</pre>
           <h4 class="text-white font-bold">${step.title}</h4>
         </div>
         <p class="text-md mb-3">${step.desc}</p>
-        <div class="bg-indigo-900/10 border border-indigo-500/20 rounded-lg p-3 text-xs">
+        <div class="bg-indigo-900/10 border border-indigo-500/20 rounded-lg p-3 text-md">
           <span class="text-indigo-300 font-bold">টিপস:</span> ${step.tip}
         </div></div>`;
       bar.style.width = ((wizardStep + 1) / WIZARD_STEPS.length * 100) + '%';
@@ -2889,7 +3074,7 @@ Unicode: &#x0995;&#x09CD;&#x09B0;&#x09C1; &#x2192; ANSI: e%«</pre>
       if (!input || !output || !state) return;
       const val = input.value;
       if (!val) {
-        output.innerHTML = '<span class="text-zinc-600 text-xs">ANSI কোড এখানে দেখাবে...</span>';
+        output.innerHTML = '<span class="text-zinc-600 text-md">ANSI কোড এখানে দেখাবে...</span>';
         return;
       }
       let result = val;
@@ -3102,10 +3287,13 @@ Unicode: &#x0995;&#x09CD;&#x09B0;&#x09C1; &#x2192; ANSI: e%«</pre>
     }
 
     // Initial state
+    // Legacy/unversioned autosaves are now ignored by loadAutoSave(), so startup always
+    // loads a clean state (imported file or SAMPLE). No stale corruption can reappear.
     state = loadAutoSave() || JSON.parse(JSON.stringify(SAMPLE));
     updateSaveIndicator();
     setupSubTabListeners();
     renderAll();
+    historyEnabled = true; // start recording history only after the initial render
     initDetails();
     // Initialize wizard if present
     if (document.getElementById('wizardContent')) renderWizardStep();
@@ -3119,9 +3307,24 @@ Unicode: &#x0995;&#x09CD;&#x09B0;&#x09C1; &#x2192; ANSI: e%«</pre>
       }
     });
 
+    document.addEventListener('keydown', function(e) {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      const k = e.key.toLowerCase();
+      const shift = e.shiftKey;
+      if (k === 'z' && !shift) { e.preventDefault(); undo(); }
+      else if (k === 'z' && shift) { e.preventDefault(); undoAll(); }
+      else if (k === 'y' && !shift) { e.preventDefault(); redo(); }
+      else if (k === 'y' && shift) { e.preventDefault(); redoAll(); }
+    });
+
     function autoConvertHexInput(val) {
       if (!val) return val;
       if (/^(#\$[0-9A-Fa-f]{1,4})+$/.test(val)) return val;
+      // Detect malformed #$ (not followed by exactly 1-4 hex digits) and error out.
+      const malformed = val.match(/#\$(?![0-9A-Fa-f]{1,4}(?:[#{]|$))/);
+      if (malformed) {
+        throw new Error('ভুল codepoint format: "' + malformed[0] + (val[malformed.index + 2] !== undefined ? val[malformed.index + 2] : '') + '..."');
+      }
       return val.replace(/(#\{[^}]+\})|(#\$[0-9A-Fa-f]{1,4})|([^#]+)|./g, function(match, varRef, hexRef, plain) {
         if (varRef) return varRef;
         if (hexRef) return hexRef;
