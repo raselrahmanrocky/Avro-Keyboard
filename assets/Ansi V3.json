@@ -2,787 +2,787 @@
   "Constants": {
     "Numbers": {
       "A_0": {
+        "UnicodeKey": "#$09E6",
         "Value": "#$0030",
-        "Comment": "০",
-        "UnicodeKey": "#$09E6"
+        "Comment": "০"
       },
       "A_1": {
+        "UnicodeKey": "#$09E7",
         "Value": "#$0031",
-        "Comment": "১",
-        "UnicodeKey": "#$09E7"
+        "Comment": "১"
       },
       "A_2": {
+        "UnicodeKey": "#$09E8",
         "Value": "#$0032",
-        "Comment": "২",
-        "UnicodeKey": "#$09E8"
+        "Comment": "২"
       },
       "A_3": {
+        "UnicodeKey": "#$09E9",
         "Value": "#$0033",
-        "Comment": "৩",
-        "UnicodeKey": "#$09E9"
+        "Comment": "৩"
       },
       "A_4": {
+        "UnicodeKey": "#$09EA",
         "Value": "#$0034",
-        "Comment": "৪",
-        "UnicodeKey": "#$09EA"
+        "Comment": "৪"
       },
       "A_5": {
+        "UnicodeKey": "#$09EB",
         "Value": "#$0035",
-        "Comment": "৫",
-        "UnicodeKey": "#$09EB"
+        "Comment": "৫"
       },
       "A_6": {
+        "UnicodeKey": "#$09EC",
         "Value": "#$0036",
-        "Comment": "৬",
-        "UnicodeKey": "#$09EC"
+        "Comment": "৬"
       },
       "A_7": {
+        "UnicodeKey": "#$09ED",
         "Value": "#$0037",
-        "Comment": "৭",
-        "UnicodeKey": "#$09ED"
+        "Comment": "৭"
       },
       "A_8": {
+        "UnicodeKey": "#$09EE",
         "Value": "#$0038",
-        "Comment": "৮",
-        "UnicodeKey": "#$09EE"
+        "Comment": "৮"
       },
       "A_9": {
+        "UnicodeKey": "#$09EF",
         "Value": "#$0039",
-        "Comment": "৯",
-        "UnicodeKey": "#$09EF"
+        "Comment": "৯"
       }
     },
     "VowelsAndKars": {
       "A_A": {
+        "UnicodeKey": "#$0985",
         "Value": "#$0078",
-        "Comment": "অ",
-        "UnicodeKey": "#$0985"
+        "Comment": "অ"
       },
       "A_AA": {
+        "UnicodeKey": "#$0986",
         "Value": "#$0078#$0079",
-        "Comment": "আ",
-        "UnicodeKey": "#$0986"
+        "Comment": "আ"
       },
       "A_AAKar": {
+        "UnicodeKey": "#$09BE",
         "Value": "#$0079",
-        "Comment": "া (আ-কার)",
-        "UnicodeKey": "#$09BE"
+        "Comment": "া (আ-কার)"
       },
       "A_I": {
+        "UnicodeKey": "#$0987",
         "Value": "#$A3#$7A",
-        "Comment": "ই",
-        "UnicodeKey": "#$0987"
+        "Comment": "ই"
       },
       "A_IKar": {
+        "UnicodeKey": "#$09BF",
         "Value": "#$21",
-        "Comment": "ি (ই-কার)",
-        "UnicodeKey": "#$09BF"
+        "Comment": "ি (ই-কার)"
       },
       "A_II": {
+        "UnicodeKey": "#$0988",
         "Value": "#$007B",
-        "Comment": "ঈ",
-        "UnicodeKey": "#$0988"
+        "Comment": "ঈ"
       },
       "A_IIKar": {
+        "UnicodeKey": "#$09C0",
         "Value": "#$23",
-        "Comment": "ী (ঈ-কার)",
-        "UnicodeKey": "#$09C0"
+        "Comment": "ী (ঈ-কার)"
       },
       "A_U": {
+        "UnicodeKey": "#$0989",
         "Value": "#$0076#$00FE#$007A",
-        "Comment": "উ",
-        "UnicodeKey": "#$0989"
+        "Comment": "উ"
       },
       "A_UKar2": {
+        "UnicodeKey": "#$09C1",
         "Value": "#$24",
-        "Comment": "ু (উ-কার ২ - ঝুলন্ত)",
-        "UnicodeKey": "#$09C1"
+        "Comment": "ু (উ-কার ২ - ঝুলন্ত)"
       },
       "A_UKar1": {
+        "UnicodeKey": "#$09C1",
         "Value": "#$25",
-        "Comment": "ু (উ-কার ১ - সাধারণ)",
-        "UnicodeKey": "#$09C1"
+        "Comment": "ু (উ-কার ১ - সাধারণ)"
       },
       "A_UKar3": {
+        "UnicodeKey": "#$09C1",
         "Value": "#$59",
-        "Comment": "ু (উ-কার ৩ - ড়ু/ঢ়ু)",
-        "UnicodeKey": "#$09C1"
+        "Comment": "ু (উ-কার ৩ - ড়ু/ঢ়ু)"
       },
       "A_UKar4": {
+        "UnicodeKey": "#$09C1",
         "Value": "#$26",
-        "Comment": "ু (উ-কার ৪ - রু)",
-        "UnicodeKey": "#$09C1"
+        "Comment": "ু (উ-কার ৪ - রু)"
       },
       "A_UU": {
+        "UnicodeKey": "#$098A",
         "Value": "#$7C",
-        "Comment": "ঊ",
-        "UnicodeKey": "#$098A"
+        "Comment": "ঊ"
       },
       "A_UUKar2": {
+        "UnicodeKey": "#$09C2",
         "Value": "#$28",
-        "Comment": "ূ (ঊ-কার ২ - ঝুলন্ত)",
-        "UnicodeKey": "#$09C2"
+        "Comment": "ূ (ঊ-কার ২ - ঝুলন্ত)"
       },
       "A_UUKar1": {
+        "UnicodeKey": "#$09C2",
         "Value": "#$29",
-        "Comment": "ূ (ঊ-কার ১ - সাধারণ)",
-        "UnicodeKey": "#$09C2"
+        "Comment": "ূ (ঊ-কার ১ - সাধারণ)"
       },
       "A_UUKar3": {
+        "UnicodeKey": "#$09C2",
         "Value": "#$2A",
-        "Comment": "ূ (ঊ-কার ৩ - রূ)",
-        "UnicodeKey": "#$09C2"
+        "Comment": "ূ (ঊ-কার ৩ - রূ)"
       },
       "A_RRI": {
+        "UnicodeKey": "#$098B",
         "Value": "#$007D",
-        "Comment": "ঋ",
-        "UnicodeKey": "#$098B"
+        "Comment": "ঋ"
       },
       "A_RRIKar1": {
+        "UnicodeKey": "#$09C3",
         "Value": "#$2C",
-        "Comment": "ৃ (ঋ-কার ১)",
-        "UnicodeKey": "#$09C3"
+        "Comment": "ৃ (ঋ-কার ১)"
       },
       "A_RRIKar2": {
+        "UnicodeKey": "#$09C3",
         "Value": "#$2B",
-        "Comment": "ৃ (ঋ-কার ২)",
-        "UnicodeKey": "#$09C3"
+        "Comment": "ৃ (ঋ-কার ২)"
       },
       "A_E": {
+        "UnicodeKey": "#$098F",
         "Value": "#$007E",
-        "Comment": "এ",
-        "UnicodeKey": "#$098F"
+        "Comment": "এ"
       },
       "A_EKar1": {
+        "UnicodeKey": "#$09C7",
         "Value": "#$F6",
-        "Comment": "ে (এ-কার ১ - সাধারণ)",
-        "UnicodeKey": "#$09C7"
+        "Comment": "ে (এ-কার ১ - সাধারণ)"
       },
       "A_EKar2": {
+        "UnicodeKey": "#$09C7",
         "Value": "#$F6#$EC",
-        "Comment": "ে (এ-কার ২ - ঝুলন্ত)",
-        "UnicodeKey": "#$09C7"
+        "Comment": "ে (এ-কার ২ - ঝুলন্ত)"
       },
       "A_OI": {
+        "UnicodeKey": "#$0990",
         "Value": "#$00FA",
-        "Comment": "ঐ",
-        "UnicodeKey": "#$0990"
+        "Comment": "ঐ"
       },
       "A_OIKar1": {
+        "UnicodeKey": "#$09C8",
         "Value": "#$F7",
-        "Comment": "ৈ (ঐ-কার ১ - সাধারণ)",
-        "UnicodeKey": "#$09C8"
+        "Comment": "ৈ (ঐ-কার ১ - সাধারণ)"
       },
       "A_OIKar2": {
+        "UnicodeKey": "#$09C8",
         "Value": "#$F7#$EC",
-        "Comment": "ৈ (ঐ-কার ২ - ঝুলন্ত)",
-        "UnicodeKey": "#$09C8"
+        "Comment": "ৈ (ঐ-কার ২ - ঝুলন্ত)"
       },
       "A_O": {
+        "UnicodeKey": "#$0993",
         "Value": "#$00E7",
-        "Comment": "ও",
-        "UnicodeKey": "#$0993"
+        "Comment": "ও"
       },
       "A_OU": {
+        "UnicodeKey": "#$0994",
         "Value": "#$00E8",
-        "Comment": "ঔ",
-        "UnicodeKey": "#$0994"
+        "Comment": "ঔ"
       },
       "A_OUKar": {
+        "UnicodeKey": "#$09CC",
         "Value": "#$EF",
-        "Comment": "ৌ (ঔ-কার)",
-        "UnicodeKey": "#$09CC"
+        "Comment": "ৌ (ঔ-কার)"
       }
     },
     "Symbols": {
       "A_Taka": {
+        "UnicodeKey": "#$09F3",
         "Value": "",
-        "Comment": "৳ (টাকা)",
-        "UnicodeKey": "#$09F3"
+        "Comment": "৳ (টাকা)"
       },
       "A_Dari": {
+        "UnicodeKey": "#$0964",
         "Value": "#$D0",
-        "Comment": "। (দাঁড়ি)",
-        "UnicodeKey": "#$0964"
+        "Comment": "। (দাঁড়ি)"
       },
       "A_DoubleDanda": {
+        "UnicodeKey": "#$0965",
         "Value": "",
-        "Comment": "॥ (দ্বিত্ব দাঁড়ি)",
-        "UnicodeKey": "#$0965"
+        "Comment": "॥ (দ্বিত্ব দাঁড়ি)"
       },
       "A_Hasanta": {
+        "UnicodeKey": "#$09CD",
         "Value": "#$E4",
-        "Comment": "্ (হসন্ত)",
-        "UnicodeKey": "#$09CD"
+        "Comment": "্ (হসন্ত)"
       },
       "A_StartDoubleQuote": {
+        "UnicodeKey": "#$0022",
         "Value": "#$F2#$F2",
-        "Comment": "\" (উদ্ধৃতি শুরু)",
-        "UnicodeKey": "#$0022"
+        "Comment": "\" (উদ্ধৃতি শুরু)"
       },
       "A_EndDoubleQuote": {
+        "UnicodeKey": "#$0022",
         "Value": "#$F3#$F3",
-        "Comment": "\" (উদ্ধৃতি শেষ)",
-        "UnicodeKey": "#$0022"
+        "Comment": "\" (উদ্ধৃতি শেষ)"
       },
       "A_StartSingleQuote": {
+        "UnicodeKey": "#$0027",
         "Value": "#$F2",
-        "Comment": "' (একক উদ্ধৃতি শুরু)",
-        "UnicodeKey": "#$0027"
+        "Comment": "' (একক উদ্ধৃতি শুরু)"
       },
       "A_EndSingleQuote": {
+        "UnicodeKey": "#$0027",
         "Value": "#$F3",
-        "Comment": "' (একক উদ্ধৃতি শেষ)",
-        "UnicodeKey": "#$0027"
+        "Comment": "' (একক উদ্ধৃতি শেষ)"
       }
     },
     "Consonants": {
       "A_K": {
+        "UnicodeKey": "#$0995",
         "Value": "#$201E#$FE",
-        "Comment": "ক",
-        "UnicodeKey": "#$0995"
+        "Comment": "ক"
       },
       "A_Kh": {
+        "UnicodeKey": "#$0996",
         "Value": "#$2026",
-        "Comment": "খ",
-        "UnicodeKey": "#$0996"
+        "Comment": "খ"
       },
       "A_G": {
+        "UnicodeKey": "#$0997",
         "Value": "#$2020",
-        "Comment": "গ",
-        "UnicodeKey": "#$0997"
+        "Comment": "গ"
       },
       "A_Gh": {
+        "UnicodeKey": "#$0998",
         "Value": "#$2021",
-        "Comment": "ঘ",
-        "UnicodeKey": "#$0998"
+        "Comment": "ঘ"
       },
       "A_NGA": {
+        "UnicodeKey": "#$0999",
         "Value": "#$02C6",
-        "Comment": "ঙ",
-        "UnicodeKey": "#$0999"
+        "Comment": "ঙ"
       },
       "A_C": {
+        "UnicodeKey": "#$099A",
         "Value": "#$2030#$00FE",
-        "Comment": "চ",
-        "UnicodeKey": "#$099A"
+        "Comment": "চ"
       },
       "A_Ch": {
+        "UnicodeKey": "#$099B",
         "Value": "#$0160#$00E9",
-        "Comment": "ছ",
-        "UnicodeKey": "#$099B"
+        "Comment": "ছ"
       },
       "A_J": {
+        "UnicodeKey": "#$099C",
         "Value": "#$2039",
-        "Comment": "জ",
-        "UnicodeKey": "#$099C"
+        "Comment": "জ"
       },
       "A_Jh": {
+        "UnicodeKey": "#$099D",
         "Value": "#$0047#$00FE",
-        "Comment": "ঝ",
-        "UnicodeKey": "#$099D"
+        "Comment": "ঝ"
       },
       "A_NYA": {
+        "UnicodeKey": "#$099E",
         "Value": "#$007E#$0152",
-        "Comment": "ঞ",
-        "UnicodeKey": "#$099E"
+        "Comment": "ঞ"
       },
       "A_Tt": {
+        "UnicodeKey": "#$099F",
         "Value": "#$00DD#$00FE",
-        "Comment": "ট",
-        "UnicodeKey": "#$099F"
+        "Comment": "ট"
       },
       "A_Tth": {
+        "UnicodeKey": "#$09A0",
         "Value": "#$00E0#$00FE",
-        "Comment": "ঠ",
-        "UnicodeKey": "#$09A0"
+        "Comment": "ঠ"
       },
       "A_Dd": {
+        "UnicodeKey": "#$09A1",
         "Value": "#$0076#$00FE",
-        "Comment": "ড",
-        "UnicodeKey": "#$09A1"
+        "Comment": "ড"
       },
       "A_Ddh": {
+        "UnicodeKey": "#$09A2",
         "Value": "#$2018#$00FE",
-        "Comment": "ঢ",
-        "UnicodeKey": "#$09A2"
+        "Comment": "ঢ"
       },
       "A_Nn": {
+        "UnicodeKey": "#$09A3",
         "Value": "#$2019",
-        "Comment": "ণ",
-        "UnicodeKey": "#$09A3"
+        "Comment": "ণ"
       },
       "A_T": {
+        "UnicodeKey": "#$09A4",
         "Value": "#$201C#$00FE",
-        "Comment": "ত",
-        "UnicodeKey": "#$09A4"
+        "Comment": "ত"
       },
       "A_Th": {
+        "UnicodeKey": "#$09A5",
         "Value": "#$00ED",
-        "Comment": "থ",
-        "UnicodeKey": "#$09A5"
+        "Comment": "থ"
       },
       "A_D": {
+        "UnicodeKey": "#$09A6",
         "Value": "#$201D",
-        "Comment": "দ",
-        "UnicodeKey": "#$09A6"
+        "Comment": "দ"
       },
       "A_Dh": {
+        "UnicodeKey": "#$09A7",
         "Value": "#$2022",
-        "Comment": "ধ",
-        "UnicodeKey": "#$09A7"
+        "Comment": "ধ"
       },
       "A_N": {
+        "UnicodeKey": "#$09A8",
         "Value": "#$02DC",
-        "Comment": "ন",
-        "UnicodeKey": "#$09A8"
+        "Comment": "ন"
       },
       "A_P": {
+        "UnicodeKey": "#$09AA",
         "Value": "#$00FE#$2122",
-        "Comment": "প",
-        "UnicodeKey": "#$09AA"
+        "Comment": "প"
       },
       "A_Ph": {
+        "UnicodeKey": "#$09AB",
         "Value": "#$0161#$00FE",
-        "Comment": "ফ",
-        "UnicodeKey": "#$09AB"
+        "Comment": "ফ"
       },
       "A_B": {
+        "UnicodeKey": "#$09AC",
         "Value": "#$00EE",
-        "Comment": "ব",
-        "UnicodeKey": "#$09AC"
+        "Comment": "ব"
       },
       "A_Bh": {
+        "UnicodeKey": "#$09AD",
         "Value": "#$00A6#$00FE",
-        "Comment": "ভ",
-        "UnicodeKey": "#$09AD"
+        "Comment": "ভ"
       },
       "A_M": {
+        "UnicodeKey": "#$09AE",
         "Value": "#$203A",
-        "Comment": "ম",
-        "UnicodeKey": "#$09AE"
+        "Comment": "ম"
       },
       "A_Z": {
+        "UnicodeKey": "#$09AF",
         "Value": "#$00EB",
-        "Comment": "য",
-        "UnicodeKey": "#$09AF"
+        "Comment": "য"
       },
       "A_R": {
+        "UnicodeKey": "#$09B0",
         "Value": "#$00EE#$00FB",
-        "Comment": "র",
-        "UnicodeKey": "#$09B0"
+        "Comment": "র"
       },
       "A_L": {
+        "UnicodeKey": "#$09B2",
         "Value": "#$0153",
-        "Comment": "ল",
-        "UnicodeKey": "#$09B2"
+        "Comment": "ল"
       },
       "A_Sh": {
+        "UnicodeKey": "#$09B6",
         "Value": "#$0178",
-        "Comment": "শ",
-        "UnicodeKey": "#$09B6"
+        "Comment": "শ"
       },
       "A_SS": {
+        "UnicodeKey": "#$09B7",
         "Value": "#$00A1#$00EC",
-        "Comment": "ষ",
-        "UnicodeKey": "#$09B7"
+        "Comment": "ষ"
       },
       "A_S": {
+        "UnicodeKey": "#$09B8",
         "Value": "#$00A2",
-        "Comment": "স",
-        "UnicodeKey": "#$09B8"
+        "Comment": "স"
       },
       "A_H": {
+        "UnicodeKey": "#$09B9",
         "Value": "#$00A3",
-        "Comment": "হ",
-        "UnicodeKey": "#$09B9"
+        "Comment": "হ"
       },
       "A_RR": {
+        "UnicodeKey": "#$09DC",
         "Value": "#$0076#$00FE#$00FC",
-        "Comment": "ড়",
-        "UnicodeKey": "#$09DC"
+        "Comment": "ড়"
       },
       "A_RRH": {
+        "UnicodeKey": "#$09DD",
         "Value": "#$2018#$00FE#$00FC",
-        "Comment": "ঢ়",
-        "UnicodeKey": "#$09DD"
+        "Comment": "ঢ়"
       },
       "A_Y": {
+        "UnicodeKey": "#$09DF",
         "Value": "#$00EB#$00FB",
-        "Comment": "য়",
-        "UnicodeKey": "#$09DF"
+        "Comment": "য়"
       },
       "A_Khandata": {
+        "UnicodeKey": "#$09CE",
         "Value": "#$00EA",
-        "Comment": "ৎ",
-        "UnicodeKey": "#$09CE"
+        "Comment": "ৎ"
       },
       "A_Anushar": {
+        "UnicodeKey": "#$0982",
         "Value": "#$201A",
-        "Comment": "ং",
-        "UnicodeKey": "#$0982"
+        "Comment": "ং"
       },
       "A_Bisharga": {
+        "UnicodeKey": "#$0983",
         "Value": "#$0192",
-        "Comment": "ঃ",
-        "UnicodeKey": "#$0983"
+        "Comment": "ঃ"
       },
       "A_Chandra": {
+        "UnicodeKey": "#$0981",
         "Value": "#$00A4",
-        "Comment": "ঁ",
-        "UnicodeKey": "#$0981"
+        "Comment": "ঁ"
       }
     },
     "FullForms": {
       "A_K_K": {
+        "UnicodeKey": "#$0995#$09CD#$0995",
         "Value": "#$45#$FE",
-        "Comment": "ক্ক",
-        "UnicodeKey": "#$0995#$09CD#$0995"
+        "Comment": "ক্ক"
       },
       "A_K_Tt": {
+        "UnicodeKey": "#$0995#$09CD#$099F",
         "Value": "#$51",
-        "Comment": "ক্ট",
-        "UnicodeKey": "#$0995#$09CD#$099F"
+        "Comment": "ক্ট"
       },
       "A_K_Ss_M": {
+        "UnicodeKey": "#$0995#$09CD#$09B8#$09CD#$09AE",
         "Value": "#$3A#$E4#$203A",
-        "Comment": "ক্স্ম",
-        "UnicodeKey": "#$0995#$09CD#$09B8#$09CD#$09AE"
+        "Comment": "ক্স্ম"
       },
       "A_K_T": {
+        "UnicodeKey": "#$0995#$09CD#$09A4",
         "Value": "#$5F#$AB",
-        "Comment": "ক্ত",
-        "UnicodeKey": "#$0995#$09CD#$09A4"
+        "Comment": "ক্ত"
       },
       "A_K_M": {
+        "UnicodeKey": "#$0995#$09CD#$09AE",
         "Value": "#$A9",
-        "Comment": "ক্ম",
-        "UnicodeKey": "#$0995#$09CD#$09AE"
+        "Comment": "ক্ম"
       },
       "A_K_R": {
+        "UnicodeKey": "#$0995#$09CD#$09B0",
         "Value": "#$65#$AB",
-        "Comment": "ক্র",
-        "UnicodeKey": "#$0995#$09CD#$09B0"
+        "Comment": "ক্র"
       },
       "A_K_Ss": {
+        "UnicodeKey": "#$0995#$09CD#$09B7",
         "Value": "#$C7#$FE",
-        "Comment": "ক্ষ",
-        "UnicodeKey": "#$0995#$09CD#$09B7"
+        "Comment": "ক্ষ"
       },
       "A_K_S": {
+        "UnicodeKey": "#$0995#$09CD#$09B8",
         "Value": "#$3A",
-        "Comment": "ক্স",
-        "UnicodeKey": "#$0995#$09CD#$09B8"
+        "Comment": "ক্স"
       },
       "A_G_Ukar": {
+        "UnicodeKey": "#$0997#$09C1",
         "Value": "#$3D",
-        "Comment": "গু",
-        "UnicodeKey": "#$0997#$09C1"
+        "Comment": "গু"
       },
       "A_G_G": {
+        "UnicodeKey": "#$0997#$09CD#$0997",
         "Value": "#$3E",
-        "Comment": "গ্গ",
-        "UnicodeKey": "#$0997#$09CD#$0997"
+        "Comment": "গ্গ"
       },
       "A_G_D": {
+        "UnicodeKey": "#$0997#$09CD#$09A6",
         "Value": "#$40#$201D",
-        "Comment": "গ্দ",
-        "UnicodeKey": "#$0997#$09CD#$09A6"
+        "Comment": "গ্দ"
       },
       "A_G_Dh": {
+        "UnicodeKey": "#$0997#$09CD#$09A7",
         "Value": "#$3F#$FE",
-        "Comment": "গ্ধ",
-        "UnicodeKey": "#$0997#$09CD#$09A7"
+        "Comment": "গ্ধ"
       },
       "A_NGA_K": {
+        "UnicodeKey": "#$0999#$09CD#$0995",
         "Value": "#$42#$FE",
-        "Comment": "ঙ্ক",
-        "UnicodeKey": "#$0999#$09CD#$0995"
+        "Comment": "ঙ্ক"
       },
       "A_NGA_G": {
+        "UnicodeKey": "#$0999#$09CD#$0997",
         "Value": "#$44",
-        "Comment": "ঙ্গ",
-        "UnicodeKey": "#$0999#$09CD#$0997"
+        "Comment": "ঙ্গ"
       },
       "A_J_J": {
+        "UnicodeKey": "#$099C#$09CD#$099C",
         "Value": "#$49",
-        "Comment": "জ্জ",
-        "UnicodeKey": "#$099C#$09CD#$099C"
+        "Comment": "জ্জ"
       },
       "A_J_Jh": {
+        "UnicodeKey": "#$099C#$09CD#$099D",
         "Value": "#$4A",
-        "Comment": "জ্ঝ",
-        "UnicodeKey": "#$099C#$09CD#$099D"
+        "Comment": "জ্ঝ"
       },
       "A_J_NYA": {
+        "UnicodeKey": "#$099C#$09CD#$099E",
         "Value": "#$4B#$FE",
-        "Comment": "জ্ঞ",
-        "UnicodeKey": "#$099C#$09CD#$099E"
+        "Comment": "জ্ঞ"
       },
       "A_NYA_C": {
+        "UnicodeKey": "#$099E#$09CD#$099A",
         "Value": "#$4D#$FE",
-        "Comment": "ঞ্চ",
-        "UnicodeKey": "#$099E#$09CD#$099A"
+        "Comment": "ঞ্চ"
       },
       "A_NYA_CH": {
+        "UnicodeKey": "#$099E#$09CD#$099B",
         "Value": "#$4E#$FE",
-        "Comment": "ঞ্ছ",
-        "UnicodeKey": "#$099E#$09CD#$099B"
+        "Comment": "ঞ্ছ"
       },
       "A_NYA_J": {
+        "UnicodeKey": "#$099E#$09CD#$099C",
         "Value": "#$4F",
-        "Comment": "ঞ্জ",
-        "UnicodeKey": "#$099E#$09CD#$099C"
+        "Comment": "ঞ্জ"
       },
       "A_NYA_Jh": {
+        "UnicodeKey": "#$099E#$09CD#$099D",
         "Value": "#$50",
-        "Comment": "ঞ্ঝ",
-        "UnicodeKey": "#$099E#$09CD#$099D"
+        "Comment": "ঞ্ঝ"
       },
       "A_Tt_Tt": {
+        "UnicodeKey": "#$099F#$09CD#$099F",
         "Value": "#$52",
-        "Comment": "ট্ট",
-        "UnicodeKey": "#$099F#$09CD#$099F"
+        "Comment": "ট্ট"
       },
       "A_Dd_Dd": {
+        "UnicodeKey": "#$09A1#$09CD#$09A1",
         "Value": "#$55#$FE",
-        "Comment": "ড্ড",
-        "UnicodeKey": "#$09A1#$09CD#$09A1"
+        "Comment": "ড্ড"
       },
       "A_Nn_Tt": {
+        "UnicodeKey": "#$09A3#$09CD#$099F",
         "Value": "#$5E#$F9#$DD#$FE",
-        "Comment": "ণ্ট",
-        "UnicodeKey": "#$09A3#$09CD#$099F"
+        "Comment": "ণ্ট"
       },
       "A_Nn_Tth": {
+        "UnicodeKey": "#$09A3#$09CD#$09A0",
         "Value": "#$5A#$FE",
-        "Comment": "ণ্ঠ",
-        "UnicodeKey": "#$09A3#$09CD#$09A0"
+        "Comment": "ণ্ঠ"
       },
       "A_NN_Dd": {
+        "UnicodeKey": "#$09A3#$09CD#$09A1",
         "Value": "#$5B#$FE",
-        "Comment": "ণ্ড",
-        "UnicodeKey": "#$09A3#$09CD#$09A1"
+        "Comment": "ণ্ড"
       },
       "A_T_T": {
+        "UnicodeKey": "#$09A4#$09CD#$09A4",
         "Value": "#$5F",
-        "Comment": "ত্ত",
-        "UnicodeKey": "#$09A4#$09CD#$09A4"
+        "Comment": "ত্ত"
       },
       "A_T_Th": {
+        "UnicodeKey": "#$09A4#$09CD#$09A5",
         "Value": "#$61",
-        "Comment": "ত্থ",
-        "UnicodeKey": "#$09A4#$09CD#$09A5"
+        "Comment": "ত্থ"
       },
       "A_T_M": {
+        "UnicodeKey": "#$09A4#$09CD#$09AE",
         "Value": "#$64",
-        "Comment": "ত্ম",
-        "UnicodeKey": "#$09A4#$09CD#$09AE"
+        "Comment": "ত্ম"
       },
       "A_T_R": {
+        "UnicodeKey": "#$09A4#$09CD#$09B0",
         "Value": "#$65",
-        "Comment": "ত্র",
-        "UnicodeKey": "#$09A4#$09CD#$09B0"
+        "Comment": "ত্র"
       },
       "A_D_D": {
+        "UnicodeKey": "#$09A6#$09CD#$09A6",
         "Value": "#$6A",
-        "Comment": "দ্দ",
-        "UnicodeKey": "#$09A6#$09CD#$09A6"
+        "Comment": "দ্দ"
       },
       "A_D_Dh": {
+        "UnicodeKey": "#$09A6#$09CD#$09A7",
         "Value": "#$6B#$FE",
-        "Comment": "দ্ধ",
-        "UnicodeKey": "#$09A6#$09CD#$09A7"
+        "Comment": "দ্ধ"
       },
       "A_D_B": {
+        "UnicodeKey": "#$09A6#$09CD#$09AC",
         "Value": "#$6D",
-        "Comment": "দ্ব",
-        "UnicodeKey": "#$09A6#$09CD#$09AC"
+        "Comment": "দ্ব"
       },
       "A_D_M": {
+        "UnicodeKey": "#$09A6#$09CD#$09AE",
         "Value": "#$70",
-        "Comment": "দ্ম",
-        "UnicodeKey": "#$09A6#$09CD#$09AE"
+        "Comment": "দ্ম"
       },
       "A_N_Tth": {
+        "UnicodeKey": "#$09A8#$09CD#$09A5",
         "Value": "#$73#$FE#$69",
-        "Comment": "ন্থ",
-        "UnicodeKey": "#$09A8#$09CD#$09A5"
+        "Comment": "ন্থ"
       },
       "A_N_Dd": {
+        "UnicodeKey": "#$09A8#$09CD#$09A1",
         "Value": "#$75#$FE",
-        "Comment": "ন্ড",
-        "UnicodeKey": "#$09A8#$09CD#$09A1"
+        "Comment": "ন্ড"
       },
       "A_N_Dh": {
+        "UnicodeKey": "#$09A8#$09CD#$09A7",
         "Value": "#$F5#$FE",
-        "Comment": "ন্ধ",
-        "UnicodeKey": "#$09A8#$09CD#$09A7"
+        "Comment": "ন্ধ"
       },
       "A_N_S": {
+        "UnicodeKey": "#$09A8#$09CD#$09B8",
         "Value": "#$AA",
-        "Comment": "ন্স",
-        "UnicodeKey": "#$09A8#$09CD#$09B8"
+        "Comment": "ন্স"
       },
       "A_P_Tt": {
+        "UnicodeKey": "#$09AA#$09CD#$099F",
         "Value": "#$B2#$57#$7A",
-        "Comment": "প্ট",
-        "UnicodeKey": "#$09AA#$09CD#$099F"
+        "Comment": "প্ট"
       },
       "A_P_T": {
+        "UnicodeKey": "#$09AA#$09CD#$09A4",
         "Value": "#$AE",
-        "Comment": "প্ত",
-        "UnicodeKey": "#$09AA#$09CD#$09A4"
+        "Comment": "প্ত"
       },
       "A_P_P": {
+        "UnicodeKey": "#$09AA#$09CD#$09AA",
         "Value": "#$AF",
-        "Comment": "প্প",
-        "UnicodeKey": "#$09AA#$09CD#$09AA"
+        "Comment": "প্প"
       },
       "A_P_S": {
+        "UnicodeKey": "#$09AA#$09CD#$09B8",
         "Value": "#$B0",
-        "Comment": "প্স",
-        "UnicodeKey": "#$09AA#$09CD#$09B8"
+        "Comment": "প্স"
       },
       "A_B_J": {
+        "UnicodeKey": "#$09AC#$09CD#$099C",
         "Value": "#$B6",
-        "Comment": "ব্জ",
-        "UnicodeKey": "#$09AC#$09CD#$099C"
+        "Comment": "ব্জ"
       },
       "A_B_D": {
+        "UnicodeKey": "#$09AC#$09CD#$09A6",
         "Value": "#$B7#$2219",
-        "Comment": "ব্দ",
-        "UnicodeKey": "#$09AC#$09CD#$09A6"
+        "Comment": "ব্দ"
       },
       "A_B_Dh": {
+        "UnicodeKey": "#$09AC#$09CD#$09A7",
         "Value": "#$B8#$FE",
-        "Comment": "ব্ধ",
-        "UnicodeKey": "#$09AC#$09CD#$09A7"
+        "Comment": "ব্ধ"
       },
       "A_Bh_R": {
+        "UnicodeKey": "#$09AD#$09CD#$09B0",
         "Value": "#$BC",
-        "Comment": "ভ্র",
-        "UnicodeKey": "#$09AD#$09CD#$09B0"
+        "Comment": "ভ্র"
       },
       "A_M_N": {
+        "UnicodeKey": "#$09AE#$09CD#$09A8",
         "Value": "#$C1#$AC",
-        "Comment": "ম্ন",
-        "UnicodeKey": "#$09AE#$09CD#$09A8"
+        "Comment": "ম্ন"
       },
       "A_M_Ph": {
+        "UnicodeKey": "#$09AE#$09CD#$09AB",
         "Value": "#$C1#$B3#$FE",
-        "Comment": "ম্ফ",
-        "UnicodeKey": "#$09AE#$09CD#$09AB"
+        "Comment": "ম্ফ"
       },
       "A_L_K": {
+        "UnicodeKey": "#$09B2#$09CD#$0995",
         "Value": "#$CD#$F1",
-        "Comment": "ল্ক",
-        "UnicodeKey": "#$09B2#$09CD#$0995"
+        "Comment": "ল্ক"
       },
       "A_L_G": {
+        "UnicodeKey": "#$09B2#$09CD#$0997",
         "Value": "#$D1",
-        "Comment": "ল্গ",
-        "UnicodeKey": "#$09B2#$09CD#$0997"
+        "Comment": "ল্গ"
       },
       "A_L_Tt": {
+        "UnicodeKey": "#$09B2#$09CD#$099F",
         "Value": "#$CE#$DD#$FE",
-        "Comment": "ল্ট",
-        "UnicodeKey": "#$09B2#$09CD#$099F"
+        "Comment": "ল্ট"
       },
       "A_L_Dd": {
+        "UnicodeKey": "#$09B2#$09CD#$09A1",
         "Value": "#$D3#$FE",
-        "Comment": "ল্ড",
-        "UnicodeKey": "#$09B2#$09CD#$09A1"
+        "Comment": "ল্ড"
       },
       "A_L_P": {
+        "UnicodeKey": "#$09B2#$09CD#$09AA",
         "Value": "#$D2",
-        "Comment": "ল্প",
-        "UnicodeKey": "#$09B2#$09CD#$09AA"
+        "Comment": "ল্প"
       },
       "A_L_Ph": {
+        "UnicodeKey": "#$09B2#$09CD#$09AB",
         "Value": "#$CD#$B3#$FE",
-        "Comment": "ল্ফ",
-        "UnicodeKey": "#$09B2#$09CD#$09AB"
+        "Comment": "ল্ফ"
       },
       "A_Sh_UKar": {
+        "UnicodeKey": "#$09B6#$09C1",
         "Value": "#$D6",
-        "Comment": "শু",
-        "UnicodeKey": "#$09B6#$09C1"
+        "Comment": "শু"
       },
       "A_Sh_C": {
+        "UnicodeKey": "#$09B6#$09CD#$099A",
         "Value": "#$D8#$FE",
-        "Comment": "শ্চ",
-        "UnicodeKey": "#$09B6#$09CD#$099A"
+        "Comment": "শ্চ"
       },
       "A_Sh_Ch": {
+        "UnicodeKey": "#$09B6#$09CD#$099B",
         "Value": "#$D9#$0160#$E9",
-        "Comment": "শ্ছ",
-        "UnicodeKey": "#$09B6#$09CD#$099B"
+        "Comment": "শ্ছ"
       },
       "A_Ss_Nn": {
+        "UnicodeKey": "#$09B7#$09CD#$09A3",
         "Value": "#$A1#$0152",
-        "Comment": "ষ্ণ",
-        "UnicodeKey": "#$09B7#$09CD#$09A3"
+        "Comment": "ষ্ণ"
       },
       "A_Ss_Tt": {
+        "UnicodeKey": "#$09B7#$09CD#$099F",
         "Value": "#$DC#$54",
-        "Comment": "ষ্ট",
-        "UnicodeKey": "#$09B7#$09CD#$099F"
+        "Comment": "ষ্ট"
       },
       "A_Ss_Tth": {
+        "UnicodeKey": "#$09B7#$09CD#$09A0",
         "Value": "#$DB#$FE",
-        "Comment": "ষ্ঠ",
-        "UnicodeKey": "#$09B7#$09CD#$09A0"
+        "Comment": "ষ্ঠ"
       },
       "A_Ss_Ph": {
+        "UnicodeKey": "#$09B8#$09CD#$09AB",
         "Value": "#$DF#$FE#$B3#$FE",
-        "Comment": "স্ফ",
-        "UnicodeKey": "#$09B8#$09CD#$09AB"
+        "Comment": "স্ফ"
       },
       "A_S_Kh": {
+        "UnicodeKey": "#$09B8#$09CD#$0996",
         "Value": "#$DF#$FE#$3C",
-        "Comment": "স্খ",
-        "UnicodeKey": "#$09B8#$09CD#$0996"
+        "Comment": "স্খ"
       },
       "A_S_Tt": {
+        "UnicodeKey": "#$09B8#$09CD#$099F",
         "Value": "#$DE#$DD#$FE",
-        "Comment": "স্ট",
-        "UnicodeKey": "#$09B8#$09CD#$099F"
+        "Comment": "স্ট"
       },
       "A_S_N": {
+        "UnicodeKey": "#$09B8#$09CD#$09A8",
         "Value": "#$DF#$FE#$AC",
-        "Comment": "স্ন",
-        "UnicodeKey": "#$09B8#$09CD#$09A8"
+        "Comment": "স্ন"
       },
       "A_S_Ph": {
+        "UnicodeKey": "#$09B8#$09CD#$09AB",
         "Value": "#$DF#$FE#$B3#$FE",
-        "Comment": "স্ফ",
-        "UnicodeKey": "#$09B8#$09CD#$09AB"
+        "Comment": "স্ফ"
       },
       "A_H_UKar": {
+        "UnicodeKey": "#$09B9#$09C1",
         "Value": "#$FD",
-        "Comment": "হু",
-        "UnicodeKey": "#$09B9#$09C1"
+        "Comment": "হু"
       },
       "A_H_RRIKar": {
+        "UnicodeKey": "#$09B9#$09C3",
         "Value": "#$A3#$2A",
-        "Comment": "হৃ",
-        "UnicodeKey": "#$09B9#$09C3"
+        "Comment": "হৃ"
       },
       "A_H_N": {
+        "UnicodeKey": "#$09B9#$09CD#$09A8",
         "Value": "#$A3#$AB",
-        "Comment": "হ্ন",
-        "UnicodeKey": "#$09B9#$09CD#$09A8"
+        "Comment": "হ্ন"
       },
       "A_H_M": {
+        "UnicodeKey": "#$09B9#$09CD#$09AE",
         "Value": "#$E1#$FE",
-        "Comment": "হ্ম",
-        "UnicodeKey": "#$09B9#$09CD#$09AE"
+        "Comment": "হ্ম"
       },
       "A_Rr_G": {
+        "UnicodeKey": "#$09B0#$09CD#$0997",
         "Value": "#$2020#$C5",
-        "Comment": "র্গ",
-        "UnicodeKey": "#$09B0#$09CD#$0997"
+        "Comment": "র্গ"
       }
     },
     "FirstHalfForms": {

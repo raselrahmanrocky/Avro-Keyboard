@@ -2855,6 +2855,7 @@ begin
       else
         CatSB.Append(',');
         CatSB.Append('"').Append(Rec.Name).Append('":{');
+      CatSB.Append('"UnicodeKey":"').Append(JSONEscape(Rec.BengaliChar)).Append('",');
       CatSB.Append('"Value":"').Append(SmartEscape(Val)).Append('",');
       CatSB.Append('"Comment":"').Append(JSONEscape(Rec.BengaliChar)).Append('"');
       CatSB.Append('}');
