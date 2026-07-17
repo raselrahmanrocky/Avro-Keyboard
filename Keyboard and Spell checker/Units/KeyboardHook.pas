@@ -250,13 +250,13 @@ begin
       // Build preview string from tracked modifier state
       ShortcutText := '';
       if TrackedCtrl then
-        ShortcutText := ShortcutText + 'Ctrl+';
+        ShortcutText := ShortcutText + 'Ctrl + ';
       if TrackedShift then
-        ShortcutText := ShortcutText + 'Shift+';
+        ShortcutText := ShortcutText + 'Shift + ';
       if TrackedAlt then
-        ShortcutText := ShortcutText + 'Alt+';
+        ShortcutText := ShortcutText + 'Alt + ';
       if TrackedWin then
-        ShortcutText := ShortcutText + 'Win+';
+        ShortcutText := ShortcutText + 'Win + ';
 
       // CASE A: KeyDown of non-modifier = finalize recording
       if ((wParam = 256) or (wParam = 260)) and (not IsModifier) then

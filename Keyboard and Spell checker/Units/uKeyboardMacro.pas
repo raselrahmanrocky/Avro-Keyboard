@@ -180,9 +180,12 @@ end;
 Function VirtualKeyToStr(VK: Byte): string;
 begin
   case VK of
+    $08: Result := 'Backspace';
+    $14: Result := 'CapsLock';
     $20: Result := 'Space';
     $30..$39: Result := Chr(VK);
     $41..$5A: Result := Chr(VK);
+    $5D: Result := 'Menu';
     $70: Result := 'F1';
     $71: Result := 'F2';
     $72: Result := 'F3';
@@ -208,6 +211,17 @@ begin
     $28: Result := 'Down';
     $25: Result := 'Left';
     $27: Result := 'Right';
+    $BA: Result := ';';
+    $BB: Result := '=';
+    $BC: Result := ',';
+    $BD: Result := '-';
+    $BE: Result := '.';
+    $BF: Result := '/';
+    $C0: Result := '`';
+    $DB: Result := '[';
+    $DC: Result := '\';
+    $DD: Result := ']';
+    $DE: Result := '''';
   else
     Result := 'VK' + IntToStr(VK);
   end;
@@ -220,7 +234,10 @@ var
   Upper: string;
 begin
   Upper := UpperCase(S);
-  if Upper = 'SPACE' then Result := $20
+  if Upper = 'BACKSPACE' then Result := $08
+  else if Upper = 'CAPSLOCK' then Result := $14
+  else if Upper = 'SPACE' then Result := $20
+  else if Upper = 'MENU' then Result := $5D
   else if Upper = 'ENTER' then Result := $0D
   else if Upper = 'ESC' then Result := $1B
   else if Upper = 'TAB' then Result := $09
@@ -248,6 +265,17 @@ begin
   else if Upper = 'F10' then Result := $79
   else if Upper = 'F11' then Result := $7A
   else if Upper = 'F12' then Result := $7B
+  else if Upper = ';' then Result := $BA
+  else if Upper = '=' then Result := $BB
+  else if Upper = ',' then Result := $BC
+  else if Upper = '-' then Result := $BD
+  else if Upper = '.' then Result := $BE
+  else if Upper = '/' then Result := $BF
+  else if Upper = '`' then Result := $C0
+  else if Upper = '[' then Result := $DB
+  else if Upper = '\' then Result := $DC
+  else if Upper = ']' then Result := $DD
+  else if Upper = '''' then Result := $DE
   else Result := $20;
 end;
 
