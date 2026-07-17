@@ -1698,7 +1698,7 @@ begin
       end;
 
       if OutputIsBijoy = 'YES' then
-        Tray.Hint := 'Avro Keyboard.' + #13 + 'Running Bangla Keyboard Mode (ANSI/Bijoy Output).' + #13 + 'Press ' + ModeSwitchKey + ' to switch to System default.'
+        Tray.Hint := 'Avro Keyboard.' + #13 + 'Running Bangla Keyboard Mode (ANSI Version).' + #13 + 'Press ' + ModeSwitchKey + ' to switch to System default.'
       else
         Tray.Hint := 'Avro Keyboard.' + #13 + 'Running Bangla Keyboard Mode.' + #13 + 'Press ' + ModeSwitchKey + ' to switch to System default.';
     end

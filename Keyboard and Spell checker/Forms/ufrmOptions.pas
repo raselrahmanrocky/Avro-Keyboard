@@ -146,7 +146,6 @@ type
     procedure ShortcutEditClick(Sender: TObject);
     private
       { Private declarations }
-      // Procedure SetTabOrder;
       procedure LoadSettings;
       procedure SaveSettings;
       function GetListIndex(List: TStrings; SearchS: string): Integer;
@@ -177,63 +176,6 @@ uses
 
 const
   Show_Window_in_Taskbar = True;
-
-  { TfrmOptions }
-  {
-    Procedure TfrmOptions.SetTabOrder;
-    Begin
-    CategoryTree.TabOrder := 0;
-
-    ButtonPanel.TabOrder := 2;
-    Button_OK.TabOrder := 0;
-    Button_Cancel.TabOrder := 1;
-    Button_Apply.TabOrder := 2;
-    Button_Help.TabOrder := 3;
-
-    Case CategoryTree.Selected.Index Of
-    0: Begin
-    //General_Panel
-    General_Panel.TabOrder := 1;
-
-    checkStartUp.TabOrder := 0;
-    CheckShowSplash.TabOrder := 1;
-    optStartupUIMode_TopBar.TabOrder := 2;
-    optStartupUIMode_Tray.TabOrder := 3;
-    optStartupUIMode_Last.TabOrder := 4;
-    optTopBarXButton_Minimize.TabOrder := 5;
-    optTopBarXButton_Close.TabOrder := 6;
-    optTopBarXButton_ShowMenu.TabOrder := 7;
-    End;
-    1: Begin
-
-    End;
-    2: Begin
-
-    End;
-    3: Begin
-
-    End;
-    4: Begin
-
-    End;
-    5: Begin
-
-    End;
-    6: Begin
-
-    End;
-    7: Begin
-
-    End;
-    8: Begin
-
-    End;
-    9: Begin
-
-    End;
-    End;
-    End;
-  }
 
   { =============================================================================== }
 
@@ -317,7 +259,6 @@ begin
   end;
 
   TopLabel.Caption := CategoryTree.Selected.Text + ' Settings...';
-  // SetTabOrder;
 end;
 
 { =============================================================================== }
@@ -448,6 +389,11 @@ end;
 { =============================================================================== }
 
 procedure TfrmOptions.FormCreate(Sender: TObject);
+const
+  LEFT_MARGIN = 24;
+  EDIT_WIDTH = 180;
+  GROUP_HEIGHT = 75;
+  GROUP_SPACING = 12;
 begin
 
   { Arrange Panels }
@@ -499,12 +445,34 @@ begin
   comboFunctionKeys_OutputMode.Visible := False;
   comboFunctionKeys_SpellerLauncher.Visible := False;
 
+  // =======================================================
+  // Standardize GroupBox layout inside KeyboardMode_Panel
+  GroupBox4.Left := 16;
+  GroupBox4.Width := KeyboardMode_Panel.Width - 60;
+  GroupBox4.Top := 12;
+  GroupBox4.Height := GROUP_HEIGHT;
+
+  GroupBox8.Left := GroupBox4.Left;
+  GroupBox8.Width := GroupBox4.Width;
+  GroupBox8.Top := GroupBox4.Top + GroupBox4.Height + GROUP_SPACING;
+  GroupBox8.Height := GROUP_HEIGHT;
+
+  GroupBox9.Left := GroupBox4.Left;
+  GroupBox9.Width := GroupBox4.Width;
+  GroupBox9.Top := GroupBox8.Top + GroupBox8.Height + GROUP_SPACING;
+  GroupBox9.Height := GROUP_HEIGHT;
+
+  // Shift sub-labels upward within their GroupBoxes
+  Label7.Top := 16;
+  Label16.Top := 16;
+  Label18.Top := 16;
+
   // Create TEdit for Keyboard Mode Switch (in GroupBox4)
   edtModeSwitch := TEdit.Create(GroupBox4);
   edtModeSwitch.Parent := GroupBox4;
-  edtModeSwitch.Left := comboFunctionKeys.Left;
-  edtModeSwitch.Top := comboFunctionKeys.Top;
-  edtModeSwitch.Width := 150;
+  edtModeSwitch.Left := LEFT_MARGIN;
+  edtModeSwitch.Top := 35;
+  edtModeSwitch.Width := EDIT_WIDTH;
   edtModeSwitch.ReadOnly := True;
   edtModeSwitch.Text := 'Set Shortcut';
   edtModeSwitch.Color := clWindow;
@@ -513,9 +481,9 @@ begin
   // Create TEdit for Output Mode Toggle (in GroupBox8)
   edtOutputMode := TEdit.Create(GroupBox8);
   edtOutputMode.Parent := GroupBox8;
-  edtOutputMode.Left := 24;
-  edtOutputMode.Top := comboFunctionKeys_OutputMode.Top;
-  edtOutputMode.Width := 150;
+  edtOutputMode.Left := LEFT_MARGIN;
+  edtOutputMode.Top := 35;
+  edtOutputMode.Width := EDIT_WIDTH;
   edtOutputMode.ReadOnly := True;
   edtOutputMode.Text := 'Set Shortcut';
   edtOutputMode.Color := clWindow;
@@ -524,9 +492,9 @@ begin
   // Create TEdit for Speller Launcher (in GroupBox9)
   edtSpellerLauncher := TEdit.Create(GroupBox9);
   edtSpellerLauncher.Parent := GroupBox9;
-  edtSpellerLauncher.Left := 24;
-  edtSpellerLauncher.Top := comboFunctionKeys_SpellerLauncher.Top;
-  edtSpellerLauncher.Width := 150;
+  edtSpellerLauncher.Left := LEFT_MARGIN;
+  edtSpellerLauncher.Top := 35;
+  edtSpellerLauncher.Width := EDIT_WIDTH;
   edtSpellerLauncher.ReadOnly := True;
   edtSpellerLauncher.Text := 'Set Shortcut';
   edtSpellerLauncher.Color := clWindow;
@@ -536,18 +504,18 @@ begin
   // ANSI Version Switcher Hotkey UI (runtime-created)
   GroupBox10 := TGroupBox.Create(KeyboardMode_Panel);
   GroupBox10.Parent := KeyboardMode_Panel;
-  GroupBox10.Top := GroupBox9.Top + GroupBox9.Height + 8;
   GroupBox10.Left := GroupBox4.Left;
   GroupBox10.Width := GroupBox4.Width;
-  GroupBox10.Height := 52;
+  GroupBox10.Top := GroupBox9.Top + GroupBox9.Height + GROUP_SPACING;
+  GroupBox10.Height := GROUP_HEIGHT;
   GroupBox10.Caption := 'ANSI Version Switcher';
 
   // Create TEdit for ANSI Version Switcher (in GroupBox10)
   edtAnsiVersion := TEdit.Create(GroupBox10);
   edtAnsiVersion.Parent := GroupBox10;
-  edtAnsiVersion.Left := 12;
-  edtAnsiVersion.Top := 19;
-  edtAnsiVersion.Width := 150;
+  edtAnsiVersion.Left := LEFT_MARGIN;
+  edtAnsiVersion.Top := 30;
+  edtAnsiVersion.Width := EDIT_WIDTH;
   edtAnsiVersion.ReadOnly := True;
   edtAnsiVersion.Text := 'Set Shortcut';
   edtAnsiVersion.Color := clWindow;
@@ -555,13 +523,12 @@ begin
 
   CheckShowAnsiSwitchNotification := TCheckBox.Create(GroupBox10);
   CheckShowAnsiSwitchNotification.Parent := GroupBox10;
-  CheckShowAnsiSwitchNotification.Left := 170;
-  CheckShowAnsiSwitchNotification.Top := 20;
+  CheckShowAnsiSwitchNotification.Left := edtAnsiVersion.Left + edtAnsiVersion.Width + 16;
+  CheckShowAnsiSwitchNotification.Top := edtAnsiVersion.Top + 1;
   CheckShowAnsiSwitchNotification.Caption := 'Show notification on switch';
-  CheckShowAnsiSwitchNotification.Width := 200;
+  CheckShowAnsiSwitchNotification.Width := 150;
 
-  if (GroupBox10.Top + GroupBox10.Height + 10) > KeyboardMode_Panel.Height then
-    KeyboardMode_Panel.Height := GroupBox10.Top + GroupBox10.Height + 10;
+  KeyboardMode_Panel.Height := GroupBox10.Top + GroupBox10.Height + 16;
 
   // Load Settings (AFTER controls are created)
   Self.LoadSettings;
