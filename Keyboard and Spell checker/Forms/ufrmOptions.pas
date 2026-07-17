@@ -247,6 +247,8 @@ end;
 
 procedure TfrmOptions.Button_ApplyClick(Sender: TObject);
 begin
+  IsRecordingHotkey := False;
+  RecordingTargetEdit := nil;
   Self.SaveSettings;
   AvroMainForm1.RefreshSettings;
 
@@ -262,6 +264,13 @@ end;
 
 procedure TfrmOptions.Button_CancelClick(Sender: TObject);
 begin
+  if IsRecordingHotkey and Assigned(RecordingTargetEdit) then
+  begin
+    RecordingTargetEdit.Text := RecordingOldText;
+    RecordingTargetEdit.Color := clWindow;
+  end;
+  IsRecordingHotkey := False;
+  RecordingTargetEdit := nil;
   Self.Close;
 end;
 
@@ -276,6 +285,8 @@ end;
 
 procedure TfrmOptions.Button_OKClick(Sender: TObject);
 begin
+  IsRecordingHotkey := False;
+  RecordingTargetEdit := nil;
   Self.SaveSettings;
   AvroMainForm1.RefreshSettings;
   Self.Close;
@@ -598,10 +609,22 @@ end;
 
 procedure TfrmOptions.ShortcutEditClick(Sender: TObject);
 begin
-  RecordingOldText := TEdit(Sender).Text;
+  // If we were already recording on a different edit box, restore its original state first
+  if IsRecordingHotkey and Assigned(RecordingTargetEdit) and (RecordingTargetEdit <> TEdit(Sender)) then
+  begin
+    RecordingTargetEdit.Text := RecordingOldText;
+    RecordingTargetEdit.Color := clWindow;
+  end;
+
+  // Keep the existing text (do not set to 'Press any key...')
+  if TEdit(Sender).Text = '' then
+    RecordingOldText := 'None'
+  else
+    RecordingOldText := TEdit(Sender).Text;
   IsRecordingHotkey := True;
   RecordingTargetEdit := TEdit(Sender);
-  TEdit(Sender).Text := 'Press any key...';
+
+  // Highlight the background to show it is active for recording
   TEdit(Sender).Color := clYellow;
 end;
 
