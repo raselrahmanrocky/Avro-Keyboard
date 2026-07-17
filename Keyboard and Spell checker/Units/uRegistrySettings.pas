@@ -1,4 +1,4 @@
-{
+﻿{
   =============================================================================
   This Source Code Form is subject to the terms of the Mozilla Public
   License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -527,22 +527,10 @@ begin
     TopBarTransparent := 'YES';
 
   // Keyboard Mode settings
-  if not((ModeSwitchKey = 'F1') or (ModeSwitchKey = 'F2') or (ModeSwitchKey = 'F3') or (ModeSwitchKey = 'F4') or (ModeSwitchKey = 'F5') or
-      (ModeSwitchKey = 'F6') or (ModeSwitchKey = 'F7') or (ModeSwitchKey = 'F8') or (ModeSwitchKey = 'F9') or (ModeSwitchKey = 'F10') or (ModeSwitchKey = 'F11')
-      or (ModeSwitchKey = 'F12') or (ModeSwitchKey = 'CTRL+SPACE')) then
-    ModeSwitchKey := 'F12';
-  if not((ToggleOutputModeKey = 'F1') or (ToggleOutputModeKey = 'F2') or (ToggleOutputModeKey = 'F3') or (ToggleOutputModeKey = 'F4') or
-      (ToggleOutputModeKey = 'F5') or (ToggleOutputModeKey = 'F6') or (ToggleOutputModeKey = 'F7') or (ToggleOutputModeKey = 'F8') or
-      (ToggleOutputModeKey = 'F9') or (ToggleOutputModeKey = 'F10') or (ToggleOutputModeKey = 'F11') or (ToggleOutputModeKey = 'F12')) then
-    ToggleOutputModeKey := 'F12';
-  if not((SpellerLauncherKey = 'F1') or (SpellerLauncherKey = 'F2') or (SpellerLauncherKey = 'F3') or (SpellerLauncherKey = 'F4') or (SpellerLauncherKey = 'F5')
-      or (SpellerLauncherKey = 'F6') or (SpellerLauncherKey = 'F7') or (SpellerLauncherKey = 'F8') or (SpellerLauncherKey = 'F9') or
-      (SpellerLauncherKey = 'F10') or (SpellerLauncherKey = 'F11') or (SpellerLauncherKey = 'F12')) then
-    SpellerLauncherKey := 'F12';
-  if not((AnsiVersionSwitchKey = 'F1') or (AnsiVersionSwitchKey = 'F2') or (AnsiVersionSwitchKey = 'F3') or (AnsiVersionSwitchKey = 'F4') or
-      (AnsiVersionSwitchKey = 'F5') or (AnsiVersionSwitchKey = 'F6') or (AnsiVersionSwitchKey = 'F7') or (AnsiVersionSwitchKey = 'F8') or
-      (AnsiVersionSwitchKey = 'F9') or (AnsiVersionSwitchKey = 'F10') or (AnsiVersionSwitchKey = 'F11') or (AnsiVersionSwitchKey = 'F12')) then
-    AnsiVersionSwitchKey := 'F12';
+  // No restrictive validation - the hotkey recording UI ensures only valid
+  // strings are saved, and MatchesHotkeySetting handles any well-formed
+  // hotkey string (e.g., 'Ctrl+F10', 'Alt+Shift+F7', 'Win+Space').
+  // Empty string or 'NONE' means the feature is disabled.
   if not((ShowAnsiSwitchNotification = 'YES') or (ShowAnsiSwitchNotification = 'NO')) then
     ShowAnsiSwitchNotification := 'YES';
 

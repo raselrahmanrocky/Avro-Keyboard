@@ -111,17 +111,18 @@ type
     GroupBox8: TGroupBox;
     Label16: TLabel;
     comboFunctionKeys_OutputMode: TComboBox;
-    Label17: TLabel;
     GroupBox9: TGroupBox;
     Label18: TLabel;
-    Label19: TLabel;
     comboFunctionKeys_SpellerLauncher: TComboBox;
     Label20: TLabel;
     LabelGlobalHotkeysLink: TLabel;
     GroupBox10: TGroupBox;
-    Label21: TLabel;
-    comboFunctionKeys_AnsiVersion: TComboBox;
     CheckShowAnsiSwitchNotification: TCheckBox;
+
+    edtModeSwitch: TEdit;
+    edtOutputMode: TEdit;
+    edtSpellerLauncher: TEdit;
+    edtAnsiVersion: TEdit;
     procedure FormCreate(Sender: TObject);
     procedure CategoryTreeClick(Sender: TObject);
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
@@ -142,6 +143,7 @@ type
     procedure optOutputANSIMouseUp(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
     procedure LabelHideTimerTimer(Sender: TObject);
     procedure LabelGlobalHotkeysLinkClick(Sender: TObject);
+    procedure ShortcutEditClick(Sender: TObject);
     private
       { Private declarations }
       // Procedure SetTabOrder;
@@ -170,7 +172,8 @@ uses
   WindowsVersion,
   uForm1,
   u_Admin,
-  ufrmEncodingWarning;
+  ufrmEncodingWarning,
+  uKeyboardMacro;
 
 const
   Show_Window_in_Taskbar = True;
@@ -479,6 +482,46 @@ begin
     CategoryTree.Items[0].Selected := True;
 
   // =======================================================
+  // Replace ComboBoxes with interactive TEdit shortcut recorders
+  // Hide the existing ComboBoxes
+  comboFunctionKeys.Visible := False;
+  comboFunctionKeys_OutputMode.Visible := False;
+  comboFunctionKeys_SpellerLauncher.Visible := False;
+
+  // Create TEdit for Keyboard Mode Switch (in GroupBox4)
+  edtModeSwitch := TEdit.Create(GroupBox4);
+  edtModeSwitch.Parent := GroupBox4;
+  edtModeSwitch.Left := comboFunctionKeys.Left;
+  edtModeSwitch.Top := comboFunctionKeys.Top;
+  edtModeSwitch.Width := 150;
+  edtModeSwitch.ReadOnly := True;
+  edtModeSwitch.Text := 'Set Shortcut';
+  edtModeSwitch.Color := clWindow;
+  edtModeSwitch.OnClick := ShortcutEditClick;
+
+  // Create TEdit for Output Mode Toggle (in GroupBox8)
+  edtOutputMode := TEdit.Create(GroupBox8);
+  edtOutputMode.Parent := GroupBox8;
+  edtOutputMode.Left := 24;
+  edtOutputMode.Top := comboFunctionKeys_OutputMode.Top;
+  edtOutputMode.Width := 150;
+  edtOutputMode.ReadOnly := True;
+  edtOutputMode.Text := 'Set Shortcut';
+  edtOutputMode.Color := clWindow;
+  edtOutputMode.OnClick := ShortcutEditClick;
+
+  // Create TEdit for Speller Launcher (in GroupBox9)
+  edtSpellerLauncher := TEdit.Create(GroupBox9);
+  edtSpellerLauncher.Parent := GroupBox9;
+  edtSpellerLauncher.Left := 24;
+  edtSpellerLauncher.Top := comboFunctionKeys_SpellerLauncher.Top;
+  edtSpellerLauncher.Width := 150;
+  edtSpellerLauncher.ReadOnly := True;
+  edtSpellerLauncher.Text := 'Set Shortcut';
+  edtSpellerLauncher.Color := clWindow;
+  edtSpellerLauncher.OnClick := ShortcutEditClick;
+
+  // =======================================================
   // ANSI Version Switcher Hotkey UI (runtime-created)
   GroupBox10 := TGroupBox.Create(KeyboardMode_Panel);
   GroupBox10.Parent := KeyboardMode_Panel;
@@ -488,23 +531,20 @@ begin
   GroupBox10.Height := 52;
   GroupBox10.Caption := 'ANSI Version Switcher';
 
-  Label21 := TLabel.Create(GroupBox10);
-  Label21.Parent := GroupBox10;
-  Label21.Left := 12;
-  Label21.Top := 22;
-  Label21.Caption := 'Ctrl + Shift';
-
-  comboFunctionKeys_AnsiVersion := TComboBox.Create(GroupBox10);
-  comboFunctionKeys_AnsiVersion.Parent := GroupBox10;
-  comboFunctionKeys_AnsiVersion.Left := 70;
-  comboFunctionKeys_AnsiVersion.Top := 19;
-  comboFunctionKeys_AnsiVersion.Width := 60;
-  comboFunctionKeys_AnsiVersion.Style := csDropDownList;
-  comboFunctionKeys_AnsiVersion.Items.AddStrings(['F1','F2','F3','F4','F5','F6','F7','F8','F9','F10','F11','F12']);
+  // Create TEdit for ANSI Version Switcher (in GroupBox10)
+  edtAnsiVersion := TEdit.Create(GroupBox10);
+  edtAnsiVersion.Parent := GroupBox10;
+  edtAnsiVersion.Left := 12;
+  edtAnsiVersion.Top := 19;
+  edtAnsiVersion.Width := 150;
+  edtAnsiVersion.ReadOnly := True;
+  edtAnsiVersion.Text := 'Set Shortcut';
+  edtAnsiVersion.Color := clWindow;
+  edtAnsiVersion.OnClick := ShortcutEditClick;
 
   CheckShowAnsiSwitchNotification := TCheckBox.Create(GroupBox10);
   CheckShowAnsiSwitchNotification.Parent := GroupBox10;
-  CheckShowAnsiSwitchNotification.Left := 140;
+  CheckShowAnsiSwitchNotification.Left := 170;
   CheckShowAnsiSwitchNotification.Top := 20;
   CheckShowAnsiSwitchNotification.Caption := 'Show notification on switch';
   CheckShowAnsiSwitchNotification.Width := 200;
@@ -514,6 +554,12 @@ begin
 
   // Load Settings (AFTER controls are created)
   Self.LoadSettings;
+
+  // Register hotkeys for conflict detection
+  RegisterHotkeyFeature(@ModeSwitchKey, 'Keyboard Mode Switch', edtModeSwitch);
+  RegisterHotkeyFeature(@ToggleOutputModeKey, 'Output Mode Toggle', edtOutputMode);
+  RegisterHotkeyFeature(@SpellerLauncherKey, 'Spell Checker Launcher', edtSpellerLauncher);
+  RegisterHotkeyFeature(@AnsiVersionSwitchKey, 'ANSI Version Switch', edtAnsiVersion);
 end;
 
 { =============================================================================== }
@@ -546,6 +592,17 @@ end;
 procedure TfrmOptions.LabelHideTimerTimer(Sender: TObject);
 begin
   LabelStatus.Visible := False;
+end;
+
+{ =============================================================================== }
+
+procedure TfrmOptions.ShortcutEditClick(Sender: TObject);
+begin
+  RecordingOldText := TEdit(Sender).Text;
+  IsRecordingHotkey := True;
+  RecordingTargetEdit := TEdit(Sender);
+  TEdit(Sender).Text := 'Press any key...';
+  TEdit(Sender).Color := clYellow;
 end;
 
 { =============================================================================== }
@@ -648,10 +705,26 @@ begin
 
   // =======================================================
   // Hotkeys Settings
-  comboFunctionKeys.ItemIndex := GetListIndex(comboFunctionKeys.Items, ModeSwitchKey);
-  comboFunctionKeys_OutputMode.ItemIndex := GetListIndex(comboFunctionKeys_OutputMode.Items, ToggleOutputModeKey);
-  comboFunctionKeys_SpellerLauncher.ItemIndex := GetListIndex(comboFunctionKeys_SpellerLauncher.Items, SpellerLauncherKey);
-  comboFunctionKeys_AnsiVersion.ItemIndex := GetListIndex(comboFunctionKeys_AnsiVersion.Items, AnsiVersionSwitchKey);
+  if ModeSwitchKey <> '' then
+    edtModeSwitch.Text := ModeSwitchKey
+  else
+    edtModeSwitch.Text := 'None';
+
+  if ToggleOutputModeKey <> '' then
+    edtOutputMode.Text := ToggleOutputModeKey
+  else
+    edtOutputMode.Text := 'None';
+
+  if SpellerLauncherKey <> '' then
+    edtSpellerLauncher.Text := SpellerLauncherKey
+  else
+    edtSpellerLauncher.Text := 'None';
+
+  if AnsiVersionSwitchKey <> '' then
+    edtAnsiVersion.Text := AnsiVersionSwitchKey
+  else
+    edtAnsiVersion.Text := 'None';
+
   CheckShowAnsiSwitchNotification.Checked := (ShowAnsiSwitchNotification = 'YES');
 
   // =========================================================
@@ -895,10 +968,26 @@ begin
   // =======================================================
   // Hotkeys Settings
 
-  ModeSwitchKey := uppercase(comboFunctionKeys.Items[comboFunctionKeys.ItemIndex]);
-  ToggleOutputModeKey := uppercase(comboFunctionKeys_OutputMode.Items[comboFunctionKeys_OutputMode.ItemIndex]);
-  SpellerLauncherKey := uppercase(comboFunctionKeys_SpellerLauncher.Items[comboFunctionKeys_SpellerLauncher.ItemIndex]);
-  AnsiVersionSwitchKey := uppercase(comboFunctionKeys_AnsiVersion.Items[comboFunctionKeys_AnsiVersion.ItemIndex]);
+  if edtModeSwitch.Text = 'None' then
+    ModeSwitchKey := ''
+  else
+    ModeSwitchKey := edtModeSwitch.Text;
+
+  if edtOutputMode.Text = 'None' then
+    ToggleOutputModeKey := ''
+  else
+    ToggleOutputModeKey := edtOutputMode.Text;
+
+  if edtSpellerLauncher.Text = 'None' then
+    SpellerLauncherKey := ''
+  else
+    SpellerLauncherKey := edtSpellerLauncher.Text;
+
+  if edtAnsiVersion.Text = 'None' then
+    AnsiVersionSwitchKey := ''
+  else
+    AnsiVersionSwitchKey := UpperCase(edtAnsiVersion.Text);
+
   if CheckShowAnsiSwitchNotification.Checked then
     ShowAnsiSwitchNotification := 'YES'
   else

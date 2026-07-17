@@ -64,7 +64,8 @@ uses
   DebugLog in 'Units\DebugLog.pas',
   Vcl.Themes,
   Vcl.Styles,
-  WindowsDarkMode in 'Units\WindowsDarkMode.pas';
+  WindowsDarkMode in 'Units\WindowsDarkMode.pas',
+  uKeyboardMacro in 'Units\uKeyboardMacro.pas';
 
 var
   Mutex: THandle;

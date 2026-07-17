@@ -456,7 +456,8 @@ uses
   ufrmEncodingWarning,
   DebugLog,
   WindowsDarkMode,
-  System.UITypes;
+  System.UITypes,
+  uKeyboardMacro;
 
 { =============================================================================== }
 
@@ -1068,6 +1069,7 @@ begin
   InitDict;
   LoadKeyboardLayoutNames;
   Initmenu;
+  LoadUserHotkeysFromXML;
 
   Updater := TUpdateCheck.Create;
   WindowDict := TDictionary<HWND, TWindowRecord>.Create;
