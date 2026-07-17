@@ -385,6 +385,7 @@ type
 
       procedure WMCopyData(var Msg: TWMCopyData); message WM_COPYDATA;
       procedure WMShowAnsiPicker(var Msg: TMessage); message WM_APP + 1;
+      procedure WMShowLayoutPicker(var Msg: TMessage); message WM_APP + 3;
     public
       { Public declarations }
       KeyboardModeChanged: Boolean;
@@ -407,6 +408,7 @@ type
       procedure SetBengaliUnicodeMode;
       procedure SetBengaliANSIMode;
       procedure ToggleAnsiVersionPicker;
+      procedure ToggleLayoutPicker;
       procedure TopBarDocToTop;
       function TransferKeyDown(const KeyCode: Integer; var Block: Boolean): string;
       procedure TransferKeyUp(const KeyCode: Integer; var Block: Boolean);
@@ -430,6 +432,7 @@ implementation
 uses
   uRegistrySettings,
   ufrmAnsiVersionPicker,
+  ufrmLayoutPicker,
   ufrmAnsiToast,
   uProcessHandler,
   uAutoCorrect,
@@ -1856,6 +1859,20 @@ end;
 
 { =============================================================================== }
 
+procedure TAvroMainForm1.ToggleLayoutPicker;
+begin
+  ShowLayoutPickerPopup;
+end;
+
+{ =============================================================================== }
+
+procedure TAvroMainForm1.WMShowLayoutPicker(var Msg: TMessage);
+begin
+  ToggleLayoutPicker;
+end;
+
+{ =============================================================================== }
+
 procedure TAvroMainForm1.ApplyPendingANSISwitchRevert;
 begin
   if not PendingANSISwitch then
@@ -1899,6 +1916,7 @@ end;
 
 procedure TAvroMainForm1.ToggleOutputEncoding;
 begin
+  if KeyLayout.KeyboardMode = SysDefault then Exit;
   if OutputIsBijoy = 'YES' then
     OutputasUnicodeRecommended1Click(nil)
   else

@@ -52,6 +52,8 @@ var
   ModeSwitchKey:          string;
   ToggleOutputModeKey:    string;
   SpellerLauncherKey:     string;
+  LayoutSwitchKey:              string;
+  ShowLayoutSwitchNotification: string;
   AnsiVersionSwitchKey:   string;
   ShowAnsiSwitchNotification: string;
 
@@ -158,6 +160,8 @@ begin
   ModeSwitchKey := UpperCase(XML.GetValue('ModeSwitchKey', 'F12'));
   ToggleOutputModeKey := UpperCase(XML.GetValue('ToggleOutputModeKey', 'F12'));
   SpellerLauncherKey := UpperCase(XML.GetValue('SpellerLauncherKey', 'F7'));
+  LayoutSwitchKey := UpperCase(XML.GetValue('LayoutSwitchKey', 'CTRL+SHIFT+F11'));
+  ShowLayoutSwitchNotification := UpperCase(XML.GetValue('ShowLayoutSwitchNotification', 'YES'));
   AnsiVersionSwitchKey := UpperCase(XML.GetValue('AnsiVersionSwitchKey', 'F12'));
   ShowAnsiSwitchNotification := UpperCase(XML.GetValue('ShowAnsiSwitchNotification', 'YES'));
 
@@ -240,6 +244,8 @@ begin
   XML.SetValue('ModeSwitchKey', ModeSwitchKey);
   XML.SetValue('ToggleOutputModeKey', ToggleOutputModeKey);
   XML.SetValue('SpellerLauncherKey', SpellerLauncherKey);
+  XML.SetValue('LayoutSwitchKey', LayoutSwitchKey);
+  XML.SetValue('ShowLayoutSwitchNotification', ShowLayoutSwitchNotification);
   XML.SetValue('AnsiVersionSwitchKey', AnsiVersionSwitchKey);
   XML.SetValue('ShowAnsiSwitchNotification', ShowAnsiSwitchNotification);
 
@@ -330,6 +336,8 @@ begin
     ModeSwitchKey := UpperCase(Reg.ReadStringDef('ModeSwitchKey', 'F12'));
     ToggleOutputModeKey := UpperCase(Reg.ReadStringDef('ToggleOutputModeKey', 'F12'));
     SpellerLauncherKey := UpperCase(Reg.ReadStringDef('SpellerLauncherKey', 'F7'));
+    LayoutSwitchKey := UpperCase(Reg.ReadStringDef('LayoutSwitchKey', 'CTRL+SHIFT+F11'));
+    ShowLayoutSwitchNotification := UpperCase(Reg.ReadStringDef('ShowLayoutSwitchNotification', 'YES'));
     AnsiVersionSwitchKey := UpperCase(Reg.ReadStringDef('AnsiVersionSwitchKey', 'F12'));
     ShowAnsiSwitchNotification := UpperCase(Reg.ReadStringDef('ShowAnsiSwitchNotification', 'YES'));
 
@@ -418,6 +426,8 @@ begin
     Reg.WriteString('ModeSwitchKey', ModeSwitchKey);
     Reg.WriteString('ToggleOutputModeKey', ToggleOutputModeKey);
     Reg.WriteString('SpellerLauncherKey', SpellerLauncherKey);
+    Reg.WriteString('LayoutSwitchKey', LayoutSwitchKey);
+    Reg.WriteString('ShowLayoutSwitchNotification', ShowLayoutSwitchNotification);
     Reg.WriteString('AnsiVersionSwitchKey', AnsiVersionSwitchKey);
     Reg.WriteString('ShowAnsiSwitchNotification', ShowAnsiSwitchNotification);
 
@@ -531,6 +541,8 @@ begin
   // strings are saved, and MatchesHotkeySetting handles any well-formed
   // hotkey string (e.g., 'Ctrl+F10', 'Alt+Shift+F7', 'Win+Space').
   // Empty string or 'NONE' means the feature is disabled.
+  if not((ShowLayoutSwitchNotification = 'YES') or (ShowLayoutSwitchNotification = 'NO')) then
+    ShowLayoutSwitchNotification := 'YES';
   if not((ShowAnsiSwitchNotification = 'YES') or (ShowAnsiSwitchNotification = 'NO')) then
     ShowAnsiSwitchNotification := 'YES';
 

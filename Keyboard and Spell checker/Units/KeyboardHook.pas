@@ -388,6 +388,18 @@ begin
         ShouldBlock := True;
         goto ExitHere;
       end;
+      // Layout Switch
+      if MatchesHotkeySettingTracked(LayoutSwitchKey, kbdllhs.vkCode) then
+      begin
+        PostMessage(AvroMainForm1.Handle, WM_APP + 3, 0, 0);
+        if SettingUsesWinModifier(LayoutSwitchKey) then
+        begin
+          SendInput_Down(VK_MENU_MASK);
+          SendInput_UP(VK_MENU_MASK);
+        end;
+        ShouldBlock := True;
+        goto ExitHere;
+      end;
       // Unicode/ANSI Toggle Shortcuts
       if UnicodeToggleShortcut = 'YES' then
       begin
@@ -440,6 +452,11 @@ begin
         goto ExitHere;
       end;
       if MatchesHotkeySettingTracked(AnsiVersionSwitchKey, kbdllhs.vkCode) then
+      begin
+        ShouldBlock := True;
+        goto ExitHere;
+      end;
+      if MatchesHotkeySettingTracked(LayoutSwitchKey, kbdllhs.vkCode) then
       begin
         ShouldBlock := True;
         goto ExitHere;
