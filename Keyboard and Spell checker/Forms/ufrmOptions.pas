@@ -118,10 +118,13 @@ type
     LabelGlobalHotkeysLink: TLabel;
     GroupBox10: TGroupBox;
     CheckShowAnsiSwitchNotification: TCheckBox;
+    GroupBox11: TGroupBox;
+    CheckShowLayoutSwitchNotification: TCheckBox;
 
     edtModeSwitch: TEdit;
     edtOutputMode: TEdit;
     edtSpellerLauncher: TEdit;
+    edtLayoutSwitch: TEdit;
     edtAnsiVersion: TEdit;
     procedure FormCreate(Sender: TObject);
     procedure CategoryTreeClick(Sender: TObject);
@@ -501,12 +504,40 @@ begin
   edtSpellerLauncher.OnClick := ShortcutEditClick;
 
   // =======================================================
+  // Layout Switcher Hotkey UI (runtime-created)
+  GroupBox11 := TGroupBox.Create(KeyboardMode_Panel);
+  GroupBox11.Parent := KeyboardMode_Panel;
+  GroupBox11.Left := GroupBox4.Left;
+  GroupBox11.Width := GroupBox4.Width;
+  GroupBox11.Top := GroupBox9.Top + GroupBox9.Height + GROUP_SPACING;
+  GroupBox11.Height := GROUP_HEIGHT;
+  GroupBox11.Caption := 'Layout Switcher';
+
+  // Create TEdit for Layout Switcher (in GroupBox11)
+  edtLayoutSwitch := TEdit.Create(GroupBox11);
+  edtLayoutSwitch.Parent := GroupBox11;
+  edtLayoutSwitch.Left := LEFT_MARGIN;
+  edtLayoutSwitch.Top := 30;
+  edtLayoutSwitch.Width := EDIT_WIDTH;
+  edtLayoutSwitch.ReadOnly := True;
+  edtLayoutSwitch.Text := 'Set Shortcut';
+  edtLayoutSwitch.Color := clWindow;
+  edtLayoutSwitch.OnClick := ShortcutEditClick;
+
+  CheckShowLayoutSwitchNotification := TCheckBox.Create(GroupBox11);
+  CheckShowLayoutSwitchNotification.Parent := GroupBox11;
+  CheckShowLayoutSwitchNotification.Left := edtLayoutSwitch.Left + edtLayoutSwitch.Width + 16;
+  CheckShowLayoutSwitchNotification.Top := edtLayoutSwitch.Top + 1;
+  CheckShowLayoutSwitchNotification.Caption := 'Show notification on switch';
+  CheckShowLayoutSwitchNotification.Width := 150;
+
+  // =======================================================
   // ANSI Version Switcher Hotkey UI (runtime-created)
   GroupBox10 := TGroupBox.Create(KeyboardMode_Panel);
   GroupBox10.Parent := KeyboardMode_Panel;
   GroupBox10.Left := GroupBox4.Left;
   GroupBox10.Width := GroupBox4.Width;
-  GroupBox10.Top := GroupBox9.Top + GroupBox9.Height + GROUP_SPACING;
+  GroupBox10.Top := GroupBox11.Top + GroupBox11.Height + GROUP_SPACING;
   GroupBox10.Height := GROUP_HEIGHT;
   GroupBox10.Caption := 'ANSI Version Switcher';
 
@@ -537,6 +568,7 @@ begin
   RegisterHotkeyFeature(@ModeSwitchKey, 'Keyboard Mode Switch', edtModeSwitch);
   RegisterHotkeyFeature(@ToggleOutputModeKey, 'Output Mode Toggle', edtOutputMode);
   RegisterHotkeyFeature(@SpellerLauncherKey, 'Spell Checker Launcher', edtSpellerLauncher);
+  RegisterHotkeyFeature(@LayoutSwitchKey, 'Layout Switch', edtLayoutSwitch);
   RegisterHotkeyFeature(@AnsiVersionSwitchKey, 'ANSI Version Switch', edtAnsiVersion);
 end;
 
@@ -709,6 +741,13 @@ begin
     edtSpellerLauncher.Text := SpellerLauncherKey
   else
     edtSpellerLauncher.Text := 'None';
+
+  if LayoutSwitchKey <> '' then
+    edtLayoutSwitch.Text := LayoutSwitchKey
+  else
+    edtLayoutSwitch.Text := 'None';
+
+  CheckShowLayoutSwitchNotification.Checked := (ShowLayoutSwitchNotification = 'YES');
 
   if AnsiVersionSwitchKey <> '' then
     edtAnsiVersion.Text := AnsiVersionSwitchKey
@@ -972,6 +1011,16 @@ begin
     SpellerLauncherKey := ''
   else
     SpellerLauncherKey := edtSpellerLauncher.Text;
+
+  if edtLayoutSwitch.Text = 'None' then
+    LayoutSwitchKey := ''
+  else
+    LayoutSwitchKey := UpperCase(edtLayoutSwitch.Text);
+
+  if CheckShowLayoutSwitchNotification.Checked then
+    ShowLayoutSwitchNotification := 'YES'
+  else
+    ShowLayoutSwitchNotification := 'NO';
 
   if edtAnsiVersion.Text = 'None' then
     AnsiVersionSwitchKey := ''
