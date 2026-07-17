@@ -569,17 +569,6 @@ object frmOptions: TfrmOptions
           Font.Style = [fsBold]
           ParentFont = False
         end
-        object Label17: TLabel
-          Left = 234
-          Top = 75
-          Width = 50
-          Height = 21
-          Margins.Left = 5
-          Margins.Top = 5
-          Margins.Right = 5
-          Margins.Bottom = 5
-          Caption = 'Shift +'
-        end
         object comboFunctionKeys_OutputMode: TComboBox
           Left = 293
           Top = 69
@@ -633,17 +622,6 @@ object frmOptions: TfrmOptions
           Font.Name = 'Tahoma'
           Font.Style = [fsBold]
           ParentFont = False
-        end
-        object Label19: TLabel
-          Left = 234
-          Top = 74
-          Width = 43
-          Height = 21
-          Margins.Left = 5
-          Margins.Top = 5
-          Margins.Right = 5
-          Margins.Bottom = 5
-          Caption = 'Ctrl +'
         end
         object comboFunctionKeys_SpellerLauncher: TComboBox
           Left = 293
