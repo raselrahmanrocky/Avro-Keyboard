@@ -1,4 +1,4 @@
-{$INCLUDE ../ProjectDefines.inc}
+﻿{$INCLUDE ../ProjectDefines.inc}
 
 Unit uKeyboardMacro;
 
@@ -503,7 +503,7 @@ begin
   FeatureCount := Length(HotkeyFeatures);
   if Idx < FeatureCount then
   begin
-    HotkeyFeatures[Idx].VariablePtr^ := '';
+    // Only update the UI — actual variable cleared by SaveSettings on OK/Apply
     if Assigned(HotkeyFeatures[Idx].EditRef) then
     begin
       HotkeyFeatures[Idx].EditRef.Text := 'None';

@@ -1,4 +1,4 @@
-﻿{
+{
   =============================================================================
   This Source Code Form is subject to the terms of the Mozilla Public
   License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -62,11 +62,10 @@ var
   TrackedAlt: Boolean = False;
   TrackedWin: Boolean = False;
 
-var
-  // Win key blocking: tracks whether Win was blocked to prevent Start Menu
-  // so Win-based hotkeys (e.g. Win+Space) can work cleanly.
-  WinBlockedForHotkey: Boolean = False;
-  NonModifierPressedAfterWin: Boolean = False;
+const
+  // Unassigned VK code used to suppress Start Menu when a Win-based hotkey fires
+  // (AutoHotkey-style MenuMaskKey technique)
+  VK_MENU_MASK = $E8;
 
   { =============================================================================== }
 
@@ -109,26 +108,24 @@ end;
 
 { =============================================================================== }
 
-// Returns True when at least one system hotkey uses the Win modifier
-function HasWinBasedHotkey: Boolean;
+// Returns True when the given hotkey setting uses the Win modifier
+function SettingUsesWinModifier(const Setting: string): Boolean;
 begin
-  Result := ((HotkeyStringToModifiers(ModeSwitchKey) and MOD_WIN) <> 0) or
-            ((HotkeyStringToModifiers(ToggleOutputModeKey) and MOD_WIN) <> 0) or
-            ((HotkeyStringToModifiers(SpellerLauncherKey) and MOD_WIN) <> 0) or
-            ((HotkeyStringToModifiers(AnsiVersionSwitchKey) and MOD_WIN) <> 0);
+  Result := (HotkeyStringToModifiers(Setting) and MOD_WIN) <> 0;
 end;
 
 { =============================================================================== }
 
-// Version of MatchesHotkeySetting that uses tracked modifier state instead of
-// GetAsyncKeyState. Required when a modifier keydown has been blocked by the hook
-// (e.g. Win key blocked to prevent Start Menu), because GetAsyncKeyState won't
-// report it as pressed.
+// Matches a hotkey setting using a combination of manual tracker state and
+// hardware-level GetAsyncKeyState. The OR logic ensures modifier tracking
+// is handled by the tracked state, while GetAsyncKeyState acts as an
+// auto-recovery failsafe for stuck trackers.
 function MatchesHotkeySettingTracked(const Setting: string; vkCode: Integer): Boolean;
 var
   NeedMods: Byte;
   NeedKey: Integer;
   CurrentMods: Byte;
+  RealCtrl, RealShift, RealAlt, RealWin: Boolean;
 begin
   Result := False;
   if (Setting = '') or (Setting = 'NONE') then
@@ -137,11 +134,25 @@ begin
   NeedMods := HotkeyStringToModifiers(Setting);
   NeedKey := HotkeyStringToKey(Setting);
 
+  // Failsafe: Query physical hardware states
+  RealCtrl := (GetAsyncKeyState(VK_CONTROL) and $8000) <> 0;
+  RealShift := (GetAsyncKeyState(VK_SHIFT) and $8000) <> 0;
+  RealAlt := (GetAsyncKeyState(VK_MENU) and $8000) <> 0;
+  RealWin := ((GetAsyncKeyState(VK_LWIN) and $8000) <> 0) or
+             ((GetAsyncKeyState(VK_RWIN) and $8000) <> 0);
+
+  // Auto-recovery: If key is physically up, force-reset stuck manual trackers
+  if not RealCtrl then TrackedCtrl := False;
+  if not RealShift then TrackedShift := False;
+  if not RealAlt then TrackedAlt := False;
+  if not RealWin then TrackedWin := False;
+
+  // Build current modifier mask from both sources (OR = belt-and-suspenders)
   CurrentMods := 0;
-  if TrackedCtrl then CurrentMods := CurrentMods or MOD_CTRL;
-  if TrackedShift then CurrentMods := CurrentMods or MOD_SHIFT;
-  if TrackedAlt then CurrentMods := CurrentMods or MOD_ALT;
-  if TrackedWin then CurrentMods := CurrentMods or MOD_WIN;
+  if TrackedCtrl or RealCtrl then CurrentMods := CurrentMods or MOD_CTRL;
+  if TrackedShift or RealShift then CurrentMods := CurrentMods or MOD_SHIFT;
+  if TrackedAlt or RealAlt then CurrentMods := CurrentMods or MOD_ALT;
+  if TrackedWin or RealWin then CurrentMods := CurrentMods or MOD_WIN;
 
   Result := (NeedMods = CurrentMods) and (NeedKey = vkCode);
 end;
@@ -155,7 +166,7 @@ var
   T:           string;
   ShortcutText: string;
   ConflictIdx: Integer;
-
+  IsModifier:  Boolean;
 label
   ExitHere;
 
@@ -197,28 +208,7 @@ begin
       else if kbdllhs.vkCode in [VK_SHIFT, VK_LSHIFT, VK_RSHIFT] then TrackedShift := True
       else if kbdllhs.vkCode in [VK_MENU, VK_LMENU, VK_RMENU] then TrackedAlt := True
       else if kbdllhs.vkCode in [VK_LWIN, VK_RWIN] then
-      begin
         TrackedWin := True;
-        // Block Win keydown if any hotkey uses the Win modifier,
-        // so Start Menu is not triggered when a Win-based hotkey is pressed.
-        if HasWinBasedHotkey then
-        begin
-          WinBlockedForHotkey := True;
-          NonModifierPressedAfterWin := False;
-          LowLevelKeyboardProc := 1;
-          Exit;
-        end;
-      end;
-      // Track if a non-modifier key was pressed while Win is blocked,
-      // so we know whether to re-send Win on keyup.
-      if WinBlockedForHotkey then
-      begin
-        if not (kbdllhs.vkCode in [VK_CONTROL, VK_LCONTROL, VK_RCONTROL,
-                                   VK_SHIFT, VK_LSHIFT, VK_RSHIFT,
-                                   VK_MENU, VK_LMENU, VK_RMENU,
-                                   VK_LWIN, VK_RWIN]) then
-          NonModifierPressedAfterWin := True;
-      end;
     end
     else if (wParam = 257) or (wParam = 261) then // KeyUp
     begin
@@ -226,21 +216,7 @@ begin
       else if kbdllhs.vkCode in [VK_SHIFT, VK_LSHIFT, VK_RSHIFT] then TrackedShift := False
       else if kbdllhs.vkCode in [VK_MENU, VK_LMENU, VK_RMENU] then TrackedAlt := False
       else if kbdllhs.vkCode in [VK_LWIN, VK_RWIN] then
-      begin
         TrackedWin := False;
-        // If Win was blocked but no hotkey key was pressed,
-        // re-send Win to open Start Menu.
-        if WinBlockedForHotkey then
-        begin
-          WinBlockedForHotkey := False;
-          if not NonModifierPressedAfterWin then
-          begin
-            SendInput_Down(VK_LWIN);
-            SendInput_UP(VK_LWIN);
-          end;
-          NonModifierPressedAfterWin := False;
-        end;
-      end;
     end;
 
     // ----------------------------------------------
@@ -261,21 +237,17 @@ begin
 
 
     // ----------------------------------------------
-    // Hotkey Recording Mode
+    // Hotkey Recording Mode (with live preview)
     // ----------------------------------------------
-    if IsRecordingHotkey and ((wParam = 256) or (wParam = 260)) then
+    if IsRecordingHotkey and ((wParam = 256) or (wParam = 257) or (wParam = 260) or (wParam = 261)) then
     begin
-      // Skip pure modifier presses (wait for main key)
-      if kbdllhs.vkCode in [VK_CONTROL, VK_LCONTROL, VK_RCONTROL,
-                            VK_SHIFT, VK_LSHIFT, VK_RSHIFT,
-                            VK_MENU, VK_LMENU, VK_RMENU,
-                            VK_LWIN, VK_RWIN] then
-      begin
-        LowLevelKeyboardProc := 1;
-        Exit;
-      end;
+      // Determine if current key is a modifier
+      IsModifier := kbdllhs.vkCode in [VK_CONTROL, VK_LCONTROL, VK_RCONTROL,
+                                        VK_SHIFT, VK_LSHIFT, VK_RSHIFT,
+                                        VK_MENU, VK_LMENU, VK_RMENU,
+                                        VK_LWIN, VK_RWIN];
 
-      // Build shortcut string from tracked modifier state
+      // Build preview string from tracked modifier state
       ShortcutText := '';
       if TrackedCtrl then
         ShortcutText := ShortcutText + 'Ctrl+';
@@ -285,46 +257,56 @@ begin
         ShortcutText := ShortcutText + 'Alt+';
       if TrackedWin then
         ShortcutText := ShortcutText + 'Win+';
-      ShortcutText := ShortcutText + VirtualKeyToStr(kbdllhs.vkCode);
 
-      // Conflict detection
-      ConflictIdx := FindConflictingFeature(ShortcutText, RecordingTargetEdit);
-      if ConflictIdx >= 0 then
+      // CASE A: KeyDown of non-modifier = finalize recording
+      if ((wParam = 256) or (wParam = 260)) and (not IsModifier) then
       begin
-        if not ResolveHotkeyConflict(ShortcutText, ConflictIdx) then
+        // Append the final key to the shortcut
+        ShortcutText := ShortcutText + VirtualKeyToStr(kbdllhs.vkCode);
+
+        // Conflict detection
+        ConflictIdx := FindConflictingFeature(ShortcutText, RecordingTargetEdit);
+        if ConflictIdx >= 0 then
         begin
-          if Assigned(RecordingTargetEdit) then
+          if not ResolveHotkeyConflict(ShortcutText, ConflictIdx) then
           begin
-            RecordingTargetEdit.Text := RecordingOldText;
-            RecordingTargetEdit.Color := clWindow;
+            // User cancelled - restore old text
+            if Assigned(RecordingTargetEdit) then
+            begin
+              RecordingTargetEdit.Text := RecordingOldText;
+              RecordingTargetEdit.Color := clWindow;
+            end;
+            IsRecordingHotkey := False;
+            RecordingTargetEdit := nil;
+            LowLevelKeyboardProc := 1;
+            Exit;
           end;
-          IsRecordingHotkey := False;
-          RecordingTargetEdit := nil;
-          LowLevelKeyboardProc := 1;
-          Exit;
+          ClearConflictByIndex(ConflictIdx);
         end;
-        ClearConflictByIndex(ConflictIdx);
-      end;
 
-      // Update the TEdit
-      if Assigned(RecordingTargetEdit) then
-      begin
-        RecordingTargetEdit.Text := ShortcutText;
-        RecordingTargetEdit.Color := clWindow;
-      end;
-      // Sync the underlying variable
-      for var FeatIdx := 0 to Length(HotkeyFeatures) - 1 do
-      begin
-        if HotkeyFeatures[FeatIdx].EditRef = RecordingTargetEdit then
+        // Update the TEdit with final shortcut
+        if Assigned(RecordingTargetEdit) then
         begin
-          HotkeyFeatures[FeatIdx].VariablePtr^ := ShortcutText;
-          Break;
+          RecordingTargetEdit.Text := ShortcutText;
+          RecordingTargetEdit.Color := clWindow;
+        end;
+
+        IsRecordingHotkey := False;
+        RecordingTargetEdit := nil;
+      end
+      // CASE B: KeyUp of any key, or KeyDown of modifier = show live preview
+      else
+      begin
+        if Assigned(RecordingTargetEdit) then
+        begin
+          if ShortcutText = '' then
+            RecordingTargetEdit.Text := 'None'
+          else
+            RecordingTargetEdit.Text := ShortcutText;
         end;
       end;
-      IsRecordingHotkey := False;
-      RecordingTargetEdit := nil;
 
-      LowLevelKeyboardProc := 1; // Block the key
+      LowLevelKeyboardProc := 1;
       Exit;
     end;
 
@@ -362,6 +344,11 @@ begin
       if MatchesHotkeySettingTracked(ModeSwitchKey, kbdllhs.vkCode) then
       begin
         AvroMainForm1.ToggleMode;
+        if SettingUsesWinModifier(ModeSwitchKey) then
+        begin
+          SendInput_Down(VK_MENU_MASK);
+          SendInput_UP(VK_MENU_MASK);
+        end;
         ShouldBlock := True;
         goto ExitHere;
       end;
@@ -369,6 +356,11 @@ begin
       if MatchesHotkeySettingTracked(ToggleOutputModeKey, kbdllhs.vkCode) then
       begin
         AvroMainForm1.ToggleOutputEncoding;
+        if SettingUsesWinModifier(ToggleOutputModeKey) then
+        begin
+          SendInput_Down(VK_MENU_MASK);
+          SendInput_UP(VK_MENU_MASK);
+        end;
         ShouldBlock := True;
         goto ExitHere;
       end;
@@ -376,6 +368,11 @@ begin
       if MatchesHotkeySettingTracked(SpellerLauncherKey, kbdllhs.vkCode) then
       begin
         AvroMainForm1.Spellcheck1Click(nil);
+        if SettingUsesWinModifier(SpellerLauncherKey) then
+        begin
+          SendInput_Down(VK_MENU_MASK);
+          SendInput_UP(VK_MENU_MASK);
+        end;
         ShouldBlock := True;
         goto ExitHere;
       end;
@@ -383,6 +380,11 @@ begin
       if MatchesHotkeySettingTracked(AnsiVersionSwitchKey, kbdllhs.vkCode) then
       begin
         PostMessage(AvroMainForm1.Handle, WM_APP + 1, 0, 0);
+        if SettingUsesWinModifier(AnsiVersionSwitchKey) then
+        begin
+          SendInput_Down(VK_MENU_MASK);
+          SendInput_UP(VK_MENU_MASK);
+        end;
         ShouldBlock := True;
         goto ExitHere;
       end;
@@ -409,6 +411,11 @@ begin
       if MatchUserHotkey(kbdllhs.vkCode, T) then
       begin
         SendKey_Char(T);
+        if TrackedWin then
+        begin
+          SendInput_Down(VK_MENU_MASK);
+          SendInput_UP(VK_MENU_MASK);
+        end;
         ShouldBlock := True;
         goto ExitHere;
       end;
