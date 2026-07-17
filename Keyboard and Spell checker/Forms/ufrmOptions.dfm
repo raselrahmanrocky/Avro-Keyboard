@@ -490,7 +490,7 @@ object frmOptions: TfrmOptions
         Left = 21
         Top = 27
         Width = 593
-        Height = 81
+        Height = 114
         Margins.Left = 5
         Margins.Top = 5
         Margins.Right = 5
@@ -525,20 +525,6 @@ object frmOptions: TfrmOptions
           Margins.Bottom = 5
           Style = csDropDownList
           TabOrder = 0
-          Items.Strings = (
-            'F1'
-            'F2'
-            'F3'
-            'F4'
-            'F5'
-            'F6'
-            'F7'
-            'F8'
-            'F9'
-            'F10'
-            'F11'
-            'F12'
-            'Ctrl+Space')
         end
       end
       object GroupBox8: TGroupBox
@@ -580,19 +566,6 @@ object frmOptions: TfrmOptions
           Margins.Bottom = 5
           Style = csDropDownList
           TabOrder = 0
-          Items.Strings = (
-            'F1'
-            'F2'
-            'F3'
-            'F4'
-            'F5'
-            'F6'
-            'F7'
-            'F8'
-            'F9'
-            'F10'
-            'F11'
-            'F12')
         end
       end
       object GroupBox9: TGroupBox
@@ -634,19 +607,6 @@ object frmOptions: TfrmOptions
           Margins.Bottom = 5
           Style = csDropDownList
           TabOrder = 0
-          Items.Strings = (
-            'F1'
-            'F2'
-            'F3'
-            'F4'
-            'F5'
-            'F6'
-            'F7'
-            'F8'
-            'F9'
-            'F10'
-            'F11'
-            'F12')
         end
       end
     end
