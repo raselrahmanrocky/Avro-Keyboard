@@ -286,15 +286,7 @@ begin
         if (not TrackedCtrl) and (not TrackedShift) and (not TrackedAlt) and (not TrackedWin) and
            ((kbdllhs.vkCode < $70) or (kbdllhs.vkCode > $7B)) then
         begin
-          // Reject: no modifier and not an F-key
-          if Assigned(RecordingTargetEdit) then
-          begin
-            RecordingTargetEdit.Text := RecordingOldText;
-            RecordingTargetEdit.Color := clWindow;
-          end;
-          IsRecordingHotkey := False;
-          RecordingTargetEdit := nil;
-          RecordingFinalized := False;
+          // Reject this keypress but keep recording session alive
           LowLevelKeyboardProc := 1;
           Exit;
         end;
@@ -320,12 +312,9 @@ begin
           ClearConflictByIndex(ConflictIdx);
         end;
 
-        // Update the TEdit with final shortcut
+        // Update the TEdit with final shortcut (keep yellow to show recording is still active)
         if Assigned(RecordingTargetEdit) then
-        begin
           RecordingTargetEdit.Text := ShortcutText;
-          RecordingTargetEdit.Color := clWindow;
-        end;
 
         // Keep recording active for continuous reconfiguration
         RecordingOldText := ShortcutText;
