@@ -202,6 +202,8 @@ end;
 
 procedure TfrmOptions.Button_ApplyClick(Sender: TObject);
 begin
+  if Assigned(RecordingTargetEdit) then
+    RecordingTargetEdit.Color := clWindow;
   IsRecordingHotkey := False;
   RecordingFinalized := False;
   RecordingTargetEdit := nil;
