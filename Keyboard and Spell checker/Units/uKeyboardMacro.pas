@@ -1,4 +1,4 @@
-﻿{$INCLUDE ../ProjectDefines.inc}
+{$INCLUDE ../ProjectDefines.inc}
 
 Unit uKeyboardMacro;
 
@@ -41,6 +41,7 @@ type
 var
   HotkeyFeatures: array of THotkeyFeature;
   RecordingOldText: string;
+  RecordingFinalized: Boolean;
 
 procedure RegisterHotkeyFeature(VarPtr: PString; const Name: string; Edit: TEdit);
 function  FindConflictingFeature(const Hotkey: string; SourceEdit: TEdit): Integer;
