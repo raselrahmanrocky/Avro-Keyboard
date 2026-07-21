@@ -180,7 +180,17 @@ uses
 const
   Show_Window_in_Taskbar = True;
 
-  { =============================================================================== }
+{ =============================================================================== }
+
+function IsHotkeyNone(const Text: string): Boolean;
+var
+  U: string;
+begin
+  U := UpperCase(Trim(Text));
+  Result := (U = '') or (U = 'NONE') or (U = 'SET SHORTCUT') or (U = 'PRESS ANY KEY...');
+end;
+
+{ =============================================================================== }
 
 procedure TfrmOptions.butEditCustomDictClick(Sender: TObject);
 begin
@@ -193,6 +203,7 @@ end;
 procedure TfrmOptions.Button_ApplyClick(Sender: TObject);
 begin
   IsRecordingHotkey := False;
+  RecordingFinalized := False;
   RecordingTargetEdit := nil;
   Self.SaveSettings;
   AvroMainForm1.RefreshSettings;
@@ -215,6 +226,7 @@ begin
     RecordingTargetEdit.Color := clWindow;
   end;
   IsRecordingHotkey := False;
+  RecordingFinalized := False;
   RecordingTargetEdit := nil;
   Self.Close;
 end;
@@ -231,6 +243,7 @@ end;
 procedure TfrmOptions.Button_OKClick(Sender: TObject);
 begin
   IsRecordingHotkey := False;
+  RecordingFinalized := False;
   RecordingTargetEdit := nil;
   Self.SaveSettings;
   AvroMainForm1.RefreshSettings;
@@ -615,12 +628,13 @@ begin
     RecordingTargetEdit.Color := clWindow;
   end;
 
-  // Keep the existing text (do not set to 'Press any key...')
-  if TEdit(Sender).Text = '' then
+  // Keep the existing text, treating placeholder/empty as "None"
+  if IsHotkeyNone(TEdit(Sender).Text) then
     RecordingOldText := 'None'
   else
     RecordingOldText := TEdit(Sender).Text;
   IsRecordingHotkey := True;
+  RecordingFinalized := False;
   RecordingTargetEdit := TEdit(Sender);
 
   // Highlight the background to show it is active for recording
@@ -997,22 +1011,22 @@ begin
   // =======================================================
   // Hotkeys Settings
 
-  if edtModeSwitch.Text = 'None' then
+  if IsHotkeyNone(edtModeSwitch.Text) then
     ModeSwitchKey := ''
   else
     ModeSwitchKey := edtModeSwitch.Text;
 
-  if edtOutputMode.Text = 'None' then
+  if IsHotkeyNone(edtOutputMode.Text) then
     ToggleOutputModeKey := ''
   else
     ToggleOutputModeKey := edtOutputMode.Text;
 
-  if edtSpellerLauncher.Text = 'None' then
+  if IsHotkeyNone(edtSpellerLauncher.Text) then
     SpellerLauncherKey := ''
   else
     SpellerLauncherKey := edtSpellerLauncher.Text;
 
-  if edtLayoutSwitch.Text = 'None' then
+  if IsHotkeyNone(edtLayoutSwitch.Text) then
     LayoutSwitchKey := ''
   else
     LayoutSwitchKey := UpperCase(edtLayoutSwitch.Text);
@@ -1022,7 +1036,7 @@ begin
   else
     ShowLayoutSwitchNotification := 'NO';
 
-  if edtAnsiVersion.Text = 'None' then
+  if IsHotkeyNone(edtAnsiVersion.Text) then
     AnsiVersionSwitchKey := ''
   else
     AnsiVersionSwitchKey := UpperCase(edtAnsiVersion.Text);

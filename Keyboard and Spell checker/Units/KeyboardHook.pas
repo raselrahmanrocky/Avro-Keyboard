@@ -200,6 +200,20 @@ begin
     end;
 
     // ----------------------------------------------
+    // Clean state reset: After a hotkey was finalized, reset all tracked
+    // modifiers on the NEXT KeyDown so the new recording starts fresh.
+    // Must run BEFORE the modifier tracking section below.
+    // ----------------------------------------------
+    if RecordingFinalized and ((wParam = 256) or (wParam = 260)) then
+    begin
+      TrackedCtrl := False;
+      TrackedShift := False;
+      TrackedAlt := False;
+      TrackedWin := False;
+      RecordingFinalized := False;
+    end;
+
+    // ----------------------------------------------
     // Track modifier key state manually (reliable even when hook blocks key events)
     // ----------------------------------------------
     if (wParam = 256) or (wParam = 260) then // KeyDown
@@ -264,13 +278,34 @@ begin
         // Append the final key to the shortcut
         ShortcutText := ShortcutText + VirtualKeyToStr(kbdllhs.vkCode);
 
+        // Treat bare modifier-only or empty as "None"
+        if (Trim(ShortcutText) = '') or (ShortcutText = 'None') then
+          ShortcutText := 'None';
+
+        // Validate: non-F keys require at least one modifier
+        if (not TrackedCtrl) and (not TrackedShift) and (not TrackedAlt) and (not TrackedWin) and
+           ((kbdllhs.vkCode < $70) or (kbdllhs.vkCode > $7B)) then
+        begin
+          // Reject: no modifier and not an F-key
+          if Assigned(RecordingTargetEdit) then
+          begin
+            RecordingTargetEdit.Text := RecordingOldText;
+            RecordingTargetEdit.Color := clWindow;
+          end;
+          IsRecordingHotkey := False;
+          RecordingTargetEdit := nil;
+          RecordingFinalized := False;
+          LowLevelKeyboardProc := 1;
+          Exit;
+        end;
+
         // Conflict detection
         ConflictIdx := FindConflictingFeature(ShortcutText, RecordingTargetEdit);
         if ConflictIdx >= 0 then
         begin
           if not ResolveHotkeyConflict(ShortcutText, ConflictIdx) then
           begin
-            // User cancelled - restore old text
+            // User cancelled - restore old text, stop recording
             if Assigned(RecordingTargetEdit) then
             begin
               RecordingTargetEdit.Text := RecordingOldText;
@@ -278,6 +313,7 @@ begin
             end;
             IsRecordingHotkey := False;
             RecordingTargetEdit := nil;
+            RecordingFinalized := False;
             LowLevelKeyboardProc := 1;
             Exit;
           end;
@@ -291,12 +327,35 @@ begin
           RecordingTargetEdit.Color := clWindow;
         end;
 
-        IsRecordingHotkey := False;
-        RecordingTargetEdit := nil;
+        // Keep recording active for continuous reconfiguration
+        RecordingOldText := ShortcutText;
+        RecordingFinalized := True;
+        // Do NOT set IsRecordingHotkey := False
+        // Do NOT set RecordingTargetEdit := nil
       end
-      // CASE B: KeyUp of any key, or KeyDown of modifier = show live preview
-      else
+      // CASE B: KeyUp of any key = block but do NOT update display if just finalized
+      else if ((wParam = 257) or (wParam = 261)) then
       begin
+        if not RecordingFinalized then
+        begin
+          // Normal live preview during initial recording
+          if Assigned(RecordingTargetEdit) then
+          begin
+            if ShortcutText = '' then
+              RecordingTargetEdit.Text := 'None'
+            else
+              RecordingTargetEdit.Text := ShortcutText;
+          end;
+        end;
+        // When RecordingFinalized is True: silently block the KeyUp,
+        // keep showing the previously finalized shortcut text
+      end
+      // CASE C: KeyDown of modifier = show live preview (new recording cycle)
+      else if ((wParam = 256) or (wParam = 260)) and IsModifier then
+      begin
+        // Clear finalized flag since user started a new combination
+        RecordingFinalized := False;
+
         if Assigned(RecordingTargetEdit) then
         begin
           if ShortcutText = '' then
