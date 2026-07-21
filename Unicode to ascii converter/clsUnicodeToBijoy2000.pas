@@ -94,6 +94,22 @@ type
     BengaliChar: string;
   end;
 
+  TRfolaRule = record
+    Consonants: string;
+    Value: string;
+    HalfValue: string;
+    ReplaceLen: Integer;
+    ContextGroup: string;
+    ContextReplaceLen: Integer;
+    ContextValue: string;
+  end;
+
+  TKarCorrection = record
+    CharStr: string;
+    FromKar: string;
+    ToKar: string;
+  end;
+
 var
   CustomFullForms: TArray<TReplacementPair>;
   CustomPreReplacements: TArray<TReplacementPair>;
@@ -108,6 +124,8 @@ var
   VowelRules: TArray<TVowelRule>;
   ConsonantGroupMap: TDictionary<string, TArray<string>>;
   AnsiGroupMap: TDictionary<string, TArray<string>>;
+  RfolaRules: TArray<TRfolaRule>;
+  KarCorrections: TArray<TKarCorrection>;
 
 
 procedure ResetAnsiToDefaults;
@@ -824,12 +842,12 @@ begin
   fConvertedText := ReplaceStr(fConvertedText, string(A_Reph) + string(A_UUKar3), string(A_UUKar3) + string(A_Reph));
   fConvertedText := ReplaceStr(fConvertedText, string(A_UUKar1) + string(A_Reph), string(A_UUKar2) + string(A_Reph));
 
-  // Dynamic Post-processing Corrections
-  fConvertedText := ReplaceStr(fConvertedText, string(A_T) + string(A_UKar1), string(A_T) + string(A_UKar2));
-  fConvertedText := ReplaceStr(fConvertedText, string(A_T) + string(A_UUKar1), string(A_T) + string(A_UUKar2));
-  fConvertedText := ReplaceStr(fConvertedText, string(A_RR) + string(A_UUKar1), string(A_RR) + string(A_UUKar2));
-  fConvertedText := ReplaceStr(fConvertedText, string(A_RRH) + string(A_UUKar1), string(A_RRH) + string(A_UUKar2));
-  fConvertedText := ReplaceStr(fConvertedText, string(A_R) + string(A_UUKar1), string(A_R) + string(A_UUKar2));
+  // Dynamic Post-processing Corrections (JSON-driven)
+  if Length(KarCorrections) > 0 then
+    for I := 0 to High(KarCorrections) do
+      fConvertedText := ReplaceStr(fConvertedText,
+        KarCorrections[I].CharStr + KarCorrections[I].FromKar,
+        KarCorrections[I].CharStr + KarCorrections[I].ToKar);
   
   // --- STRICT SANITIZATION FOR ANSI OUTPUT (Optimized with TStringBuilder) ---
   SB := TStringBuilder.Create; 
@@ -1041,10 +1059,38 @@ end;
 
 { =============================================================================== }
 
+function CharInGroup(const Ch: string; const GroupName: string): Boolean;
+var
+  Arr: TArray<string>;
+  S: string;
+begin
+  Result := False;
+  if GroupName = '' then Exit;
+  if GroupName = 'default' then
+    Exit(True);
+  if ConsonantGroupMap <> nil then
+  begin
+    if ConsonantGroupMap.TryGetValue(GroupName, Arr) then
+      for S in Arr do
+        if S = Ch then
+          Exit(True);
+  end;
+  if AnsiGroupMap <> nil then
+  begin
+    if AnsiGroupMap.TryGetValue(GroupName, Arr) then
+      for S in Arr do
+        if S = Ch then
+          Exit(True);
+  end;
+end;
+
 procedure TUnicodeToBijoy2000.ConvertRFola_ZFola_Hasanta;
 var
   I: Integer;
   PrevC: string;
+  IsHalfForm: Boolean;
+  Rule: TRfolaRule;
+  Matched: Boolean;
 begin
   // Convert Z-Fola
   fConvertedText := ReplaceStr(fConvertedText, b_Hasanta + b_z, A_ZFola);
@@ -1057,57 +1103,85 @@ begin
       break;
 
     PrevC := MidStr(fConvertedText, I - 1, 1);
+    IsHalfForm := (I - 2 >= 1) and (MidStr(fConvertedText, I - 2, 1) = b_Hasanta);
 
-    { P/G + RoFola }
-    if (PrevC = b_p) or (PrevC = b_g) or (PrevC = b_sh) then
-    // MidStr(fConvertedText, I, 2) := A_RFola_3
-      fConvertedText := WideStuffString(fConvertedText, I, 2, A_RFola_3)
-      { V+Rofola, 2nd Half V+Rofola }
-    else if PrevC = b_Bh then
+    Matched := False;
+    if Length(RfolaRules) > 0 then
     begin
-      if MidStr(fConvertedText, I - 2, 1) = b_Hasanta then
-        // MidStr(fConvertedText, I - 1, 3) := A_BH_R_2H
-        fConvertedText := WideStuffString(fConvertedText, I - 1, 3, A_BH_R_2H)
-      else
-        // MidStr(fConvertedText, I - 1, 3) := A_Bh_R;
-        fConvertedText := WideStuffString(fConvertedText, I - 1, 3, A_Bh_R);
-    end
-    { K+Rofola, 2nd Half K+Rofola }
-    else if PrevC = b_K then
-    begin
-      if MidStr(fConvertedText, I - 2, 1) = b_Hasanta then
-        // MidStr(fConvertedText, I - 1, 3) := A_K_R_2H
-        fConvertedText := WideStuffString(fConvertedText, I - 1, 3, A_K_R_2H)
-      else
-        // MidStr(fConvertedText, I - 1, 3) := A_K_R;
-        fConvertedText := WideStuffString(fConvertedText, I - 1, 3, A_K_R);
-    end
-    { T+Rofola, 2nd Half T+Rofola }
-    else if PrevC = b_t then
-    begin
-      if MidStr(fConvertedText, I - 2, 1) = b_Hasanta then
+      for Rule in RfolaRules do
       begin
-      // MidStr(fConvertedText, I - 1, 3) := A_T_R_2H
-        if (MidStr(fConvertedText, I - 3, 1) = b_K) or (MidStr(fConvertedText, I - 3, 1) = b_t) then
-          fConvertedText := WideStuffString(fConvertedText, I, 2, A_RFola_2)
+        // Check context group first (e.g., t preceded by K/t)
+        if (Rule.ContextGroup <> '') and CharInGroup(PrevC, Rule.Consonants) then
+        begin
+          // Check if the character before PrevC's Hasanta is in ContextGroup
+          if IsHalfForm and (I - 3 >= 1) then
+          begin
+            if CharInGroup(MidStr(fConvertedText, I - 3, 1), Rule.ContextGroup) then
+            begin
+              fConvertedText := WideStuffString(fConvertedText, I, Rule.ContextReplaceLen, Rule.ContextValue);
+              Matched := True;
+              Break;
+            end;
+          end;
+        end;
+        // Check main consonant group
+        if CharInGroup(PrevC, Rule.Consonants) then
+        begin
+          if Rule.ReplaceLen = 3 then
+          begin
+            // 3-char: replace consonant + ্ + র
+            if IsHalfForm and (Rule.HalfValue <> '') then
+              fConvertedText := WideStuffString(fConvertedText, I - 1, 3, Rule.HalfValue)
+            else
+              fConvertedText := WideStuffString(fConvertedText, I - 1, 3, Rule.Value);
+          end
+          else
+          begin
+            // 2-char: replace ্ + র
+            fConvertedText := WideStuffString(fConvertedText, I, 2, Rule.Value);
+          end;
+          Matched := True;
+          Break;
+        end;
+      end;
+    end;
+
+    // Fallback to hardcoded defaults if no rule matched
+    if not Matched then
+    begin
+      if (PrevC = b_p) or (PrevC = b_g) or (PrevC = b_sh) then
+        fConvertedText := WideStuffString(fConvertedText, I, 2, A_RFola_3)
+      else if PrevC = b_Bh then
+      begin
+        if IsHalfForm then
+          fConvertedText := WideStuffString(fConvertedText, I - 1, 3, A_BH_R_2H)
         else
-          fConvertedText := WideStuffString(fConvertedText, I - 1, 3, A_T_R_2H);
+          fConvertedText := WideStuffString(fConvertedText, I - 1, 3, A_Bh_R);
       end
-      else
-        // MidStr(fConvertedText, I - 1, 3) := A_T_R;
-        fConvertedText := WideStuffString(fConvertedText, I - 1, 3, A_T_R);
-    end
-    else if (PrevC = A_K_T) or (PrevC = A_T_T) or (PrevC = A_P_T) then
-    begin
-      fConvertedText := WideStuffString(fConvertedText, I, 2, A_RFola_2);
-    end
-    else
-    begin
-      if PrevC = b_ph then
-        // MidStr(fConvertedText, I, 2) := A_RFola_2
+      else if PrevC = b_K then
+      begin
+        if IsHalfForm then
+          fConvertedText := WideStuffString(fConvertedText, I - 1, 3, A_K_R_2H)
+        else
+          fConvertedText := WideStuffString(fConvertedText, I - 1, 3, A_K_R);
+      end
+      else if PrevC = b_t then
+      begin
+        if IsHalfForm then
+        begin
+          if (I - 3 >= 1) and ((MidStr(fConvertedText, I - 3, 1) = b_K) or (MidStr(fConvertedText, I - 3, 1) = b_t)) then
+            fConvertedText := WideStuffString(fConvertedText, I, 2, A_RFola_2)
+          else
+            fConvertedText := WideStuffString(fConvertedText, I - 1, 3, A_T_R_2H);
+        end
+        else
+          fConvertedText := WideStuffString(fConvertedText, I - 1, 3, A_T_R);
+      end
+      else if (PrevC = A_K_T) or (PrevC = A_T_T) or (PrevC = A_P_T) then
+        fConvertedText := WideStuffString(fConvertedText, I, 2, A_RFola_2)
+      else if PrevC = b_ph then
         fConvertedText := WideStuffString(fConvertedText, I, 2, A_RFola_2)
       else
-        // MidStr(fConvertedText, I, 2) := A_RFola_1;
         fConvertedText := WideStuffString(fConvertedText, I, 2, A_RFola_1);
     end;
 
@@ -1533,7 +1607,9 @@ begin
     begin
       // MatchMode 1: Only check the single character at ContextEnd
       if (PrecedingChar <> '') and (PrecedingChar = Mapping.Consonants) then
-        MatchLen := 1;
+        MatchLen := 1
+      else if (PrecedingChar <> '') then
+        MatchLen := MatchGroupLength(Text, Result.ContextEnd, Mapping.Consonants);
     end
     else
     begin
@@ -2162,6 +2238,8 @@ begin
   Finalize(ActiveReplacements); ActiveReplacements := nil;
   Finalize(KarInclusiveReplacements); KarInclusiveReplacements := nil;
   Finalize(VowelRules); VowelRules := nil;
+  Finalize(RfolaRules); RfolaRules := nil;
+  Finalize(KarCorrections); KarCorrections := nil;
   if AnsiGroupMap <> nil then AnsiGroupMap.Clear;
   if ConsonantGroupMap <> nil then ConsonantGroupMap.Clear;
   PrepareActiveReplacements;
@@ -2672,6 +2750,109 @@ begin
               else
                 JSkipValue(JSON, P);
             end;
+          end;
+        end
+        else
+          JSkipValue(JSON, P);
+      end;
+    end
+    else if Key = 'RfolaRules' then
+    begin
+      SetLength(RfolaRules, 0);
+      if (P <= Length(JSON)) and (JSON[P] = '[') then Inc(P) else Continue;
+      while P <= Length(JSON) do
+      begin
+        JSkipWS(JSON, P);
+        if (P > Length(JSON)) or (JSON[P] = ']') then begin Inc(P); Break; end;
+        if JSON[P] = ',' then begin Inc(P); Continue; end;
+        if JSON[P] = '{' then
+        begin
+          Inc(P);
+          SetLength(RfolaRules, Length(RfolaRules) + 1);
+          with RfolaRules[High(RfolaRules)] do
+          begin
+            Consonants := '';
+            Value := '';
+            HalfValue := '';
+            ReplaceLen := 2;
+            ContextGroup := '';
+            ContextReplaceLen := 0;
+            ContextValue := '';
+            while P <= Length(JSON) do
+            begin
+              JSkipWS(JSON, P);
+              if (P > Length(JSON)) or (JSON[P] = '}') then begin Inc(P); Break; end;
+              if JSON[P] = ',' then begin Inc(P); Continue; end;
+              FieldName := JReadString(JSON, P);
+              JSkipWS(JSON, P); if JSON[P] = ':' then Inc(P);
+              JSkipWS(JSON, P);
+              if FieldName = 'consonants' then
+                Consonants := JReadString(JSON, P)
+              else if FieldName = 'value' then
+                Value := JReadString(JSON, P)
+              else if FieldName = 'halfValue' then
+                HalfValue := JReadString(JSON, P)
+              else if FieldName = 'replaceLen' then
+                ReplaceLen := StrToIntDef(JReadString(JSON, P), 2)
+              else if FieldName = 'contextGroup' then
+                ContextGroup := JReadString(JSON, P)
+              else if FieldName = 'contextReplaceLen' then
+                ContextReplaceLen := StrToIntDef(JReadString(JSON, P), 0)
+              else if FieldName = 'contextValue' then
+                ContextValue := JReadString(JSON, P)
+              else
+                JSkipValue(JSON, P);
+            end;
+            Consonants := ProcessHexAndUnicode(Consonants);
+            Value := ResolveValue(Value);
+            if HalfValue <> '' then
+              HalfValue := ResolveValue(HalfValue);
+            if ContextValue <> '' then
+              ContextValue := ResolveValue(ContextValue);
+          end;
+        end
+        else
+          JSkipValue(JSON, P);
+      end;
+    end
+    else if Key = 'KarCorrections' then
+    begin
+      SetLength(KarCorrections, 0);
+      if (P <= Length(JSON)) and (JSON[P] = '[') then Inc(P) else Continue;
+      while P <= Length(JSON) do
+      begin
+        JSkipWS(JSON, P);
+        if (P > Length(JSON)) or (JSON[P] = ']') then begin Inc(P); Break; end;
+        if JSON[P] = ',' then begin Inc(P); Continue; end;
+        if JSON[P] = '{' then
+        begin
+          Inc(P);
+          SetLength(KarCorrections, Length(KarCorrections) + 1);
+          with KarCorrections[High(KarCorrections)] do
+          begin
+            CharStr := '';
+            FromKar := '';
+            ToKar := '';
+            while P <= Length(JSON) do
+            begin
+              JSkipWS(JSON, P);
+              if (P > Length(JSON)) or (JSON[P] = '}') then begin Inc(P); Break; end;
+              if JSON[P] = ',' then begin Inc(P); Continue; end;
+              FieldName := JReadString(JSON, P);
+              JSkipWS(JSON, P); if JSON[P] = ':' then Inc(P);
+              JSkipWS(JSON, P);
+              if FieldName = 'char' then
+                CharStr := JReadString(JSON, P)
+              else if FieldName = 'from' then
+                FromKar := JReadString(JSON, P)
+              else if FieldName = 'to' then
+                ToKar := JReadString(JSON, P)
+              else
+                JSkipValue(JSON, P);
+            end;
+            CharStr := ProcessHexAndUnicode(CharStr);
+            FromKar := ResolveValue(FromKar);
+            ToKar := ResolveValue(ToKar);
           end;
         end
         else
