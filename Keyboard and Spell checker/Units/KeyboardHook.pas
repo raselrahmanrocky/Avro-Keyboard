@@ -287,7 +287,7 @@ begin
            ((kbdllhs.vkCode < $70) or (kbdllhs.vkCode > $7B)) then
         begin
           // Reject this keypress but keep recording session alive
-          LowLevelKeyboardProc := 1;
+          LowLevelKeyboardProc := CallNextHookEx(HookRetVal, nCode, wParam, lParam);
           Exit;
         end;
 
@@ -306,7 +306,7 @@ begin
             IsRecordingHotkey := False;
             RecordingTargetEdit := nil;
             RecordingFinalized := False;
-            LowLevelKeyboardProc := 1;
+            LowLevelKeyboardProc := CallNextHookEx(HookRetVal, nCode, wParam, lParam);
             Exit;
           end;
           ClearConflictByIndex(ConflictIdx);
@@ -354,7 +354,7 @@ begin
         end;
       end;
 
-      LowLevelKeyboardProc := 1;
+      LowLevelKeyboardProc := CallNextHookEx(HookRetVal, nCode, wParam, lParam);
       Exit;
     end;
 
