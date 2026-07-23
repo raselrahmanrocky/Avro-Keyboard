@@ -2859,7 +2859,7 @@ begin
           JSkipValue(JSON, P);
       end;
     end
-    else if Key = 'AnsiGroups' then
+    else if Key = 'RaPhalaGroups' then
     begin
       if AnsiGroupMap = nil then
         AnsiGroupMap := TDictionary<string, TArray<string>>.Create
@@ -2893,6 +2893,20 @@ begin
         end
         else
           JSkipValue(JSON, P);
+      end;
+
+      // Merge RaPhalas1 + RaPhalas2 into combined RaPhalas group
+      var RaArr: TArray<string>;
+      var MergedList := TList<string>.Create;
+      try
+        if AnsiGroupMap.TryGetValue('RaPhalas1', RaArr) then
+          MergedList.AddRange(RaArr);
+        if AnsiGroupMap.TryGetValue('RaPhalas2', RaArr) then
+          MergedList.AddRange(RaArr);
+        if MergedList.Count > 0 then
+          AnsiGroupMap.AddOrSetValue('RaPhalas', MergedList.ToArray);
+      finally
+        MergedList.Free;
       end;
     end
     else if Key = 'ConsonantGroups' then
