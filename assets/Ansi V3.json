@@ -1,4 +1,4 @@
-{
+﻿{
   "Constants": {
     "Numbers": {
       "A_0": {
@@ -1124,8 +1124,13 @@
     },
     {
       "Key": "#$09A1#$09CD#$09AC",
-      "Value": "#$76#$E4#$FE#$EE",
+      "Value": "#$76#$FE#$B5",
       "Comment": "ড্ব"
+    },
+    {
+      "Key": "#$09A1#$09CD#$09A1#$09CD#$09B0",
+      "Value": "#$55#$C8#$FE",
+      "Comment": "ড্ড্র"
     },
     {
       "Key": "#$09A1#$09CD#$09B0",
@@ -1201,6 +1206,16 @@
       "Key": "#$0995#$09CD#$09B2#$09C1",
       "Value": "#$201E#$CF#$24#$FE",
       "Comment": "ক্লু"
+    },
+    {
+      "Key": "#$0995#$09CD#$09B2#$09C2",
+      "Value": "#$201E#$CF#$28#$FE",
+      "Comment": "ক্লূ"
+    },
+    {
+      "Key": "#$0995#$09CD#$09B2#$09C3",
+      "Value": "#$201E#$CF#$2B#$FE",
+      "Comment": "ক্লৃ"
     },
     {
       "Key": "#$09B2#$09CD#$09AC",
@@ -1567,74 +1582,844 @@
       "Comment": "ঢ়ু"
     },
     {
-      "Key": "#$FE#{A_UKar1}",
-      "Value": "#{A_UKar1}#$FE",
-      "Comment": "FE কানেক্টর + উ-কার ১ → আদর্শ ক্রম"
+      "Key": "#$201E#$FE#{A_UKar1}",
+      "Value": "#$201E#{A_UKar1}#$FE",
+      "Comment": "ক + FE + UKar1 → swap (SwapGroup)"
     },
     {
-      "Key": "#$FE#{A_UKar2}",
-      "Value": "#{A_UKar2}#$FE",
-      "Comment": "FE কানেক্টর + উ-কার ২ → আদর্শ ক্রম"
+      "Key": "#$201E#$FE#{A_UKar2}",
+      "Value": "#$201E#{A_UKar2}#$FE",
+      "Comment": "ক + FE + UKar2 → swap (SwapGroup)"
     },
     {
-      "Key": "#$FE#{A_UKar4}",
-      "Value": "#{A_UKar4}#$FE",
-      "Comment": "FE কানেক্টর + উ-কার ৪ → আদর্শ ক্রম"
+      "Key": "#$201E#$FE#{A_UKar4}",
+      "Value": "#$201E#{A_UKar4}#$FE",
+      "Comment": "ক + FE + UKar4 → swap (SwapGroup)"
     },
     {
-      "Key": "#$FE#{A_UUKar1}",
-      "Value": "#{A_UUKar1}#$FE",
-      "Comment": "FE কানেক্টর + ঊ-কার ১ → আদর্শ ক্রম"
+      "Key": "#$201E#$FE#{A_UUKar1}",
+      "Value": "#$201E#{A_UUKar1}#$FE",
+      "Comment": "ক + FE + UUKar1 → swap (SwapGroup)"
     },
     {
-      "Key": "#$FE#{A_UUKar2}",
-      "Value": "#{A_UUKar2}#$FE",
-      "Comment": "FE কানেক্টর + ঊ-কার ২ → আদর্শ ক্রম"
+      "Key": "#$201E#$FE#{A_UUKar2}",
+      "Value": "#$201E#{A_UUKar2}#$FE",
+      "Comment": "ক + FE + UUKar2 → swap (SwapGroup)"
     },
     {
-      "Key": "#$FE#{A_UUKar3}",
-      "Value": "#{A_UUKar3}#$FE",
-      "Comment": "FE কানেক্টর + ঊ-কার ৩ → আদর্শ ক্রম"
+      "Key": "#$201E#$FE#{A_UUKar3}",
+      "Value": "#$201E#{A_UUKar3}#$FE",
+      "Comment": "ক + FE + UUKar3 → swap (SwapGroup)"
     },
     {
-      "Key": "#$E9#{A_UKar1}",
-      "Value": "#{A_UKar1}#$E9",
-      "Comment": "E9 কানেক্টর + উ-কার ১ → আদর্শ ক্রম"
+      "Key": "#$201E#$FE#{A_RRIKar1}",
+      "Value": "#$201E#{A_RRIKar1}#$FE",
+      "Comment": "ক + FE + RRIKar → swap (SwapGroup)"
     },
     {
-      "Key": "#$E9#{A_UKar2}",
-      "Value": "#{A_UKar2}#$E9",
-      "Comment": "E9 কানেক্টর + উ-কার ২ → আদর্শ ক্রম"
+      "Key": "#$2030#$FE#{A_UKar1}",
+      "Value": "#$2030#{A_UKar1}#$FE",
+      "Comment": "চ + FE + UKar1 → swap (SwapGroup)"
     },
     {
-      "Key": "#$E9#{A_UKar4}",
-      "Value": "#{A_UKar4}#$E9",
-      "Comment": "E9 কানেক্টর + উ-কার ৪ → আদর্শ ক্রম"
+      "Key": "#$2030#$FE#{A_UKar2}",
+      "Value": "#$2030#{A_UKar2}#$FE",
+      "Comment": "চ + FE + UKar2 → swap (SwapGroup)"
     },
     {
-      "Key": "#$E9#{A_UUKar1}",
-      "Value": "#{A_UUKar1}#$E9",
-      "Comment": "E9 কানেক্টর + ঊ-কার ১ → আদর্শ ক্রম"
+      "Key": "#$2030#$FE#{A_UKar4}",
+      "Value": "#$2030#{A_UKar4}#$FE",
+      "Comment": "চ + FE + UKar4 → swap (SwapGroup)"
     },
     {
-      "Key": "#$E9#{A_UUKar2}",
-      "Value": "#{A_UUKar2}#$E9",
-      "Comment": "E9 কানেক্টর + ঊ-কার ২ → আদর্শ ক্রম"
+      "Key": "#$2030#$FE#{A_UUKar1}",
+      "Value": "#$2030#{A_UUKar1}#$FE",
+      "Comment": "চ + FE + UUKar1 → swap (SwapGroup)"
     },
     {
-      "Key": "#$E9#{A_UUKar3}",
-      "Value": "#{A_UUKar3}#$E9",
-      "Comment": "E9 কানেক্টর + ঊ-কার ৩ → আদর্শ ক্রম"
+      "Key": "#$2030#$FE#{A_UUKar2}",
+      "Value": "#$2030#{A_UUKar2}#$FE",
+      "Comment": "চ + FE + UUKar2 → swap (SwapGroup)"
     },
     {
-      "Key": "#$FE#{A_RRIKar1}",
-      "Value": "#{A_RRIKar1}#$FE",
-      "Comment": "FE কানেক্টর + ঋ-কার → আদর্শ ক্রম"
+      "Key": "#$2030#$FE#{A_UUKar3}",
+      "Value": "#$2030#{A_UUKar3}#$FE",
+      "Comment": "চ + FE + UUKar3 → swap (SwapGroup)"
     },
     {
-      "Key": "#$E9#{A_RRIKar1}",
-      "Value": "#{A_RRIKar1}#$E9",
-      "Comment": "E9 কানেক্টর + ঋ-কার → আদর্শ ক্রম"
+      "Key": "#$2030#$FE#{A_RRIKar1}",
+      "Value": "#$2030#{A_RRIKar1}#$FE",
+      "Comment": "চ + FE + RRIKar → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$0047#$FE#{A_UKar1}",
+      "Value": "#$0047#{A_UKar1}#$FE",
+      "Comment": "ঝ + FE + UKar1 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$0047#$FE#{A_UKar2}",
+      "Value": "#$0047#{A_UKar2}#$FE",
+      "Comment": "ঝ + FE + UKar2 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$0047#$FE#{A_UKar4}",
+      "Value": "#$0047#{A_UKar4}#$FE",
+      "Comment": "ঝ + FE + UKar4 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$0047#$FE#{A_UUKar1}",
+      "Value": "#$0047#{A_UUKar1}#$FE",
+      "Comment": "ঝ + FE + UUKar1 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$0047#$FE#{A_UUKar2}",
+      "Value": "#$0047#{A_UUKar2}#$FE",
+      "Comment": "ঝ + FE + UUKar2 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$0047#$FE#{A_UUKar3}",
+      "Value": "#$0047#{A_UUKar3}#$FE",
+      "Comment": "ঝ + FE + UUKar3 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$0047#$FE#{A_RRIKar1}",
+      "Value": "#$0047#{A_RRIKar1}#$FE",
+      "Comment": "ঝ + FE + RRIKar → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$DD#$FE#{A_UKar1}",
+      "Value": "#$DD#{A_UKar1}#$FE",
+      "Comment": "ট + FE + UKar1 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$DD#$FE#{A_UKar2}",
+      "Value": "#$DD#{A_UKar2}#$FE",
+      "Comment": "ট + FE + UKar2 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$DD#$FE#{A_UKar4}",
+      "Value": "#$DD#{A_UKar4}#$FE",
+      "Comment": "ট + FE + UKar4 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$DD#$FE#{A_UUKar1}",
+      "Value": "#$DD#{A_UUKar1}#$FE",
+      "Comment": "ট + FE + UUKar1 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$DD#$FE#{A_UUKar2}",
+      "Value": "#$DD#{A_UUKar2}#$FE",
+      "Comment": "ট + FE + UUKar2 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$DD#$FE#{A_UUKar3}",
+      "Value": "#$DD#{A_UUKar3}#$FE",
+      "Comment": "ট + FE + UUKar3 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$DD#$FE#{A_RRIKar1}",
+      "Value": "#$DD#{A_RRIKar1}#$FE",
+      "Comment": "ট + FE + RRIKar → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$E0#$FE#{A_UKar1}",
+      "Value": "#$E0#{A_UKar1}#$FE",
+      "Comment": "ঠ + FE + UKar1 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$E0#$FE#{A_UKar2}",
+      "Value": "#$E0#{A_UKar2}#$FE",
+      "Comment": "ঠ + FE + UKar2 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$E0#$FE#{A_UKar4}",
+      "Value": "#$E0#{A_UKar4}#$FE",
+      "Comment": "ঠ + FE + UKar4 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$E0#$FE#{A_UUKar1}",
+      "Value": "#$E0#{A_UUKar1}#$FE",
+      "Comment": "ঠ + FE + UUKar1 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$E0#$FE#{A_UUKar2}",
+      "Value": "#$E0#{A_UUKar2}#$FE",
+      "Comment": "ঠ + FE + UUKar2 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$E0#$FE#{A_UUKar3}",
+      "Value": "#$E0#{A_UUKar3}#$FE",
+      "Comment": "ঠ + FE + UUKar3 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$E0#$FE#{A_RRIKar1}",
+      "Value": "#$E0#{A_RRIKar1}#$FE",
+      "Comment": "ঠ + FE + RRIKar → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$76#$FE#{A_UKar1}",
+      "Value": "#$76#{A_UKar1}#$FE",
+      "Comment": "ড + FE + UKar1 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$76#$FE#{A_UKar2}",
+      "Value": "#$76#{A_UKar2}#$FE",
+      "Comment": "ড + FE + UKar2 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$76#$FE#{A_UKar4}",
+      "Value": "#$76#{A_UKar4}#$FE",
+      "Comment": "ড + FE + UKar4 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$76#$FE#{A_UUKar1}",
+      "Value": "#$76#{A_UUKar1}#$FE",
+      "Comment": "ড + FE + UUKar1 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$76#$FE#{A_UUKar2}",
+      "Value": "#$76#{A_UUKar2}#$FE",
+      "Comment": "ড + FE + UUKar2 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$76#$FE#{A_UUKar3}",
+      "Value": "#$76#{A_UUKar3}#$FE",
+      "Comment": "ড + FE + UUKar3 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$76#$FE#{A_RRIKar1}",
+      "Value": "#$76#{A_RRIKar1}#$FE",
+      "Comment": "ড + FE + RRIKar → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$2018#$FE#{A_UKar1}",
+      "Value": "#$2018#{A_UKar1}#$FE",
+      "Comment": "ঢ + FE + UKar1 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$2018#$FE#{A_UKar2}",
+      "Value": "#$2018#{A_UKar2}#$FE",
+      "Comment": "ঢ + FE + UKar2 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$2018#$FE#{A_UKar4}",
+      "Value": "#$2018#{A_UKar4}#$FE",
+      "Comment": "ঢ + FE + UKar4 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$2018#$FE#{A_UUKar1}",
+      "Value": "#$2018#{A_UUKar1}#$FE",
+      "Comment": "ঢ + FE + UUKar1 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$2018#$FE#{A_UUKar2}",
+      "Value": "#$2018#{A_UUKar2}#$FE",
+      "Comment": "ঢ + FE + UUKar2 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$2018#$FE#{A_UUKar3}",
+      "Value": "#$2018#{A_UUKar3}#$FE",
+      "Comment": "ঢ + FE + UUKar3 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$2018#$FE#{A_RRIKar1}",
+      "Value": "#$2018#{A_RRIKar1}#$FE",
+      "Comment": "ঢ + FE + RRIKar → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$201C#$FE#{A_UKar1}",
+      "Value": "#$201C#{A_UKar1}#$FE",
+      "Comment": "ত + FE + UKar1 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$201C#$FE#{A_UKar2}",
+      "Value": "#$201C#{A_UKar2}#$FE",
+      "Comment": "ত + FE + UKar2 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$201C#$FE#{A_UKar4}",
+      "Value": "#$201C#{A_UKar4}#$FE",
+      "Comment": "ত + FE + UKar4 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$201C#$FE#{A_UUKar1}",
+      "Value": "#$201C#{A_UUKar1}#$FE",
+      "Comment": "ত + FE + UUKar1 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$201C#$FE#{A_UUKar2}",
+      "Value": "#$201C#{A_UUKar2}#$FE",
+      "Comment": "ত + FE + UUKar2 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$201C#$FE#{A_UUKar3}",
+      "Value": "#$201C#{A_UUKar3}#$FE",
+      "Comment": "ত + FE + UUKar3 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$201C#$FE#{A_RRIKar1}",
+      "Value": "#$201C#{A_RRIKar1}#$FE",
+      "Comment": "ত + FE + RRIKar → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$0161#$FE#{A_UKar1}",
+      "Value": "#$0161#{A_UKar1}#$FE",
+      "Comment": "ফ + FE + UKar1 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$0161#$FE#{A_UKar2}",
+      "Value": "#$0161#{A_UKar2}#$FE",
+      "Comment": "ফ + FE + UKar2 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$0161#$FE#{A_UKar4}",
+      "Value": "#$0161#{A_UKar4}#$FE",
+      "Comment": "ফ + FE + UKar4 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$0161#$FE#{A_UUKar1}",
+      "Value": "#$0161#{A_UUKar1}#$FE",
+      "Comment": "ফ + FE + UUKar1 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$0161#$FE#{A_UUKar2}",
+      "Value": "#$0161#{A_UUKar2}#$FE",
+      "Comment": "ফ + FE + UUKar2 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$0161#$FE#{A_UUKar3}",
+      "Value": "#$0161#{A_UUKar3}#$FE",
+      "Comment": "ফ + FE + UUKar3 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$0161#$FE#{A_RRIKar1}",
+      "Value": "#$0161#{A_RRIKar1}#$FE",
+      "Comment": "ফ + FE + RRIKar → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$A6#$FE#{A_UKar1}",
+      "Value": "#$A6#{A_UKar1}#$FE",
+      "Comment": "ভ + FE + UKar1 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$A6#$FE#{A_UKar2}",
+      "Value": "#$A6#{A_UKar2}#$FE",
+      "Comment": "ভ + FE + UKar2 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$A6#$FE#{A_UKar4}",
+      "Value": "#$A6#{A_UKar4}#$FE",
+      "Comment": "ভ + FE + UKar4 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$A6#$FE#{A_UUKar1}",
+      "Value": "#$A6#{A_UUKar1}#$FE",
+      "Comment": "ভ + FE + UUKar1 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$A6#$FE#{A_UUKar2}",
+      "Value": "#$A6#{A_UUKar2}#$FE",
+      "Comment": "ভ + FE + UUKar2 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$A6#$FE#{A_UUKar3}",
+      "Value": "#$A6#{A_UUKar3}#$FE",
+      "Comment": "ভ + FE + UUKar3 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$A6#$FE#{A_RRIKar1}",
+      "Value": "#$A6#{A_RRIKar1}#$FE",
+      "Comment": "ভ + FE + RRIKar → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$45#$FE#{A_UKar1}",
+      "Value": "#$45#{A_UKar1}#$FE",
+      "Comment": "ক্ক + FE + UKar1 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$45#$FE#{A_UKar2}",
+      "Value": "#$45#{A_UKar2}#$FE",
+      "Comment": "ক্ক + FE + UKar2 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$45#$FE#{A_UKar4}",
+      "Value": "#$45#{A_UKar4}#$FE",
+      "Comment": "ক্ক + FE + UKar4 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$45#$FE#{A_UUKar1}",
+      "Value": "#$45#{A_UUKar1}#$FE",
+      "Comment": "ক্ক + FE + UUKar1 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$45#$FE#{A_UUKar2}",
+      "Value": "#$45#{A_UUKar2}#$FE",
+      "Comment": "ক্ক + FE + UUKar2 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$45#$FE#{A_UUKar3}",
+      "Value": "#$45#{A_UUKar3}#$FE",
+      "Comment": "ক্ক + FE + UUKar3 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$45#$FE#{A_RRIKar1}",
+      "Value": "#$45#{A_RRIKar1}#$FE",
+      "Comment": "ক্ক + FE + RRIKar → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$C7#$FE#{A_UKar1}",
+      "Value": "#$C7#{A_UKar1}#$FE",
+      "Comment": "ক্ষ + FE + UKar1 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$C7#$FE#{A_UKar2}",
+      "Value": "#$C7#{A_UKar2}#$FE",
+      "Comment": "ক্ষ + FE + UKar2 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$C7#$FE#{A_UKar4}",
+      "Value": "#$C7#{A_UKar4}#$FE",
+      "Comment": "ক্ষ + FE + UKar4 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$C7#$FE#{A_UUKar1}",
+      "Value": "#$C7#{A_UUKar1}#$FE",
+      "Comment": "ক্ষ + FE + UUKar1 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$C7#$FE#{A_UUKar2}",
+      "Value": "#$C7#{A_UUKar2}#$FE",
+      "Comment": "ক্ষ + FE + UUKar2 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$C7#$FE#{A_UUKar3}",
+      "Value": "#$C7#{A_UUKar3}#$FE",
+      "Comment": "ক্ষ + FE + UUKar3 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$C7#$FE#{A_RRIKar1}",
+      "Value": "#$C7#{A_RRIKar1}#$FE",
+      "Comment": "ক্ষ + FE + RRIKar → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$42#$FE#{A_UKar1}",
+      "Value": "#$42#{A_UKar1}#$FE",
+      "Comment": "ঙ্ক + FE + UKar1 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$42#$FE#{A_UKar2}",
+      "Value": "#$42#{A_UKar2}#$FE",
+      "Comment": "ঙ্ক + FE + UKar2 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$42#$FE#{A_UKar4}",
+      "Value": "#$42#{A_UKar4}#$FE",
+      "Comment": "ঙ্ক + FE + UKar4 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$42#$FE#{A_UUKar1}",
+      "Value": "#$42#{A_UUKar1}#$FE",
+      "Comment": "ঙ্ক + FE + UUKar1 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$42#$FE#{A_UUKar2}",
+      "Value": "#$42#{A_UUKar2}#$FE",
+      "Comment": "ঙ্ক + FE + UUKar2 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$42#$FE#{A_UUKar3}",
+      "Value": "#$42#{A_UUKar3}#$FE",
+      "Comment": "ঙ্ক + FE + UUKar3 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$42#$FE#{A_RRIKar1}",
+      "Value": "#$42#{A_RRIKar1}#$FE",
+      "Comment": "ঙ্ক + FE + RRIKar → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$6B#$FE#{A_UKar1}",
+      "Value": "#$6B#{A_UKar1}#$FE",
+      "Comment": "দ্ধ + FE + UKar1 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$6B#$FE#{A_UKar2}",
+      "Value": "#$6B#{A_UKar2}#$FE",
+      "Comment": "দ্ধ + FE + UKar2 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$6B#$FE#{A_UKar4}",
+      "Value": "#$6B#{A_UKar4}#$FE",
+      "Comment": "দ্ধ + FE + UKar4 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$6B#$FE#{A_UUKar1}",
+      "Value": "#$6B#{A_UUKar1}#$FE",
+      "Comment": "দ্ধ + FE + UUKar1 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$6B#$FE#{A_UUKar2}",
+      "Value": "#$6B#{A_UUKar2}#$FE",
+      "Comment": "দ্ধ + FE + UUKar2 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$6B#$FE#{A_UUKar3}",
+      "Value": "#$6B#{A_UUKar3}#$FE",
+      "Comment": "দ্ধ + FE + UUKar3 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$6B#$FE#{A_RRIKar1}",
+      "Value": "#$6B#{A_RRIKar1}#$FE",
+      "Comment": "দ্ধ + FE + RRIKar → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$75#$FE#{A_UKar1}",
+      "Value": "#$75#{A_UKar1}#$FE",
+      "Comment": "ন্ড + FE + UKar1 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$75#$FE#{A_UKar2}",
+      "Value": "#$75#{A_UKar2}#$FE",
+      "Comment": "ন্ড + FE + UKar2 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$75#$FE#{A_UKar4}",
+      "Value": "#$75#{A_UKar4}#$FE",
+      "Comment": "ন্ড + FE + UKar4 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$75#$FE#{A_UUKar1}",
+      "Value": "#$75#{A_UUKar1}#$FE",
+      "Comment": "ন্ড + FE + UUKar1 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$75#$FE#{A_UUKar2}",
+      "Value": "#$75#{A_UUKar2}#$FE",
+      "Comment": "ন্ড + FE + UUKar2 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$75#$FE#{A_UUKar3}",
+      "Value": "#$75#{A_UUKar3}#$FE",
+      "Comment": "ন্ড + FE + UUKar3 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$75#$FE#{A_RRIKar1}",
+      "Value": "#$75#{A_RRIKar1}#$FE",
+      "Comment": "ন্ড + FE + RRIKar → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$F5#$FE#{A_UKar1}",
+      "Value": "#$F5#{A_UKar1}#$FE",
+      "Comment": "ন্ধ + FE + UKar1 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$F5#$FE#{A_UKar2}",
+      "Value": "#$F5#{A_UKar2}#$FE",
+      "Comment": "ন্ধ + FE + UKar2 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$F5#$FE#{A_UKar4}",
+      "Value": "#$F5#{A_UKar4}#$FE",
+      "Comment": "ন্ধ + FE + UKar4 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$F5#$FE#{A_UUKar1}",
+      "Value": "#$F5#{A_UUKar1}#$FE",
+      "Comment": "ন্ধ + FE + UUKar1 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$F5#$FE#{A_UUKar2}",
+      "Value": "#$F5#{A_UUKar2}#$FE",
+      "Comment": "ন্ধ + FE + UUKar2 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$F5#$FE#{A_UUKar3}",
+      "Value": "#$F5#{A_UUKar3}#$FE",
+      "Comment": "ন্ধ + FE + UUKar3 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$F5#$FE#{A_RRIKar1}",
+      "Value": "#$F5#{A_RRIKar1}#$FE",
+      "Comment": "ন্ধ + FE + RRIKar → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$55#$FE#{A_UKar1}",
+      "Value": "#$55#{A_UKar1}#$FE",
+      "Comment": "ড্ড + FE + UKar1 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$55#$FE#{A_UKar2}",
+      "Value": "#$55#{A_UKar2}#$FE",
+      "Comment": "ড্ড + FE + UKar2 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$55#$FE#{A_UKar4}",
+      "Value": "#$55#{A_UKar4}#$FE",
+      "Comment": "ড্ড + FE + UKar4 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$55#$FE#{A_UUKar1}",
+      "Value": "#$55#{A_UUKar1}#$FE",
+      "Comment": "ড্ড + FE + UUKar1 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$55#$FE#{A_UUKar2}",
+      "Value": "#$55#{A_UUKar2}#$FE",
+      "Comment": "ড্ড + FE + UUKar2 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$55#$FE#{A_UUKar3}",
+      "Value": "#$55#{A_UUKar3}#$FE",
+      "Comment": "ড্ড + FE + UUKar3 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$55#$FE#{A_RRIKar1}",
+      "Value": "#$55#{A_RRIKar1}#$FE",
+      "Comment": "ড্ড + FE + RRIKar → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$5A#$FE#{A_UKar1}",
+      "Value": "#$5A#{A_UKar1}#$FE",
+      "Comment": "ণ্ঠ + FE + UKar1 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$5A#$FE#{A_UKar2}",
+      "Value": "#$5A#{A_UKar2}#$FE",
+      "Comment": "ণ্ঠ + FE + UKar2 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$5A#$FE#{A_UKar4}",
+      "Value": "#$5A#{A_UKar4}#$FE",
+      "Comment": "ণ্ঠ + FE + UKar4 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$5A#$FE#{A_UUKar1}",
+      "Value": "#$5A#{A_UUKar1}#$FE",
+      "Comment": "ণ্ঠ + FE + UUKar1 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$5A#$FE#{A_UUKar2}",
+      "Value": "#$5A#{A_UUKar2}#$FE",
+      "Comment": "ণ্ঠ + FE + UUKar2 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$5A#$FE#{A_UUKar3}",
+      "Value": "#$5A#{A_UUKar3}#$FE",
+      "Comment": "ণ্ঠ + FE + UUKar3 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$5A#$FE#{A_RRIKar1}",
+      "Value": "#$5A#{A_RRIKar1}#$FE",
+      "Comment": "ণ্ঠ + FE + RRIKar → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$5B#$FE#{A_UKar1}",
+      "Value": "#$5B#{A_UKar1}#$FE",
+      "Comment": "ণ্ড + FE + UKar1 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$5B#$FE#{A_UKar2}",
+      "Value": "#$5B#{A_UKar2}#$FE",
+      "Comment": "ণ্ড + FE + UKar2 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$5B#$FE#{A_UKar4}",
+      "Value": "#$5B#{A_UKar4}#$FE",
+      "Comment": "ণ্ড + FE + UKar4 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$5B#$FE#{A_UUKar1}",
+      "Value": "#$5B#{A_UUKar1}#$FE",
+      "Comment": "ণ্ড + FE + UUKar1 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$5B#$FE#{A_UUKar2}",
+      "Value": "#$5B#{A_UUKar2}#$FE",
+      "Comment": "ণ্ড + FE + UUKar2 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$5B#$FE#{A_UUKar3}",
+      "Value": "#$5B#{A_UUKar3}#$FE",
+      "Comment": "ণ্ড + FE + UUKar3 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$5B#$FE#{A_RRIKar1}",
+      "Value": "#$5B#{A_RRIKar1}#$FE",
+      "Comment": "ণ্ড + FE + RRIKar → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$B8#$FE#{A_UKar1}",
+      "Value": "#$B8#{A_UKar1}#$FE",
+      "Comment": "ব্ধ + FE + UKar1 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$B8#$FE#{A_UKar2}",
+      "Value": "#$B8#{A_UKar2}#$FE",
+      "Comment": "ব্ধ + FE + UKar2 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$B8#$FE#{A_UKar4}",
+      "Value": "#$B8#{A_UKar4}#$FE",
+      "Comment": "ব্ধ + FE + UKar4 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$B8#$FE#{A_UUKar1}",
+      "Value": "#$B8#{A_UUKar1}#$FE",
+      "Comment": "ব্ধ + FE + UUKar1 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$B8#$FE#{A_UUKar2}",
+      "Value": "#$B8#{A_UUKar2}#$FE",
+      "Comment": "ব্ধ + FE + UUKar2 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$B8#$FE#{A_UUKar3}",
+      "Value": "#$B8#{A_UUKar3}#$FE",
+      "Comment": "ব্ধ + FE + UUKar3 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$B8#$FE#{A_RRIKar1}",
+      "Value": "#$B8#{A_RRIKar1}#$FE",
+      "Comment": "ব্ধ + FE + RRIKar → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$E1#$FE#{A_UKar1}",
+      "Value": "#$E1#{A_UKar1}#$FE",
+      "Comment": "হ্ম + FE + UKar1 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$E1#$FE#{A_UKar2}",
+      "Value": "#$E1#{A_UKar2}#$FE",
+      "Comment": "হ্ম + FE + UKar2 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$E1#$FE#{A_UKar4}",
+      "Value": "#$E1#{A_UKar4}#$FE",
+      "Comment": "হ্ম + FE + UKar4 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$E1#$FE#{A_UUKar1}",
+      "Value": "#$E1#{A_UUKar1}#$FE",
+      "Comment": "হ্ম + FE + UUKar1 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$E1#$FE#{A_UUKar2}",
+      "Value": "#$E1#{A_UUKar2}#$FE",
+      "Comment": "হ্ম + FE + UUKar2 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$E1#$FE#{A_UUKar3}",
+      "Value": "#$E1#{A_UUKar3}#$FE",
+      "Comment": "হ্ম + FE + UUKar3 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$E1#$FE#{A_RRIKar1}",
+      "Value": "#$E1#{A_RRIKar1}#$FE",
+      "Comment": "হ্ম + FE + RRIKar → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$D8#$FE#{A_UKar1}",
+      "Value": "#$D8#{A_UKar1}#$FE",
+      "Comment": "শ্চ + FE + UKar1 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$D8#$FE#{A_UKar2}",
+      "Value": "#$D8#{A_UKar2}#$FE",
+      "Comment": "শ্চ + FE + UKar2 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$D8#$FE#{A_UKar4}",
+      "Value": "#$D8#{A_UKar4}#$FE",
+      "Comment": "শ্চ + FE + UKar4 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$D8#$FE#{A_UUKar1}",
+      "Value": "#$D8#{A_UUKar1}#$FE",
+      "Comment": "শ্চ + FE + UUKar1 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$D8#$FE#{A_UUKar2}",
+      "Value": "#$D8#{A_UUKar2}#$FE",
+      "Comment": "শ্চ + FE + UUKar2 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$D8#$FE#{A_UUKar3}",
+      "Value": "#$D8#{A_UUKar3}#$FE",
+      "Comment": "শ্চ + FE + UUKar3 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$D8#$FE#{A_RRIKar1}",
+      "Value": "#$D8#{A_RRIKar1}#$FE",
+      "Comment": "শ্চ + FE + RRIKar → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$DB#$FE#{A_UKar1}",
+      "Value": "#$DB#{A_UKar1}#$FE",
+      "Comment": "ষ্ঠ + FE + UKar1 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$DB#$FE#{A_UKar2}",
+      "Value": "#$DB#{A_UKar2}#$FE",
+      "Comment": "ষ্ঠ + FE + UKar2 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$DB#$FE#{A_UKar4}",
+      "Value": "#$DB#{A_UKar4}#$FE",
+      "Comment": "ষ্ঠ + FE + UKar4 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$DB#$FE#{A_UUKar1}",
+      "Value": "#$DB#{A_UUKar1}#$FE",
+      "Comment": "ষ্ঠ + FE + UUKar1 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$DB#$FE#{A_UUKar2}",
+      "Value": "#$DB#{A_UUKar2}#$FE",
+      "Comment": "ষ্ঠ + FE + UUKar2 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$DB#$FE#{A_UUKar3}",
+      "Value": "#$DB#{A_UUKar3}#$FE",
+      "Comment": "ষ্ঠ + FE + UUKar3 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$DB#$FE#{A_RRIKar1}",
+      "Value": "#$DB#{A_RRIKar1}#$FE",
+      "Comment": "ষ্ঠ + FE + RRIKar → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$0160#$E9#{A_UKar1}",
+      "Value": "#$0160#{A_UKar1}#$E9",
+      "Comment": "ছ + E9 + UKar1 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$0160#$E9#{A_UKar2}",
+      "Value": "#$0160#{A_UKar2}#$E9",
+      "Comment": "ছ + E9 + UKar2 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$0160#$E9#{A_UKar4}",
+      "Value": "#$0160#{A_UKar4}#$E9",
+      "Comment": "ছ + E9 + UKar4 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$0160#$E9#{A_UUKar1}",
+      "Value": "#$0160#{A_UUKar1}#$E9",
+      "Comment": "ছ + E9 + UUKar1 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$0160#$E9#{A_UUKar2}",
+      "Value": "#$0160#{A_UUKar2}#$E9",
+      "Comment": "ছ + E9 + UUKar2 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$0160#$E9#{A_UUKar3}",
+      "Value": "#$0160#{A_UUKar3}#$E9",
+      "Comment": "ছ + E9 + UUKar3 → swap (SwapGroup)"
+    },
+    {
+      "Key": "#$0160#$E9#{A_RRIKar1}",
+      "Value": "#$0160#{A_RRIKar1}#$E9",
+      "Comment": "ছ + E9 + RRIKar → swap (SwapGroup)"
     },
     {
       "Key": "#{A_RFola_2}#{A_UKar2}",
@@ -1754,16 +2539,34 @@
           "matchMode": 0
         },
         {
-          "consonants": "RaPhalas",
-          "value": "#{A_UKar2}",
-          "process": "post",
-          "matchMode": 0
-        },
-        {
           "consonants": "BaseLineRight",
           "value": "#{A_UKar1}",
           "process": "post",
           "matchMode": 1
+        },
+        {
+          "consonants": "RaPhalas1",
+          "value": "#{A_UKar2}",
+          "process": "post",
+          "matchMode": 1
+        },
+        {
+          "consonants": "RaPhalas2",
+          "value": "#{A_UKar1}",
+          "process": "post",
+          "matchMode": 1
+        },
+        {
+          "consonants": "ConnectorsSwapGroup",
+          "value": "#{A_UKar1}",
+          "process": "post",
+          "matchMode": 0
+        },
+        {
+          "consonants": "ConnectorsKeepGroup",
+          "value": "#{A_UKar1}",
+          "process": "post",
+          "matchMode": 0
         }
       ]
     },
@@ -1793,16 +2596,34 @@
           "matchMode": 0
         },
         {
-          "consonants": "RaPhalas",
-          "value": "#{A_UUKar2}",
-          "process": "post",
-          "matchMode": 0
-        },
-        {
           "consonants": "BaseLineRight",
           "value": "#{A_UUKar1}",
           "process": "post",
           "matchMode": 1
+        },
+        {
+          "consonants": "RaPhalas1",
+          "value": "#{A_UUKar2}",
+          "process": "post",
+          "matchMode": 1
+        },
+        {
+          "consonants": "RaPhalas2",
+          "value": "#{A_UUKar1}",
+          "process": "post",
+          "matchMode": 1
+        },
+        {
+          "consonants": "ConnectorsSwapGroup",
+          "value": "#{A_UUKar1}",
+          "process": "post",
+          "matchMode": 0
+        },
+        {
+          "consonants": "ConnectorsKeepGroup",
+          "value": "#{A_UUKar1}",
+          "process": "post",
+          "matchMode": 0
         }
       ]
     },
@@ -1816,12 +2637,6 @@
           "matchMode": 0
         },
         {
-          "consonants": "RaPhalas",
-          "value": "#{A_RRIKar1}",
-          "process": "post",
-          "matchMode": 0
-        },
-        {
           "consonants": "BaseLineRight",
           "value": "#{A_RRIKar1}",
           "process": "post",
@@ -1832,15 +2647,41 @@
           "value": "#{A_RRIKar2}",
           "process": "pre",
           "matchMode": 0
+        },
+        {
+          "consonants": "RaPhalas1",
+          "value": "#{A_RRIKar2}",
+          "process": "post",
+          "matchMode": 1
+        },
+        {
+          "consonants": "RaPhalas2",
+          "value": "#{A_RRIKar1}",
+          "process": "post",
+          "matchMode": 1
+        },
+        {
+          "consonants": "ConnectorsSwapGroup",
+          "value": "#{A_RRIKar1}",
+          "process": "post",
+          "matchMode": 0
+        },
+        {
+          "consonants": "ConnectorsKeepGroup",
+          "value": "#{A_RRIKar1}",
+          "process": "post",
+          "matchMode": 0
         }
       ]
     }
   },
-  "AnsiGroups": {
-    "RaPhalas": [
+  "RaPhalaGroups": {
+    "RaPhalas1": [
       "#$C6",
-      "#$C8",
-      "#$C9",
+      "#$C8#$FE",
+      "#$C9"
+    ],
+    "RaPhalas2": [
       "#$CA",
       "#$CB",
       "#$CC"
@@ -1961,6 +2802,41 @@
       "#$09AF",
       "#$09B2",
       "#$09B7"
+    ],
+    "ConnectorsSwapGroup": [
+      "#$201E#$FE",
+      "#$2030#$FE",
+      "#$0160#$E9",
+      "#$0047#$FE",
+      "#$DD#$FE",
+      "#$E0#$FE",
+      "#$76#$FE",
+      "#$2018#$FE",
+      "#$201C#$FE",
+      "#$0161#$FE",
+      "#$A6#$FE",
+      "#$45#$FE",
+      "#$C7#$FE",
+      "#$42#$FE",
+      "#$6B#$FE",
+      "#$75#$FE",
+      "#$F5#$FE",
+      "#$55#$FE",
+      "#$5A#$FE",
+      "#$5B#$FE",
+      "#$B8#$FE",
+      "#$E1#$FE",
+      "#$D8#$FE",
+      "#$DB#$FE"
+    ],
+    "ConnectorsKeepGroup": [
+      "#$DF#$FE",
+      "#$DF#$E9",
+      "#$4B#$FE",
+      "#$DC#$FE",
+      "#$73#$FE",
+      "#$D9#$0160#$E9",
+      "#$C8#$FE"
     ]
   },
   "RfolaRules": [
