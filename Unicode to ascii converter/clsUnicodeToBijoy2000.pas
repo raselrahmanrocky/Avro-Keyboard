@@ -1457,31 +1457,44 @@ var
   Arr: TArray<string>;
   S: string;
   SLen: Integer;
+  CompareStr: string;
 begin
   Result := 0;
   if (CharIndex < 1) or (CharIndex > Length(FullText)) then Exit;
-  if ConsonantGroupMap <> nil then
-  begin
-    if ConsonantGroupMap.TryGetValue(GroupName, Arr) then
-      for S in Arr do
-      begin
-        SLen := Length(S);
-        if (SLen <= CharIndex) and
-           (Copy(FullText, CharIndex - SLen + 1, SLen) = S) then
-          if SLen > Result then
-            Result := SLen;
-      end;
-  end;
+
+  // post-phase এ টেক্সট ANSI থাকে, তাই AnsiGroupMap আগে চেক করি
   if AnsiGroupMap <> nil then
   begin
     if AnsiGroupMap.TryGetValue(GroupName, Arr) then
       for S in Arr do
       begin
         SLen := Length(S);
-        if (SLen <= CharIndex) and
-           (Copy(FullText, CharIndex - SLen + 1, SLen) = S) then
-          if SLen > Result then
-            Result := SLen;
+        if (SLen <= CharIndex) then
+        begin
+          // টেক্সট থেকে ওই পজিশন পর্যন্ত অংশটুকু কপি করি
+          CompareStr := Copy(FullText, CharIndex - SLen + 1, SLen);
+          if CompareStr = S then
+          begin
+            if SLen > Result then
+              Result := SLen;
+          end;
+        end;
+      end;
+  end;
+
+  // Unicode গ্রুপের জন্য চেক (Pre-phase এর জন্য)
+  if ConsonantGroupMap <> nil then
+  begin
+    if ConsonantGroupMap.TryGetValue(GroupName, Arr) then
+      for S in Arr do
+      begin
+        SLen := Length(S);
+        if (SLen <= CharIndex) then
+        begin
+          if Copy(FullText, CharIndex - SLen + 1, SLen) = S then
+            if SLen > Result then
+              Result := SLen;
+        end;
       end;
   end;
 end;
@@ -1493,8 +1506,10 @@ var
   UseAlt: Boolean;
   Found: Boolean;
   Resolved: string;
+  SearchChar: string;
   OccurrenceIndex: Integer;
   ClusterInfo: TClusterMatchInfo;
+  LastPos: Integer; // <--- নতুন ভ্যারিয়েবল
 begin
   Found := False;
   for Rule in VowelRules do
@@ -1507,10 +1522,17 @@ begin
   if not Found then
     Exit;
 
+  if Phase = 'post' then
+    SearchChar := ResolveValue(Rule.DefaultVal)
+  else
+    SearchChar := KarChar;
+
   OccurrenceIndex := 0;
+  LastPos := 1; // <--- শুরু পজিশন ১ থেকে
 
   repeat
-    I := Pos(KarChar, fConvertedText);
+    // PosEx ব্যবহার করা হয়েছে যাতে আগের পজিশনের পর থেকে খোঁজা শুরু করে
+    I := PosEx(SearchChar, fConvertedText, LastPos); 
     if I <= 0 then
       Break;
 
@@ -1522,12 +1544,10 @@ begin
 
       if ClusterInfo.BestMatchLen > 0 then
       begin
-        // Phase filtering: skip mappings not intended for this phase
         if (Phase <> '') and
            (ClusterInfo.BestMapping.ProcessPhase <> '') and
            (ClusterInfo.BestMapping.ProcessPhase <> Phase) then
         begin
-          // This mapping doesn't belong to this phase — use default
           Resolved := ResolveValue(Rule.DefaultVal);
         end
         else
@@ -1553,6 +1573,9 @@ begin
       Resolved := ResolveValue(Rule.DefaultVal);
       fConvertedText := WideStuffString(fConvertedText, I, 1, Resolved);
     end;
+
+    // খুব গুরুত্বপূর্ণ: পরবর্তী সার্চ যেন বর্তমান পজিশনের পর থেকে শুরু হয়
+    LastPos := I + Length(Resolved); 
   until I <= 0;
 end;
 
