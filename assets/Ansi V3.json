@@ -1024,17 +1024,17 @@
     },
     {
       "Key": "#$09B8#$09CD#$0995#$09C1",
-      "Value": "#$DF#$E9#$25#$F1",
+      "Value": "#$DF#$FE#$25#$F1",
       "Comment": "স্কু"
     },
     {
       "Key": "#$09B8#$09CD#$0995#$09C2",
-      "Value": "#$DF#$E9#$29#$F1",
+      "Value": "#$DF#$FE#$29#$F1",
       "Comment": "স্কূ"
     },
     {
       "Key": "#$09B8#$09CD#$0995#$09C3",
-      "Value": "#$DF#$E9#$2C#$F1",
+      "Value": "#$DF#$FE#$2C#$F1",
       "Comment": "স্কৃ"
     },
     {
@@ -1531,6 +1531,21 @@
       "Key": "#$0995#$09CD#$09AC",
       "Value": "#$F0",
       "Comment": "ক্ব → #$F0"
+    },
+    {
+      "Key": "#$09B9#$09CD#$09B0#$09C1",
+      "Value": "#$00A3#$0024#$00C9",
+      "Comment": "হ্রু"
+    },
+    {
+      "Key": "#$09B9#$09CD#$09B0#$09C2",
+      "Value": "#$00A3#$0028#$00C9",
+      "Comment": "হ্রূ"
+    },
+    {
+      "Key": "#$09B9#$09CD#$09B0#$09C3",
+      "Value": "#$00A3#$002B#$00C9",
+      "Comment": "হ্রৃ"
     }
   ],
   "PreReplacements": [
@@ -2505,6 +2520,21 @@
       "Key": "Ïþ,",
       "Value": "Ï+þ",
       "Comment": "হাফ ল+ৃ কার"
+    },
+    {
+      "Key": "ñ%",
+      "Value": "%ñ",
+      "Comment": "হাফ ক+ু"
+    },
+    {
+      "Key": "ñ)",
+      "Value": ")ñ",
+      "Comment": "হাফ ক+ূ"
+    },
+    {
+      "Key": "ñ,",
+      "Value": ",ñ",
+      "Comment": "হাফ ক+ৃ"
     }
   ],
   "VowelRules": {
@@ -2535,18 +2565,6 @@
         },
         {
           "consonants": "BaseLineRight",
-          "value": "#{A_UKar1}",
-          "process": "post",
-          "matchMode": 1
-        },
-        {
-          "consonants": "RaPhalas1",
-          "value": "#{A_UKar2}",
-          "process": "post",
-          "matchMode": 1
-        },
-        {
-          "consonants": "RaPhalas2",
           "value": "#{A_UKar1}",
           "process": "post",
           "matchMode": 1
@@ -2597,18 +2615,6 @@
           "matchMode": 1
         },
         {
-          "consonants": "RaPhalas1",
-          "value": "#{A_UUKar2}",
-          "process": "post",
-          "matchMode": 1
-        },
-        {
-          "consonants": "RaPhalas2",
-          "value": "#{A_UUKar1}",
-          "process": "post",
-          "matchMode": 1
-        },
-        {
           "consonants": "ConnectorsSwapGroup",
           "value": "#{A_UUKar1}",
           "process": "post",
@@ -2644,18 +2650,6 @@
           "matchMode": 0
         },
         {
-          "consonants": "RaPhalas1",
-          "value": "#{A_RRIKar2}",
-          "process": "post",
-          "matchMode": 1
-        },
-        {
-          "consonants": "RaPhalas2",
-          "value": "#{A_RRIKar1}",
-          "process": "post",
-          "matchMode": 1
-        },
-        {
           "consonants": "ConnectorsSwapGroup",
           "value": "#{A_RRIKar1}",
           "process": "post",
@@ -2670,16 +2664,32 @@
       ]
     }
   },
+  "GroupKarCorrections": [
+    {
+      "group": "RaPhalas1",
+      "from": "#{A_UKar1}",
+      "to": "#{A_UKar2}"
+    },
+    {
+      "group": "RaPhalas1",
+      "from": "#{A_UUKar1}",
+      "to": "#{A_UUKar2}"
+    },
+    {
+      "group": "RaPhalas1",
+      "from": "#{A_RRIKar1}",
+      "to": "#{A_RRIKar2}"
+    }
+  ],
   "RaPhalaGroups": {
     "RaPhalas1": [
-      "#$C6",
-      "#$C8#$FE",
-      "#$C9"
+      "#{A_RFola_3}",
+      "#{A_RFola_2}#$FE",
+      "#{A_RFola_1}"
     ],
     "RaPhalas2": [
-      "#$CA",
-      "#$CB",
-      "#$CC"
+      "#{A_RFola_2}",
+      "#{A_RFola_1}"
     ],
     "Connectors": [
       "#$FE",
@@ -2896,16 +2906,16 @@
       "Comment": "ত + ঊকার ১ → ২"
     },
     {
-      "char": "#$09DC",
+      "char": "#{A_RR}",
       "from": "#{A_UUKar1}",
       "to": "#{A_UUKar2}",
-      "Comment": "ড় + ঊকার ১ → ২"
+      "Comment": "ড় + ঊকার ১ → ২"
     },
     {
-      "char": "#$09DD",
+      "char": "#{A_RRH}",
       "from": "#{A_UUKar1}",
       "to": "#{A_UUKar2}",
-      "Comment": "ঢ় + ঊকার ১ → ২"
+      "Comment": "ঢ় + ঊকার ১ → ২"
     }
   ]
 }

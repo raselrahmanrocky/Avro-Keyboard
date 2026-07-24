@@ -872,7 +872,8 @@
                 </div>
                 <p class="text-md text-zinc-400">ANSI-রূপান্তরিত টেক্সটে কার নির্বাচন</p>
                 <div class="mt-3 flex flex-wrap gap-1">
-                  <span class="text-[11px] bg-green-800/40 text-green-300 px-1.5 py-0.5 rounded">AnsiGroups</span>
+                  <span class="text-[11px] bg-green-800/40 text-green-300 px-1.5 py-0.5 rounded">RaPhalaGroups</span>
+                  <span class="text-[11px] bg-green-800/40 text-green-300 px-1.5 py-0.5 rounded">GroupKarCorrections</span>
                   <span class="text-[11px] bg-green-800/40 text-green-300 px-1.5 py-0.5 rounded">3 Steps</span>
                 </div>
               </div>
@@ -958,7 +959,8 @@
                 Phase C: Post-phase — ANSI-তে রূপান্তরের পর কার নির্বাচন
               </h5>
               <p class="text-md text-zinc-400 leading-relaxed">Phase A-এর পরিপূরক। এখনো টেক্সট ANSI-তে রূপান্তরিত হয়ে
-                গেছে — তাই AnsiGroups (ANSI কোডপয়েন্ট) দিয়ে ম্যাচ করা যায়।</p>
+                গেছে — তাই <strong class="text-white">RaPhalaGroups</strong> (ANSI কোডপয়েন্ট) দিয়ে ম্যাচ করা যায়।
+                গ্রুপ-ভিত্তিক কারেকশন (যেমন র-ফলার পর উ-কার ১→২) <code>GroupKarCorrections</code> দিয়ে সংজ্ঞায়িত হয় এবং FinalTouch-এ <code>CustomPostReplacements</code>-এ এক্সপ্যান্ড হয়।</p>
               <div class="space-y-1 text-md mt-2">
                 <div class="flex items-center gap-2 text-zinc-300"><span
                     class="text-green-400 font-mono text-[14px] w-5">১৬.</span> ApplyRuleForKar(উ-কার, 'post')</div>
@@ -968,7 +970,8 @@
                     class="text-green-400 font-mono text-[14px] w-5">১৮.</span> ApplyRuleForKar(ঋ-কার, 'post')</div>
               </div>
               <p class="text-[15px] text-zinc-500 mt-2 italic">উদাহরণ: ক্রু লিখলে Phase B-তে র-ফলা ANSI #$C6-তে
-                রূপান্তরিত হয়। Phase C-তে AnsiGroups.RaPhalas-এ ম্যাচ করে ঝুলন্ত উ-কার নির্বাচিত হয়।</p>
+                রূপান্তরিত হয়। Phase C-তে RaPhalaGroups.RaPhalas1-এ ম্যাচ করে ঝুলন্ত উ-কার নির্বাচিত হয়। এছাড়া
+                GroupKarCorrections র-ফলার পরের সব উ-কার/ঊ-কার/ঋ-কারকে ঝুলন্ত ভ্যারিয়েন্টে সুইচ করে।</p>
             </div>
           </div>
         </details>
@@ -1009,15 +1012,18 @@
             <span class="material-symbols-outlined transition-transform">expand_more</span>
           </summary>
           <div class="details-content text-zinc-400 leading-relaxed space-y-3">
-            <p>JSON ফাইলটি <strong class="text-white">৭টি প্রধান সেকশনে</strong> বিভক্ত:</p>
+            <p>JSON ফাইলটি <strong class="text-white">১০টি প্রধান সেকশনে</strong> বিভক্ত:</p>
             <pre class="bg-black/40 p-3 rounded-lg text-zinc-300 text-md">{
   "Constants":             // বর্ণ ও Glyph-এর সংজ্ঞা (৭টি উপ-ক্যাটাগরি)
   "FullFormReplacements":  // পূর্ণ যুক্তাক্ষরের তালিকা
   "PreReplacements":       // Pre-processing প্রতিস্থাপন
   "PostReplacements":      // Post-processing প্রতিস্থাপন (সবার শেষে)
   "VowelRules":            // স্বরবর্ণ-কার Glyph নির্বাচনের নিয়ম
+  "GroupKarCorrections":   // গ্রুপ-ভিত্তিক কারেকশন (CustomPostReplacements-এ এক্সপ্যান্ড হয়)
+  "RaPhalaGroups":         // ANSI কোডপয়েন্টের গ্রুপ (RaPhalas1, Connectors)
   "ConsonantGroups":       // Unicode ব্যঞ্জনবর্ণের গ্রুপ
-  "AnsiGroups":            // ANSI কোডপয়েন্টের গ্রুপ (RaPhalas, Connectors)
+  "RfolaRules":            // র-ফলা গ্লিফ নির্বাচনের নিয়ম
+  "KarCorrections":        // নির্দিষ্ট বর্ণ + কার কম্বিনেশনের কারেকশন
 }</pre>
             <details open>
               <summary class="font-semibold text-indigo-300 cursor-pointer text-md">Constants &#x2192; ৭টি উপ-ক্যাটাগরি
@@ -1046,13 +1052,40 @@
               </div>
             </details>
             <details open>
-              <summary class="font-semibold text-indigo-300 cursor-pointer text-md">AnsiGroups &#x2192; ANSI কোডপয়েন্ট
+              <summary class="font-semibold text-indigo-300 cursor-pointer text-md">RaPhalaGroups &#x2192; ANSI কোডপয়েন্ট
                 গ্রুপ</summary>
               <div class="mt-2 pl-4">
-                <p>ANSI কোডপয়েন্টের গ্রুপিং — কনভার্সনের <strong class="text-white">পরে</strong> কাজ করে। VowelRules ও
-                  FinalTouch উভয় ক্ষেত্রেই ব্যবহার হয়।</p>
-                <pre
-                  class="bg-black/40 p-2 rounded-lg text-zinc-300 text-md mt-1">"RaPhalas": ["#$C6", "#$C8", "#$C9", "#$CA", "#$CB", "#$CC"]</pre>
+                <p>ANSI কোডপয়েন্টের গ্রুপিং — কনভার্সনের <strong class="text-white">পরে</strong> কাজ করে। VowelRules, GroupKarCorrections ও
+                  FinalTouch উভয় ক্ষেত্রেই ব্যবহার হয়। মেম্বারগুলো <code>#{VariableName}</code> রেফারেন্স ব্যবহার করে।</p>
+                <pre class="bg-black/40 p-2 rounded-lg text-zinc-300 text-md mt-1">"RaPhalas1": ["#{A_RFola_3}", "#{A_RFola_2}#$FE", "#{A_RFola_1}"]
+"RaPhalas2": ["#{A_RFola_2}", "#{A_RFola_1}"]
+"Connectors": ["#$FE", "#$E9"]</pre>
+              </div>
+            </details>
+            <details open>
+              <summary class="font-semibold text-indigo-300 cursor-pointer text-md">GroupKarCorrections &#x2192; গ্রুপ-ভিত্তিক কারেকশন
+              </summary>
+              <div class="mt-2 pl-4">
+                <p>নির্দিষ্ট ANSI গ্রুপের সব মেম্বারের জন্য কার-ভ্যারিয়েন্ট সুইচ করে। লোডের সময় প্রতিটি এন্ট্রি
+                  <code>CustomPostReplacements</code>-এ এক্সপ্যান্ড হয়। <code>VowelRules</code>-কে ১০০% Unicode pre-rules
+                  ও backspace toggle-এ ফোকাস রাখতে সাহায্য করে।</p>
+                <pre class="bg-black/40 p-2 rounded-lg text-zinc-300 text-md mt-1">{ "group": "RaPhalas1", "from": "#{A_UKar1}", "to": "#{A_UKar2}" }
+{ "group": "RaPhalas1", "from": "#{A_UUKar1}", "to": "#{A_UUKar2}" }
+{ "group": "RaPhalas1", "from": "#{A_RRIKar1}", "to": "#{A_RRIKar2}" }</pre>
+                <p class="text-[13px] text-zinc-500 mt-1">এক্সপ্যানশন: RaPhalas1-এর প্রতিটি মেম্বার + A_UKar1 &#x2192; মেম্বার + A_UKar2</p>
+              </div>
+            </details>
+            <details open>
+              <summary class="font-semibold text-indigo-300 cursor-pointer text-md">KarCorrections &#x2192; বর্ণ-নির্দিষ্ট কারেকশন
+              </summary>
+              <div class="mt-2 pl-4">
+                <p>নির্দিষ্ট বর্ণ + কার কম্বিনেশনের জন্য বিশেষ সংশোধন। <code>"char"</code> প্রপার্টি
+                  <strong class="text-white">Unicode Bengali Codepoint</strong> (যেমন <code>"#$09A4"</code> = ত)
+                  এবং <strong class="text-white">ANSI Variable</strong> (যেমন <code>"#{A_T}"</code>) — উভয়ই সাপোর্ট করে।</p>
+                <pre class="bg-black/40 p-2 rounded-lg text-zinc-300 text-md mt-1">{ "char": "#{A_T}",     "from": "#{A_UKar1}", "to": "#{A_UKar2}" }  // ANSI variable
+{ "char": "#$09A4",   "from": "#{A_UKar1}", "to": "#{A_UKar2}" }  // Unicode codepoint
+{ "char": "#{A_RR}",   "from": "#{A_UUKar1}", "to": "#{A_UUKar2}" }
+{ "char": "#{A_RRH}",  "from": "#{A_UUKar1}", "to": "#{A_UUKar2}" }</pre>
               </div>
             </details>
           </div>
@@ -1127,7 +1160,8 @@
                 </h4>
                 <p class="text-md">এটি সবশেষে চলে, যখন টেক্সটটি ইতিমধ্যে <strong class="text-white">ANSI</strong>-তে
                   রূপান্তরিত হয়ে গেছে। এখন ইঞ্জিন শুধু দেখে যে কোন ANSI কোডপয়েন্টের পর কোন কার বসবে। এটি মূলত <strong
-                    class="text-white">AnsiGroups</strong>-এর উপর ভিত্তি করে কাজ করে।</p>
+                    class="text-white">RaPhalaGroups</strong>-এর উপর ভিত্তি করে কাজ করে। গ্রুপ-ভিত্তিক কারেকশন
+                  (যেমন র-ফলার পর উ-কার ১&#x2192;২) <code>GroupKarCorrections</code> দিয়ে সংজ্ঞায়িত হয়।</p>
               </div>
             </div>
 
@@ -1137,7 +1171,7 @@
                 রূপান্তরের পর (Phase
                 C) প্রয়োগ হবে, এবং ফাঁকা মানে Phase B (মূল কনভার্সন) তে প্রয়োগ হবে। এই পৃথকীকরণ প্রয়োজন কারণ কিছু
                 কার-কম্বিনেশন শুধু Unicode পর্যায়েই সঠিকভাবে নির্ধারণ করা যায় (যেমন BelowBaseVariant, RuClusters),
-                আবার কিছু শুধু ANSI পর্যায়েই (যেমন RaPhalas)।</p>
+                আবার কিছু শুধু ANSI পর্যায়েই (যেমন RaPhalas1)।</p>
               <p><strong class="text-white">কেন এই জটিলতা?</strong> কিছু ক্ষেত্রে আমরা জানি বর্ণটি ইউনিকোডে কী ছিল,
                 কিন্তু রূপান্তরের পর সেটি কোন গ্লিফ হয়ে গেল তা জানতে হয়। এজন্য Pre এবং Post ফেজের মাধ্যমে আমরা দুই
                 স্তরেই কন্ট্রোল রাখতে পারি।</p>
@@ -1219,14 +1253,17 @@ DDH + Nukta &#x2192; RRH (ঢ়)
                 রূপান্তরের পর কার নির্বাচন</summary>
               <div class="mt-2 pl-4 space-y-2">
                 <p>Phase C Phase A-এর পরিপূরক। এখনো টেক্সট ANSI-তে রূপান্তরিত হয়ে গেছে — তাই <strong
-                    class="text-white">AnsiGroups (ANSI কোডপয়েন্ট)</strong> দিয়ে ম্যাচ করা যায়।</p>
+                    class="text-white">RaPhalaGroups (ANSI কোডপয়েন্ট)</strong> দিয়ে ম্যাচ করা যায়। গ্রুপ-ভিত্তিক
+                  কারেকশন <code>GroupKarCorrections</code> দিয়ে সংজ্ঞায়িত হয় এবং FinalTouch-এ
+                  <code>CustomPostReplacements</code>-এ এক্সপ্যান্ড হয়।</p>
                 <pre class="bg-black/40 p-2 rounded-lg text-zinc-300 text-md">ApplyRuleForKar(b_Ukar, 'post');    // উ-কার — process:"post" Mapping প্রয়োগ
 ApplyRuleForKar(b_UUKar, 'post');   // ঊ-কার
 ApplyRuleForKar(b_Rrikar, 'post');  // ঋ-কার</pre>
                 <p><strong class="text-white">কেন আলাদা ফেজে?</strong> কারণ কিছু Mapping <code>"process": "post"</code>
-                  সেট করা আছে — যেমন RaPhalas, BaseLineRight। যেমন, ক্রু লিখলে Phase B-তে র-ফলা ANSI কোডপয়েন্ট #$C6-তে
+                  সেট করা আছে — যেমন BaseLineRight। যেমন, ক্রু লিখলে Phase B-তে র-ফলা ANSI কোডপয়েন্ট #$C6-তে
                   রূপান্তরিত হয়। Phase C-তে ApplyRuleForKar দেখে যে পূর্ববর্তী ক্যারেক্টার #$C6, যা
-                  AnsiGroups.RaPhalas-এ আছে — তাই A_UKar2 (ঝুলন্ত উ-কার) নির্বাচিত হয়।</p>
+                  RaPhalaGroups.RaPhalas1-এ আছে — তাই A_UKar2 (ঝুলন্ত উ-কার) নির্বাচিত হয়।
+                  এছাড়া GroupKarCorrections র-ফলার পরের সব উ-কারকে ঝুলন্ত ভ্যারিয়েন্টে সুইচ করে।</p>
               </div>
             </details>
 
@@ -1238,7 +1275,7 @@ ApplyRuleForKar(b_Rrikar, 'post');  // ঋ-কার</pre>
                 <ol class="list-decimal list-inside text-md space-y-1">
                   <li><strong class="text-white">Unicode বনাম ANSI পরিচিতি:</strong> কিছু ক্লাস্টার (যেমন ট্র, ড্র) শুধু
                     Unicode অবস্থায় চেনা যায় (ConsonantGroups), আবার কিছু (যেমন র-ফলা #$C6) শুধু ANSI অবস্থায়
-                    (AnsiGroups)।</li>
+                    (RaPhalaGroups)।</li>
                   <li><strong class="text-white">অর্ডার সংবেদনশীলতা:</strong> DeNormalize ও ReArrangeKars টেক্সটের
                     অর্ডার পরিবর্তন করে। Phase A এই পরিবর্তনের আগে কাজ করে, Phase C পরে।</li>
                   <li><strong class="text-white">ফলব্যাক ব্যবস্থাপনা:</strong> যদি Phase A কোনো Mapping-এ ম্যাচ না পায়,
@@ -1289,7 +1326,7 @@ ApplyRuleForKar(b_Rrikar, 'post');  // ঋ-কার</pre>
       "process": "pre"
     },
     {
-      "consonants": "RaPhalas",      // AnsiGroups নাম
+      "consonants": "RaPhalas1",     // RaPhalaGroups নাম
       "value": "#{A_UKar2}",
       "process": "post"               // &#x2190; Post-phase এ প্রয়োগ
     },
@@ -1413,8 +1450,8 @@ Toggle ON (Backspace): alt = A_UKar2 (#$24 — ঝুলন্ত)
                   সরাসরি ক্যারেক্টারের সাথে মিলে (যেমন "#$09B0" = "র")</li>
                 <li><strong class="text-indigo-300">ConsonantGroups Match:</strong> ConsonantGroupMap-এ গ্রুপের নাম
                   দিয়ে খোঁজা হয় (যেমন "RuClusters", "BelowBaseVariant")</li>
-                <li><strong class="text-indigo-300">AnsiGroups Match:</strong> AnsiGroupMap-এ গ্রুপের নাম দিয়ে খোঁজা
-                  হয় (যেমন "RaPhalas") — শুধু Phase C তে</li>
+                <li><strong class="text-indigo-300">RaPhalaGroups Match:</strong> AnsiGroupMap-এ গ্রুপের নাম দিয়ে খোঁজা
+                  হয় (যেমন "RaPhalas1") — শুধু Phase C তে</li>
                 <li><strong class="text-indigo-300">Default:</strong> কোনো Mapping না মিললে <code>default</code> মান
                   ব্যবহার হয়</li>
               </ol>
@@ -1432,8 +1469,8 @@ Toggle ON (Backspace): alt = A_UKar2 (#$24 — ঝুলন্ত)
                 থাকায় <code>alt = A_UKar2</code> (ঝুলন্ত) এ ফ্লিপ করে।</p>
               <p><strong class="text-white">ট্রু (ট + র + উ-কার):</strong> "ট্র" BelowBaseVariant গ্রুপে আছে,
                 matchMode=০ &#x2192; <code>value = #$0024</code> (ছাতা উ-কার)।</p>
-              <p><strong class="text-white">ক্রু (ক + র + উ-কার):</strong> ANSI-তে রূপান্তরের পর র (#$C6) — RaPhalas
-                (AnsiGroups), process="post" &#x2192; <code>value = A_UKar2</code> (ঝুলন্ত)।</p>
+              <p><strong class="text-white">ক্রু (ক + র + উ-কার):</strong> ANSI-তে রূপান্তরের পর র (#$C6) — RaPhalas1
+                (RaPhalaGroups), process="post" &#x2192; <code>value = A_UKar2</code> (ঝুলন্ত)।</p>
               <p><strong class="text-white">গু (গ + উ-কার):</strong> "গ" BaseLineRight গ্রুপে, matchMode=১ &#x2192;
                 <code>A_UKar1</code> (সাধারণ)।
               </p>
@@ -1485,15 +1522,15 @@ Toggle ON (Backspace): alt = A_UKar2 (#$24 — ঝুলন্ত)
                   <p class="text-md mt-2 italic">উদাহরণ: <code>"BelowBaseVariant": ["ট্র", "ড্র"]</code></p>
                 </div>
                 <div class="bg-black/30 p-4 rounded-lg border border-green-500/20">
-                  <h5 class="text-green-300 font-bold mb-2">AnsiGroups (ANSI)</h5>
+                  <h5 class="text-green-300 font-bold mb-2">RaPhalaGroups (ANSI)</h5>
                   <p class="text-md">এটি কনভার্সনের <strong class="text-white">পরে</strong> কাজ করে। যখন বর্ণটি ইতিমধ্যে
                     ANSI হেক্স কোডে পরিণত হয়েছে, তখন এই গ্রুপ ব্যবহৃত হয়।</p>
-                  <p class="text-md mt-2 italic">উদাহরণ: <code>"RaPhalas": ["#$C6", "#$C8"]</code></p>
+                  <p class="text-md mt-2 italic">উদাহরণ: <code>"RaPhalas1": ["#{A_RFola_3}", "#{A_RFola_2}#$FE"]</code></p>
                 </div>
               </div>
               <p class="mt-4 text-md">এই দ্বৈত পদ্ধতির ফলে আমরা অনেক জটিল গ্লিফ হ্যান্ডেল করতে পারি। যেমন: 'ক' এর পরে
                 'র-ফলা' বসলে সেটি ইউনিকোড থেকে ANSI-তে রূপান্তর হয়ে <code>#$C6</code> হয়ে যায়। এখন যদি তার পরে 'উ-কার'
-                আসে, তবে ইঞ্জিন <code>AnsiGroups.RaPhalas</code> দেখে বুঝতে পারে যে এখানে বিশেষ গ্লিফ বসাতে হবে।</p>
+                আসে, তবে ইঞ্জিন <code>RaPhalaGroups.RaPhalas1</code> দেখে বুঝতে পারে যে এখানে বিশেষ গ্লিফ বসাতে হবে।</p>
             </div>
             <div class="bg-black/30 p-4 rounded-lg space-y-3 text-md">
               <p><strong class="text-indigo-300">BelowBaseVariant:</strong> এমন যুক্তবর্ণ যাদের নিচে র-ফলা ঝুলে না থেকে
@@ -1507,7 +1544,7 @@ Toggle ON (Backspace): alt = A_UKar2 (#$24 — ঝুলন্ত)
 
               <p><strong class="text-indigo-300">BaseLineRight:</strong> ডানপাশে খাড়া Stem যুক্ত বর্ণ ও যুক্তবর্ণ। এদের
                 নিচে সাধারণ ঝুলন্ত উ-কার (A_UKar1) বসে। <strong class="text-white">র-ফলাসহ Cluster এখানে লাগে
-                  না</strong> — AnsiGroups.RaPhalas স্বয়ংক্রিয়ভাবে হ্যান্ডল করে। MatchMode ১ ব্যবহার করে — শুধু শেষ
+                  না</strong> — RaPhalaGroups.RaPhalas1 স্বয়ংক্রিয়ভাবে হ্যান্ডল করে। MatchMode ১ ব্যবহার করে — শুধু শেষ
                 বর্ণ চেক করে। Phase C (Post-phase) তে কাজ করে।</p>
             </div>
 
@@ -1543,30 +1580,32 @@ Toggle ON (Backspace): alt = A_UKar2 (#$24 — ঝুলন্ত)
           </div>
         </details>
 
-        <!-- 6. AnsiGroups: ANSI কোডপয়েন্ট গ্রুপিং -->
+        <!-- 6. RaPhalaGroups: ANSI কোডপয়েন্ট গ্রুপিং -->
         <details class="premium-card elevation-1 group" open>
           <summary class="font-bold text-white flex items-center justify-between p-5">
             <div class="flex items-center gap-3"><span
-                class="material-symbols-outlined text-indigo-400">group_work</span><span>৬. AnsiGroups: ANSI কোডপয়েন্ট
+                class="material-symbols-outlined text-indigo-400">group_work</span><span>৬. RaPhalaGroups: ANSI কোডপয়েন্ট
                 গ্রুপিং</span></div>
             <span class="material-symbols-outlined transition-transform">expand_more</span>
           </summary>
           <div class="details-content text-zinc-400 leading-relaxed space-y-3">
             <div class="bg-indigo-900/20 border border-indigo-800/30 p-3 rounded-lg text-md">
-              <strong class="text-white">মূল পার্থক্য:</strong> AnsiGroups ANSI কোডপয়েন্ট গ্রুপ করে — কনভার্সনের
-              <strong class="text-white">পরে</strong> কাজ করে। এটি <strong class="text-white">দুই জায়গায়</strong>
-              ব্যবহার হয়: (১) VowelRules Level-৩ ম্যাচিং (Phase C) (২) FinalTouch-এর ApplyGenericGlyphSwaps।
+              <strong class="text-white">মূল পার্থক্য:</strong> RaPhalaGroups ANSI কোডপয়েন্ট গ্রুপ করে — কনভার্সনের
+              <strong class="text-white">পরে</strong> কাজ করে। এটি <strong class="text-white">তিন জায়গায়</strong>
+              ব্যবহার হয়: (১) VowelRules Level-৩ ম্যাচিং (Phase C) (২) GroupKarCorrections (৩) FinalTouch-এর ApplyGenericGlyphSwaps।
+              মেম্বারগুলো <code>#{VariableName}</code> রেফারেন্স ব্যবহার করে।
             </div>
 
             <h4 class="text-white font-semibold mt-4">JSON গঠন</h4>
-            <pre class="bg-black/40 p-3 rounded-lg text-zinc-300 text-md">"AnsiGroups": {
-  "RaPhalas": ["#$C6", "#$C8", "#$C9", "#$CA", "#$CB", "#$CC"],
+            <pre class="bg-black/40 p-3 rounded-lg text-zinc-300 text-md">"RaPhalaGroups": {
+  "RaPhalas1": ["#{A_RFola_3}", "#{A_RFola_2}#$FE", "#{A_RFola_1}"],
+  "RaPhalas2": ["#{A_RFola_2}", "#{A_RFola_1}"],
   "Connectors": ["#$FE", "#$E9"]
 }</pre>
 
-            <h4 class="text-white font-semibold mt-4">RaPhalas — রেফ সনাক্তকরণ</h4>
+            <h4 class="text-white font-semibold mt-4">RaPhalas1 — রেফ সনাক্তকরণ</h4>
             <div class="bg-black/30 p-4 rounded-lg space-y-2 text-md">
-              <p><strong class="text-white">কেন RaPhalas AnsiGroups-এ?</strong> রেফ মূল Unicode অবস্থায়
+              <p><strong class="text-white">কেন RaPhalas1 RaPhalaGroups-এ?</strong> রেফ মূল Unicode অবস্থায়
                 <code>r + Hasanta</code> প্যাটার্ন। কিন্তু Phase B-তে <code>ReArrangeReph</code> এবং
                 <code>Consonants</code> ধাপে এটি ANSI Glyph-এ রূপান্তরিত হয় — যেমন ট্ট (#$C6), ণ্ট (#$C8), ণ্ঠ (#$C9)।
                 এই ANSI Glyph-গুলো শুধু ANSI পরিবেশেই সনাক্ত করা যায়।
@@ -1574,7 +1613,7 @@ Toggle ON (Backspace): alt = A_UKar2 (#$24 — ঝুলন্ত)
               <pre class="bg-black/40 p-2 rounded-lg text-zinc-300 text-md">Phase B এর পর: ক্র → ক + র-ফলা(#$C6)
 Phase C: ApplyRuleForKar(উ-কার, 'post')
 &#x2192; FindBestClusterMatch: পূর্ববর্তী ANSI = #$C6
-&#x2192; AnsiGroups.RaPhalas-এ #$C6 আছে → ম্যাচ!
+&#x2192; RaPhalaGroups.RaPhalas1-এ #$C6 আছে → ম্যাচ!
 &#x2192; <strong class="text-green-400">value = A_UKar2 (ঝুলন্ত উ-কার)</strong></pre>
             </div>
 
@@ -1589,11 +1628,11 @@ Phase C: ApplyRuleForKar(উ-কার, 'post')
 
             <h4 class="text-white font-semibold mt-4">ApplyGenericGlyphSwaps — ডায়নামিক পুনর্বিন্যাস</h4>
             <pre class="bg-black/40 p-3 rounded-lg text-zinc-300 text-md">১. সব কার Glyph কালেক্ট: A_UKar1-4, A_UUKar1-3, A_RRIKar1-2
-২. AnsiGroups থেকে Modifier লোড: RaPhalas + Connectors
-৩. ফলব্যাক (JSON-ে AnsiGroups না থাকলে): RFola, ZFola, Reph, RR, R, RRH
+২. RaPhalaGroups থেকে Modifier লোড: RaPhalas1 + Connectors
+৩. ফলব্যাক (JSON-ে RaPhalaGroups না থাকলে): RFola, ZFola, Reph, RR, R, RRH
 ৪. Nested Loop: প্রতিটি Modifier × প্রতিটি কার
 ৫. ReplaceStr(Modifier + Kar, Kar + Modifier) — অর্ডার সুয়াপ</pre>
-            <p><strong class="text-white">শক্তি:</strong> একটি নতুন Hex Code AnsiGroups-এ যোগ করলেই স্বয়ংক্রিয়ভাবে সব
+            <p><strong class="text-white">শক্তি:</strong> একটি নতুন Hex Code RaPhalaGroups-এ যোগ করলেই স্বয়ংক্রিয়ভাবে সব
               কারের সাথে কম্বিনেশন হ্যান্ডল হয়।</p>
 
             <h4 class="text-white font-semibold mt-4">কোন গ্রুপে কোন কোডপয়েন্ট যোগ করবেন</h4>
@@ -1608,7 +1647,7 @@ Phase C: ApplyRuleForKar(উ-কার, 'post')
                 </thead>
                 <tbody>
                   <tr>
-                    <td class="font-mono text-indigo-300">RaPhalas</td>
+                    <td class="font-mono text-indigo-300">RaPhalas1</td>
                     <td>ANSI Glyph-এর উপর Reph/রেফ বসে এবং এটি Phase C এ VowelRules-এ ম্যাচ দরকার</td>
                     <td>ট্ট (#$C6), ণ্ট (#$C8)</td>
                   </tr>
@@ -1652,10 +1691,12 @@ Reph + UUKar → UUKar + Reph</pre>
 
             <h4 class="text-white font-semibold mt-4">৩. পোস্ট-প্রসেসিং কারেকশন</h4>
             <div class="bg-black/30 p-4 rounded-lg text-md">
-              <p>নির্দিষ্ট বর্ণ + কার কম্বিনেশনের জন্য বিশেষ সংশোধন:</p>
-              <pre class="bg-black/40 p-2 rounded-lg text-zinc-300 text-md">ট + উ-কার১ → ট + উ-কার২ (ঝুলন্ত)
-ঊ-কার১ + ড় → ঊ-কার২ + ড়
-ঊ-কার১ + র → ঊ-কার২ + র</pre>
+              <p>নির্দিষ্ট বর্ণ + কার কম্বিনেশনের জন্য বিশেষ সংশোধন — JSON-ড্রিভেন:</p>
+              <pre class="bg-black/40 p-2 rounded-lg text-zinc-300 text-md">KarCorrections: { char: "#{A_T}", from: "#{A_UKar1}", to: "#{A_UKar2}" }
+  → ত + উ-কার১ → ত + উ-কার২ (ঝুলন্ত)
+GroupKarCorrections: { group: "RaPhalas1", from: "#{A_UKar1}", to: "#{A_UKar2}" }
+  → র-ফলা + উ-কার১ → র-ফলা + উ-কার২ (প্রতিটি মেম্বারের জন্য)</pre>
+              <p class="text-[13px] text-zinc-500 mt-2"><code>KarCorrections</code> নির্দিষ্ট বর্ণের জন্য, <code>GroupKarCorrections</code> গ্রুপের সব মেম্বারের জন্য। দুটোই FinalTouch-এ চলে।</p>
             </div>
 
             <h4 class="text-white font-semibold mt-4">৪. Unicode স্যানিটাইজেশন</h4>
@@ -1669,8 +1710,8 @@ Reph + UUKar → UUKar + Reph</pre>
               <p>এটি FinalTouch-এর সবচেয়ে শক্তিশালী ফিচার। এটি সম্পূর্ণভাবে স্বয়ংক্রিয় — ব্যবহারকারীকে প্রতিটি
                 কম্বিনেশনের জন্য আলাদা নিয়ম লিখতে হয় না।</p>
               <ol class="list-decimal list-inside space-y-1">
-                <li><strong class="text-white">Modifier Collection:</strong> AnsiGroups থেকে সব Modifier Glyph লোড করে
-                  (RaPhalas + Connectors)। ফলব্যাক হিসেবে RFola, ZFola, Reph, RR, R, RRH ব্যবহার করে।</li>
+                <li><strong class="text-white">Modifier Collection:</strong> RaPhalaGroups থেকে সব Modifier Glyph লোড করে
+                  (RaPhalas1 + Connectors)। ফলব্যাক হিসেবে RFola, ZFola, Reph, RR, R, RRH ব্যবহার করে।</li>
                 <li><strong class="text-white">Kar Collection:</strong> সব কার Glyph লোড করে — A_UKar1-4, A_UUKar1-3,
                   A_RRIKar1-2।</li>
                 <li><strong class="text-white">Nested Loop:</strong> প্রতিটি Modifier-এর জন্য প্রতিটি কার-এর সাথে
@@ -1681,14 +1722,14 @@ Reph + UUKar → UUKar + Reph</pre>
               <pre class="bg-black/40 p-2 rounded-lg text-zinc-300 text-md">উদাহরণ: র-ফলা(#$C6) + উ-কার(#$25)
 &#x2192; ReplaceStr ম্যাচ করে
 &#x2192; ফলাফল: উ-কার(#$25) + র-ফলা(#$C6) &#x2192; <strong class="text-green-400">সঠিক অর্ডার</strong></pre>
-              <p><strong class="text-white">শক্তি:</strong> AnsiGroups-এ একটি নতুন Hex Code যোগ করলেই স্বয়ংক্রিয়ভাবে
+              <p><strong class="text-white">শক্তি:</strong> RaPhalaGroups-এ একটি নতুন Hex Code যোগ করলেই স্বয়ংক্রিয়ভাবে
                 সব কারের সাথে কম্বিনেশন হ্যান্ডল হয়। প্রতিটি কম্বিনেশনের জন্য আলাদা নিয়ম লিখার প্রয়োজন নেই।</p>
             </div>
 
             <h4 class="text-white font-semibold mt-4">৬. CustomPostReplacements</h4>
             <div class="bg-black/30 p-4 rounded-lg text-md">
-              <p>সব শেষে PostReplacements তালিকা থেকে ব্যবহারকারী-সংজ্ঞায়িত প্রতিস্থাপন প্রয়োগ করে। এটি নতুন
-                পরিস্থিতির জন্য ফলব্যাক হিসেবে কাজ করে।</p>
+              <p>সব শেষে PostReplacements তালিকা থেকে প্রতিস্থাপন প্রয়োগ করে। <code>GroupKarCorrections</code>
+                থেকে এক্সপ্যান্ড হওয়া এন্ট্রিগুলোও এখানে যোগ হয়। Key Length Descending ক্রমে সাজানো, তাই দীর্ঘতম ম্যাচ আগে হয়।</p>
             </div>
           </div>
           <div class="details-content text-zinc-400 leading-relaxed space-y-3">
@@ -1841,7 +1882,7 @@ Reph + UUKar → UUKar + Reph</pre>
             </div>
             <div class="bg-black/30 p-4 rounded-lg">
               <h4 class="text-white font-semibold mb-2">ApplyGenericGlyphSwaps</h4>
-              <p>ANSI আউটপুটে Modifier+Kar অর্ডার ঠিক করে। AnsiGroups থেকে Modifier লোড করে, Nested Loop চালিয়ে
+              <p>ANSI আউটপুটে Modifier+Kar অর্ডার ঠিক করে। RaPhalaGroups থেকে Modifier লোড করে, Nested Loop চালিয়ে
                 <code>ReplaceStr(Modif+Kar, Kar+Modif)</code> করে।
               </p>
             </div>
@@ -1894,9 +1935,16 @@ Reph + UUKar → UUKar + Reph</pre>
                   <td>Unicode বর্ণের গ্রুপ সংজ্ঞায়িত/পরিবর্তন করতে — Phase A/B এর জন্য</td>
                 </tr>
                 <tr>
-                  <td class="font-mono text-indigo-300">AnsiGroups</td>
-                  <td>ANSI কোডপয়েন্ট গ্রুপ সংজ্ঞায়িত করতে — Phase C VowelRules ম্যাচিং ও FinalTouch Glyph Swap উভয়ের
-                    জন্য</td>
+                  <td class="font-mono text-indigo-300">RaPhalaGroups</td>
+                  <td>ANSI কোডপয়েন্ট গ্রুপ সংজ্ঞায়িত করতে — Phase C VowelRules ম্যাচিং, GroupKarCorrections ও FinalTouch Glyph Swap উভয়ের জন্য</td>
+                </tr>
+                <tr>
+                  <td class="font-mono text-indigo-300">GroupKarCorrections</td>
+                  <td>গ্রুপ-ভিত্তিক কারেকশন যোগ করতে (যেমন র-ফলার পর উ-কার ১&#x2192;২) — FinalTouch-এ CustomPostReplacements-এ এক্সপ্যান্ড হয়</td>
+                </tr>
+                <tr>
+                  <td class="font-mono text-indigo-300">KarCorrections</td>
+                  <td>নির্দিষ্ট বর্ণ + কার কম্বিনেশনের কারেকশন যোগ করতে — Unicode codepoint বা ANSI variable উভয় সাপোর্ট করে</td>
                 </tr>
               </tbody>
             </table>
@@ -2331,15 +2379,15 @@ Unicode: &#x0995;&#x09CD;&#x09B0;&#x09C1; &#x2192; ANSI: e%«</pre>
           "A_AAKar": { "UnicodeKey": "া", "Value": "#$0079", "Comment": "া (আ-কার)" },
           "A_I": { "UnicodeKey": "ই", "Value": "#$A3#$7A", "Comment": "ই" },
           "A_IKar": { "UnicodeKey": "ি", "Value": "#$21", "Comment": "ি (ই-কার)" },
-          "A_UKar1": { "UnicodeKey": "ু", "Value": "#$25", "Comment": "ু (উ-কার ১)" },
-          "A_UKar2": { "UnicodeKey": "ু", "Value": "#$24", "Comment": "ু (উ-কার ২)" },
+          "A_UKar1": { "UnicodeKey": "ু", "Value": "#$25", "Comment": "ু (উ-কার ১ - সাধারণ)" },
+          "A_UKar2": { "UnicodeKey": "ু", "Value": "#$24", "Comment": "ু (উ-কার ২ - ঝুলন্ত)" },
           "A_UKar3": { "UnicodeKey": "ু", "Value": "#$59", "Comment": "ু (উ-কার ৩)" },
-          "A_UKar4": { "UnicodeKey": "ু", "Value": "#$26", "Comment": "ু (উ-কার ৪)" },
-          "A_UUKar1": { "UnicodeKey": "ূ", "Value": "#$29", "Comment": "ূ (ঊ-কার ১)" },
-          "A_UUKar2": { "UnicodeKey": "ূ", "Value": "#$28", "Comment": "ূ (ঊ-কার ২)" },
+          "A_UKar4": { "UnicodeKey": "ু", "Value": "#$26", "Comment": "ু (উ-কার ৪ - র-এর পর)" },
+          "A_UUKar1": { "UnicodeKey": "ূ", "Value": "#$29", "Comment": "ূ (ঊ-কার ১ - সাধারণ)" },
+          "A_UUKar2": { "UnicodeKey": "ূ", "Value": "#$28", "Comment": "ূ (ঊ-কার ২ - ঝুলন্ত)" },
           "A_UUKar3": { "UnicodeKey": "ূ", "Value": "#$2A", "Comment": "ূ (ঊ-কার ৩)" },
-          "A_RRIKar1": { "UnicodeKey": "ৃ", "Value": "#$2C", "Comment": "ৃ (ঋ-কার ১)" },
-          "A_RRIKar2": { "UnicodeKey": "ৃ", "Value": "#$2B", "Comment": "ৃ (ঋ-কার ২)" }
+          "A_RRIKar1": { "UnicodeKey": "ৃ", "Value": "#$2C", "Comment": "ৃ (ঋ-কার ১ - সাধারণ)" },
+          "A_RRIKar2": { "UnicodeKey": "ৃ", "Value": "#$2B", "Comment": "ৃ (ঋ-কার ২ - ঝুলন্ত)" }
         },
         "Symbols": {
           "A_Hasanta": { "UnicodeKey": "্", "Value": "#$E4", "Comment": "্ (হসন্ত)" },
@@ -2348,7 +2396,10 @@ Unicode: &#x0995;&#x09CD;&#x09B0;&#x09C1; &#x2192; ANSI: e%«</pre>
         "Consonants": {
           "A_K": { "UnicodeKey": "ক", "Value": "#$201E#$FE", "Comment": "ক" },
           "A_Kh": { "UnicodeKey": "খ", "Value": "#$2026", "Comment": "খ" },
-          "A_G": { "UnicodeKey": "গ", "Value": "#$2020", "Comment": "গ" }
+          "A_G": { "UnicodeKey": "গ", "Value": "#$2020", "Comment": "গ" },
+          "A_T": { "UnicodeKey": "ত", "Value": "#$201C#$00FE", "Comment": "ত" },
+          "A_RR": { "UnicodeKey": "ড়", "Value": "#$BE", "Comment": "ড়" },
+          "A_RRH": { "UnicodeKey": "ঢ়", "Value": "#$BF", "Comment": "ঢ়" }
         },
         "FullForms": {
           "A_K_K": { "UnicodeKey": "ক্ক", "Value": "#$45#$FE", "Comment": "ক্ক" },
@@ -2360,8 +2411,9 @@ Unicode: &#x0995;&#x09CD;&#x09B0;&#x09C1; &#x2192; ANSI: e%«</pre>
           "A_M_1H": { "UnicodeKey": "ম", "Value": "#$C1", "Comment": "ম-এর প্রথম খন্ড" }
         },
         "SecondHalfForms": {
-          "A_RFola_1": { "UnicodeKey": "র", "Value": "#$C9", "Comment": "র-ফলা ১" },
-          "A_RFola_2": { "UnicodeKey": "র", "Value": "#$CA", "Comment": "র-ফলা ২" }
+          "A_RFola_1": { "UnicodeKey": "র", "Value": "#$C9", "Comment": "র-ফলা ১ (সাধারণ)" },
+          "A_RFola_2": { "UnicodeKey": "র", "Value": "#$CA", "Comment": "র-ফলা ২ (সাধারণ + FE)" },
+          "A_RFola_3": { "UnicodeKey": "র", "Value": "#$D6", "Comment": "র-ফলা ৩ (শু-এর পর)" }
         }
       },
       "FullFormReplacements": [
@@ -2373,31 +2425,42 @@ Unicode: &#x0995;&#x09CD;&#x09B0;&#x09C1; &#x2192; ANSI: e%«</pre>
         { "Key": "#$003F", "Value": "#$DA", "Comment": "?" }
       ],
       "PostReplacements": [
-        { "Key": "#$FE#{A_UKar1}", "Value": "#{A_UKar1}#$FE", "Comment": "FE + উ-কার ১" },
-        { "Key": "#$E9#{A_UKar1}", "Value": "#{A_UKar1}#$E9", "Comment": "E9 + উ-কার ১" }
+        { "Key": "#$FE#{A_UKar1}", "Value": "#{A_UKar1}#$FE", "Comment": "FE + উ-কার ১ সুয়াপ" },
+        { "Key": "#$E9#{A_UKar1}", "Value": "#{A_UKar1}#$E9", "Comment": "E9 + উ-কার ১ সুয়াপ" }
       ],
       "VowelRules": {
         "#$09C1": {
           "default": "#{A_UKar1}",
           "toggle": "backspace",
           "mappings": [
-            { "consonants": "#$09B0", "value": "#{A_UKar4}", "alt": "#{A_UKar2}" },
-            { "consonants": "BelowBaseVariant", "value": "#$0024" },
-            { "consonants": "RuClusters", "value": "#{A_UKar4}", "alt": "#{A_UKar1}" },
-            { "consonants": "RaPhalas", "value": "#{A_UKar2}" },
-            { "consonants": "BaseLineRight", "value": "#{A_UKar1}" }
+            { "consonants": "#$09B0", "value": "#{A_UKar4}", "alt": "#{A_UKar1}", "toggle": "backspace", "process": "pre", "matchMode": 1 },
+            { "consonants": "BelowBaseVariant", "value": "#$0024", "process": "pre", "matchMode": 0 },
+            { "consonants": "RuClusters", "value": "#{A_UKar4}", "alt": "#{A_UKar1}", "process": "pre", "matchMode": 0 },
+            { "consonants": "BaseLineRight", "value": "#{A_UKar1}", "process": "post", "matchMode": 1 }
           ]
         }
       },
-      "AnsiGroups": {
-        "RaPhalas": ["#$C6", "#$C8", "#$C9", "#$CA", "#$CB", "#$CC"],
+      "GroupKarCorrections": [
+        { "group": "RaPhalas1", "from": "#{A_UKar1}", "to": "#{A_UKar2}" },
+        { "group": "RaPhalas1", "from": "#{A_UUKar1}", "to": "#{A_UUKar2}" },
+        { "group": "RaPhalas1", "from": "#{A_RRIKar1}", "to": "#{A_RRIKar2}" }
+      ],
+      "RaPhalaGroups": {
+        "RaPhalas1": ["#{A_RFola_3}", "#{A_RFola_2}#$FE", "#{A_RFola_1}"],
+        "RaPhalas2": ["#{A_RFola_2}", "#{A_RFola_1}"],
         "Connectors": ["#$FE", "#$E9"]
       },
       "ConsonantGroups": {
         "BelowBaseVariant": ["ট্র", "ড্র", "ঢ্র"],
         "RuClusters": ["#$0997#$09CD#$09B0", "#$0998#$09CD#$09B0", "#$09A4#$09CD#$09B0"],
         "BaseLineRight": ["খ", "গ", "ঘ", "ণ", "থ", "দ", "ধ", "ন", "প", "ব", "ম", "য", "র", "ল", "শ", "ষ", "স", "হ", "য়"]
-      }
+      },
+      "KarCorrections": [
+        { "char": "#$09A4", "from": "#{A_UKar1}", "to": "#{A_UKar2}", "Comment": "ত + উ-কার ১ → ২" },
+        { "char": "#$09A4", "from": "#{A_UUKar1}", "to": "#{A_UUKar2}", "Comment": "ত (Unicode) + ঊ-কার ১ → ২" },
+        { "char": "#{A_RR}", "from": "#{A_UUKar1}", "to": "#{A_UUKar2}", "Comment": "ড় + ঊ-কার ১ → ২" },
+        { "char": "#{A_RRH}", "from": "#{A_UUKar1}", "to": "#{A_UUKar2}", "Comment": "ঢ় + ঊ-কার ১ → ২" }
+      ]
     };
 
     function hexToChars(hexStr) {
@@ -2673,7 +2736,7 @@ Unicode: &#x0995;&#x09CD;&#x09B0;&#x09C1; &#x2192; ANSI: e%«</pre>
         </div>
       </div>
       <div>
-        <label class="text-[14px] uppercase font-bold text-zinc-500 mb-2 block">Mappings (ConsonantGroup / AnsiGroup / Direct Char)</label>
+        <label class="text-[14px] uppercase font-bold text-zinc-500 mb-2 block">Mappings (ConsonantGroup / RaPhalaGroup / Direct Char)</label>
         <div class="space-y-4">
           ${(r.mappings || []).map((m, mi) => {
             const processVal = m.process || '';
@@ -3013,7 +3076,7 @@ Unicode: &#x0995;&#x09CD;&#x09B0;&#x09C1; &#x2192; ANSI: e%«</pre>
 
     // ===== GLYPH REFERENCE =====
     // GLYPH_REF is now built dynamically from the loaded JSON mapping
-    // (Constants + AnsiGroups) so it always reflects the current mapping.
+    // (Constants + RaPhalaGroups) so it always reflects the current mapping.
     function buildGlyphRef() {
       const rows = [];
       if (state && state.Constants) {
@@ -3027,9 +3090,9 @@ Unicode: &#x0995;&#x09CD;&#x09B0;&#x09C1; &#x2192; ANSI: e%«</pre>
           });
         });
       }
-      if (state && state.AnsiGroups) {
-        ['RaPhalas', 'Connectors'].forEach(g => {
-          (state.AnsiGroups[g] || []).forEach(h => {
+      if (state && state.RaPhalaGroups) {
+        ['RaPhalas1', 'Connectors'].forEach(g => {
+          (state.RaPhalaGroups[g] || []).forEach(h => {
             rows.push({ hex: h, glyph: decodeValuePreview(h, state), name: g + ' modifier  ·  ' + h });
           });
         });
@@ -3067,7 +3130,7 @@ Unicode: &#x0995;&#x09CD;&#x09B0;&#x09C1; &#x2192; ANSI: e%«</pre>
       { title: 'ধাপ ২ — Hex Code খোঁজা', icon: 'code', desc: 'Character Map (charmap.exe) ব্যবহার করে ফন্টের সঠিক ANSI Hex Code খুঁজে বের করুন।', tip: '"Hex & Tools" ট্যাবের Hex Translator ব্যবহার করতে পারেন। প্রতিটি বর্ণের জন্য ANSI কোডপয়েন্ট নোট করুন।' },
       { title: 'ধাপ ৩ — Constants যোগ', icon: 'settings', desc: 'নতুন ভ্যারিয়েবল দরকার হলে Constants-এ যোগ করুন।', tip: 'যেমন: A_UKar_Special = #$XX। "Constants" ট্যাবে যান, সঠিক ক্যাটাগরি নির্বাচন করুন, "+ Add" বাটনে ক্লিক করুন।' },
       { title: 'ধাপ ৪ — ConsonantGroups যোগ', icon: 'group_work', desc: 'নতুন Unicode Cluster গ্রুপ দরকার হলে ConsonantGroups-এ যোগ করুন।', tip: 'BelowBaseVariant, RuClusters, BaseLineRight — যেটি প্রয়োজন সেটি বাছাই করুন। এগুলো Phase A-তে Unicode Cluster ম্যাচ করতে ব্যবহৃত হয়।' },
-      { title: 'ধাপ ৫ — AnsiGroups যোগ', icon: 'group_work', desc: 'ANSI-ভিত্তিক Modifier হলে AnsiGroups-এ যোগ করুন।', tip: 'RaPhalas, Connectors — যেটি প্রয়োজন সেটি বাছাই করুন। এগুলো Phase C-তে ANSI কোডপয়েন্ট ম্যাচ করতে ব্যবহৃত হয়।' },
+      { title: 'ধাপ ৫ — RaPhalaGroups যোগ', icon: 'group_work', desc: 'ANSI-ভিত্তিক Modifier হলে RaPhalaGroups-এ যোগ করুন।', tip: 'RaPhalas1, Connectors — যেটি প্রয়োজন সেটি বাছাই করুন। এগুলো Phase C-তে ANSI কোডপয়েন্ট ম্যাচ করতে এবং GroupKarCorrections-এ গ্রুপ-ভিত্তিক কারেকশন তৈরি করতে ব্যবহৃত হয়।' },
       { title: 'ধাপ ৬ — VowelRules Mapping', icon: 'rule', desc: 'VowelRules-এ Mapping যোগ/আপডেট করুন। সঠিক process, matchMode, toggle নিশ্চিত করুন।', tip: '"pre" = Phase A (ANSI তে কনভার্ট করার আগে Unicode-তে), "post" = Phase C (ANSI-তে), ফাঁকা = Phase B (মূল কনভার্সন)। matchMode: "cluster" বা "char"। toggle: "none" বা "backspace" — "backspace" = ব্যাকস্পেসে গ্লিফ পরিবর্তন।' },
       { title: 'ধাপ ৭ — পরীক্ষা', icon: 'check_circle', desc: 'Editor-এ পরীক্ষা করুন। সব ফেজ (Pre, Main, Post) ধাপে সঠিকভাবে কাজ করছে কিনা দেখুন।', tip: 'লাইভ মিনি-কনভার্টার ব্যবহার করে দ্রুত পরীক্ষা করুন। পূর্ণ পরীক্ষার জন্য সম্পূর্ণ ইউনিকোড টেক্সট লিখে ANSI আউটপুট যাচাই করুন।' }
     ];
