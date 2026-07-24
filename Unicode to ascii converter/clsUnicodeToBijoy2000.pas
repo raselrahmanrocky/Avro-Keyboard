@@ -1049,11 +1049,6 @@ begin
   Consonants;
   FinalTouch;
 
-  // === Phase C: Post-phase vowel rule pass (ANSI-converted text) ===
-  ApplyRuleForKar(b_Ukar, 'post');
-  ApplyRuleForKar(b_UUKar, 'post');
-  ApplyRuleForKar(b_Rrikar, 'post');
-
   Result := fConvertedText;
 end;
 
@@ -2323,6 +2318,10 @@ var
   Rec: TAnsiVarRec;
   Lines: TStringList;
   Items: TList<string>;
+  GCorrGroup, GCorrFrom, GCorrTo: string;
+  GroupMembers: TArray<string>;
+  GCorrMember: string;
+  GCorrPair: TReplacementPair;
 begin
   ResetAnsiToDefaults;
 
@@ -2873,9 +2872,60 @@ begin
               else
                 JSkipValue(JSON, P);
             end;
-            CharStr := ProcessHexAndUnicode(CharStr);
+            CharStr := ResolveValue(CharStr);
             FromKar := ResolveValue(FromKar);
             ToKar := ResolveValue(ToKar);
+          end;
+        end
+        else
+          JSkipValue(JSON, P);
+      end;
+    end
+    else if Key = 'GroupKarCorrections' then
+    begin
+      if (P <= Length(JSON)) and (JSON[P] = '[') then Inc(P) else Continue;
+      while P <= Length(JSON) do
+      begin
+        JSkipWS(JSON, P);
+        if (P > Length(JSON)) or (JSON[P] = ']') then begin Inc(P); Break; end;
+        if JSON[P] = ',' then begin Inc(P); Continue; end;
+        if JSON[P] = '{' then
+        begin
+          Inc(P);
+          GCorrGroup := ''; GCorrFrom := ''; GCorrTo := '';
+          while P <= Length(JSON) do
+          begin
+            JSkipWS(JSON, P);
+            if (P > Length(JSON)) or (JSON[P] = '}') then begin Inc(P); Break; end;
+            if JSON[P] = ',' then begin Inc(P); Continue; end;
+            FieldName := JReadString(JSON, P);
+            JSkipWS(JSON, P); if JSON[P] = ':' then Inc(P);
+            JSkipWS(JSON, P);
+            if FieldName = 'group' then
+              GCorrGroup := JReadString(JSON, P)
+            else if FieldName = 'from' then
+              GCorrFrom := JReadString(JSON, P)
+            else if FieldName = 'to' then
+              GCorrTo := JReadString(JSON, P)
+            else
+              JSkipValue(JSON, P);
+          end;
+          if (GCorrGroup <> '') and (GCorrFrom <> '') and (GCorrTo <> '') and
+             (AnsiGroupMap <> nil) then
+          begin
+            if AnsiGroupMap.TryGetValue(GCorrGroup, GroupMembers) then
+            begin
+              for GCorrMember in GroupMembers do
+              begin
+                GCorrPair.Key := ResolveValue(GCorrMember + GCorrFrom);
+                GCorrPair.Value := ResolveValue(GCorrMember + GCorrTo);
+                if (GCorrPair.Key <> '') and (GCorrPair.Key <> GCorrPair.Value) then
+                begin
+                  SetLength(CustomPostReplacements, Length(CustomPostReplacements) + 1);
+                  CustomPostReplacements[High(CustomPostReplacements)] := GCorrPair;
+                end;
+              end;
+            end;
           end;
         end
         else
@@ -2918,19 +2968,6 @@ begin
           JSkipValue(JSON, P);
       end;
 
-      // Merge RaPhalas1 + RaPhalas2 into combined RaPhalas group
-      var RaArr: TArray<string>;
-      var MergedList := TList<string>.Create;
-      try
-        if AnsiGroupMap.TryGetValue('RaPhalas1', RaArr) then
-          MergedList.AddRange(RaArr);
-        if AnsiGroupMap.TryGetValue('RaPhalas2', RaArr) then
-          MergedList.AddRange(RaArr);
-        if MergedList.Count > 0 then
-          AnsiGroupMap.AddOrSetValue('RaPhalas', MergedList.ToArray);
-      finally
-        MergedList.Free;
-      end;
     end
     else if Key = 'ConsonantGroups' then
     begin
