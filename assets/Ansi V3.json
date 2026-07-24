@@ -2437,21 +2437,6 @@
       "Comment": "CF কানেক্টর + উ-কার ১ও২ → আদর্শ ক্রম"
     },
     {
-      "Key": "ñ%",
-      "Value": "%ñ",
-      "Comment": ""
-    },
-    {
-      "Key": "ñ)",
-      "Value": ")ñ",
-      "Comment": ""
-    },
-    {
-      "Key": "ñ,",
-      "Value": ",ñ",
-      "Comment": ""
-    },
-    {
       "Key": "þÅ,",
       "Value": ",þÅ",
       "Comment": "Thron+Reph+Ree → Ree+Thron+Reph"
@@ -2464,11 +2449,6 @@
     {
       "Key": "þ$2B",
       "Value": "$2Bþ",
-      "Comment": ""
-    },
-    {
-      "Key": "Ï%",
-      "Value": "Ï$",
       "Comment": ""
     },
     {
@@ -2510,6 +2490,21 @@
       "Key": "#$C6#$29",
       "Value": "#$C6#$28",
       "Comment": "Æ) → Æ( (BelowBaseVariant UUKar fix)"
+    },
+    {
+      "Key": "Ïþ%",
+      "Value": "Ï$þ",
+      "Comment": "হাফ ল+ু কার"
+    },
+    {
+      "Key": "Ïþ)",
+      "Value": "Ï(þ",
+      "Comment": "হাফ ল+ূ কার"
+    },
+    {
+      "Key": "Ïþ,",
+      "Value": "Ï+þ",
+      "Comment": "হাফ ল+ৃ কার"
     }
   ],
   "VowelRules": {
