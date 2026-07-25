@@ -1,4 +1,4 @@
-﻿{
+{
   =============================================================================
   This Source Code Form is subject to the terms of the Mozilla Public
   License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -111,7 +111,8 @@ uses
   uForm1,
   uTopBar,
   WindowsVersion,
-  clsUnicodeToBijoy2000;
+  clsUnicodeToBijoy2000,
+  uKeyboardMacro;
 
 { =============================================================================== }
 
@@ -520,6 +521,35 @@ end;
 
 { =============================================================================== }
 
+procedure DeduplicateHotkeys;
+var
+  Keys: array[0..4] of ^string;
+  I, J: Integer;
+begin
+  // Priority: ModeSwitch > ToggleOutput > SpellerLauncher > LayoutSwitch > AnsiVersion
+  Keys[0] := @ModeSwitchKey;
+  Keys[1] := @ToggleOutputModeKey;
+  Keys[2] := @SpellerLauncherKey;
+  Keys[3] := @LayoutSwitchKey;
+  Keys[4] := @AnsiVersionSwitchKey;
+
+  // For each higher-priority key, clear any lower-priority key with the same value
+  for I := 0 to 3 do
+  begin
+    if (Keys[I]^ = '') or (Keys[I]^ = 'NONE') then
+      Continue;
+    for J := I + 1 to 4 do
+    begin
+      if (Keys[J]^ <> '') and (Keys[J]^ <> 'NONE') and
+         (HotkeyStringToModifiers(Keys[I]^) = HotkeyStringToModifiers(Keys[J]^)) and
+         (HotkeyStringToKey(Keys[I]^) = HotkeyStringToKey(Keys[J]^)) then
+        Keys[J]^ := '';
+    end;
+  end;
+end;
+
+{ =============================================================================== }
+
 procedure ValidateSettings;
 begin
   // General settings
@@ -601,6 +631,10 @@ begin
     ANSIToggleShortcut := 'YES';
   if not((IgnoreCapsLock = 'YES') or (IgnoreCapsLock = 'NO')) then
     IgnoreCapsLock := 'NO';
+
+  // Hotkey deduplication: reset lower-priority hotkeys that
+  // duplicate a higher-priority one.
+  DeduplicateHotkeys;
 
   // ANSI Mapping Version
   if clsUnicodeToBijoy2000.AnsiVersion = '' then
