@@ -1574,12 +1574,32 @@ begin
   until I <= 0;
 end;
 
+function HasHasantaBefore(const Text: string; Pos: Integer): Boolean;
+var
+  I: Integer;
+begin
+  Result := False;
+  if Pos - 1 < 1 then
+    Exit;
+
+  I := Pos - 1; // Pos (র)-এর ঠিক আগের ঘর থেকে হসন্ত চেক করা শুরু হবে
+  
+  // ZWJ / ZWNJ ক্যারেক্টার থাকলে সেগুলো স্কিপ করবে
+  while (I >= 1) and ((Text[I] = zwj) or (Text[I] = zwnj)) do
+    Dec(I);
+
+  // যদি ঠিক আগের বর্ণটি হসন্ত (b_Hasanta) হয়
+  if (I >= 1) and (Text[I] = b_Hasanta) then
+    Result := True;
+end;
+
 function TUnicodeToBijoy2000.FindBestClusterMatch(const Text: string;
   KarPos: Integer; const Rule: TVowelRule): TClusterMatchInfo;
 var
   PrecedingChar: string;
   Mapping: TVowelRuleMapping;
   MatchLen: Integer;
+  GroupMatchLen: Integer;
 begin
   Result.MatchedCluster := '';
   Result.BestMatchLen := 0;
@@ -1595,7 +1615,7 @@ begin
   if KarPos - 1 < 1 then
     Exit;
 
-  // Z-fola-aware context resolution
+  // Resolve Z-fola context
   PrecedingChar := Text[KarPos - 1];
   Result.ContextEnd := KarPos - 1;
   Result.IsZfola := (PrecedingChar = b_z) and (KarPos - 2 >= 1) and
@@ -1613,7 +1633,7 @@ begin
   if Result.ContextEnd < 1 then
     Exit;
 
-  // Best-match search: scan ALL mappings, pick the longest match.
+  // Evaluate best match across rule mappings
   for Mapping in Rule.Mappings do
   begin
     if Mapping.Consonants = '' then
@@ -1621,21 +1641,26 @@ begin
 
     MatchLen := 0;
 
-    if Mapping.MatchMode = 1 then
+    // 1. Direct single-character match (skip if preceded by Hasanta = half-form conjunct)
+    if (PrecedingChar <> '') and (PrecedingChar = Mapping.Consonants) and
+       not HasHasantaBefore(Text, KarPos - 1) then
     begin
-      // MatchMode 1: Only check the single character at ContextEnd
-      if (PrecedingChar <> '') and (PrecedingChar = Mapping.Consonants) then
+      if Mapping.MatchMode = 1 then
         MatchLen := 1
-      else if (PrecedingChar <> '') then
-        MatchLen := MatchGroupLength(Text, Result.ContextEnd, Mapping.Consonants);
+      else
+        MatchLen := Length(Mapping.Consonants);
     end
     else
     begin
-      // MatchMode 0: Standard full-cluster longest-match
-      if (PrecedingChar <> '') and (PrecedingChar = Mapping.Consonants) then
-        MatchLen := Length(Mapping.Consonants)
-      else
-        MatchLen := MatchGroupLength(Text, Result.ContextEnd, Mapping.Consonants);
+      // 2. Group-based cluster match
+      GroupMatchLen := MatchGroupLength(Text, Result.ContextEnd, Mapping.Consonants);
+      if GroupMatchLen > 0 then
+      begin
+        if Mapping.MatchMode = 1 then
+          MatchLen := 1 // Force matched length to 1 for matchMode = 1
+        else
+          MatchLen := GroupMatchLen; // Use exact cluster length for matchMode = 0
+      end;
     end;
 
     if MatchLen > Result.BestMatchLen then
@@ -1645,7 +1670,6 @@ begin
     end;
   end;
 
-  // Extract exact matched string from the text
   if Result.BestMatchLen > 0 then
     Result.MatchedCluster := Copy(Text, Result.ContextEnd - Result.BestMatchLen + 1,
                                   Result.BestMatchLen);
@@ -1749,12 +1773,11 @@ function TUnicodeToBijoy2000.FindMappingToggle(const Rule: TVowelRule;
 var
   Mapping: TVowelRuleMapping;
   BestMapping: TVowelRuleMapping;
-  BestMatchLen, MatchLen: Integer;
+  BestMatchLen, MatchLen, GroupMatchLen: Integer;
   LastC: string;
   ActualConsonantPart: string;
   Len: Integer;
 begin
-  // Default: fall back to rule-level toggle when no mapping matches at all.
   MappingToggleOnBackspace := Rule.ToggleOnBackspace;
   Result := False;
   MatchedCluster := '';
@@ -1765,8 +1788,7 @@ begin
   ActualConsonantPart := ConsonantPart;
   Len := Length(ActualConsonantPart);
 
-  // If the cluster ends with b_Hasanta + b_z (Unicode representation of Z-fola/য-ফলা),
-  // safely strip it to accurately find the preceding base consonant.
+  // Strip Z-fola suffix if present
   if (Len >= 2) and
      (Copy(ActualConsonantPart, Len, 1) = b_z) and
      (Copy(ActualConsonantPart, Len - 1, 1) = b_Hasanta) then
@@ -1778,15 +1800,11 @@ begin
   if ActualConsonantPart = '' then
     Exit;
 
-  // Use Copy/Length (RTL-safe for Delphi 2007/XE+) instead of newer helpers.
   LastC := Copy(ActualConsonantPart, Len, 1);
 
-  // Best-match: scan ALL mappings, pick the longest match.
   BestMatchLen := 0;
   BestMapping.Consonants := '';
   BestMapping.ToggleOnBackspace := False;
-  BestMapping.MatchMode := 0;
-  BestMapping.ProcessPhase := '';
 
   for Mapping in Rule.Mappings do
   begin
@@ -1795,19 +1813,26 @@ begin
 
     MatchLen := 0;
 
-    if Mapping.MatchMode = 1 then
+    // 1. Direct character match (skip if preceded by Hasanta = half-form conjunct)
+    if (LastC = Mapping.Consonants) and
+       not HasHasantaBefore(ActualConsonantPart, Len) then
     begin
-      // MatchMode 1: Only check the single character at position Len
-      if LastC = Mapping.Consonants then
-        MatchLen := 1;
+      if Mapping.MatchMode = 1 then
+        MatchLen := 1
+      else
+        MatchLen := Length(Mapping.Consonants);
     end
     else
     begin
-      // MatchMode 0: Standard full-cluster longest-match
-      if LastC = Mapping.Consonants then
-        MatchLen := Length(Mapping.Consonants)
-      else
-        MatchLen := MatchGroupLength(ActualConsonantPart, Len, Mapping.Consonants);
+      // 2. Group match
+      GroupMatchLen := MatchGroupLength(ActualConsonantPart, Len, Mapping.Consonants);
+      if GroupMatchLen > 0 then
+      begin
+        if Mapping.MatchMode = 1 then
+          MatchLen := 1
+        else
+          MatchLen := GroupMatchLen;
+      end;
     end;
 
     if MatchLen > BestMatchLen then
@@ -1819,10 +1844,7 @@ begin
 
   if BestMatchLen > 0 then
   begin
-    // Strict mapping isolation: use ONLY the best-match mapping's toggle
-    // setting.  No fallback to other mappings or the rule-level toggle.
     MappingToggleOnBackspace := BestMapping.ToggleOnBackspace;
-    // Extract exact matched cluster from the consonant part
     MatchedCluster := Copy(ActualConsonantPart, Len - BestMatchLen + 1, BestMatchLen);
     Result := True;
   end;
@@ -2881,7 +2903,7 @@ begin
           JSkipValue(JSON, P);
       end;
     end
-    else if Key = 'GroupKarCorrections' then
+else if Key = 'GroupKarCorrections' then
     begin
       if (P <= Length(JSON)) and (JSON[P] = '[') then Inc(P) else Continue;
       while P <= Length(JSON) do
@@ -2917,8 +2939,18 @@ begin
             begin
               for GCorrMember in GroupMembers do
               begin
+                // ১. মূল সিকোয়েন্স (RFola + Kar)
                 GCorrPair.Key := ResolveValue(GCorrMember + GCorrFrom);
                 GCorrPair.Value := ResolveValue(GCorrMember + GCorrTo);
+                if (GCorrPair.Key <> '') and (GCorrPair.Key <> GCorrPair.Value) then
+                begin
+                  SetLength(CustomPostReplacements, Length(CustomPostReplacements) + 1);
+                  CustomPostReplacements[High(CustomPostReplacements)] := GCorrPair;
+                end;
+
+                // ২. Swap হওয়া সিকোয়েন্স (Kar + RFola) - FinalTouch এর স্যাপের সাথে ম্যাচ করার জন্য
+                GCorrPair.Key := ResolveValue(GCorrFrom + GCorrMember);
+                GCorrPair.Value := ResolveValue(GCorrTo + GCorrMember);
                 if (GCorrPair.Key <> '') and (GCorrPair.Key <> GCorrPair.Value) then
                 begin
                   SetLength(CustomPostReplacements, Length(CustomPostReplacements) + 1);
