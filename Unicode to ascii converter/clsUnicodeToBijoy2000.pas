@@ -2268,6 +2268,14 @@ begin
       function(const L, R: TReplacementPair): Integer
       begin
         Result := R.Key.Length - L.Key.Length;
+        if Result = 0 then
+        begin
+          // If lengths are equal, priority is given to ordinary conjuncts (excluding 'ra-phala') first.
+          if L.Key.EndsWith(string(b_r)) and not R.Key.EndsWith(string(b_r)) then
+            Result := 1
+          else if not L.Key.EndsWith(string(b_r)) and R.Key.EndsWith(string(b_r)) then
+            Result := -1;
+        end;
       end
     ));
     TArray.Sort<TReplacementPair>(KarInclusiveReplacements, TComparer<TReplacementPair>.Construct(

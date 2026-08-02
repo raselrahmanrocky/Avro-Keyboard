@@ -928,6 +928,16 @@
   },
   "FullFormReplacements": [
     {
+      "Key": "",
+      "Value": "",
+      "Comment": "QuotedblLeft"
+    },
+    {
+      "Key": "#$002F#$003E#$003E",
+      "Value": "#$6E",
+      "Comment": "QuotedblRight"
+    },
+    {
       "Key": "#$09A8#$09CD#$09A4",
       "Value": "#$68#$73#$FE",
       "Comment": "ন্ত"
