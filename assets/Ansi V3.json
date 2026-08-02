@@ -1995,6 +1995,26 @@
   ],
   "PreReplacements": [
     {
+      "Key": "#$2018",
+      "Value": "#{A_StartSingleQuote}",
+      "Comment": "ইউনিকোড ‘ (U+2018) → বিজোড় একক উদ্ধৃতি শুরু"
+    },
+    {
+      "Key": "#$2019",
+      "Value": "#{A_EndSingleQuote}",
+      "Comment": "ইউনিকোড ’ (U+2019) → বিজোড় একক উদ্ধৃতি শেষ"
+    },
+    {
+      "Key": "#$201C",
+      "Value": "#{A_StartDoubleQuote}",
+      "Comment": "ইউনিকোড “ (U+201C) → বিজোড় দ্বিত্ব উদ্ধৃতি শুরু"
+    },
+    {
+      "Key": "#$201D",
+      "Value": "#{A_EndDoubleQuote}",
+      "Comment": "ইউনিকোড ” (U+201D) → বিজোড় দ্বিত্ব উদ্ধৃতি শেষ"
+    },
+    {
       "Key": "#$09CD#$0964",
       "Value": "#$FF",
       "Comment": "্। থেকে সরাসরি ব্যাকস্ল্যাশ"

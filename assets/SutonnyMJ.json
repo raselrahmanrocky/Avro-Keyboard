@@ -218,12 +218,12 @@
       "A_StartDoubleQuote": {
         "UnicodeKey": "#$0022",
         "Value": "#$00D2",
-        "Comment": "\" (উদ্ধৃতি শুরু)"
+        "Comment": "ডাবল (উদ্ধৃতি শুরু)"
       },
       "A_EndDoubleQuote": {
         "UnicodeKey": "#$0022",
         "Value": "#$00D3",
-        "Comment": "\" (উদ্ধৃতি শেষ)"
+        "Comment": "ডাবল (উদ্ধৃতি শেষ)"
       },
       "A_StartSingleQuote": {
         "UnicodeKey": "#$0027",
@@ -933,6 +933,11 @@
       "Comment": "চ্ব → P¡"
     },
     {
+      "Key": "#$0997#$09CD#$09A3",
+      "Value": "M&Y",
+      "Comment": "গ্ণ"
+    },
+    {
       "Key": "#$09A4#$09CD#$09AE",
       "Value": "#$005A#$00A5",
       "Comment": "ত্ম → Z¥"
@@ -1018,11 +1023,6 @@
       "Comment": "ণ্ণ → Yœ"
     },
     {
-      "Key": "#$09AB#$09CD#$09B0#$09C1",
-      "Value": "#$0064#$00AB#$007A",
-      "Comment": "ফ্রু → d«z"
-    },
-    {
       "Key": "#$09AC#$09CD#$09A7#$09C1",
       "Value": "#$00E4#$007A",
       "Comment": "ব্ধু → äz"
@@ -1081,6 +1081,21 @@
       "Key": "#$0995#$09CD#$09A4#$09CD#$09B0#$09C3",
       "Value": "#$00B3#$00AB#$2026",
       "Comment": "ক্ত্রৃ → ³«…"
+    },
+    {
+      "Key": "#$09AE#$09CD#$09AD",
+      "Value": "#$00A4#$00A2",
+      "Comment": "ম্ভ"
+    },
+    {
+      "Key": "#$09AE#$09CD#$09AD#$09CD#$09B0",
+      "Value": "#$00A4#$00A3",
+      "Comment": "ম্ভ্র"
+    },
+    {
+      "Key": "#$09B9#$09CD#$09A3",
+      "Value": "#$006E#$00E8",
+      "Comment": "হ্ণ"
     }
   ],
   "PreReplacements": [
@@ -1088,6 +1103,26 @@
       "Key": "#$09CD#$0964",
       "Value": "#$005C",
       "Comment": "্। থেকে সরাসরি ব্যাকস্ল্যাশ"
+    },
+    {
+      "Key": "#$2018",
+      "Value": "#{A_StartSingleQuote}",
+      "Comment": "ইউনিকোড ‘ (U+2018) → বিজোড় একক উদ্ধৃতি শুরু"
+    },
+    {
+      "Key": "#$2019",
+      "Value": "#{A_EndSingleQuote}",
+      "Comment": "ইউনিকোড ’ (U+2019) → বিজোড় একক উদ্ধৃতি শেষ"
+    },
+    {
+      "Key": "#$201C",
+      "Value": "#{A_StartDoubleQuote}",
+      "Comment": "ইউনিকোড “ (U+201C) → বিজোড় দ্বিত্ব উদ্ধৃতি শুরু"
+    },
+    {
+      "Key": "#$201D",
+      "Value": "#{A_EndDoubleQuote}",
+      "Comment": "ইউনিকোড ” (U+201D) → বিজোড় দ্বিত্ব উদ্ধৃতি শেষ"
     }
   ],
   "PostReplacements": [
@@ -1095,17 +1130,33 @@
       "Key": "#$0059#$00A1",
       "Value": "#$0059#$00A6",
       "Comment": "ণ্ব: সংশোধন Y¡ → Y¦"
+    },
+    {
+      "Key": "¯Íz",
+      "Value": "¯‘",
+      "Comment": "স্তু"
+    },
+    {
+      "Key": "šÍz",
+      "Value": "š‘",
+      "Comment": "ন্তু"
     }
   ],
   "VowelRules": {
     "#$09C1": {
-      "default": "#{A_UKar1}",
+      "default": "#{A_UKar2}",
       "mappings": [
         {
           "consonants": "#$09B0",
           "value": "#{A_UKar4}",
           "alt": "#{A_UKar2}",
           "toggle": "backspace",
+          "process": "pre",
+          "matchMode": 1
+        },
+        {
+          "consonants": "BaseLineLeft",
+          "value": "#{A_UKar1}",
           "process": "pre",
           "matchMode": 1
         },
@@ -1130,27 +1181,33 @@
           "matchMode": 0
         },
         {
-          "consonants": "ConnectorsSwapGroup",
-          "value": "#{A_UKar1}",
-          "process": "post",
-          "matchMode": 0
-        },
-        {
-          "consonants": "ConnectorsKeepGroup",
-          "value": "#{A_UKar1}",
-          "process": "post",
-          "matchMode": 0
-        },
-        {
           "consonants": "Customkar1",
           "value": "#{A_UKar2}",
+          "process": "pre",
+          "matchMode": 1
+        },
+        {
+          "consonants": "RaPhalas1",
+          "value": "#{A_UKar2}",
+          "process": "post",
+          "matchMode": 1
+        },
+        {
+          "consonants": "RaPhalas2",
+          "value": "#{A_UKar1}",
+          "process": "post",
+          "matchMode": 1
+        },
+        {
+          "consonants": "RR_RRH",
+          "value": "#{A_UKar3}",
           "process": "pre",
           "matchMode": 1
         }
       ]
     },
     "#$09C2": {
-      "default": "#{A_UUKar1}",
+      "default": "#{A_UUKar2}",
       "mappings": [
         {
           "consonants": "#$09B0",
@@ -1161,6 +1218,12 @@
           "matchMode": 1
         },
         {
+          "consonants": "BaseLineLeft",
+          "value": "#{A_UUKar1}",
+          "process": "pre",
+          "matchMode": 1
+        },
+        {
           "consonants": "BaseLineRight",
           "value": "#{A_UUKar2}",
           "process": "pre",
@@ -1181,28 +1244,34 @@
           "matchMode": 0
         },
         {
-          "consonants": "ConnectorsSwapGroup",
-          "value": "#{A_UUKar1}",
-          "process": "post",
-          "matchMode": 0
-        },
-        {
-          "consonants": "ConnectorsKeepGroup",
-          "value": "#{A_UUKar1}",
-          "process": "post",
-          "matchMode": 0
-        },
-        {
           "consonants": "Customkar1",
           "value": "#{A_UUKar2}",
           "process": "pre",
           "matchMode": 0
+        },
+        {
+          "consonants": "RaPhalas1",
+          "value": "#{A_UUKar2}",
+          "process": "post",
+          "matchMode": 1
+        },
+        {
+          "consonants": "RaPhalas2",
+          "value": "#{A_UUKar1}",
+          "process": "post",
+          "matchMode": 1
         }
       ]
     },
     "#$09C3": {
-      "default": "#{A_RRIKar1}",
+      "default": "#{A_RRIKar2}",
       "mappings": [
+        {
+          "consonants": "BaseLineLeft",
+          "value": "#{A_RRIKar1}",
+          "process": "pre",
+          "matchMode": 1
+        },
         {
           "consonants": "BaseLineRight",
           "value": "#{A_RRIKar2}",
@@ -1217,20 +1286,8 @@
         },
         {
           "consonants": "RuClusters",
-          "value": "#{A_RRIKar1}",
+          "value": "#{A_RRIKar2}",
           "process": "pre",
-          "matchMode": 0
-        },
-        {
-          "consonants": "ConnectorsSwapGroup",
-          "value": "#{A_RRIKar1}",
-          "process": "post",
-          "matchMode": 0
-        },
-        {
-          "consonants": "ConnectorsKeepGroup",
-          "value": "#{A_RRIKar1}",
-          "process": "post",
           "matchMode": 0
         },
         {
@@ -1238,39 +1295,33 @@
           "value": "#{A_RRIKar2}",
           "process": "pre",
           "matchMode": 0
+        },
+        {
+          "consonants": "RaPhalas1",
+          "value": "#{A_RRIKar2}",
+          "process": "post",
+          "matchMode": 1
+        },
+        {
+          "consonants": "RaPhalas2",
+          "value": "#{A_RRIKar1}",
+          "process": "post",
+          "matchMode": 1
         }
       ]
     }
   },
   "RaPhalaGroups": {
     "RaPhalas1": [
-      "#{A_RFola_3}",
-      "#{A_RFola_2}",
-      "#{A_RFola_1}"
+      "#{A_RFola_1}",
+      "#{A_RFola_3}"
     ],
     "RaPhalas2": [
-      "#{A_RFola_2}",
-      "#{A_RFola_1}"
+      "#{A_RFola_2}"
     ],
     "Connectors": []
   },
-  "GroupKarCorrections": [
-    {
-      "group": "RaPhalas1",
-      "from": "#{A_UKar1}",
-      "to": "#{A_UKar2}"
-    },
-    {
-      "group": "RaPhalas1",
-      "from": "#{A_UUKar1}",
-      "to": "#{A_UUKar2}"
-    },
-    {
-      "group": "RaPhalas1",
-      "from": "#{A_RRIKar1}",
-      "to": "#{A_RRIKar2}"
-    }
-  ],
+  "GroupKarCorrections": [],
   "ConsonantGroups": {
     "BelowBaseVariant": [
       "ট্র",
@@ -1287,11 +1338,13 @@
       "#$09AE#$09CD#$09AD#$09CD#$09B0"
     ],
     "RuClusters": [
+      "#$0996#$09CD#$09B0",
       "#$0997#$09CD#$09B0",
       "#$0998#$09CD#$09B0",
       "#$09A4#$09CD#$09B0",
       "#$09A6#$09CD#$09B0",
       "#$09A7#$09CD#$09B0",
+      "#$09A5#$09CD#$09B0",
       "#$09A8#$09CD#$09B0",
       "#$09AA#$09CD#$09B0",
       "#$09AC#$09CD#$09B0",
@@ -1301,6 +1354,29 @@
       "#$09B7#$09CD#$09B0",
       "#$09B8#$09CD#$09B0",
       "#$09B9#$09CD#$09B0"
+    ],
+    "BaseLineLeft": [
+      "#$0995",
+      "#$0999",
+      "#$099A",
+      "#$099B",
+      "#$099D",
+      "#$099E",
+      "#$099F",
+      "#$09A0",
+      "#$09A1",
+      "#$09A2",
+      "#$09A4",
+      "#$09AB",
+      "#$09AD",
+      "ক্ক",
+      "ক্র",
+      "ক্ত",
+      "ক্ল",
+      "ক্ষ",
+      "ষ্ণ",
+      "ষ্ফ",
+      "হ্ম"
     ],
     "BaseLineRight": [
       "#$0996",
@@ -1362,88 +1438,45 @@
       "#{A_S_N}",
       "#{A_H_N}",
       "#{A_H_M}",
-      "#{A_Rr_G}"
+      "#{A_Rr_G}",
+      "ঙ্গ",
+      "ম্ব",
+      "গ্ল",
+      "ল্গ",
+      "ল্প"
     ],
-    "RfolaPGroup": [
+    "RR_RRH": [
+      "#$09DC",
+      "#$09DD"
+    ],
+    "Rfola3": [
       "#$09AA",
       "#$0997",
       "#$09B6"
-    ],
-    "RfolaBhGroup": [
-      "#$09AD"
-    ],
-    "RfolaKGroup": [
-      "#$0995"
-    ],
-    "RfolaTGroup": [
-      "#$09A4"
-    ],
-    "RfolaBelowBaseGroup": [
-      "#$00B3",
-      "#$00CB",
-      "#$00DF"
-    ],
-    "RfolaPhGroup": [
-      "#$09AB"
     ],
     "TKContext": [
       "#$0995",
       "#$09A4"
     ],
-    "RuFola": [
-      "#$0996",
-      "#$0998",
-      "#$09A3",
-      "#$09A5",
-      "#$09A6",
-      "#$09A8",
-      "#$09AC",
-      "#$09AF",
-      "#$09B2",
-      "#$09B7"
+    "Rfola2Group": [
+      "#{A_NGA_K}",
+      "#{A_N_Dh}",
+      "#{A_M_Ph}",
+      "#{A_L_Ph}",
+      "#{A_K_Ss}",
+      "#$09AB"
     ],
     "ConnectorsSwapGroup": [],
     "ConnectorsKeepGroup": []
   },
   "RfolaRules": [
     {
-      "consonants": "RfolaPGroup",
+      "consonants": "Rfola3",
       "value": "#{A_RFola_3}",
       "replaceLen": 2
     },
     {
-      "consonants": "RfolaBhGroup",
-      "value": "#{A_Bh_R}",
-      "halfValue": "#{A_BH_R_2H}",
-      "replaceLen": 3
-    },
-    {
-      "consonants": "RfolaKGroup",
-      "value": "#{A_K_R}",
-      "halfValue": "#{A_K_R_2H}",
-      "replaceLen": 3
-    },
-    {
-      "consonants": "RfolaTGroup",
-      "value": "#{A_T_R}",
-      "halfValue": "#{A_T_R_2H}",
-      "replaceLen": 3,
-      "contextGroup": "TKContext",
-      "contextReplaceLen": 2,
-      "contextValue": "#{A_RFola_2}"
-    },
-    {
-      "consonants": "RfolaBelowBaseGroup",
-      "value": "#{A_RFola_2}",
-      "replaceLen": 2
-    },
-    {
-      "consonants": "RfolaPhGroup",
-      "value": "#{A_RFola_2}",
-      "replaceLen": 2
-    },
-    {
-      "consonants": "RuFola",
+      "consonants": "Rfola2Group",
       "value": "#{A_RFola_2}",
       "replaceLen": 2
     },
@@ -1454,18 +1487,6 @@
     }
   ],
   "KarCorrections": [
-    {
-      "char": "#$09A4",
-      "from": "#{A_UKar1}",
-      "to": "#{A_UKar2}",
-      "Comment": "ত + উকার ১ → ২"
-    },
-    {
-      "char": "#$09A4",
-      "from": "#{A_UUKar1}",
-      "to": "#{A_UUKar2}",
-      "Comment": "ত + ঊকার ১ → ২"
-    },
     {
       "char": "#{A_RR}",
       "from": "#{A_UUKar1}",
