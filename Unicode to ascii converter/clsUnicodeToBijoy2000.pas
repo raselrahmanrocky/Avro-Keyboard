@@ -967,6 +967,10 @@ begin
   fUniText := UniText;
   fConvertedText := fUniText;
 
+  // ১. dynamic pre-placement fixes - একদম শুরুতে কাঁচা ইউনিকোড ইনপুটে রান হবে
+  for I := 0 to Length(CustomPreReplacements) - 1 do
+    fConvertedText := ReplaceStr(fConvertedText, CustomPreReplacements[I].Key, CustomPreReplacements[I].Value);
+
   for Rule in VowelRules do
   begin
     if not RuleHasAnyToggle(Rule) then
@@ -979,7 +983,6 @@ begin
          (Copy(fLastUniText, 1, Length(ConsonantPart)) = ConsonantPart) and
          (Copy(fLastUniText, Length(ConsonantPart) + 1, Length(Rule.KarChar)) = Rule.KarChar) then
       begin
-        // A backspace removed the kar: resolve the per-mapping toggle configuration
         FindMappingToggle(Rule, ConsonantPart, MapToggleBack, MatchedCluster);
         if MapToggleBack then
         begin
@@ -994,6 +997,9 @@ begin
 
   fLastUniText := UniText;
 
+  // ২. Resolve kar-inclusive full forms BEFORE the vowel-rule pass
+  ApplyKarInclusiveFullForms;
+
   // === Phase A: Pre-phase vowel rule pass (raw Unicode text) ===
   ApplyRuleForKar(b_Ukar, 'pre');
   ApplyRuleForKar(b_UUKar, 'pre');
@@ -1001,30 +1007,21 @@ begin
 
   // Clean start
   DeNormalize;
-  
-  // 1. Apply dynamic pre-placement fixes
-  for I := 0 to Length(CustomPreReplacements) - 1 do
-    fConvertedText := ReplaceStr(fConvertedText, CustomPreReplacements[I].Key, CustomPreReplacements[I].Value);
 
-  // 2. Rearrange Vowels and Reph
+  // ৩. Rearrange Vowels and Reph
   ReArrangeKars;
   ReArrangeReph;
 
-  // 3. Resolve kar-inclusive full forms (e.g. ক্রু/ক্রূ/ক্রৃ) BEFORE the vowel-rule
-  //    pass so their explicit encodings are not defeated by generic kar handling.
-  ApplyKarInclusiveFullForms;
-
-  // 4. Apply the U/UU/RRI vowel-rule pass while clusters are still Unicode, so
-  //    group-based mappings (RuClusters, BaseLineRight, ...) can match correctly.
+  // ৪. Apply the U/UU/RRI main pass
   ApplyVowelKars;
 
-  // 5. Process remaining Conjuncts and Full Forms
+  // ৫. Process remaining Conjuncts and Full Forms
   ReplaceFullForms;
 
-  // 6. Process remaining Vowels (EKar, OIKar, standalone vowels/kars)
+  // ৬. Process remaining Vowels
   ReplaceKarsVowels;
 
-  // 7. Apply Glyphs, Halfs, and Consonants
+  // ৭. Apply Glyphs, Halfs, and Consonants
   ConvertRFola_ZFola_Hasanta;
   
   { ==========================================================
@@ -1047,6 +1044,10 @@ begin
   { =========================================================== }
   SecondHalfForms;
   Consonants;
+  // === Post-phase vowel rule pass ===
+  ApplyRuleForKar(b_Ukar, 'post');
+  ApplyRuleForKar(b_UUKar, 'post');
+  ApplyRuleForKar(b_Rrikar, 'post');
   FinalTouch;
 
   Result := fConvertedText;
@@ -1122,17 +1123,21 @@ begin
         // Check main consonant group
         if CharInGroup(PrevC, Rule.Consonants) then
         begin
-          if Rule.ReplaceLen = 3 then
+          if Rule.ReplaceLen > 2 then
           begin
-            // 3-char: replace consonant + ্ + র
-            if IsHalfForm and (Rule.HalfValue <> '') then
-              fConvertedText := WideStuffString(fConvertedText, I - 1, 3, Rule.HalfValue)
-            else
-              fConvertedText := WideStuffString(fConvertedText, I - 1, 3, Rule.Value);
+            // Dynamic replace length (3, 4, 5, etc.)
+            var StartPos := I - (Rule.ReplaceLen - 2);
+            if StartPos >= 1 then
+            begin
+              if IsHalfForm and (Rule.HalfValue <> '') then
+                fConvertedText := WideStuffString(fConvertedText, StartPos, Rule.ReplaceLen, Rule.HalfValue)
+              else
+                fConvertedText := WideStuffString(fConvertedText, StartPos, Rule.ReplaceLen, Rule.Value);
+            end;
           end
           else
           begin
-            // 2-char: replace ্ + র
+            // Default 2-char: replace ্ + র
             fConvertedText := WideStuffString(fConvertedText, I, 2, Rule.Value);
           end;
           Matched := True;
@@ -1187,7 +1192,7 @@ end;
 
 procedure TUnicodeToBijoy2000.DeNormalize;
 begin
-  fConvertedText := ReplaceStr(fUniText, b_z + b_Nukta, b_y);
+  fConvertedText := ReplaceStr(fConvertedText, b_z + b_Nukta, b_y);
   fConvertedText := ReplaceStr(fConvertedText, b_dd + b_Nukta, b_rr);
   fConvertedText := ReplaceStr(fConvertedText, b_ddh + b_Nukta, b_rrh);
   while Pos(b_Hasanta + b_Hasanta + b_Hasanta, fConvertedText) > 0 do
@@ -1276,10 +1281,10 @@ begin
   if fKar <> #0 then wSTmp := fKar + wSTmp;
 
   fConvertedText := wSTmp;
-  fConvertedText := ReplaceStr(fConvertedText, string(b_StartSingleQuote), A_StartSingleQuote);
-  fConvertedText := ReplaceStr(fConvertedText, string(b_EndSingleQuote), A_EndSingleQuote);
-  fConvertedText := ReplaceStr(fConvertedText, string(b_StartDoubleQuote), A_StartDoubleQuote);
-  fConvertedText := ReplaceStr(fConvertedText, string(b_EndDoubleQuote), A_EndDoubleQuote);
+  //fConvertedText := ReplaceStr(fConvertedText, string(b_StartSingleQuote), A_StartSingleQuote);
+  //fConvertedText := ReplaceStr(fConvertedText, string(b_EndSingleQuote), A_EndSingleQuote);
+  //fConvertedText := ReplaceStr(fConvertedText, string(b_StartDoubleQuote), A_StartDoubleQuote);
+  //fConvertedText := ReplaceStr(fConvertedText, string(b_EndDoubleQuote), A_EndDoubleQuote);
 end;
 
 { =============================================================================== }
@@ -1443,6 +1448,8 @@ begin
   end;
 end;
 
+function HasHasantaBefore(const Text: string; Pos: Integer): Boolean; forward;
+
 // Returns the length of the longest group entry that matches ending at
 // CharIndex, or 0 if no entry matches.  Groups are compared as atomic
 // literal blocks (block-based matching — never character-by-character).
@@ -1453,11 +1460,11 @@ var
   S: string;
   SLen: Integer;
   CompareStr: string;
+  MatchStart: Integer;
 begin
   Result := 0;
   if (CharIndex < 1) or (CharIndex > Length(FullText)) then Exit;
 
-  // post-phase এ টেক্সট ANSI থাকে, তাই AnsiGroupMap আগে চেক করি
   if AnsiGroupMap <> nil then
   begin
     if AnsiGroupMap.TryGetValue(GroupName, Arr) then
@@ -1466,9 +1473,9 @@ begin
         SLen := Length(S);
         if (SLen <= CharIndex) then
         begin
-          // টেক্সট থেকে ওই পজিশন পর্যন্ত অংশটুকু কপি করি
-          CompareStr := Copy(FullText, CharIndex - SLen + 1, SLen);
-          if CompareStr = S then
+          MatchStart := CharIndex - SLen + 1;
+          CompareStr := Copy(FullText, MatchStart, SLen);
+          if (CompareStr = S) and not HasHasantaBefore(FullText, MatchStart) then
           begin
             if SLen > Result then
               Result := SLen;
@@ -1477,7 +1484,6 @@ begin
       end;
   end;
 
-  // Unicode গ্রুপের জন্য চেক (Pre-phase এর জন্য)
   if ConsonantGroupMap <> nil then
   begin
     if ConsonantGroupMap.TryGetValue(GroupName, Arr) then
@@ -1486,9 +1492,12 @@ begin
         SLen := Length(S);
         if (SLen <= CharIndex) then
         begin
-          if Copy(FullText, CharIndex - SLen + 1, SLen) = S then
+          MatchStart := CharIndex - SLen + 1;
+          if (Copy(FullText, MatchStart, SLen) = S) and not HasHasantaBefore(FullText, MatchStart) then
+          begin
             if SLen > Result then
               Result := SLen;
+          end;
         end;
       end;
   end;
@@ -1677,19 +1686,40 @@ end;
 
 procedure TUnicodeToBijoy2000.ApplyKarInclusiveFullForms;
 var
-  I: Integer;
+  I, PosIdx: Integer;
+  K, V: string;
+  MatchStart: Integer;
 begin
   for I := 0 to Length(KarInclusiveReplacements) - 1 do
-    fConvertedText := ReplaceStr(fConvertedText, KarInclusiveReplacements[I].Key, KarInclusiveReplacements[I].Value);
+  begin
+    K := KarInclusiveReplacements[I].Key;
+    V := KarInclusiveReplacements[I].Value;
+    if (K = '') or (V = '') then Continue;
+
+    PosIdx := 1;
+    repeat
+      PosIdx := PosEx(K, fConvertedText, PosIdx);
+      if PosIdx <= 0 then Break;
+
+      // চেক করা হচ্ছে ক্যারেক্টারটির ঠিক পূর্বে হসন্ত আছে কিনা (যেমন: 'ঙ্গু'-এর ভেতর 'গু')
+      MatchStart := PosIdx;
+      if HasHasantaBefore(fConvertedText, MatchStart) then
+      begin
+        // হসন্ত থাকলে এটি যুক্তবর্ণের অংশ, তাই একক 'গু' হিসেবে ভাঙা যাবে না
+        Inc(PosIdx, Length(K));
+      end
+      else
+      begin
+        fConvertedText := WideStuffString(fConvertedText, PosIdx, Length(K), V);
+        Inc(PosIdx, Length(V));
+      end;
+    until False;
+  end;
 end;
 
 procedure TUnicodeToBijoy2000.ApplyVowelKars;
 begin
   // Convert UKar
-  fConvertedText := ReplaceStr(fConvertedText, b_g + b_Ukar, A_G_Ukar);
-  fConvertedText := ReplaceStr(fConvertedText, b_sh + b_Ukar, A_Sh_UKar);
-  fConvertedText := ReplaceStr(fConvertedText, b_h + b_Ukar, A_H_UKar);
-  fConvertedText := ReplaceStr(fConvertedText, b_Hasanta + b_t + b_Ukar, b_Hasanta + A_T_UKar_2H);
   ApplyRuleForKar(b_Ukar);
   fConvertedText := ReplaceStr(fConvertedText, b_Ukar, GetAnsiVarValue('A_UKar1'));
 
@@ -1698,7 +1728,6 @@ begin
   fConvertedText := ReplaceStr(fConvertedText, b_UUKar, GetAnsiVarValue('A_UUKar1'));
 
   // Convert RRIKar
-  fConvertedText := ReplaceStr(fConvertedText, b_h + b_Rrikar, A_H_RRIKar);
   ApplyRuleForKar(b_Rrikar);
   fConvertedText := ReplaceStr(fConvertedText, b_Rrikar, GetAnsiVarValue('A_RRIKar1'));
 end;
