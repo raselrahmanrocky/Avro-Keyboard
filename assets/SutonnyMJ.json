@@ -1127,12 +1127,12 @@
       "Comment": "ণ্ব: সংশোধন Y¡ → Y¦"
     },
     {
-      "Key": "#$00AF#$00CD#$007A",
+      "Key": "#$00AF#$00CD#$0079",
       "Value": "#$00AF#$2018",
       "Comment": "স্তু"
     },
     {
-      "Key": "#$0161#$00CD#$007A",
+      "Key": "#$0161#$00CD#$0079",
       "Value": "#$0161#$2018",
       "Comment": "ন্তু"
     }
@@ -1460,7 +1460,8 @@
       "#{A_L_Ph}",
       "#{A_K_Ss}",
       "#$09AB",
-      "#{A_K_T}"
+      "#{A_K_T}",
+      "#$09B9"
     ],
     "ConnectorsSwapGroup": [],
     "ConnectorsKeepGroup": []

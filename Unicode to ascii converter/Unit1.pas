@@ -112,6 +112,7 @@ end;
 procedure TForm1.FormClose(Sender: TObject; var Action: TCloseAction);
 begin
   FUniToBijoy.Free;
+  FUniToBijoy := nil;
   Action := caFree;
   Form1 := nil;
 end;
@@ -121,6 +122,7 @@ end;
 procedure TForm1.FormCreate(Sender: TObject);
 begin
   HandleThemes;
+  LoadCurrentActiveMapping;
   FUniToBijoy := TUnicodeToBijoy2000.Create;
 end;
 

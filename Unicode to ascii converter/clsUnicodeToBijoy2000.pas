@@ -1365,7 +1365,7 @@ var
 begin
   if (AnsiOverrides <> nil) and AnsiOverrides.TryGetValue(Name, Result) then
     Exit;
-  if AnsiRegistryMap.TryGetValue(Name, Rec) then
+  if (AnsiRegistryMap <> nil) and AnsiRegistryMap.TryGetValue(Name, Rec) then
   begin
     if Rec.VarType = avChar then
       Result := string(PChar(Rec.Ptr)^)
@@ -3394,7 +3394,8 @@ begin
 end;
 
 initialization
-  { AnsiRegistry, AnsiRegistryMap, AnsiOverrides are lazily initialized on first use }
+  EnsureAnsiRegistry;
+  EnsureAnsiOverrides;
 
 finalization
   AnsiRegistry.Free;
