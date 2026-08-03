@@ -807,7 +807,7 @@ var
   Len: Integer;
   I: Integer;
   C: Char;
-  SB: TStringBuilder; // TStringBuilder ডিক্লেয়ার করা হলো
+  SB: TStringBuilder; // TStringBuilder declared
 begin
   fConvertedText := ReplaceStr(fConvertedText, string(b_Hasanta) + string(zwnj), string(A_Hasanta));
   
@@ -877,11 +877,11 @@ begin
       C := fConvertedText[I];
       if (Ord(C) >= $0980) and (Ord(C) <= $09FF) then Continue;
       if ((Ord(C) >= $200B) and (Ord(C) <= $200F)) or (Ord(C) = $FEFF) then Continue;
-      SB.Append(C); // সরাসরি বাফারে যোগ হচ্ছে, কপি হবে না
+      SB.Append(C); // Added directly to buffer, no copy
     end;
     fConvertedText := SB.ToString;
   finally
-    SB.Free; // মেমোরি মুক্ত করা হলো
+    SB.Free; // Memory freed
   end;
 
   // Applying dynamic post-processing fixes (LAST)
@@ -940,7 +940,7 @@ function TUnicodeToBijoy2000.GetToggleState(const Context, Key: string; Occurren
 var
   CombinedKey: string;
 begin
-  // Contextual key: Consonant + Index + KarChar (e.g. র_1_#$09C1)
+  // Contextual key: Consonant + Index + KarChar (e.g. ra_1_#$09C1)
   CombinedKey := Context + '_' + IntToStr(OccurrenceIndex) + '_' + Key;
   if fToggleStates = nil then
     fToggleStates := TDictionary<string, Boolean>.Create;
@@ -987,7 +987,7 @@ begin
   fUniText := UniText;
   fConvertedText := fUniText;
 
-  // ১. dynamic pre-placement fixes - একদম শুরুতে কাঁচা ইউনিকোড ইনপুটে রান হবে
+  // 1. Dynamic pre-placement fixes - runs at the very beginning on raw Unicode input
   for I := 0 to Length(CustomPreReplacements) - 1 do
     fConvertedText := ReplaceStr(fConvertedText, CustomPreReplacements[I].Key, CustomPreReplacements[I].Value);
 
@@ -1017,7 +1017,7 @@ begin
 
   fLastUniText := UniText;
 
-  // ২. Resolve kar-inclusive full forms BEFORE the vowel-rule pass
+  // 2. Resolve kar-inclusive full forms BEFORE the vowel-rule pass
   ApplyKarInclusiveFullForms;
 
   // === Phase A: Pre-phase vowel rule pass (raw Unicode text) ===
@@ -1028,20 +1028,20 @@ begin
   // Clean start
   DeNormalize;
 
-  // ৩. Rearrange Vowels and Reph
+  // 3. Rearrange Vowels and Reph
   ReArrangeKars;
   ReArrangeReph;
 
-  // ৪. Apply the U/UU/RRI main pass
+  // 4. Apply the U/UU/RRI main pass
   ApplyVowelKars;
 
-  // ৫. Process remaining Conjuncts and Full Forms
+  // 5. Process remaining Conjuncts and Full Forms
   ReplaceFullForms;
 
-  // ৬. Process remaining Vowels
+  // 6. Process remaining Vowels
   ReplaceKarsVowels;
 
-  // ৭. Apply Glyphs, Halfs, and Consonants
+  // 7. Apply Glyphs, Halfs, and Consonants
   ConvertRFola_ZFola_Hasanta;
   
   { ==========================================================
@@ -1157,7 +1157,7 @@ begin
           end
           else
           begin
-            // Default 2-char: replace ্ + র
+            // Default 2-char: replace hasanta + ra
             fConvertedText := WideStuffString(fConvertedText, I, 2, Rule.Value);
           end;
           Matched := True;
@@ -1533,7 +1533,7 @@ var
   SearchChar: string;
   OccurrenceIndex: Integer;
   ClusterInfo: TClusterMatchInfo;
-  LastPos: Integer; // <--- নতুন ভ্যারিয়েবল
+  LastPos: Integer; // <--- new variable
 begin
   Found := False;
   for Rule in VowelRules do
@@ -1552,10 +1552,10 @@ begin
     SearchChar := KarChar;
 
   OccurrenceIndex := 0;
-  LastPos := 1; // <--- শুরু পজিশন ১ থেকে
+  LastPos := 1; // <--- starting position from 1
 
   repeat
-    // PosEx ব্যবহার করা হয়েছে যাতে আগের পজিশনের পর থেকে খোঁজা শুরু করে
+    // PosEx is used to start searching from after the previous position
     I := PosEx(SearchChar, fConvertedText, LastPos); 
     if I <= 0 then
       Break;
@@ -1598,7 +1598,7 @@ begin
       fConvertedText := WideStuffString(fConvertedText, I, 1, Resolved);
     end;
 
-    // খুব গুরুত্বপূর্ণ: পরবর্তী সার্চ যেন বর্তমান পজিশনের পর থেকে শুরু হয়
+    // Very important: next search must start from after the current position
     LastPos := I + Length(Resolved); 
   until I <= 0;
 end;
@@ -1611,13 +1611,13 @@ begin
   if Pos - 1 < 1 then
     Exit;
 
-  I := Pos - 1; // Pos (র)-এর ঠিক আগের ঘর থেকে হসন্ত চেক করা শুরু হবে
+  I := Pos - 1; // Start checking for hasanta from the cell just before Pos (ra)
   
-  // ZWJ / ZWNJ ক্যারেক্টার থাকলে সেগুলো স্কিপ করবে
+  // Skip ZWJ / ZWNJ characters if present
   while (I >= 1) and ((Text[I] = zwj) or (Text[I] = zwnj)) do
     Dec(I);
 
-  // যদি ঠিক আগের বর্ণটি হসন্ত (b_Hasanta) হয়
+  // If the character immediately before is hasanta (b_Hasanta)
   if (I >= 1) and (Text[I] = b_Hasanta) then
     Result := True;
 end;
@@ -1721,11 +1721,11 @@ begin
       PosIdx := PosEx(K, fConvertedText, PosIdx);
       if PosIdx <= 0 then Break;
 
-      // চেক করা হচ্ছে ক্যারেক্টারটির ঠিক পূর্বে হসন্ত আছে কিনা (যেমন: 'ঙ্গু'-এর ভেতর 'গু')
+      // Checking if there's a hasanta immediately before the character (e.g., 'gu' inside 'nggu')
       MatchStart := PosIdx;
       if HasHasantaBefore(fConvertedText, MatchStart) then
       begin
-        // হসন্ত থাকলে এটি যুক্তবর্ণের অংশ, তাই একক 'গু' হিসেবে ভাঙা যাবে না
+        // If hasanta exists, it's part of a conjunct, so cannot be split as a standalone 'gu'
         Inc(PosIdx, Length(K));
       end
       else
@@ -3081,7 +3081,7 @@ else if Key = 'GroupKarCorrections' then
             begin
               for GCorrMember in GroupMembers do
               begin
-                // ১. মূল সিকোয়েন্স (RFola + Kar)
+                // 1. Main sequence (RFola + Kar)
                 GCorrPair.Key := ResolveValue(GCorrMember + GCorrFrom);
                 GCorrPair.Value := ResolveValue(GCorrMember + GCorrTo);
                 if (GCorrPair.Key <> '') and (GCorrPair.Key <> GCorrPair.Value) then
@@ -3090,7 +3090,7 @@ else if Key = 'GroupKarCorrections' then
                   CustomPostReplacements[High(CustomPostReplacements)] := GCorrPair;
                 end;
 
-                // ২. Swap হওয়া সিকোয়েন্স (Kar + RFola) - FinalTouch এর স্যাপের সাথে ম্যাচ করার জন্য
+                // 2. Swapped sequence (Kar + RFola) - to match the swap in FinalTouch
                 GCorrPair.Key := ResolveValue(GCorrFrom + GCorrMember);
                 GCorrPair.Value := ResolveValue(GCorrTo + GCorrMember);
                 if (GCorrPair.Key <> '') and (GCorrPair.Key <> GCorrPair.Value) then
