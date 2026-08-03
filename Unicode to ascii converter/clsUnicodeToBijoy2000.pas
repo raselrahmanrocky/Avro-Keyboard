@@ -81,6 +81,7 @@ type
   TReplacementPair = record
     Key: string;
     Value: string;
+    Comment: string;
   end;
 
   TAnsiVarType = (avChar, avString);
@@ -92,6 +93,7 @@ type
     Ptr: Pointer;
     DefaultVal: string;
     BengaliChar: string;
+    Comment: string;
   end;
 
   TRfolaRule = record
@@ -102,12 +104,26 @@ type
     ContextGroup: string;
     ContextReplaceLen: Integer;
     ContextValue: string;
+    RawValue: string;
+    RawHalfValue: string;
+    RawContextValue: string;
+    Comment: string;
   end;
 
   TKarCorrection = record
+    RawCharStr: string;
     CharStr: string;
+    RawFromKar: string;
     FromKar: string;
+    RawToKar: string;
     ToKar: string;
+    Comment: string;
+  end;
+
+  TGroupKarCorrection = record
+    Group: string;
+    From: string;
+    To_: string;
   end;
 
 var
@@ -124,8 +140,11 @@ var
   VowelRules: TArray<TVowelRule>;
   ConsonantGroupMap: TDictionary<string, TArray<string>>;
   AnsiGroupMap: TDictionary<string, TArray<string>>;
+  AnsiGroupRawMap: TDictionary<string, TArray<string>>;
   RfolaRules: TArray<TRfolaRule>;
   KarCorrections: TArray<TKarCorrection>;
+  GroupKarCorrections: TArray<TGroupKarCorrection>;
+  ConsonantGroupRawMap: TDictionary<string, TArray<string>>;
 
 
 procedure ResetAnsiToDefaults;
@@ -408,6 +427,7 @@ procedure InitializeAnsiRegistry;
     Rec.Ptr := APtr;
     Rec.DefaultVal := ADefaultVal;
     Rec.BengaliChar := ABengali;
+    Rec.Comment := ABengali;
     AnsiRegistry.Add(Rec);
     AnsiRegistryMap.AddOrSetValue(AName, Rec);
   end;
@@ -446,8 +466,8 @@ begin
   RegVar('A_UUKar1', 'VowelsAndKars', avChar, @A_UUKar1, '#$201A', 'ূ (ঊ-কার ১ - সাধারণ)');
   RegVar('A_UUKar3', 'VowelsAndKars', avChar, @A_UUKar3, '#$192', 'ূ (ঊ-কার ৩ - রূ)');
   RegVar('A_RRI', 'VowelsAndKars', avChar, @A_RRI, '#$46', 'ঋ');
-  RegVar('A_RRIKar1', 'VowelsAndKars', avChar, @A_RRIKar1, '#$201E', 'ৃ (ঋ-কার ১)');
-  RegVar('A_RRIKar2', 'VowelsAndKars', avChar, @A_RRIKar2, '#$2026', 'ৃ (ঋ-কার ২)');
+  RegVar('A_RRIKar1', 'VowelsAndKars', avChar, @A_RRIKar1, '#$201E', 'ৃ (ঋ-কার ১ - সাধারণ)');
+  RegVar('A_RRIKar2', 'VowelsAndKars', avChar, @A_RRIKar2, '#$2026', 'ৃ (ঋ-কার ২ - ঝুলন্ত)');
   RegVar('A_E', 'VowelsAndKars', avChar, @A_E, '#$47', 'এ');
   RegVar('A_EKar1', 'VowelsAndKars', avChar, @A_EKar1, '#$2020', 'ে (এ-কার ১ - সাধারণ)');
   RegVar('A_EKar2', 'VowelsAndKars', avChar, @A_EKar2, '#$2021', 'ে (এ-কার ২ - ঝুলন্ত)');
@@ -2044,6 +2064,24 @@ begin
   end;
 end;
 
+function JReadInt(const S: string; var P: Integer; Default: Integer): Integer;
+var
+  Start: Integer;
+  Neg: Boolean;
+begin
+  Result := Default;
+  JSkipWS(S, P);
+  if (P > Length(S)) then Exit;
+  Neg := False;
+  if S[P] = '-' then begin Neg := True; Inc(P); end;
+  if (P > Length(S)) or not CharInSet(S[P], ['0'..'9']) then Exit;
+  Start := P;
+  while (P <= Length(S)) and CharInSet(S[P], ['0'..'9']) do
+    Inc(P);
+  Result := StrToIntDef(Copy(S, Start, P - Start), Default);
+  if Neg then Result := -Result;
+end;
+
 procedure JSkipValue(const S: string; var P: Integer);
 var
   Depth: Integer;
@@ -2084,65 +2122,99 @@ function JSONPrettyPrint(const JSON: string): string;
 var
   SB: TStringBuilder;
   P, Depth: Integer;
-  C: Char;
+  C, NextC: Char;
+  InString: Boolean;
+
+  procedure AppendIndent;
+  begin
+    SB.Append(sLineBreak);
+    if Depth > 0 then
+      SB.Append(StringOfChar(' ', Depth * 2));
+  end;
+
 begin
+  if JSON = '' then Exit('');
   SB := TStringBuilder.Create;
   try
     Depth := 0;
+    InString := False;
     P := 1;
     while P <= Length(JSON) do
     begin
       C := JSON[P];
+
+      if InString then
+      begin
+        SB.Append(C);
+        if (C = '"') and (JSON[P - 1] <> '\') then
+          InString := False;
+        Inc(P);
+        Continue;
+      end;
+
       case C of
+        '"':
+          begin
+            InString := True;
+            SB.Append(C);
+            Inc(P);
+          end;
+
         '{', '[':
           begin
             SB.Append(C);
-            Inc(Depth);
-            SB.Append(sLineBreak);
-            SB.Append(StringOfChar(' ', Depth * 2));
-            Inc(P);
+
+            NextC := #0;
+            var LookAhead := P + 1;
+            while LookAhead <= Length(JSON) do
+            begin
+              if JSON[LookAhead] > ' ' then
+              begin
+                NextC := JSON[LookAhead];
+                Break;
+              end;
+              Inc(LookAhead);
+            end;
+
+            if ((C = '{') and (NextC = '}')) or ((C = '[') and (NextC = ']')) then
+            begin
+              Inc(P);
+              while (P <= Length(JSON)) and (JSON[P] <= ' ') do Inc(P);
+              if (P <= Length(JSON)) and ((JSON[P] = '}') or (JSON[P] = ']')) then
+              begin
+                SB.Append(JSON[P]);
+                Inc(P);
+              end;
+            end
+            else
+            begin
+              Inc(Depth);
+              AppendIndent;
+              Inc(P);
+            end;
           end;
+
         '}', ']':
           begin
-            SB.Append(sLineBreak);
             Dec(Depth);
-            SB.Append(StringOfChar(' ', Depth * 2));
+            AppendIndent;
             SB.Append(C);
             Inc(P);
           end;
+
         ',':
           begin
-            SB.Append(',');
-            SB.Append(sLineBreak);
-            SB.Append(StringOfChar(' ', Depth * 2));
+            SB.Append(C);
+            AppendIndent;
             Inc(P);
           end;
+
         ':':
           begin
             SB.Append(': ');
             Inc(P);
           end;
-        '"':
-          begin
-            SB.Append('"');
-            Inc(P);
-            while P <= Length(JSON) do
-            begin
-              C := JSON[P];
-              SB.Append(C);
-              Inc(P);
-              if C = '\' then
-              begin
-                if P <= Length(JSON) then
-                begin
-                  SB.Append(JSON[P]);
-                  Inc(P);
-                end;
-              end
-              else if C = '"' then
-                Break;
-            end;
-          end;
+
       else
         if C > ' ' then
           SB.Append(C);
@@ -2317,8 +2389,11 @@ begin
   Finalize(VowelRules); VowelRules := nil;
   Finalize(RfolaRules); RfolaRules := nil;
   Finalize(KarCorrections); KarCorrections := nil;
+  Finalize(GroupKarCorrections); GroupKarCorrections := nil;
   if AnsiGroupMap <> nil then AnsiGroupMap.Clear;
+  if AnsiGroupRawMap <> nil then AnsiGroupRawMap.Clear;
   if ConsonantGroupMap <> nil then ConsonantGroupMap.Clear;
+  if ConsonantGroupRawMap <> nil then ConsonantGroupRawMap.Clear;
   PrepareActiveReplacements;
 end;
 
@@ -2343,7 +2418,7 @@ procedure LoadAnsiMapping(const Path: string; ErrorLog: TStringList = nil);
         if S[Pos] = ',' then begin Inc(Pos); Continue; end;
         if S[Pos] = '{' then
         begin
-          Inc(Pos); Pair.Key := ''; Pair.Value := '';
+          Inc(Pos); Pair.Key := ''; Pair.Value := ''; Pair.Comment := '';
           while Pos <= Length(S) do
           begin
             JSkipWS(S, Pos);
@@ -2355,6 +2430,8 @@ procedure LoadAnsiMapping(const Path: string; ErrorLog: TStringList = nil);
               Pair.Key := ResolveValue(JReadString(S, Pos))
             else if Field = 'Value' then
               Pair.Value := ResolveValue(JReadString(S, Pos))
+            else if Field = 'Comment' then
+              Pair.Comment := JReadString(S, Pos)
             else
               JSkipValue(S, Pos);
           end;
@@ -2377,6 +2454,8 @@ var
   Rec: TAnsiVarRec;
   Lines: TStringList;
   Items: TList<string>;
+  RawItems: TList<string>;
+  RawStr: string;
   GCorrGroup, GCorrFrom, GCorrTo: string;
   GroupMembers: TArray<string>;
   GCorrMember: string;
@@ -2815,7 +2894,12 @@ begin
                           ToggleOnBackspace := (ToggleVal = 'backspace');
                         end
                         else if FieldName = 'matchMode' then
-                          MatchMode := StrToIntDef(JReadString(JSON, P), 0)
+                        begin
+                          if (P <= Length(JSON)) and (JSON[P] = '"') then
+                            MatchMode := StrToIntDef(JReadString(JSON, P), 0)
+                          else
+                            MatchMode := JReadInt(JSON, P, 0);
+                        end
                         else if FieldName = 'process' then
                           ProcessPhase := LowerCase(JReadString(JSON, P))
                         else
@@ -2859,6 +2943,10 @@ begin
             ContextGroup := '';
             ContextReplaceLen := 0;
             ContextValue := '';
+            RawValue := '';
+            RawHalfValue := '';
+            RawContextValue := '';
+            Comment := '';
             while P <= Length(JSON) do
             begin
               JSkipWS(JSON, P);
@@ -2870,17 +2958,28 @@ begin
               if FieldName = 'consonants' then
                 Consonants := JReadString(JSON, P)
               else if FieldName = 'value' then
-                Value := JReadString(JSON, P)
+              begin
+                RawValue := JReadString(JSON, P);
+                Value := RawValue;
+              end
               else if FieldName = 'halfValue' then
-                HalfValue := JReadString(JSON, P)
+              begin
+                RawHalfValue := JReadString(JSON, P);
+                HalfValue := RawHalfValue;
+              end
               else if FieldName = 'replaceLen' then
-                ReplaceLen := StrToIntDef(JReadString(JSON, P), 2)
+                ReplaceLen := JReadInt(JSON, P, 2)
               else if FieldName = 'contextGroup' then
                 ContextGroup := JReadString(JSON, P)
               else if FieldName = 'contextReplaceLen' then
-                ContextReplaceLen := StrToIntDef(JReadString(JSON, P), 0)
+                ContextReplaceLen := JReadInt(JSON, P, 0)
               else if FieldName = 'contextValue' then
-                ContextValue := JReadString(JSON, P)
+              begin
+                RawContextValue := JReadString(JSON, P);
+                ContextValue := RawContextValue;
+              end
+              else if FieldName = 'Comment' then
+                Comment := JReadString(JSON, P)
               else
                 JSkipValue(JSON, P);
             end;
@@ -2911,9 +3010,13 @@ begin
           SetLength(KarCorrections, Length(KarCorrections) + 1);
           with KarCorrections[High(KarCorrections)] do
           begin
+            RawCharStr := '';
             CharStr := '';
+            RawFromKar := '';
             FromKar := '';
+            RawToKar := '';
             ToKar := '';
+            Comment := '';
             while P <= Length(JSON) do
             begin
               JSkipWS(JSON, P);
@@ -2923,17 +3026,19 @@ begin
               JSkipWS(JSON, P); if JSON[P] = ':' then Inc(P);
               JSkipWS(JSON, P);
               if FieldName = 'char' then
-                CharStr := JReadString(JSON, P)
+                RawCharStr := JReadString(JSON, P)
               else if FieldName = 'from' then
-                FromKar := JReadString(JSON, P)
+                RawFromKar := JReadString(JSON, P)
               else if FieldName = 'to' then
-                ToKar := JReadString(JSON, P)
+                RawToKar := JReadString(JSON, P)
+              else if (FieldName = 'Comment') or (FieldName = 'comment') then
+                Comment := JReadString(JSON, P)
               else
                 JSkipValue(JSON, P);
             end;
-            CharStr := ResolveValue(CharStr);
-            FromKar := ResolveValue(FromKar);
-            ToKar := ResolveValue(ToKar);
+            CharStr := ResolveValue(RawCharStr);
+            FromKar := ResolveValue(RawFromKar);
+            ToKar := ResolveValue(RawToKar);
           end;
         end
         else
@@ -2996,6 +3101,10 @@ else if Key = 'GroupKarCorrections' then
               end;
             end;
           end;
+          SetLength(GroupKarCorrections, Length(GroupKarCorrections) + 1);
+          GroupKarCorrections[High(GroupKarCorrections)].Group := GCorrGroup;
+          GroupKarCorrections[High(GroupKarCorrections)].From := GCorrFrom;
+          GroupKarCorrections[High(GroupKarCorrections)].To_ := GCorrTo;
         end
         else
           JSkipValue(JSON, P);
@@ -3007,6 +3116,10 @@ else if Key = 'GroupKarCorrections' then
         AnsiGroupMap := TDictionary<string, TArray<string>>.Create
       else
         AnsiGroupMap.Clear;
+      if AnsiGroupRawMap = nil then
+        AnsiGroupRawMap := TDictionary<string, TArray<string>>.Create
+      else
+        AnsiGroupRawMap.Clear;
       if (P <= Length(JSON)) and (JSON[P] = '{') then Inc(P) else Continue;
       while P <= Length(JSON) do
       begin
@@ -3020,17 +3133,22 @@ else if Key = 'GroupKarCorrections' then
         begin
           Inc(P);
           Items := TList<string>.Create;
+          RawItems := TList<string>.Create;
           try
             while P <= Length(JSON) do
             begin
               JSkipWS(JSON, P);
               if (P > Length(JSON)) or (JSON[P] = ']') then begin Inc(P); Break; end;
               if JSON[P] = ',' then begin Inc(P); Continue; end;
-              Items.Add(ResolveValue(JReadString(JSON, P)));
+              RawStr := JReadString(JSON, P);
+              Items.Add(ResolveValue(RawStr));
+              RawItems.Add(RawStr);
             end;
             AnsiGroupMap.AddOrSetValue(Key, Items.ToArray);
+            AnsiGroupRawMap.AddOrSetValue(Key, RawItems.ToArray);
           finally
             Items.Free;
+            RawItems.Free;
           end;
         end
         else
@@ -3044,6 +3162,10 @@ else if Key = 'GroupKarCorrections' then
         ConsonantGroupMap := TDictionary<string, TArray<string>>.Create
       else
         ConsonantGroupMap.Clear;
+      if ConsonantGroupRawMap = nil then
+        ConsonantGroupRawMap := TDictionary<string, TArray<string>>.Create
+      else
+        ConsonantGroupRawMap.Clear;
       if (P <= Length(JSON)) and (JSON[P] = '{') then Inc(P) else Continue;
       while P <= Length(JSON) do
       begin
@@ -3057,17 +3179,22 @@ else if Key = 'GroupKarCorrections' then
         begin
           Inc(P);
           Items := TList<string>.Create;
+          RawItems := TList<string>.Create;
           try
             while P <= Length(JSON) do
             begin
               JSkipWS(JSON, P);
               if (P > Length(JSON)) or (JSON[P] = ']') then begin Inc(P); Break; end;
               if JSON[P] = ',' then begin Inc(P); Continue; end;
-              Items.Add(ResolveValue(JReadString(JSON, P)));
+              RawStr := JReadString(JSON, P);
+              Items.Add(ResolveValue(RawStr));
+              RawItems.Add(RawStr);
             end;
             ConsonantGroupMap.AddOrSetValue(Key, Items.ToArray);
+            ConsonantGroupRawMap.AddOrSetValue(Key, RawItems.ToArray);
           finally
             Items.Free;
+            RawItems.Free;
           end;
         end
         else
@@ -3136,7 +3263,7 @@ begin
       SB.Append('{');
       SB.Append('"Key":"').Append(SmartEscape(Pairs[I].Key)).Append('",');
       SB.Append('"Value":"').Append(SmartEscape(Pairs[I].Value)).Append('",');
-      SB.Append('"Comment":"').Append(JSONEscape(Pairs[I].Key)).Append('"');
+      SB.Append('"Comment":"').Append(JSONEscape(Pairs[I].Comment)).Append('"');
       SB.Append('}');
     end;
     SB.Append(']');
@@ -3148,54 +3275,91 @@ end;
 
 { =============================================================================== }
 
+function IsGroupName(const S: string): Boolean;
+var
+  I: Integer;
+begin
+  Result := True;
+  if S = '' then Exit(False);
+  for I := 1 to Length(S) do
+    if not CharInSet(S[I], ['a'..'z', 'A'..'Z', '0'..'9', '_']) then
+      Exit(False);
+end;
+
+function ValueToHexOrName(const S: string): string;
+begin
+  if IsGroupName(S) then
+    Result := S
+  else
+    Result := SmartEscape(S);
+end;
+
+function HasUnicodeKeyCategory(const Category: string): Boolean;
+begin
+  Result := (Category <> 'FirstHalfForms') and (Category <> 'SecondHalfForms');
+end;
+
+{ =============================================================================== }
+
 procedure ExportAnsiMapping(const Path: string);
 var
   Lines: TStringList;
   SB: TStringBuilder;
   CatSB: TStringBuilder;
-  CatMap: TDictionary<string, TStringBuilder>;
-  I: Integer;
+  CategoryOrder: TList<string>;
+  CatEntries: TDictionary<string, TStringBuilder>;
+  I, J, K: Integer;
   Val: string;
-  Rec: TAnsiVarRec;
+  Rec, MapRec: TAnsiVarRec;
+  CatName, KarCharHex: string;
+  Arr: TArray<string>;
 begin
   EnsureAnsiRegistry;
   EnsureAnsiOverrides;
-  CatMap := TDictionary<string, TStringBuilder>.Create;
+  CategoryOrder := TList<string>.Create;
+  CatEntries := TDictionary<string, TStringBuilder>.Create;
   Lines := TStringList.Create;
   try
     for Rec in AnsiRegistry do
     begin
-      if Rec.VarType = avChar then
-        Val := string(PChar(Rec.Ptr)^)
-      else
-        Val := PString(Rec.Ptr)^;
+      MapRec := Rec;
+      AnsiRegistryMap.TryGetValue(Rec.Name, MapRec);
 
-      if not CatMap.TryGetValue(Rec.Category, CatSB) then
+      Val := GetAnsiVarValue(MapRec.Name);
+
+      if not CatEntries.ContainsKey(MapRec.Category) then
       begin
-        CatSB := TStringBuilder.Create;
-        CatSB.Append('"').Append(Rec.Category).Append('":{');
-        CatMap.Add(Rec.Category, CatSB);
-      end
-      else
+        CatEntries.Add(MapRec.Category, TStringBuilder.Create);
+        CategoryOrder.Add(MapRec.Category);
+      end;
+
+      CatSB := CatEntries[MapRec.Category];
+      if CatSB.Length > 0 then
         CatSB.Append(',');
-        CatSB.Append('"').Append(Rec.Name).Append('":{');
-      CatSB.Append('"UnicodeKey":"').Append(JSONEscape(Rec.BengaliChar)).Append('",');
+
+      CatSB.Append('"').Append(MapRec.Name).Append('":{');
+
+      if HasUnicodeKeyCategory(MapRec.Category) and (MapRec.BengaliChar <> '') then
+        CatSB.Append('"UnicodeKey":"').Append(SmartEscape(MapRec.BengaliChar)).Append('",');
+
       CatSB.Append('"Value":"').Append(SmartEscape(Val)).Append('",');
-      CatSB.Append('"Comment":"').Append(JSONEscape(Rec.BengaliChar)).Append('"');
+      CatSB.Append('"Comment":"').Append(JSONEscape(MapRec.Comment)).Append('"');
       CatSB.Append('}');
     end;
 
     SB := TStringBuilder.Create;
     try
       SB.Append('{');
+
       SB.Append('"Constants":{');
-      I := 0;
-      for CatSB in CatMap.Values do
+      for I := 0 to CategoryOrder.Count - 1 do
       begin
         if I > 0 then SB.Append(',');
-        CatSB.Append('}');
+        CatName := CategoryOrder[I];
+        CatSB := CatEntries[CatName];
+        SB.Append('"').Append(CatName).Append('":{');
         SB.Append(CatSB.ToString);
-        Inc(I);
+        SB.Append('}');
       end;
       SB.Append('}');
 
@@ -3205,6 +3369,195 @@ begin
         SB.Append(',"FullFormReplacements":').Append(MakeJSONArrOfReplPairs(GetDefaultFullForms));
       SB.Append(',"PreReplacements":').Append(MakeJSONArrOfReplPairs(CustomPreReplacements));
       SB.Append(',"PostReplacements":').Append(MakeJSONArrOfReplPairs(CustomPostReplacements));
+
+      if Length(VowelRules) > 0 then
+      begin
+        SB.Append(',"VowelRules":{');
+        for I := 0 to High(VowelRules) do
+        begin
+          if I > 0 then SB.Append(',');
+          KarCharHex := SmartEscape(VowelRules[I].KarChar);
+          SB.Append('"').Append(KarCharHex).Append('":{');
+          SB.Append('"default":"').Append(VowelRules[I].DefaultVal).Append('"');
+          if VowelRules[I].Toggle <> 'none' then
+            SB.Append(',"toggle":"').Append(VowelRules[I].Toggle).Append('"');
+          SB.Append(',"mappings":[');
+          for J := 0 to High(VowelRules[I].Mappings) do
+          begin
+            if J > 0 then SB.Append(',');
+            SB.Append('{');
+            SB.Append('"consonants":"').Append(ValueToHexOrName(VowelRules[I].Mappings[J].Consonants)).Append('"');
+            SB.Append(',"value":"').Append(VowelRules[I].Mappings[J].Value).Append('"');
+            if VowelRules[I].Mappings[J].Alt <> '' then
+              SB.Append(',"alt":"').Append(VowelRules[I].Mappings[J].Alt).Append('"');
+            if VowelRules[I].Mappings[J].ToggleOnBackspace then
+              SB.Append(',"toggle":"backspace"');
+            if VowelRules[I].Mappings[J].ProcessPhase <> '' then
+              SB.Append(',"process":"').Append(VowelRules[I].Mappings[J].ProcessPhase).Append('"');
+            SB.Append(',"matchMode":').Append(IntToStr(VowelRules[I].Mappings[J].MatchMode));
+            SB.Append('}');
+          end;
+          SB.Append(']');
+          SB.Append('}');
+        end;
+        SB.Append('}');
+      end;
+
+      if (AnsiGroupRawMap <> nil) and (AnsiGroupRawMap.Count > 0) then
+      begin
+        SB.Append(',"RaPhalaGroups":{');
+        K := 0;
+        for CatName in AnsiGroupRawMap.Keys do
+        begin
+          if K > 0 then SB.Append(',');
+          SB.Append('"').Append(CatName).Append('":[');
+          Arr := AnsiGroupRawMap[CatName];
+          for J := 0 to High(Arr) do
+          begin
+            if J > 0 then SB.Append(',');
+            SB.Append('"').Append(Arr[J]).Append('"');
+          end;
+          SB.Append(']');
+          Inc(K);
+        end;
+        SB.Append('}');
+      end
+      else if (AnsiGroupMap <> nil) and (AnsiGroupMap.Count > 0) then
+      begin
+        SB.Append(',"RaPhalaGroups":{');
+        K := 0;
+        for CatName in AnsiGroupMap.Keys do
+        begin
+          if K > 0 then SB.Append(',');
+          SB.Append('"').Append(CatName).Append('":[');
+          Arr := AnsiGroupMap[CatName];
+          for J := 0 to High(Arr) do
+          begin
+            if J > 0 then SB.Append(',');
+            SB.Append('"').Append(ValueToHexOrName(Arr[J])).Append('"');
+          end;
+          SB.Append(']');
+          Inc(K);
+        end;
+        SB.Append('}');
+      end;
+
+      SB.Append(',"GroupKarCorrections":[');
+      for I := 0 to Length(GroupKarCorrections) - 1 do
+      begin
+        if I > 0 then SB.Append(',');
+        SB.Append('{');
+        SB.Append('"group":"').Append(GroupKarCorrections[I].Group).Append('",');
+        SB.Append('"from":"').Append(JSONEscape(GroupKarCorrections[I].From)).Append('",');
+        SB.Append('"to":"').Append(JSONEscape(GroupKarCorrections[I].To_)).Append('"');
+        SB.Append('}');
+      end;
+      SB.Append(']');
+
+      if (ConsonantGroupRawMap <> nil) and (ConsonantGroupRawMap.Count > 0) then
+      begin
+        SB.Append(',"ConsonantGroups":{');
+        K := 0;
+        for CatName in ConsonantGroupRawMap.Keys do
+        begin
+          if K > 0 then SB.Append(',');
+          SB.Append('"').Append(CatName).Append('":[');
+          Arr := ConsonantGroupRawMap[CatName];
+          for J := 0 to High(Arr) do
+          begin
+            if J > 0 then SB.Append(',');
+            SB.Append('"').Append(Arr[J]).Append('"');
+          end;
+          SB.Append(']');
+          Inc(K);
+        end;
+        SB.Append('}');
+      end
+      else if (ConsonantGroupMap <> nil) and (ConsonantGroupMap.Count > 0) then
+      begin
+        SB.Append(',"ConsonantGroups":{');
+        K := 0;
+        for CatName in ConsonantGroupMap.Keys do
+        begin
+          if K > 0 then SB.Append(',');
+          SB.Append('"').Append(CatName).Append('":[');
+          Arr := ConsonantGroupMap[CatName];
+          for J := 0 to High(Arr) do
+          begin
+            if J > 0 then SB.Append(',');
+            SB.Append('"').Append(ValueToHexOrName(Arr[J])).Append('"');
+          end;
+          SB.Append(']');
+          Inc(K);
+        end;
+        SB.Append('}');
+      end;
+
+      if Length(RfolaRules) > 0 then
+      begin
+        SB.Append(',"RfolaRules":[');
+        for I := 0 to High(RfolaRules) do
+        begin
+          if I > 0 then SB.Append(',');
+          SB.Append('{');
+          SB.Append('"consonants":"').Append(ValueToHexOrName(RfolaRules[I].Consonants)).Append('",');
+          if RfolaRules[I].RawValue <> '' then
+            SB.Append('"value":"').Append(RfolaRules[I].RawValue).Append('"')
+          else
+            SB.Append('"value":"').Append(SmartEscape(RfolaRules[I].Value)).Append('"');
+          if RfolaRules[I].HalfValue <> '' then
+          begin
+            if RfolaRules[I].RawHalfValue <> '' then
+              SB.Append(',"halfValue":"').Append(RfolaRules[I].RawHalfValue).Append('"')
+            else
+              SB.Append(',"halfValue":"').Append(SmartEscape(RfolaRules[I].HalfValue)).Append('"');
+          end;
+          if RfolaRules[I].ReplaceLen > 0 then
+            SB.Append(',"replaceLen":').Append(IntToStr(RfolaRules[I].ReplaceLen));
+          if RfolaRules[I].ContextGroup <> '' then
+            SB.Append(',"contextGroup":"').Append(RfolaRules[I].ContextGroup).Append('"');
+          if RfolaRules[I].ContextReplaceLen > 0 then
+            SB.Append(',"contextReplaceLen":').Append(IntToStr(RfolaRules[I].ContextReplaceLen));
+          if RfolaRules[I].ContextValue <> '' then
+          begin
+            if RfolaRules[I].RawContextValue <> '' then
+              SB.Append(',"contextValue":"').Append(RfolaRules[I].RawContextValue).Append('"')
+            else
+              SB.Append(',"contextValue":"').Append(SmartEscape(RfolaRules[I].ContextValue)).Append('"');
+          end;
+          if RfolaRules[I].Comment <> '' then
+            SB.Append(',"Comment":"').Append(JSONEscape(RfolaRules[I].Comment)).Append('"');
+          SB.Append('}');
+        end;
+        SB.Append(']');
+      end;
+
+      if Length(KarCorrections) > 0 then
+      begin
+        SB.Append(',"KarCorrections":[');
+        for I := 0 to High(KarCorrections) do
+        begin
+          if I > 0 then SB.Append(',');
+          SB.Append('{');
+          if KarCorrections[I].RawCharStr <> '' then
+            SB.Append('"char":"').Append(JSONEscape(KarCorrections[I].RawCharStr)).Append('",')
+          else
+            SB.Append('"char":"').Append(JSONEscape(KarCorrections[I].CharStr)).Append('",');
+          if KarCorrections[I].RawFromKar <> '' then
+            SB.Append('"from":"').Append(JSONEscape(KarCorrections[I].RawFromKar)).Append('",')
+          else
+            SB.Append('"from":"').Append(JSONEscape(KarCorrections[I].FromKar)).Append('",');
+          if KarCorrections[I].RawToKar <> '' then
+            SB.Append('"to":"').Append(JSONEscape(KarCorrections[I].RawToKar)).Append('"')
+          else
+            SB.Append('"to":"').Append(JSONEscape(KarCorrections[I].ToKar)).Append('"');
+          if KarCorrections[I].Comment <> '' then
+            SB.Append(',"Comment":"').Append(JSONEscape(KarCorrections[I].Comment)).Append('"');
+          SB.Append('}');
+        end;
+        SB.Append(']');
+      end;
+
       SB.Append('}');
 
       Lines.Text := JSONPrettyPrint(SB.ToString);
@@ -3213,8 +3566,11 @@ begin
       SB.Free;
     end;
   finally
-    for CatSB in CatMap.Values do CatSB.Free;
-    CatMap.Free;
+    for CatName in CategoryOrder do
+      if CatEntries.ContainsKey(CatName) then
+        CatEntries[CatName].Free;
+    CatEntries.Free;
+    CategoryOrder.Free;
     Lines.Free;
   end;
 end;
@@ -3402,6 +3758,8 @@ finalization
   AnsiRegistryMap.Free;
   AnsiOverrides.Free;
   AnsiGroupMap.Free;
+  AnsiGroupRawMap.Free;
   ConsonantGroupMap.Free;
+  ConsonantGroupRawMap.Free;
 
 end.
