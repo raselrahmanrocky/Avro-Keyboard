@@ -6,8 +6,8 @@ object Form1: TForm1
   Margins.Right = 5
   Margins.Bottom = 5
   Caption = 'Avro Unicode to Bijoy Converter'
-  ClientHeight = 449
-  ClientWidth = 864
+  ClientHeight = 600
+  ClientWidth = 900
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -17,8 +17,6 @@ object Form1: TForm1
   Icon.Data = {
     0000010001001010000001002000680400001600000028000000100000002000
     0000010020000000000000040000120B0000120B000000000000000000000000
-    0000000000000000000000000000000000000000000000000000000000000000
-    0000000000000000000000000000000000000000000000000000000000000000
     0000000000000000000000000000000000000000000000000000000000000000
     0000000000000000000000000000000000000000000000000000000000000000
     0000000000000000000000000000000000000000000000000000000000000000
@@ -52,12 +50,14 @@ object Form1: TForm1
     0000FFFF0000FFFF0000FFFF0000FFFF000080FF000080FF000081FF000080FE
     0000803800008000000090010000FC030000FF1F0000FFFF0000FFFF0000}
   Position = poScreenCenter
+  Constraints.MinHeight = 600
+  Constraints.MinWidth = 900
   OnClose = FormClose
   OnCreate = FormCreate
   PixelsPerInch = 144
   DesignSize = (
-    864
-    449)
+    900
+    600)
   TextHeight = 21
   object Label1: TLabel
     Left = 12
@@ -70,52 +70,11 @@ object Form1: TForm1
     Margins.Bottom = 5
     Caption = 'Type or Paste Unicode Bangla text here:'
   end
-  object Label8: TLabel
-    Left = 237
-    Top = 417
-    Width = 150
-    Height = 21
-    Margins.Left = 5
-    Margins.Top = 5
-    Margins.Right = 5
-    Margins.Bottom = 5
-    Caption = 'All Rights Reserved.'
-  end
-  object Label_OmicronLab: TLabel
-    Left = 108
-    Top = 417
-    Width = 120
-    Height = 20
-    Cursor = crHandPoint
-    Margins.Left = 5
-    Margins.Top = 5
-    Margins.Right = 5
-    Margins.Bottom = 5
-    Caption = 'OmicronLab.'
-    Font.Charset = ANSI_CHARSET
-    Font.Color = clBlue
-    Font.Height = -17
-    Font.Name = 'Verdana'
-    Font.Style = [fsBold, fsUnderline]
-    ParentFont = False
-    OnClick = Label_OmicronLabClick
-  end
-  object Label4: TLabel
-    Left = 12
-    Top = 417
-    Width = 91
-    Height = 21
-    Margins.Left = 5
-    Margins.Top = 5
-    Margins.Right = 5
-    Margins.Bottom = 5
-    Caption = 'Copyright '#169
-  end
   object MEMO1: TMemo
     Left = 12
     Top = 36
-    Width = 831
-    Height = 158
+    Width = 876
+    Height = 200
     Margins.Left = 5
     Margins.Top = 5
     Margins.Right = 5
@@ -132,9 +91,9 @@ object Form1: TForm1
   end
   object MEMO2: TMemo
     Left = 12
-    Top = 249
-    Width = 831
-    Height = 158
+    Top = 293
+    Width = 876
+    Height = 270
     Margins.Left = 5
     Margins.Top = 5
     Margins.Right = 5
@@ -151,7 +110,7 @@ object Form1: TForm1
   end
   object Button1: TButton
     Left = 12
-    Top = 203
+    Top = 246
     Width = 275
     Height = 37
     Margins.Left = 5
@@ -169,22 +128,61 @@ object Form1: TForm1
     TabOrder = 2
     OnClick = Button1Click
   end
-  object Progress: TProgressBar
-    Left = 408
-    Top = 416
-    Width = 435
-    Height = 19
-    Margins.Left = 5
-    Margins.Top = 5
-    Margins.Right = 5
-    Margins.Bottom = 5
-    Anchors = [akLeft, akRight, akBottom]
+  object PanelFooter: TPanel
+    Left = 0
+    Top = 563
+    Width = 900
+    Height = 37
+    Align = alBottom
+    BevelOuter = bvNone
+    DoubleBuffered = True
+    ParentDoubleBuffered = False
     TabOrder = 3
-    Visible = False
+    object Label4: TLabel
+      Left = 12
+      Top = 8
+      Width = 91
+      Height = 21
+      Caption = 'Copyright '#169
+      Transparent = True
+    end
+    object Label_OmicronLab: TLabel
+      Left = 108
+      Top = 8
+      Width = 120
+      Height = 20
+      Cursor = crHandPoint
+      Caption = 'OmicronLab.'
+      Font.Charset = ANSI_CHARSET
+      Font.Color = clBlue
+      Font.Height = -17
+      Font.Name = 'Verdana'
+      Font.Style = [fsBold, fsUnderline]
+      ParentFont = False
+      Transparent = True
+      OnClick = Label_OmicronLabClick
+    end
+    object Label8: TLabel
+      Left = 237
+      Top = 8
+      Width = 150
+      Height = 21
+      Caption = 'All Rights Reserved.'
+      Transparent = True
+    end
+    object Progress: TProgressBar
+      Left = 464
+      Top = 10
+      Width = 424
+      Height = 19
+      Anchors = [akLeft, akRight, akTop]
+      TabOrder = 0
+      Visible = False
+    end
   end
   object AppEvents: TApplicationEvents
     OnSettingChange = AppEventsSettingChange
-    Left = 720
-    Top = 192
+    Left = 756
+    Top = 236
   end
 end
