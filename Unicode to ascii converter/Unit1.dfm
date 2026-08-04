@@ -54,6 +54,7 @@ object Form1: TForm1
   Constraints.MinWidth = 900
   OnClose = FormClose
   OnCreate = FormCreate
+  OnResize = FormResize
   PixelsPerInch = 144
   DesignSize = (
     900
