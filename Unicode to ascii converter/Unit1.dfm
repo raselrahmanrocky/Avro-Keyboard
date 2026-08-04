@@ -60,27 +60,28 @@ object Form1: TForm1
     900
     600)
   TextHeight = 21
-  object Label1: TLabel
-    Left = 12
-    Top = 12
-    Width = 299
-    Height = 21
-    Margins.Left = 5
-    Margins.Top = 5
-    Margins.Right = 5
-    Margins.Bottom = 5
-    Caption = 'Type or Paste Unicode Bangla text here:'
+  object PanelHeader: TPanel
+    Left = 0
+    Top = 0
+    Width = 900
+    Height = 28
+    Align = alTop
+    BevelOuter = bvNone
+    TabOrder = 0
+    object Label1: TLabel
+      Left = 12
+      Top = 4
+      Width = 299
+      Height = 21
+      Caption = 'Type or Paste Unicode Bangla text here:'
+    end
   end
   object MEMO1: TMemo
-    Left = 12
-    Top = 36
-    Width = 876
-    Height = 200
-    Margins.Left = 5
-    Margins.Top = 5
-    Margins.Right = 5
-    Margins.Bottom = 5
-    Anchors = [akLeft, akTop, akRight]
+    Left = 0
+    Top = 28
+    Width = 900
+    Height = 250
+    Align = alTop
     Font.Charset = ANSI_CHARSET
     Font.Color = clWindowText
     Font.Height = -20
@@ -88,18 +89,49 @@ object Form1: TForm1
     Font.Style = []
     ParentFont = False
     ScrollBars = ssVertical
-    TabOrder = 0
+    TabOrder = 1
+  end
+  object Splitter1: TSplitter
+    Left = 0
+    Top = 278
+    Width = 900
+    Height = 5
+    Cursor = crVSplit
+    Align = alTop
+    OnMoved = Splitter1Moved
+    ExplicitWidth = 864
+  end
+  object PanelButton: TPanel
+    Left = 0
+    Top = 283
+    Width = 900
+    Height = 42
+    Align = alTop
+    BevelOuter = bvNone
+    TabOrder = 2
+    object Button1: TButton
+      Left = 12
+      Top = 6
+      Width = 275
+      Height = 30
+      Caption = 'Convert to Bijoy encoding >>'
+      Default = True
+      Font.Charset = DEFAULT_CHARSET
+      Font.Color = clWindowText
+      Font.Height = -17
+      Font.Name = 'Tahoma'
+      Font.Style = [fsBold]
+      ParentFont = False
+      TabOrder = 0
+      OnClick = Button1Click
+    end
   end
   object MEMO2: TMemo
-    Left = 12
-    Top = 293
-    Width = 876
-    Height = 270
-    Margins.Left = 5
-    Margins.Top = 5
-    Margins.Right = 5
-    Margins.Bottom = 5
-    Anchors = [akLeft, akTop, akRight, akBottom]
+    Left = 0
+    Top = 325
+    Width = 900
+    Height = 238
+    Align = alClient
     Font.Charset = ANSI_CHARSET
     Font.Color = clWindowText
     Font.Height = -32
@@ -107,27 +139,7 @@ object Form1: TForm1
     Font.Style = []
     ParentFont = False
     ScrollBars = ssVertical
-    TabOrder = 1
-  end
-  object Button1: TButton
-    Left = 12
-    Top = 246
-    Width = 275
-    Height = 37
-    Margins.Left = 5
-    Margins.Top = 5
-    Margins.Right = 5
-    Margins.Bottom = 5
-    Caption = 'Convert to Bijoy encoding >>'
-    Default = True
-    Font.Charset = DEFAULT_CHARSET
-    Font.Color = clWindowText
-    Font.Height = -17
-    Font.Name = 'Tahoma'
-    Font.Style = [fsBold]
-    ParentFont = False
-    TabOrder = 2
-    OnClick = Button1Click
+    TabOrder = 3
   end
   object PanelFooter: TPanel
     Left = 0
@@ -138,7 +150,7 @@ object Form1: TForm1
     BevelOuter = bvNone
     DoubleBuffered = True
     ParentDoubleBuffered = False
-    TabOrder = 3
+    TabOrder = 4
     object Label4: TLabel
       Left = 12
       Top = 8

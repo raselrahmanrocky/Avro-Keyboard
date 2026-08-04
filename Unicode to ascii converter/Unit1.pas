@@ -39,15 +39,21 @@ type
     Label4: TLabel;
     AppEvents: TApplicationEvents;
     PanelFooter: TPanel;
+    PanelHeader: TPanel;
+    PanelButton: TPanel;
+    Splitter1: TSplitter;
     procedure FormCreate(Sender: TObject);
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
     procedure FormResize(Sender: TObject);
     procedure Button1Click(Sender: TObject);
+    procedure Splitter1Moved(Sender: TObject);
     procedure Label_OmicronLabClick(Sender: TObject);
     procedure AppEventsSettingChange(Sender: TObject; Flag: Integer; const Section: string; var Result: LongInt);
     private
       { Private declarations }
       FUniToBijoy: TUnicodeToBijoy2000;
+      FSplitterRatio: Double;
+      FSplitterUsed: Boolean;
 
       procedure HandleThemes;
     public
@@ -81,8 +87,6 @@ begin
 end;
 
 procedure TForm1.Button1Click(Sender: TObject);
-var
-  i, TotalLines: Integer;
 begin
   MEMO1.Enabled := False;
   MEMO2.Enabled := False;
@@ -92,18 +96,10 @@ begin
   MEMO2.Clear;
   application.ProcessMessages;
 
-  TotalLines := MEMO1.Lines.Count;
-  MEMO2.Lines.BeginUpdate;
-  for i := 0 to TotalLines - 1 do
-  begin
-    MEMO2.Lines.Add(FUniToBijoy.Convert(MEMO1.Lines[i]));
+  MEMO2.Text := FUniToBijoy.Convert(MEMO1.Text);
 
-    Progress.Position := ((i + 1) * 100) div (TotalLines + 1);
-
-    application.ProcessMessages;
-  end;
-  MEMO2.Lines.EndUpdate;
-
+  Progress.Position := 100;
+  application.ProcessMessages;
   Progress.Visible := False;
   MEMO1.Enabled := True;
   MEMO2.Enabled := True;
@@ -124,6 +120,8 @@ end;
 procedure TForm1.FormCreate(Sender: TObject);
 begin
   PanelFooter.DoubleBuffered := True;
+  FSplitterRatio := 0.5;
+  FSplitterUsed := False;
   HandleThemes;
   FUniToBijoy := TUnicodeToBijoy2000.Create;
 end;
@@ -132,17 +130,26 @@ end;
 
 procedure TForm1.FormResize(Sender: TObject);
 var
-  Available, Gap, MemoH: Integer;
+  Available: Integer;
 begin
-  Gap := 8;
-  Available := ClientHeight - PanelFooter.Height - Button1.Height - MEMO1.Top - (Gap * 3);
+  Available := ClientHeight - PanelHeader.Height - PanelButton.Height - PanelFooter.Height - Splitter1.Height;
   if Available < 100 then
     Available := 100;
-  MemoH := Available div 2;
-  MEMO1.Height := MemoH;
-  Button1.Top := MEMO1.Top + MEMO1.Height + Gap;
-  MEMO2.Top := Button1.Top + Button1.Height + Gap;
-  MEMO2.Height := Available - MemoH;
+  MEMO1.Height := Round(Available * FSplitterRatio);
+end;
+
+{ =============================================================================== }
+
+procedure TForm1.Splitter1Moved(Sender: TObject);
+var
+  Available: Integer;
+begin
+  Available := ClientHeight - PanelHeader.Height - PanelButton.Height - PanelFooter.Height - Splitter1.Height;
+  if Available > 0 then
+  begin
+    FSplitterRatio := MEMO1.Height / Available;
+    FSplitterUsed := True;
+  end;
 end;
 
 { =============================================================================== }
