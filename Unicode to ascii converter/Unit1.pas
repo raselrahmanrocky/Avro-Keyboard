@@ -22,6 +22,7 @@ uses
   Forms,
   Dialogs,
   StdCtrls,
+  ExtCtrls,
   clsUnicodeToBijoy2000,
   ComCtrls,
   Vcl.AppEvnts;
@@ -37,6 +38,7 @@ type
     Label_OmicronLab: TLabel;
     Label4: TLabel;
     AppEvents: TApplicationEvents;
+    PanelFooter: TPanel;
     procedure FormCreate(Sender: TObject);
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
     procedure Button1Click(Sender: TObject);
@@ -112,7 +114,6 @@ end;
 procedure TForm1.FormClose(Sender: TObject; var Action: TCloseAction);
 begin
   FUniToBijoy.Free;
-  FUniToBijoy := nil;
   Action := caFree;
   Form1 := nil;
 end;
@@ -121,8 +122,8 @@ end;
 
 procedure TForm1.FormCreate(Sender: TObject);
 begin
+  PanelFooter.DoubleBuffered := True;
   HandleThemes;
-  LoadCurrentActiveMapping;
   FUniToBijoy := TUnicodeToBijoy2000.Create;
 end;
 
