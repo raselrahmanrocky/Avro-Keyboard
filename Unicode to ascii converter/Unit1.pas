@@ -41,6 +41,7 @@ type
     PanelFooter: TPanel;
     procedure FormCreate(Sender: TObject);
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
+    procedure FormResize(Sender: TObject);
     procedure Button1Click(Sender: TObject);
     procedure Label_OmicronLabClick(Sender: TObject);
     procedure AppEventsSettingChange(Sender: TObject; Flag: Integer; const Section: string; var Result: LongInt);
@@ -125,6 +126,23 @@ begin
   PanelFooter.DoubleBuffered := True;
   HandleThemes;
   FUniToBijoy := TUnicodeToBijoy2000.Create;
+end;
+
+{ =============================================================================== }
+
+procedure TForm1.FormResize(Sender: TObject);
+var
+  Available, Gap, MemoH: Integer;
+begin
+  Gap := 8;
+  Available := ClientHeight - PanelFooter.Height - Button1.Height - MEMO1.Top - (Gap * 3);
+  if Available < 100 then
+    Available := 100;
+  MemoH := Available div 2;
+  MEMO1.Height := MemoH;
+  Button1.Top := MEMO1.Top + MEMO1.Height + Gap;
+  MEMO2.Top := Button1.Top + Button1.Height + Gap;
+  MEMO2.Height := Available - MemoH;
 end;
 
 { =============================================================================== }
