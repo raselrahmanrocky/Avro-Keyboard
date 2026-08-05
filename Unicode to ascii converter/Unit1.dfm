@@ -46,6 +46,8 @@ object Form1: TForm1
     0000FFFF0000FFFF0000FFFF0000FFFF000080FF000080FF000081FF000080FE
     0000803800008000000090010000FC030000FF1F0000FFFF0000FFFF0000}
   Position = poScreenCenter
+  Constraints.MinHeight = 346
+  Constraints.MinWidth = 520
   OnClose = FormClose
   OnCreate = FormCreate
   OnResize = FormResize
