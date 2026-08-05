@@ -179,6 +179,16 @@ begin
     DisableAlign; // Stop extra re-aligning during resize
     try
       MEMO1.Height := Round(Available * FSplitterRatio);
+      if MEMO1.Height < 60 then
+      begin
+        MEMO1.Height := 60;
+        FSplitterRatio := MEMO1.Height / Available;
+      end;
+      if Available - MEMO1.Height - Splitter1.Height < 80 then
+      begin
+        MEMO1.Height := Available - 80 - Splitter1.Height;
+        FSplitterRatio := MEMO1.Height / Available;
+      end;
     finally
       EnableAlign;
     end;
@@ -194,7 +204,19 @@ begin
   Available := ClientHeight - PanelHeader.Height - PanelButton.Height
     - PanelFooter.Height - Splitter1.Height;
   if Available > 0 then
+  begin
     FSplitterRatio := MEMO1.Height / Available;
+    if MEMO1.Height < 60 then
+    begin
+      MEMO1.Height := 60;
+      FSplitterRatio := MEMO1.Height / Available;
+    end;
+    if Available - MEMO1.Height - Splitter1.Height < 80 then
+    begin
+      MEMO1.Height := Available - 80 - Splitter1.Height;
+      FSplitterRatio := MEMO1.Height / Available;
+    end;
+  end;
 end;
 
 { =============================================================================== }
