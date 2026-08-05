@@ -50,6 +50,7 @@ object Form1: TForm1
   Constraints.MinWidth = 520
   OnClose = FormClose
   OnCreate = FormCreate
+  PixelsPerInch = 80
   OnResize = FormResize
   TextHeight = 13
   object PanelHeader: TPanel
@@ -71,7 +72,7 @@ object Form1: TForm1
       Caption = 'Type or Paste Unicode Bangla text here:'
     end
   end
-  object MEMO1: TMemo
+  object MEMO1: TJustifiedBox
     Left = 8
     Top = 24
     Width = 649
@@ -87,8 +88,6 @@ object Form1: TForm1
     Font.Height = -13
     Font.Name = 'Siyam Rupali'
     Font.Style = []
-    ParentFont = False
-    ScrollBars = ssVertical
     TabOrder = 1
   end
   object Splitter1: TSplitter
@@ -133,7 +132,7 @@ object Form1: TForm1
       OnClick = Button1Click
     end
   end
-  object MEMO2: TMemo
+  object MEMO2: TJustifiedBox
     Left = 8
     Top = 166
     Width = 649
@@ -149,8 +148,6 @@ object Form1: TForm1
     Font.Height = -21
     Font.Name = 'Kalpurush ANSI'
     Font.Style = []
-    ParentFont = False
-    ScrollBars = ssVertical
     TabOrder = 3
   end
   object PanelFooter: TPanel

@@ -25,12 +25,13 @@ uses
   clsUnicodeToBijoy2000,
   ComCtrls,
   ExtCtrls,
+  uJustifiedBox,
   Vcl.AppEvnts;
 
 type
   TForm1 = class(TForm)
-    MEMO1: TMemo;
-    MEMO2: TMemo;
+    MEMO1: TJustifiedBox;
+    MEMO2: TJustifiedBox;
     Label1: TLabel;
     Button1: TButton;
     Progress: TProgressBar;
