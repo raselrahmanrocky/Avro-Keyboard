@@ -155,7 +155,7 @@ begin
   HandleThemes;
   DoubleBuffered := True;
   
-  // Panel flickering বন্ধ করতে DoubleBuffered অন রাখা
+  // Keep DoubleBuffered on to stop panel flickering
   PanelHeader.DoubleBuffered := True;
   PanelButton.DoubleBuffered := True;
   PanelFooter.DoubleBuffered := True;
@@ -175,7 +175,7 @@ begin
     - PanelFooter.Height - Splitter1.Height;
   if Available > 0 then
   begin
-    DisableAlign; // Resize-এর সময় বাড়তি Re-align থামানোর জন্য
+    DisableAlign; // Stop extra re-aligning during resize
     try
       MEMO1.Height := Round(Available * FSplitterRatio);
     finally
