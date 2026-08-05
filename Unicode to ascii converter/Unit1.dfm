@@ -1,23 +1,19 @@
 object Form1: TForm1
   Left = 0
   Top = 0
-  Margins.Left = 5
-  Margins.Top = 5
-  Margins.Right = 5
-  Margins.Bottom = 5
   Caption = 'Avro Unicode to Bijoy Converter'
-  ClientHeight = 600
-  ClientWidth = 900
+  ClientHeight = 398
+  ClientWidth = 665
   Color = clBtnFace
+  DoubleBuffered = True
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
-  Font.Height = -17
+  Font.Height = -11
   Font.Name = 'Tahoma'
   Font.Style = []
   Icon.Data = {
     0000010001001010000001002000680400001600000028000000100000002000
     0000010020000000000000040000120B0000120B000000000000000000000000
-    0000000000000000000000000000000000000000000000000000000000000000
     0000000000000000000000000000000000000000000000000000000000000000
     0000000000000000000000000000000000000000000000000000000000000000
     0000000000000000000000000000000000000000000000000000000000000000
@@ -50,41 +46,43 @@ object Form1: TForm1
     0000FFFF0000FFFF0000FFFF0000FFFF000080FF000080FF000081FF000080FE
     0000803800008000000090010000FC030000FF1F0000FFFF0000FFFF0000}
   Position = poScreenCenter
-  Constraints.MinHeight = 600
-  Constraints.MinWidth = 900
   OnClose = FormClose
   OnCreate = FormCreate
   OnResize = FormResize
-  PixelsPerInch = 144
-  DesignSize = (
-    900
-    600)
-  TextHeight = 21
+  TextHeight = 13
   object PanelHeader: TPanel
     Left = 0
     Top = 0
-    Width = 900
-    Height = 28
+    Width = 665
+    Height = 24
     Align = alTop
     BevelOuter = bvNone
+    DoubleBuffered = True
+    FullRepaint = False
+    ParentDoubleBuffered = False
     TabOrder = 0
     object Label1: TLabel
-      Left = 12
-      Top = 4
-      Width = 299
-      Height = 21
+      Left = 8
+      Top = 5
+      Width = 195
+      Height = 13
       Caption = 'Type or Paste Unicode Bangla text here:'
     end
   end
   object MEMO1: TMemo
-    Left = 0
-    Top = 28
-    Width = 900
-    Height = 250
+    Left = 8
+    Top = 24
+    Width = 649
+    Height = 105
     Align = alTop
+    AlignWithMargins = True
+    Margins.Left = 8
+    Margins.Top = 0
+    Margins.Right = 8
+    Margins.Bottom = 0
     Font.Charset = ANSI_CHARSET
     Font.Color = clWindowText
-    Font.Height = -20
+    Font.Height = -13
     Font.Name = 'Siyam Rupali'
     Font.Style = []
     ParentFont = False
@@ -92,33 +90,40 @@ object Form1: TForm1
     TabOrder = 1
   end
   object Splitter1: TSplitter
-    Left = 0
-    Top = 278
-    Width = 900
+    Left = 8
+    Top = 129
+    Width = 649
     Height = 5
     Cursor = crVSplit
     Align = alTop
-    OnMoved = Splitter1Moved
-    ExplicitWidth = 864
+    AlignWithMargins = True
+    Margins.Left = 8
+    Margins.Top = 0
+    Margins.Right = 8
+    Margins.Bottom = 0
+    OnMoved = SplitterMoved
   end
   object PanelButton: TPanel
     Left = 0
-    Top = 283
-    Width = 900
-    Height = 42
+    Top = 134
+    Width = 665
+    Height = 32
     Align = alTop
     BevelOuter = bvNone
+    DoubleBuffered = True
+    FullRepaint = False
+    ParentDoubleBuffered = False
     TabOrder = 2
     object Button1: TButton
-      Left = 12
-      Top = 6
-      Width = 275
-      Height = 30
+      Left = 8
+      Top = 3
+      Width = 183
+      Height = 25
       Caption = 'Convert to Bijoy encoding >>'
       Default = True
       Font.Charset = DEFAULT_CHARSET
       Font.Color = clWindowText
-      Font.Height = -17
+      Font.Height = -11
       Font.Name = 'Tahoma'
       Font.Style = [fsBold]
       ParentFont = False
@@ -127,14 +132,19 @@ object Form1: TForm1
     end
   end
   object MEMO2: TMemo
-    Left = 0
-    Top = 325
-    Width = 900
-    Height = 238
+    Left = 8
+    Top = 166
+    Width = 649
+    Height = 207
     Align = alClient
+    AlignWithMargins = True
+    Margins.Left = 8
+    Margins.Top = 0
+    Margins.Right = 8
+    Margins.Bottom = 0
     Font.Charset = ANSI_CHARSET
     Font.Color = clWindowText
-    Font.Height = -32
+    Font.Height = -21
     Font.Name = 'Kalpurush ANSI'
     Font.Style = []
     ParentFont = False
@@ -143,51 +153,49 @@ object Form1: TForm1
   end
   object PanelFooter: TPanel
     Left = 0
-    Top = 563
-    Width = 900
-    Height = 37
+    Top = 373
+    Width = 665
+    Height = 25
     Align = alBottom
     BevelOuter = bvNone
     DoubleBuffered = True
+    FullRepaint = False
     ParentDoubleBuffered = False
     TabOrder = 4
     object Label4: TLabel
-      Left = 12
-      Top = 8
-      Width = 91
-      Height = 21
+      Left = 8
+      Top = 6
+      Width = 60
+      Height = 13
       Caption = 'Copyright '#169
-      Transparent = True
     end
     object Label_OmicronLab: TLabel
-      Left = 108
-      Top = 8
-      Width = 120
-      Height = 20
+      Left = 72
+      Top = 6
+      Width = 81
+      Height = 13
       Cursor = crHandPoint
       Caption = 'OmicronLab.'
       Font.Charset = ANSI_CHARSET
       Font.Color = clBlue
-      Font.Height = -17
+      Font.Height = -11
       Font.Name = 'Verdana'
       Font.Style = [fsBold, fsUnderline]
       ParentFont = False
-      Transparent = True
       OnClick = Label_OmicronLabClick
     end
     object Label8: TLabel
-      Left = 237
-      Top = 8
-      Width = 150
-      Height = 21
+      Left = 158
+      Top = 6
+      Width = 97
+      Height = 13
       Caption = 'All Rights Reserved.'
-      Transparent = True
     end
     object Progress: TProgressBar
-      Left = 464
-      Top = 10
-      Width = 424
-      Height = 19
+      Left = 272
+      Top = 6
+      Width = 383
+      Height = 13
       Anchors = [akLeft, akRight, akTop]
       TabOrder = 0
       Visible = False
@@ -195,7 +203,7 @@ object Form1: TForm1
   end
   object AppEvents: TApplicationEvents
     OnSettingChange = AppEventsSettingChange
-    Left = 756
-    Top = 236
+    Left = 720
+    Top = 192
   end
 end
