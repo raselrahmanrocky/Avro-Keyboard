@@ -28,7 +28,9 @@ uses
   ComCtrls,
   ExtCtrls,
   Vcl.AppEvnts,
-  uRoundedPanel;
+  uRoundedPanel,
+  Math,
+  StrUtils;
 
 type
   // Interceptor class to stop TRichEdit flicker during live resize
@@ -44,10 +46,9 @@ type
     MEMO2Panel: TRoundedPanel;
     Label1: TLabel;
     Button1: TButton;
+    cbAnsiVersion: TComboBox;
     Progress: TProgressBar;
-    Label8: TLabel;
     Label_OmicronLab: TLabel;
-    Label4: TLabel;
     AppEvents: TApplicationEvents;
     PanelHeader: TPanel;
     PanelButton: TPanel;
@@ -63,6 +64,10 @@ type
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
     procedure FormResize(Sender: TObject);
     procedure Button1Click(Sender: TObject);
+    procedure cbAnsiVersionDrawItem(Control: TWinControl; Index: Integer;
+      Rect: TRect; State: TOwnerDrawState);
+    procedure cbAnsiVersionChange(Sender: TObject);
+    procedure FormDestroy(Sender: TObject);
     procedure SplitterMoved(Sender: TObject);
     procedure Label_OmicronLabClick(Sender: TObject);
     procedure AppEventsSettingChange(Sender: TObject; Flag: Integer; const Section: string; var Result: LongInt);
@@ -86,6 +91,7 @@ type
     procedure DrawRoundedFrame(APanel: TPanel; AMemo: TRichEdit);
     function PopupMemo: TRichEdit;
     function CanPasteToMemo: Boolean;
+    procedure PopulateAnsiVersionsCombo;
   protected
     procedure CreateParams(var Params: TCreateParams); override;
   public
@@ -382,11 +388,137 @@ end;
 
 { =============================================================================== }
 
+procedure TForm1.PopulateAnsiVersionsCombo;
+var
+  SR: TSearchRec;
+  FileTitle: string;
+begin
+  cbAnsiVersion.Items.BeginUpdate;
+  try
+    cbAnsiVersion.Items.Clear;
+
+    // Always offer the built-in Default mapping first
+    cbAnsiVersion.Items.Add('Default');
+
+    if DirectoryExists(AnsiMappingDir) then
+      if FindFirst(AnsiMappingDir + '*.json', faAnyFile, SR) = 0 then
+      begin
+        try
+          repeat
+            // Skip directories and the reserved 'Default' name
+            if (SR.Attr and faDirectory <> 0) or SameText(SR.Name, 'Default.json') then
+              Continue;
+
+            FileTitle := ChangeFileExt(SR.Name, '');
+            cbAnsiVersion.Items.Add(FileTitle);
+          until FindNext(SR) <> 0;
+        finally
+          FindClose(SR);
+        end;
+      end;
+  finally
+    cbAnsiVersion.Items.EndUpdate;
+  end;
+end;
+
+{ =============================================================================== }
+
+procedure TForm1.cbAnsiVersionChange(Sender: TObject);
+var
+  VerName, ErrMsg: string;
+begin
+  VerName := cbAnsiVersion.Text;
+  if VerName = '' then
+    Exit;
+
+  if not TrySetAnsiVersion(VerName, ErrMsg) then
+    MessageDlg('Failed to load ANSI mapping: ' + ErrMsg, mtError, [mbOK], 0);
+end;
+
+{ =============================================================================== }
+
+procedure TForm1.cbAnsiVersionDrawItem(Control: TWinControl; Index: Integer;
+  Rect: TRect; State: TOwnerDrawState);
+var
+  Combo: TComboBox;
+  Text: string;
+  BgColor, TextColor, AccentColor: TColor;
+  IsSelected, IsChecked: Boolean;
+  RadioRect: TRect;
+begin
+  Combo := TComboBox(Control);
+  Text := Combo.Items[Index];
+  IsSelected := odSelected in State;
+  IsChecked := SameText(AnsiVersion, Text) or
+              ((AnsiVersion = '') and (Text = 'Default'));
+
+  // ১. ডার্ক/লাইট থিম অনুযায়ী কালার সেটআপ
+  if StyleServices.Enabled then
+  begin
+    if IsSelected then
+      BgColor := StyleServices.GetSystemColor(clHighlight)
+    else
+      BgColor := StyleServices.GetSystemColor(clWindow);
+
+    TextColor := StyleServices.GetSystemColor(
+      IfThen(IsSelected, clHighlightText, clWindowText));
+    AccentColor := StyleServices.GetSystemColor(clHighlight);
+  end
+  else
+  begin
+    if IsSelected then
+      BgColor := $00E67E22 // Modern Accent Color (Blue/Orange)
+    else
+      BgColor := clWindow;
+
+    TextColor := IfThen(IsSelected, clWhite, clBlack);
+    AccentColor := $00E67E22;
+  end;
+
+  // ২. আইটেম ব্যাকগ্রাউন্ড ড্র করা
+  Combo.Canvas.Brush.Color := BgColor;
+  Combo.Canvas.Brush.Style := bsSolid;
+  Combo.Canvas.FillRect(Rect);
+
+  // ৩. রেডিও বাটন সাইন (Circle Indicator) ড্র করা
+  RadioRect := System.Classes.Rect(Rect.Left + 6, Rect.Top + (Rect.Height - 12) div 2,
+                                   Rect.Left + 18, Rect.Top + (Rect.Height + 12) div 2);
+
+  Combo.Canvas.Pen.Color := IfThen(IsSelected, TextColor, clGray);
+  Combo.Canvas.Brush.Style := bsClear;
+  Combo.Canvas.Ellipse(RadioRect); // আউটার সার্কেল
+
+  if IsChecked then
+  begin
+    // ইনার সিলেক্টেড ডট (Radio Dot)
+    InflateRect(RadioRect, -3, -3);
+    Combo.Canvas.Brush.Color := IfThen(IsSelected, TextColor, AccentColor);
+    Combo.Canvas.Brush.Style := bsSolid;
+    Combo.Canvas.Pen.Style := psClear;
+    Combo.Canvas.Ellipse(RadioRect);
+  end;
+
+  // ৪. টেক্সট ড্র করা
+  Combo.Canvas.Brush.Style := bsClear;
+  Combo.Canvas.Font := Combo.Font;
+  Combo.Canvas.Font.Color := TextColor;
+  Combo.Canvas.TextOut(Rect.Left + 26, Rect.Top + (Rect.Height - Combo.Canvas.TextHeight(Text)) div 2, Text);
+end;
+
+{ =============================================================================== }
+
 procedure TForm1.FormClose(Sender: TObject; var Action: TCloseAction);
 begin
   FUniToBijoy.Free;
   Action := caFree;
   Form1 := nil;
+end;
+
+{ =============================================================================== }
+
+procedure TForm1.FormDestroy(Sender: TObject);
+begin
+  // No manual cleanup needed here; cbAnsiVersion is owned by the form.
 end;
 
 { =============================================================================== }
@@ -404,6 +536,15 @@ begin
   FSplitterRatio := MEMO1Panel.Height /
     (ClientHeight - PanelHeader.Height - PanelButton.Height - PanelFooter.Height - Splitter1.Height);
   FUniToBijoy := TUnicodeToBijoy2000.Create;
+
+  AnsiMappingDir := GetAvroDataDir + 'AnsiMapping\';
+  ForceDirectories(AnsiMappingDir);
+  PopulateAnsiVersionsCombo;
+
+  // Sync the combo selection with the current AnsiVersion
+  cbAnsiVersion.ItemIndex := cbAnsiVersion.Items.IndexOf(AnsiVersion);
+  if cbAnsiVersion.ItemIndex < 0 then
+    cbAnsiVersion.ItemIndex := 0;
 
   // DefAttributes is set so that newly pasted/typed text also
   // uses MEMO1 = Siyam Rupali and MEMO2 = Kalpurush ANSI fonts
