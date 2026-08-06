@@ -14,14 +14,19 @@ interface
 uses
   Classes,
   Graphics,
-  ExtCtrls;
+  ExtCtrls,
+  Messages,
+  Controls,
+  Windows;
 
 type
   TRoundedPanel = class(TPanel)
   private
     FOnDraw: TNotifyEvent;
+    procedure WMEraseBkgnd(var Message: TWMEraseBkgnd); message WM_ERASEBKGND;
   protected
     procedure Paint; override;
+    procedure CreateParams(var Params: TCreateParams); override;
   public
     function Surface: TCanvas;
   published
@@ -29,6 +34,23 @@ type
   end;
 
 implementation
+
+{ =============================================================================== }
+
+procedure TRoundedPanel.CreateParams(var Params: TCreateParams);
+begin
+  inherited CreateParams(Params);
+  // Panel must not over-paint its children (RichEdit) during live resize
+  Params.Style := Params.Style or WS_CLIPCHILDREN;
+end;
+
+{ =============================================================================== }
+
+procedure TRoundedPanel.WMEraseBkgnd(var Message: TWMEraseBkgnd);
+begin
+  // Prevent background erasing to stop flicker during resize
+  Message.Result := 1;
+end;
 
 { =============================================================================== }
 
@@ -47,6 +69,6 @@ begin
 end;
 
 initialization
-  RegisterClass(TRoundedPanel);
+  Classes.RegisterClass(TRoundedPanel);
 
 end.
