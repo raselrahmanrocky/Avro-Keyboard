@@ -31,6 +31,12 @@ uses
   uRoundedPanel;
 
 type
+  // Interceptor class to stop TRichEdit flicker during live resize
+  TRichEdit = class(ComCtrls.TRichEdit)
+  private
+    procedure WMEraseBkgnd(var Message: TWMEraseBkgnd); message WM_ERASEBKGND;
+  end;
+
   TForm1 = class(TForm)
     MEMO1: TRichEdit;
     MEMO2: TRichEdit;
@@ -70,18 +76,20 @@ type
     procedure MenuSelectAllClick(Sender: TObject);
     procedure MenuClearClick(Sender: TObject);
     procedure MEMOContextPopup(Sender: TObject; MousePos: TPoint; var Handled: Boolean);
-    private
-      FUniToBijoy: TUnicodeToBijoy2000;
-      FSplitterRatio: Double;
-      FPopupTarget: TRichEdit;
+  private
+    FUniToBijoy: TUnicodeToBijoy2000;
+    FSplitterRatio: Double;
+    FPopupTarget: TRichEdit;
 
-      procedure HandleThemes;
-      procedure MakeTextJustified(RE: TRichEdit);
-      procedure DrawRoundedFrame(APanel: TPanel; AMemo: TRichEdit);
-      function PopupMemo: TRichEdit;
-      function CanPasteToMemo: Boolean;
-    public
-      { Public declarations }
+    procedure HandleThemes;
+    procedure MakeTextJustified(RE: TRichEdit);
+    procedure DrawRoundedFrame(APanel: TPanel; AMemo: TRichEdit);
+    function PopupMemo: TRichEdit;
+    function CanPasteToMemo: Boolean;
+  protected
+    procedure CreateParams(var Params: TCreateParams); override;
+  public
+    { Public declarations }
   end;
 
 var
@@ -96,6 +104,23 @@ uses
   WindowsDarkMode,
   Winapi.RichEdit,
   Themes;
+
+{ =============================================================================== }
+
+procedure TRichEdit.WMEraseBkgnd(var Message: TWMEraseBkgnd);
+begin
+  // Suppress unnecessary background erasing of RichEdit to smooth live resize
+  Message.Result := 1;
+end;
+
+{ =============================================================================== }
+
+procedure TForm1.CreateParams(var Params: TCreateParams);
+begin
+  inherited CreateParams(Params);
+  // Set WS_CLIPCHILDREN on the form so child controls stay smooth while resizing
+  Params.Style := Params.Style or WS_CLIPCHILDREN;
+end;
 
 { =============================================================================== }
 
@@ -331,7 +356,22 @@ begin
     Progress.Position := (P * 100) div (TotalLen + 1);
     application.ProcessMessages;
   end;
+  // Preset the default font for the ANSI preview so that every new
+  // run of text starts in Kalpurush ANSI
+  MEMO2.DefAttributes.Name := MEMO2.Font.Name;
+  MEMO2.DefAttributes.Size := MEMO2.Font.Size;
+  MEMO2.DefAttributes.Charset := MEMO2.Font.Charset;
+
   MEMO2.Text := OutText;
+
+  // Force the selected font (Kalpurush ANSI) over the whole text so that
+  // no part is shown in another font (in its English form)
+  MEMO2.SelectAll;
+  MEMO2.SelAttributes.Name := MEMO2.Font.Name;
+  MEMO2.SelAttributes.Size := MEMO2.Font.Size;
+  MEMO2.SelAttributes.Charset := MEMO2.Font.Charset;
+  MEMO2.SelLength := 0;
+
   MakeTextJustified(MEMO2);
 
   Progress.Visible := False;
@@ -364,6 +404,16 @@ begin
   FSplitterRatio := MEMO1Panel.Height /
     (ClientHeight - PanelHeader.Height - PanelButton.Height - PanelFooter.Height - Splitter1.Height);
   FUniToBijoy := TUnicodeToBijoy2000.Create;
+
+  // DefAttributes is set so that newly pasted/typed text also
+  // uses MEMO1 = Siyam Rupali and MEMO2 = Kalpurush ANSI fonts
+  MEMO1.DefAttributes.Name := MEMO1.Font.Name;
+  MEMO1.DefAttributes.Size := MEMO1.Font.Size;
+  MEMO1.DefAttributes.Charset := MEMO1.Font.Charset;
+  MEMO2.DefAttributes.Name := MEMO2.Font.Name;
+  MEMO2.DefAttributes.Size := MEMO2.Font.Size;
+  MEMO2.DefAttributes.Charset := MEMO2.Font.Charset;
+
   MakeTextJustified(MEMO1);
   MakeTextJustified(MEMO2);
 
@@ -380,27 +430,34 @@ end;
 
 procedure TForm1.FormResize(Sender: TObject);
 var
-  Available: Integer;
+  Available, NewHeight: Integer;
 begin
   Available := ClientHeight - PanelHeader.Height - PanelButton.Height
     - PanelFooter.Height - Splitter1.Height;
   if Available > 0 then
   begin
-    DisableAlign; // Stop extra re-aligning during resize
-    try
-      MEMO1Panel.Height := Round(Available * FSplitterRatio);
-      if MEMO1Panel.Height < 80 then
-      begin
-        MEMO1Panel.Height := 80;
-        FSplitterRatio := MEMO1Panel.Height / Available;
+    NewHeight := Round(Available * FSplitterRatio);
+    if NewHeight < 80 then
+    begin
+      NewHeight := 80;
+      FSplitterRatio := NewHeight / Available;
+    end;
+    if Available - NewHeight - Splitter1.Height < 80 then
+    begin
+      NewHeight := Available - 80 - Splitter1.Height;
+      FSplitterRatio := NewHeight / Available;
+    end;
+
+    // Only re-align when the height actually changes, to avoid needless
+    // re-layout and repainting on every pixel of a resize
+    if MEMO1Panel.Height <> NewHeight then
+    begin
+      DisableAlign; // Stop extra re-aligning during resize
+      try
+        MEMO1Panel.Height := NewHeight;
+      finally
+        EnableAlign;
       end;
-      if Available - MEMO1Panel.Height - Splitter1.Height < 80 then
-      begin
-        MEMO1Panel.Height := Available - 80 - Splitter1.Height;
-        FSplitterRatio := MEMO1Panel.Height / Available;
-      end;
-    finally
-      EnableAlign;
     end;
   end;
 end;
