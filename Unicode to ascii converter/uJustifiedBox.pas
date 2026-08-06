@@ -4,9 +4,10 @@
   Draws multi-line text with full justification (both edges aligned).
   GDI's DrawText has no justification flag and TMemo cannot justify,
   so the text is wrapped and word-spaced manually. The control also
-  supports text selection by mouse drag and Shift+arrows, typing
-  (append at end), Backspace, Enter, Ctrl+V/Ctrl+C/Ctrl+A, a
-  right-click menu, mouse-wheel scrolling and a vertical scroll bar.
+  supports text selection by mouse drag and Shift+arrows, typing at
+  caret position, Backspace, Enter, Ctrl+V/Ctrl+C/Ctrl+A, a
+  right-click menu, mouse-wheel scrolling, a vertical scroll bar
+  and caret blinking like MS Word.
 }
 
 unit uJustifiedBox;
@@ -15,7 +16,7 @@ interface
 
 uses
   Windows, Messages, SysUtils, Math, Classes, Graphics, Controls, Forms,
-  StdCtrls, Clipbrd, Menus, Themes;
+  StdCtrls, Clipbrd, Menus, Themes, ExtCtrls;
 
 type
   TWordItem = record
@@ -45,7 +46,15 @@ type
     FLineH: Integer;
     FAnchorChar: Integer;
     FCaretChar: Integer;
+    FCaretVisible: Boolean;
+    FCaretTimer: TTimer;
     FMouseDown: Boolean;
+    FWordDrag: Boolean;
+    FLastClickTime: Cardinal;
+    FLastClickX, FLastClickY: Integer;
+    procedure SelectWordAt(AChar: Integer);
+    function WordStartAt(AChar: Integer): Integer;
+    function WordEndAt(AChar: Integer): Integer;
     procedure SetFont(Value: TFont);
     procedure SetText(const Value: string);
     function GetTextRect: TRect;
@@ -55,20 +64,25 @@ type
     procedure BuildLayout(AWidth: Integer);
     function MeasureHeight: Integer;
     function CharToX(AChar: Integer; const Line: TLineItem): Integer;
+    function CharAtXOnLine(const Line: TLineItem; AX: Integer): Integer;
     function CharAtPos(X, Y: Integer): Integer;
     function CaretPos(AChar: Integer; out AX, AY: Integer): Boolean;
+    function CaretLineIdx(AChar: Integer): Integer;
     function SelectionText: string;
+    procedure EnsureVisible(LineIdx: Integer);
+    procedure MoveCaretVertically(Dir: Integer; Shift: TShiftState);
     procedure UpdateScrollBar;
     procedure ScrollBarChange(Sender: TObject);
-    procedure Append(const S: string);
+    procedure InsertAtCaret(const S: string);
     procedure DeleteSelection;
-    procedure DeleteLastChar;
+    procedure DeleteAtCaret;
     procedure PasteFromClipboard;
     procedure DrawWordText(X, Y: Integer; const S: string; AColor: TColor);
     procedure MenuPaste(Sender: TObject);
     procedure MenuCopy(Sender: TObject);
     procedure MenuClear(Sender: TObject);
     procedure MenuSelectAll(Sender: TObject);
+    procedure CaretTimer(Sender: TObject);
   protected
     procedure WndProc(var Message: TMessage); override;
     procedure Paint; override;
@@ -104,6 +118,16 @@ const
   BORDER = 6;
   TEXT_PAD = 10;
 
+function IsWordBreak(Ch: Char): Boolean;
+begin
+  case Ch of
+    ' ', #9, #10, #13:
+      Result := True;
+  else
+    Result := False;
+  end;
+end;
+
 constructor TJustifiedBox.Create(AOwner: TComponent);
 var
   MI: TMenuItem;
@@ -113,6 +137,11 @@ begin
   TabStop := True;
   Cursor := crIBeam;
   FFont := TFont.Create;
+
+  FCaretTimer := TTimer.Create(Self);
+  FCaretTimer.Interval := 500;
+  FCaretTimer.OnTimer := CaretTimer;
+  FCaretTimer.Enabled := False;
 
   FScrollBar := TScrollBar.Create(Self);
   FScrollBar.Parent := Self;
@@ -157,8 +186,9 @@ end;
 procedure TJustifiedBox.SetText(const Value: string);
 begin
   FText := Value;
-  FAnchorChar := 0;
   FCaretChar := Length(FText);
+  FAnchorChar := FCaretChar;
+  FScrollPos := 0;
   UpdateScrollBar;
   Invalidate;
 end;
@@ -267,12 +297,12 @@ begin
       LineW := 0;
       LineStart := P - 1;
     end
-    else if FText[P] = ' ' then
+    else if IsWordBreak(FText[P]) then
       Inc(P)
     else
     begin
       WordStart := P;
-      while (P <= Length(FText)) and not CharInSet(FText[P], [' ', #13, #10]) do
+      while (P <= Length(FText)) and not IsWordBreak(FText[P]) do
         Inc(P);
       W := Copy(FText, WordStart, P - WordStart);
       Ww := Canvas.TextWidth(W);
@@ -305,64 +335,167 @@ end;
 
 function TJustifiedBox.CharToX(AChar: Integer; const Line: TLineItem): Integer;
 var
-  I: Integer;
+  I, NumSpaces, SpaceIdx, GapW, PrevEnd: Integer;
 begin
   if Length(Line.Words) = 0 then
     Exit(0);
+
+  if AChar <= Line.Words[0].StartChar then
+    Exit(Line.Words[0].X);
+
   for I := 0 to High(Line.Words) do
   begin
-    if AChar < Line.Words[I].StartChar + Length(Line.Words[I].Text) then
+    if (AChar >= Line.Words[I].StartChar) and
+       (AChar <= Line.Words[I].StartChar + Length(Line.Words[I].Text)) then
     begin
       Result := Line.Words[I].X + Canvas.TextWidth(Copy(Line.Words[I].Text, 1,
-        Max(0, AChar - Line.Words[I].StartChar)));
+        AChar - Line.Words[I].StartChar));
       Exit;
     end;
+
+    if I < High(Line.Words) then
+    begin
+      PrevEnd := Line.Words[I].StartChar + Length(Line.Words[I].Text);
+      if (AChar > PrevEnd) and (AChar < Line.Words[I + 1].StartChar) then
+      begin
+        NumSpaces := Line.Words[I + 1].StartChar - PrevEnd;
+        SpaceIdx := AChar - PrevEnd;
+        GapW := Line.Words[I + 1].X - (Line.Words[I].X + Line.Words[I].Width);
+        Result := (Line.Words[I].X + Line.Words[I].Width) +
+          Round(GapW * (SpaceIdx / NumSpaces));
+        Exit;
+      end;
+    end;
   end;
+
   Result := Line.Words[High(Line.Words)].X + Line.Words[High(Line.Words)].Width;
+end;
+
+function TJustifiedBox.CharAtXOnLine(const Line: TLineItem; AX: Integer): Integer;
+var
+  I, K, CharW, PrevCharW, MidX, GapW, NumSpaces, SpaceIdx: Integer;
+  WItem: TWordItem;
+  PrevEnd: Integer;
+begin
+  if Length(Line.Words) = 0 then
+    Exit(Line.LineStartChar);
+
+  if AX <= Line.Words[0].X then
+    Exit(Line.Words[0].StartChar);
+
+  for I := 0 to High(Line.Words) do
+  begin
+    WItem := Line.Words[I];
+
+    if (AX >= WItem.X) and (AX <= WItem.X + WItem.Width) then
+    begin
+      PrevCharW := 0;
+      for K := 1 to Length(WItem.Text) do
+      begin
+        CharW := Canvas.TextWidth(Copy(WItem.Text, 1, K));
+        MidX := WItem.X + (PrevCharW + CharW) div 2;
+        if AX < MidX then
+          Exit(WItem.StartChar + K - 1);
+        PrevCharW := CharW;
+      end;
+      Exit(WItem.StartChar + Length(WItem.Text));
+    end;
+
+    if I < High(Line.Words) then
+    begin
+      if (AX > WItem.X + WItem.Width) and (AX < Line.Words[I + 1].X) then
+      begin
+        GapW := Line.Words[I + 1].X - (WItem.X + WItem.Width);
+        PrevEnd := WItem.StartChar + Length(WItem.Text);
+        NumSpaces := Line.Words[I + 1].StartChar - PrevEnd;
+        if (GapW > 0) and (NumSpaces > 0) then
+        begin
+          SpaceIdx := Round(((AX - (WItem.X + WItem.Width)) / GapW) * NumSpaces);
+          Exit(PrevEnd + SpaceIdx);
+        end
+        else
+          Exit(PrevEnd);
+      end;
+    end;
+  end;
+
+  Exit(Line.Words[High(Line.Words)].StartChar + Length(Line.Words[High(Line.Words)].Text));
 end;
 
 function TJustifiedBox.CharAtPos(X, Y: Integer): Integer;
 var
   R: TRect;
-  ContentX, ContentY, LineIdx, W: Integer;
-  WItem: TWordItem;
-  I: Integer;
+  ContentX, ContentY, LineIdx, W, Res: Integer;
 begin
-  Result := Length(FText);
   R := GetDrawRect;
   W := R.Right - R.Left;
   if (Length(FLayout) = 0) or (FLayoutWidth <> W) then
     BuildLayout(W);
+
+  if Length(FLayout) = 0 then
+    Exit(0);
+
   ContentX := X - R.Left;
   ContentY := Y - R.Top + FScrollPos;
-  if ContentY <= 0 then
-    Exit(0);
-  if ContentY >= FLayoutHeight then
-    Exit(Length(FText));
-  LineIdx := ContentY div FLineH;
-  if LineIdx > High(FLayout) then
-    Exit(Length(FText));
-  with FLayout[LineIdx] do
+
+  if ContentY < 0 then
+    LineIdx := 0
+  else if ContentY >= FLayoutHeight then
+    LineIdx := High(FLayout)
+  else
   begin
-    if Length(Words) = 0 then
-      Exit(LineStartChar);
-    if ContentX < Words[0].X then
-      Exit(Words[0].StartChar);
-    for I := 0 to High(Words) do
-    begin
-      WItem := Words[I];
-      if ContentX <= WItem.X + WItem.Width then
-      begin
-        Result := WItem.StartChar;
-        while (Result - WItem.StartChar < Length(WItem.Text)) and
-          (Canvas.TextWidth(Copy(WItem.Text, 1, Result - WItem.StartChar + 1)) <
-           ContentX - WItem.X) do
-          Inc(Result);
-        Exit;
-      end;
-    end;
-    Exit(Words[High(Words)].StartChar + Length(Words[High(Words)].Text));
+    LineIdx := 0;
+    while (LineIdx < High(FLayout)) and (FLayout[LineIdx + 1].Y <= ContentY) do
+      Inc(LineIdx);
   end;
+
+  Res := CharAtXOnLine(FLayout[LineIdx], ContentX);
+  Result := Res;
+end;
+
+procedure TJustifiedBox.EnsureVisible(LineIdx: Integer);
+var
+  Y, DrawH: Integer;
+begin
+  if (LineIdx < 0) or (LineIdx > High(FLayout)) then
+    Exit;
+  Y := FLayout[LineIdx].Y;
+  DrawH := GetDrawRect.Bottom - GetDrawRect.Top;
+  if Y < FScrollPos then
+    FScrollPos := Y
+  else if Y + FLineH > FScrollPos + DrawH then
+    FScrollPos := Y + FLineH - DrawH;
+  UpdateScrollBar;
+end;
+
+procedure TJustifiedBox.MoveCaretVertically(Dir: Integer; Shift: TShiftState);
+var
+  C, LineIdx, X, NewCaret, I: Integer;
+begin
+  C := FCaretChar;
+  if C < 0 then
+    C := 0;
+  if C > Length(FText) then
+    C := Length(FText);
+  LineIdx := -1;
+  for I := High(FLayout) downto 0 do
+    if FLayout[I].LineStartChar <= C then
+    begin
+      LineIdx := I;
+      Break;
+    end;
+  if LineIdx < 0 then
+    Exit;
+  X := CharToX(C, FLayout[LineIdx]);
+  Inc(LineIdx, Dir);
+  if (LineIdx < 0) or (LineIdx > High(FLayout)) then
+    Exit;
+  NewCaret := CharAtXOnLine(FLayout[LineIdx], X);
+  FCaretChar := NewCaret;
+  if not (ssShift in Shift) then
+    FAnchorChar := NewCaret;
+  EnsureVisible(LineIdx);
+  Invalidate;
 end;
 
 function TJustifiedBox.CaretPos(AChar: Integer; out AX, AY: Integer): Boolean;
@@ -385,6 +518,23 @@ begin
   end;
   AX := 0;
   AY := 0;
+end;
+
+function TJustifiedBox.CaretLineIdx(AChar: Integer): Integer;
+var
+  I: Integer;
+begin
+  Result := 0;
+  if AChar < 0 then
+    Exit(0);
+  if Length(FLayout) = 0 then
+    Exit(0);
+
+  for I := High(FLayout) downto 0 do
+  begin
+    if AChar >= FLayout[I].LineStartChar then
+      Exit(I);
+  end;
 end;
 
 function TJustifiedBox.SelectionText: string;
@@ -447,16 +597,22 @@ begin
   Invalidate;
 end;
 
-procedure TJustifiedBox.Append(const S: string);
+procedure TJustifiedBox.InsertAtCaret(const S: string);
+var
+  Pos: Integer;
 begin
   if S = '' then
     Exit;
   if Min(FAnchorChar, FCaretChar) < Max(FAnchorChar, FCaretChar) then
     DeleteSelection;
-  FText := FText + S;
-  FAnchorChar := Length(FText);
-  FCaretChar := Length(FText);
-  FScrollPos := MaxInt;
+  Pos := FCaretChar;
+  if Pos < 0 then
+    Pos := 0;
+  if Pos > Length(FText) then
+    Pos := Length(FText);
+  Insert(S, FText, Pos + 1);
+  FAnchorChar := Pos + Length(S);
+  FCaretChar := Pos + Length(S);
   UpdateScrollBar;
   Invalidate;
 end;
@@ -477,16 +633,30 @@ begin
   end;
 end;
 
-procedure TJustifiedBox.DeleteLastChar;
+procedure TJustifiedBox.DeleteAtCaret;
+var
+  Pos: Integer;
 begin
-  if FText = '' then
+  if Min(FAnchorChar, FCaretChar) < Max(FAnchorChar, FCaretChar) then
+  begin
+    DeleteSelection;
     Exit;
-  if (Length(FText) >= 2) and (FText[Length(FText) - 1] = #13) and (FText[Length(FText)] = #10) then
-    Delete(FText, Length(FText) - 1, 2)
+  end;
+  Pos := FCaretChar;
+  if Pos <= 0 then
+    Exit;
+  if (Pos >= 2) and (FText[Pos] = #10) and (FText[Pos - 1] = #13) then
+  begin
+    Delete(FText, Pos - 1, 2);
+    FAnchorChar := Pos - 2;
+    FCaretChar := Pos - 2;
+  end
   else
-    Delete(FText, Length(FText), 1);
-  FAnchorChar := Length(FText);
-  FCaretChar := Length(FText);
+  begin
+    Delete(FText, Pos, 1);
+    FAnchorChar := Pos - 1;
+    FCaretChar := Pos - 1;
+  end;
   UpdateScrollBar;
   Invalidate;
 end;
@@ -498,7 +668,7 @@ begin
   S := Clipboard.AsText;
   if S = '' then
     Exit;
-  Append(S);
+  InsertAtCaret(S);
 end;
 
 procedure TJustifiedBox.DrawWordText(X, Y: Integer; const S: string; AColor: TColor);
@@ -612,13 +782,10 @@ begin
       else
         X := CharToX(S2, Line);
       SelR.Right := R.Left + X;
-      if SelR.Right > SelR.Left then
-      begin
-        SelR.Top := py;
-        SelR.Bottom := py + FLineH;
-        Canvas.Brush.Color := SelBg;
-        Canvas.FillRect(SelR);
-      end;
+      SelR.Top := py;
+      SelR.Bottom := py + FLineH;
+      Canvas.Brush.Color := SelBg;
+      Canvas.FillRect(SelR);
     end;
 
     for J := 0 to High(Line.Words) do
@@ -634,19 +801,19 @@ begin
       else
       begin
         preLen := selFrom - wS;
-        selLen := selTo - wS;
+        selLen := selTo - selFrom;
         if preLen > 0 then
           DrawWordText(X, py, Copy(WItem.Text, 1, preLen), Fg);
         X := X + Canvas.TextWidth(Copy(WItem.Text, 1, preLen));
         DrawWordText(X, py, Copy(WItem.Text, preLen + 1, selLen), SelFg);
         X := X + Canvas.TextWidth(Copy(WItem.Text, preLen + 1, selLen));
-        if selLen < Length(WItem.Text) then
-          DrawWordText(X, py, Copy(WItem.Text, selLen + 1, Length(WItem.Text) - selLen), Fg);
+        if preLen + selLen < Length(WItem.Text) then
+          DrawWordText(X, py, Copy(WItem.Text, preLen + selLen + 1, Length(WItem.Text) - preLen - selLen), Fg);
       end;
     end;
   end;
 
-  if Focused and CaretPos(FCaretChar, px, py) then
+  if Focused and FCaretVisible and CaretPos(FCaretChar, px, py) then
   begin
     Canvas.Pen.Style := psSolid;
     Canvas.Pen.Color := Fg;
@@ -678,8 +845,11 @@ procedure TJustifiedBox.KeyDown(var Key: Word; Shift: TShiftState);
 var
   Wnd: HWND;
   S: string;
+  Pos: Integer;
 begin
   inherited KeyDown(Key, Shift);
+  FCaretTimer.Enabled := True;
+  FCaretVisible := True;
   if (Key <> 0) and (ssCtrl in Shift) then
   begin
     case Key of
@@ -708,16 +878,26 @@ begin
   case Key of
     VK_BACK:
       begin
-        if Min(FAnchorChar, FCaretChar) < Max(FAnchorChar, FCaretChar) then
-          DeleteSelection
-        else
-          DeleteLastChar;
+        DeleteAtCaret;
         Key := 0;
       end;
     VK_DELETE:
       begin
         if Min(FAnchorChar, FCaretChar) < Max(FAnchorChar, FCaretChar) then
-          DeleteSelection;
+          DeleteSelection
+        else
+        begin
+          Pos := FCaretChar;
+          if (Pos >= 0) and (Pos < Length(FText)) then
+          begin
+            if (Pos + 1 < Length(FText)) and (FText[Pos + 1] = #13) and (FText[Pos + 2] = #10) then
+              Delete(FText, Pos + 1, 2)
+            else
+              Delete(FText, Pos + 1, 1);
+            UpdateScrollBar;
+            Invalidate;
+          end;
+        end;
         Key := 0;
       end;
     VK_LEFT:
@@ -726,6 +906,7 @@ begin
           Dec(FCaretChar);
         if not (ssShift in Shift) then
           FAnchorChar := FCaretChar;
+        EnsureVisible(CaretLineIdx(FCaretChar));
         Invalidate;
         Key := 0;
       end;
@@ -735,6 +916,7 @@ begin
           Inc(FCaretChar);
         if not (ssShift in Shift) then
           FAnchorChar := FCaretChar;
+        EnsureVisible(CaretLineIdx(FCaretChar));
         Invalidate;
         Key := 0;
       end;
@@ -743,6 +925,7 @@ begin
         FCaretChar := 0;
         if not (ssShift in Shift) then
           FAnchorChar := 0;
+        EnsureVisible(CaretLineIdx(FCaretChar));
         Invalidate;
         Key := 0;
       end;
@@ -751,12 +934,13 @@ begin
         FCaretChar := Length(FText);
         if not (ssShift in Shift) then
           FAnchorChar := Length(FText);
+        EnsureVisible(CaretLineIdx(FCaretChar));
         Invalidate;
         Key := 0;
       end;
     VK_RETURN:
       begin
-        Append(#13#10);
+        InsertAtCaret(#13#10);
         Key := 0;
       end;
     VK_TAB:
@@ -768,14 +952,16 @@ begin
       end;
     VK_UP:
       begin
-        FScrollPos := FScrollPos - FScrollBar.SmallChange;
-        UpdateScrollBar;
+        MoveCaretVertically(-1, Shift);
+        EnsureVisible(CaretLineIdx(FCaretChar));
+        Invalidate;
         Key := 0;
       end;
     VK_DOWN:
       begin
-        FScrollPos := FScrollPos + FScrollBar.SmallChange;
-        UpdateScrollBar;
+        MoveCaretVertically(1, Shift);
+        EnsureVisible(CaretLineIdx(FCaretChar));
+        Invalidate;
         Key := 0;
       end;
     VK_PRIOR:
@@ -800,27 +986,113 @@ begin
     Key := #0
   else
   begin
-    Append(Key);
+    InsertAtCaret(Key);
+    FCaretTimer.Enabled := True;
+    FCaretVisible := True;
     Key := #0;
   end;
 end;
 
 procedure TJustifiedBox.MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+var
+  IsDblClick: Boolean;
 begin
   inherited MouseDown(Button, Shift, X, Y);
   if Button = mbLeft then
   begin
     SetFocus;
     BuildLayout(GetDrawRect.Right - GetDrawRect.Left);
+    IsDblClick := (GetTickCount - FLastClickTime <= GetDoubleClickTime) and
+      (Abs(X - FLastClickX) <= GetSystemMetrics(SM_CXDOUBLECLK)) and
+      (Abs(Y - FLastClickY) <= GetSystemMetrics(SM_CYDOUBLECLK));
+    FLastClickTime := GetTickCount;
+    FLastClickX := X;
+    FLastClickY := Y;
     FAnchorChar := CharAtPos(X, Y);
-    FCaretChar := FAnchorChar;
+    if IsDblClick then
+    begin
+      SelectWordAt(FAnchorChar);
+      FWordDrag := True;
+    end
+    else
+    begin
+      FCaretChar := FAnchorChar;
+      FWordDrag := False;
+    end;
     FMouseDown := True;
+    FCaretTimer.Enabled := True;
+    FCaretVisible := True;
     Windows.SetCapture(Handle);
     Invalidate;
   end;
 end;
 
+procedure TJustifiedBox.SelectWordAt(AChar: Integer);
+var
+  S, E: Integer;
+begin
+  if Length(FText) = 0 then
+  begin
+    FAnchorChar := 0;
+    FCaretChar := 0;
+    Exit;
+  end;
+  if AChar < 0 then
+    AChar := 0;
+  if AChar > Length(FText) then
+    AChar := Length(FText);
+
+  if (AChar < Length(FText)) and (FText[AChar + 1] > ' ') and
+     not CharInSet(FText[AChar + 1], [#13, #10]) then
+  begin
+    S := AChar;
+    while (S > 0) and (FText[S + 1] > ' ') and not CharInSet(FText[S + 1], [#13, #10]) do
+      Dec(S);
+    E := AChar;
+    while (E < Length(FText)) and (FText[E + 1] > ' ') and not CharInSet(FText[E + 1], [#13, #10]) do
+      Inc(E);
+  end
+  else
+  begin
+    E := AChar;
+    while (E > 0) and ((FText[E + 1] <= ' ') or CharInSet(FText[E + 1], [#13, #10])) do
+      Dec(E);
+    S := E;
+    while (S > 0) and (FText[S + 1] > ' ') and not CharInSet(FText[S + 1], [#13, #10]) do
+      Dec(S);
+  end;
+
+  FAnchorChar := S;
+  FCaretChar := E;
+end;
+
+function TJustifiedBox.WordStartAt(AChar: Integer): Integer;
+begin
+  if AChar < 0 then
+    AChar := 0;
+  if AChar > Length(FText) then
+    AChar := Length(FText);
+  while (AChar > 0) and (FText[AChar] > ' ') and not CharInSet(FText[AChar], [#13, #10]) do
+    Dec(AChar);
+  Result := AChar;
+end;
+
+function TJustifiedBox.WordEndAt(AChar: Integer): Integer;
+begin
+  if AChar < 0 then
+    AChar := 0;
+  if AChar > Length(FText) then
+    AChar := Length(FText);
+  while (AChar < Length(FText)) and ((FText[AChar + 1] <= ' ') or CharInSet(FText[AChar + 1], [#13, #10])) do
+    Inc(AChar);
+  while (AChar < Length(FText)) and (FText[AChar + 1] > ' ') and not CharInSet(FText[AChar + 1], [#13, #10]) do
+    Inc(AChar);
+  Result := AChar;
+end;
+
 procedure TJustifiedBox.MouseMove(Shift: TShiftState; X, Y: Integer);
+var
+  C: Integer;
 begin
   inherited MouseMove(Shift, X, Y);
   if FMouseDown then
@@ -835,7 +1107,20 @@ begin
       FScrollPos := FScrollPos + 16;
       UpdateScrollBar;
     end;
-    FCaretChar := CharAtPos(X, Y);
+    if Y < 0 then
+      Y := 0
+    else if Y > ClientHeight then
+      Y := ClientHeight;
+    C := CharAtPos(X, Y);
+    if FWordDrag then
+    begin
+      if C >= FAnchorChar then
+        FCaretChar := WordEndAt(C)
+      else
+        FCaretChar := WordStartAt(C);
+    end
+    else
+      FCaretChar := C;
     Invalidate;
   end;
 end;
@@ -846,6 +1131,7 @@ begin
   if Button = mbLeft then
   begin
     FMouseDown := False;
+    FWordDrag := False;
     Windows.ReleaseCapture;
     Invalidate;
   end;
@@ -854,12 +1140,22 @@ end;
 procedure TJustifiedBox.DoEnter;
 begin
   inherited DoEnter;
+  FCaretVisible := True;
+  FCaretTimer.Enabled := True;
   Invalidate;
 end;
 
 procedure TJustifiedBox.DoExit;
 begin
   inherited DoExit;
+  FCaretTimer.Enabled := False;
+  FCaretVisible := False;
+  Invalidate;
+end;
+
+procedure TJustifiedBox.CaretTimer(Sender: TObject);
+begin
+  FCaretVisible := not FCaretVisible;
   Invalidate;
 end;
 

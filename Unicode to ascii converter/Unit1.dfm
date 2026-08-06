@@ -72,23 +72,47 @@ object Form1: TForm1
       Caption = 'Type or Paste Unicode Bangla text here:'
     end
   end
-  object MEMO1: TJustifiedBox
+  object MEMO1Panel: TRoundedPanel
     Left = 8
     Top = 24
     Width = 649
-    Height = 105
+    Height = 125
     Align = alTop
     AlignWithMargins = True
     Margins.Left = 8
     Margins.Top = 0
     Margins.Right = 8
     Margins.Bottom = 0
-    Font.Charset = ANSI_CHARSET
-    Font.Color = clWindowText
-    Font.Height = -13
-    Font.Name = 'Siyam Rupali'
-    Font.Style = []
+    BevelOuter = bvNone
+    DoubleBuffered = True
+    FullRepaint = True
+    ParentDoubleBuffered = False
     TabOrder = 1
+    OnDraw = MemoPanelPaint
+    OnMouseDown = MemoPanelMouseDown
+    object MEMO1: TRichEdit
+      Left = 10
+      Top = 10
+      Width = 629
+      Height = 105
+      Align = alClient
+      AlignWithMargins = True
+      Margins.Left = 10
+      Margins.Top = 10
+      Margins.Right = 10
+      Margins.Bottom = 10
+      BorderStyle = bsNone
+      Font.Charset = ANSI_CHARSET
+      Font.Color = clWindowText
+      Font.Height = -13
+      Font.Name = 'Siyam Rupali'
+      Font.Style = []
+      ParentFont = False
+      ScrollBars = ssVertical
+      TabOrder = 0
+      OnEnter = MemoFocusChanged
+      OnExit = MemoFocusChanged
+    end
   end
   object Splitter1: TSplitter
     Left = 8
@@ -132,7 +156,7 @@ object Form1: TForm1
       OnClick = Button1Click
     end
   end
-  object MEMO2: TJustifiedBox
+  object MEMO2Panel: TRoundedPanel
     Left = 8
     Top = 166
     Width = 649
@@ -143,12 +167,36 @@ object Form1: TForm1
     Margins.Top = 0
     Margins.Right = 8
     Margins.Bottom = 0
-    Font.Charset = ANSI_CHARSET
-    Font.Color = clWindowText
-    Font.Height = -21
-    Font.Name = 'Kalpurush ANSI'
-    Font.Style = []
+    BevelOuter = bvNone
+    DoubleBuffered = True
+    FullRepaint = True
+    ParentDoubleBuffered = False
     TabOrder = 3
+    OnDraw = MemoPanelPaint
+    OnMouseDown = MemoPanelMouseDown
+    object MEMO2: TRichEdit
+      Left = 10
+      Top = 10
+      Width = 629
+      Height = 187
+      Align = alClient
+      AlignWithMargins = True
+      Margins.Left = 10
+      Margins.Top = 10
+      Margins.Right = 10
+      Margins.Bottom = 10
+      BorderStyle = bsNone
+      Font.Charset = ANSI_CHARSET
+      Font.Color = clWindowText
+      Font.Height = -21
+      Font.Name = 'Kalpurush ANSI'
+      Font.Style = []
+      ParentFont = False
+      ScrollBars = ssVertical
+      TabOrder = 0
+      OnEnter = MemoFocusChanged
+      OnExit = MemoFocusChanged
+    end
   end
   object PanelFooter: TPanel
     Left = 0
@@ -204,5 +252,33 @@ object Form1: TForm1
     OnSettingChange = AppEventsSettingChange
     Left = 720
     Top = 192
+  end
+  object PopupMenu1: TPopupMenu
+    Left = 664
+    Top = 192
+    OnPopup = PopupMenu1Popup
+    object Cut1: TMenuItem
+      Caption = 'Cut'
+      OnClick = MenuCutClick
+    end
+    object Copy1: TMenuItem
+      Caption = 'Copy'
+      OnClick = MenuCopyClick
+    end
+    object Paste1: TMenuItem
+      Caption = 'Paste'
+      OnClick = MenuPasteClick
+    end
+    object N1: TMenuItem
+      Caption = '-'
+    end
+    object SelectAll1: TMenuItem
+      Caption = 'Select All'
+      OnClick = MenuSelectAllClick
+    end
+    object Clear1: TMenuItem
+      Caption = 'Clear'
+      OnClick = MenuClearClick
+    end
   end
 end
