@@ -366,6 +366,10 @@ begin
   FUniToBijoy := TUnicodeToBijoy2000.Create;
   MakeTextJustified(MEMO1);
   MakeTextJustified(MEMO2);
+
+  // Add internal text padding so text doesn't touch the scrollbar or border
+  SendMessage(MEMO1.Handle, EM_SETMARGINS, EC_LEFTMARGIN or EC_RIGHTMARGIN, MakeLParam(6, 6));
+  SendMessage(MEMO2.Handle, EM_SETMARGINS, EC_LEFTMARGIN or EC_RIGHTMARGIN, MakeLParam(6, 6));
   MEMO1.PopupMenu := PopupMenu1;
   MEMO2.PopupMenu := PopupMenu1;
   MEMO1.OnContextPopup := MEMOContextPopup;
