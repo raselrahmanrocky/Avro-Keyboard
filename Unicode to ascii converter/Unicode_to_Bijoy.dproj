@@ -136,6 +136,7 @@
         <DCCReference Include="Unit1.pas">
             <Form>Form1</Form>
         </DCCReference>
+        <DCCReference Include="uRoundedPanel.pas"/>
         <DCCReference Include="clsUnicodeToBijoy2000.pas"/>
         <DCCReference Include="..\Keyboard and Spell checker\Units\BanglaChars.pas"/>
         <DCCReference Include="..\Keyboard and Spell checker\Units\uFileFolderHandling.pas"/>

@@ -27,20 +27,10 @@ uses
   clsUnicodeToBijoy2000,
   ComCtrls,
   ExtCtrls,
-  Vcl.AppEvnts;
+  Vcl.AppEvnts,
+  uRoundedPanel;
 
 type
-  TRoundedPanel = class(TPanel)
-  private
-    FOnDraw: TNotifyEvent;
-  protected
-    procedure Paint; override;
-  public
-    function Surface: TCanvas;
-  published
-    property OnDraw: TNotifyEvent read FOnDraw write FOnDraw;
-  end;
-
   TForm1 = class(TForm)
     MEMO1: TRichEdit;
     MEMO2: TRichEdit;
@@ -106,22 +96,6 @@ uses
   WindowsDarkMode,
   Winapi.RichEdit,
   Themes;
-
-{ =============================================================================== }
-
-procedure TRoundedPanel.Paint;
-begin
-  inherited Paint;
-  if Assigned(FOnDraw) then
-    FOnDraw(Self);
-end;
-
-{ =============================================================================== }
-
-function TRoundedPanel.Surface: TCanvas;
-begin
-  Result := Canvas;
-end;
 
 { =============================================================================== }
 
@@ -459,8 +433,5 @@ begin
 end;
 
 { =============================================================================== }
-
-initialization
-  RegisterClass(TRoundedPanel);
 
 end.
