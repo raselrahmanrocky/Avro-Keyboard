@@ -60,6 +60,7 @@ type
       procedure Consonants;
       procedure FinalTouch;
       procedure DeNormalize;
+      procedure ReplaceNumbers;
 
       // Utility Functions
       function BaseLineRightCharacter(const wC: string): Boolean;
@@ -1027,6 +1028,7 @@ begin
 
   // Clean start
   DeNormalize;
+  ReplaceNumbers;
 
   // 3. Rearrange Vowels and Reph
   ReArrangeKars;
@@ -1222,6 +1224,22 @@ end;
 
 { =============================================================================== }
 
+procedure TUnicodeToBijoy2000.ReplaceNumbers;
+begin
+  fConvertedText := ReplaceStr(fConvertedText, b_0, A_0);
+  fConvertedText := ReplaceStr(fConvertedText, b_1, A_1);
+  fConvertedText := ReplaceStr(fConvertedText, b_2, A_2);
+  fConvertedText := ReplaceStr(fConvertedText, b_3, A_3);
+  fConvertedText := ReplaceStr(fConvertedText, b_4, A_4);
+  fConvertedText := ReplaceStr(fConvertedText, b_5, A_5);
+  fConvertedText := ReplaceStr(fConvertedText, b_6, A_6);
+  fConvertedText := ReplaceStr(fConvertedText, b_7, A_7);
+  fConvertedText := ReplaceStr(fConvertedText, b_8, A_8);
+  fConvertedText := ReplaceStr(fConvertedText, b_9, A_9);
+end;
+
+{ =============================================================================== }
+
 procedure TUnicodeToBijoy2000.ReArrangeKars;
 var
   I:           Integer;
@@ -1301,10 +1319,6 @@ begin
   if fKar <> #0 then wSTmp := fKar + wSTmp;
 
   fConvertedText := wSTmp;
-  //fConvertedText := ReplaceStr(fConvertedText, string(b_StartSingleQuote), A_StartSingleQuote);
-  //fConvertedText := ReplaceStr(fConvertedText, string(b_EndSingleQuote), A_EndSingleQuote);
-  //fConvertedText := ReplaceStr(fConvertedText, string(b_StartDoubleQuote), A_StartDoubleQuote);
-  //fConvertedText := ReplaceStr(fConvertedText, string(b_EndDoubleQuote), A_EndDoubleQuote);
 end;
 
 { =============================================================================== }

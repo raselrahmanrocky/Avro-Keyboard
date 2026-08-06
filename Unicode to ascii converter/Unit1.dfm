@@ -53,6 +53,7 @@ object Form1: TForm1
   Constraints.MinWidth = 520
   OnClose = FormClose
   OnCreate = FormCreate
+  OnDestroy = FormDestroy
   PixelsPerInch = 80
   OnResize = FormResize
   TextHeight = 13
@@ -143,11 +144,11 @@ object Form1: TForm1
     ParentDoubleBuffered = False
     TabOrder = 2
     object Button1: TButton
-      Left = 8
+      Left = 20
       Top = 3
-      Width = 183
+      Width = 100
       Height = 25
-      Caption = 'Convert to Bijoy encoding >>'
+      Caption = 'Convert'
       Default = True
       Font.Charset = DEFAULT_CHARSET
       Font.Color = clWindowText
@@ -157,6 +158,17 @@ object Form1: TForm1
       ParentFont = False
       TabOrder = 0
       OnClick = Button1Click
+    end
+    object cbAnsiVersion: TComboBox
+      Left = 197
+      Top = 3
+      Width = 160
+      Height = 25
+      Style = csOwnerDrawFixed
+      ItemHeight = 22
+      TabOrder = 1
+      OnDrawItem = cbAnsiVersionDrawItem
+      OnChange = cbAnsiVersionChange
     end
   end
   object MEMO2Panel: TRoundedPanel
@@ -212,39 +224,11 @@ object Form1: TForm1
     FullRepaint = False
     ParentDoubleBuffered = False
     TabOrder = 4
-    object Label4: TLabel
-      Left = 8
-      Top = 6
-      Width = 60
-      Height = 13
-      Caption = 'Copyright '#169
-    end
-    object Label_OmicronLab: TLabel
-      Left = 72
-      Top = 6
-      Width = 81
-      Height = 13
-      Cursor = crHandPoint
-      Caption = 'OmicronLab.'
-      Font.Charset = ANSI_CHARSET
-      Font.Color = clBlue
-      Font.Height = -11
-      Font.Name = 'Verdana'
-      Font.Style = [fsBold, fsUnderline]
-      ParentFont = False
-      OnClick = Label_OmicronLabClick
-    end
-    object Label8: TLabel
-      Left = 158
-      Top = 6
-      Width = 97
-      Height = 13
-      Caption = 'All Rights Reserved.'
-    end
+
     object Progress: TProgressBar
-      Left = 272
+      Left = 12
       Top = 6
-      Width = 383
+      Width = 645
       Height = 13
       Anchors = [akLeft, akRight, akTop]
       TabOrder = 0
