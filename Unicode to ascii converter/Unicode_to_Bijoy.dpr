@@ -13,6 +13,7 @@ uses
   Unit1 in 'Unit1.pas' {Form1} ,
   uRoundedPanel in 'uRoundedPanel.pas',
   clsUnicodeToBijoy2000 in 'clsUnicodeToBijoy2000.pas',
+  clsBijoy2000ToUnicode in 'clsBijoy2000ToUnicode.pas',
   BanglaChars in '..\Keyboard and Spell checker\Units\BanglaChars.pas',
   uFileFolderHandling in '..\Keyboard and Spell checker\Units\uFileFolderHandling.pas',
   WindowsDarkMode in '..\Keyboard and Spell checker\Units\WindowsDarkMode.pas',

@@ -1,4 +1,4 @@
-{
+﻿{
   =============================================================================
   This Source Code Form is subject to the terms of the Mozilla Public
   License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -25,6 +25,7 @@ uses
   Clipbrd,
   StdCtrls,
   clsUnicodeToBijoy2000,
+  clsBijoy2000ToUnicode,
   ComCtrls,
   ExtCtrls,
   Vcl.AppEvnts,
@@ -39,6 +40,28 @@ type
     procedure WMEraseBkgnd(var Message: TWMEraseBkgnd); message WM_ERASEBKGND;
   end;
 
+  // Fully custom-painted drop-down used to pick the ANSI mapping version.
+  // The face (rounded border, Bangla glyph bullet, chevron arrow and live
+  // hover / press / focus states) is drawn from scratch in PaintFace so it
+  // matches the rounded-panel look of the rest of the form.
+  TAnsiVersionCombo = class(StdCtrls.TComboBox)
+  private
+    FHovered: Boolean;
+    FPressed: Boolean;
+    FActive: Boolean;  // drop-down list is open
+    procedure CMMouseEnter(var Message: TMessage); message CM_MOUSEENTER;
+    procedure CMMouseLeave(var Message: TMessage); message CM_MOUSELEAVE;
+    procedure WMLButtonDown(var Message: TWMLButtonDown); message WM_LBUTTONDOWN;
+    procedure WMLButtonUp(var Message: TWMLButtonUp); message WM_LBUTTONUP;
+    procedure WMSetFocus(var Message: TWMSetFocus); message WM_SETFOCUS;
+    procedure WMKillFocus(var Message: TWMKillFocus); message WM_KILLFOCUS;
+    procedure WMPaint(var Message: TWMPaint); message WM_PAINT;
+    procedure WMEraseBkgnd(var Message: TWMEraseBkgnd); message WM_ERASEBKGND;
+    procedure PaintFace(DC: HDC);
+  public
+    procedure SetDropDownActive(const Value: Boolean);
+  end;
+
   TForm1 = class(TForm)
     MEMO1: TRichEdit;
     MEMO2: TRichEdit;
@@ -46,7 +69,9 @@ type
     MEMO2Panel: TRoundedPanel;
     Label1: TLabel;
     Button1: TButton;
-    cbAnsiVersion: TComboBox;
+    Button2: TButton;
+    LabelAnsi: TLabel;
+    cbAnsiVersion: TAnsiVersionCombo;
     Progress: TProgressBar;
     Label_OmicronLab: TLabel;
     AppEvents: TApplicationEvents;
@@ -64,9 +89,12 @@ type
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
     procedure FormResize(Sender: TObject);
     procedure Button1Click(Sender: TObject);
+    procedure Button2Click(Sender: TObject);
     procedure cbAnsiVersionDrawItem(Control: TWinControl; Index: Integer;
       Rect: TRect; State: TOwnerDrawState);
     procedure cbAnsiVersionChange(Sender: TObject);
+    procedure cbAnsiVersionDropDown(Sender: TObject);
+    procedure cbAnsiVersionCloseUp(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
     procedure SplitterMoved(Sender: TObject);
     procedure Label_OmicronLabClick(Sender: TObject);
@@ -83,6 +111,7 @@ type
     procedure MEMOContextPopup(Sender: TObject; MousePos: TPoint; var Handled: Boolean);
   private
     FUniToBijoy: TUnicodeToBijoy2000;
+    FBijoyToUni: TBijoy2000ToUnicode;
     FSplitterRatio: Double;
     FPopupTarget: TRichEdit;
 
@@ -110,6 +139,259 @@ uses
   WindowsDarkMode,
   Winapi.RichEdit,
   Themes;
+
+{ =============================================================================== }
+{ Small colour helpers shared by the mapping picker                             }
+{ =============================================================================== }
+
+// Accent colour used across the mapping picker (warm amber, matches the app)
+const
+  AccentColor = $00E67E22;
+
+// Returns the effective colour for the current Windows theme
+function SysColor(AColor: TColor): TColor;
+begin
+  if StyleServices.Enabled then
+    Result := StyleServices.GetSystemColor(AColor)
+  else
+    Result := ColorToRGB(AColor);
+end;
+
+// Blends Percent2% (0..100) of C2 into C1
+function MixColor(C1, C2: TColor; Percent2: Integer): TColor;
+var
+  R1, G1, B1, R2, G2, B2: Integer;
+begin
+  if Percent2 <= 0 then
+    Exit(C1);
+  if Percent2 >= 100 then
+    Exit(C2);
+  R1 := GetRValue(ColorToRGB(C1));
+  G1 := GetGValue(ColorToRGB(C1));
+  B1 := GetBValue(ColorToRGB(C1));
+  R2 := GetRValue(ColorToRGB(C2));
+  G2 := GetGValue(ColorToRGB(C2));
+  B2 := GetBValue(ColorToRGB(C2));
+  Result := RGB(R1 + (R2 - R1) * Percent2 div 100,
+                G1 + (G2 - G1) * Percent2 div 100,
+                B1 + (B2 - B1) * Percent2 div 100);
+end;
+
+// True when AText is the mapping currently in effect
+function IsCheckedMapping(const AText: string): Boolean;
+begin
+  Result := SameText(AnsiVersion, AText) or
+            ((AnsiVersion = '') and SameText(AText, 'Default'));
+end;
+
+// Draws the Bangla glyph bullet (the letter "ক" in the app's own ANSI font)
+// centred inside ARect. NOTE: the font is selected into the DC eagerly by
+// TCanvas whenever a font property changes, so the raw DrawText call below
+// always uses the freshly configured font - keep the two together.
+procedure DrawAnsiGlyphBullet(C: TCanvas; const ARect: TRect; AColor: TColor);
+var
+  Glyph: string;
+  R: TRect;
+begin
+  Glyph := #$0995; // ক
+  C.Font.Name := 'Kalpurush ANSI';
+  C.Font.Charset := ANSI_CHARSET;
+  C.Font.Size := 10;
+  C.Font.Style := [];
+  C.Font.Color := AColor;
+  C.Brush.Style := bsClear;
+  R := ARect; // DrawText needs a var rect
+  DrawText(C.Handle, PChar(Glyph), Length(Glyph), R,
+    DT_SINGLELINE or DT_VCENTER or DT_NOPREFIX);
+end;
+
+{ =============================================================================== }
+{ TAnsiVersionCombo - custom-painted mapping picker face                        }
+{ =============================================================================== }
+
+procedure TAnsiVersionCombo.CMMouseEnter(var Message: TMessage);
+begin
+  FHovered := True;
+  Invalidate;
+  inherited;
+end;
+
+procedure TAnsiVersionCombo.CMMouseLeave(var Message: TMessage);
+begin
+  FHovered := False;
+  Invalidate;
+  inherited;
+end;
+
+procedure TAnsiVersionCombo.WMLButtonDown(var Message: TWMLButtonDown);
+begin
+  FPressed := True;
+  Invalidate;
+  inherited;
+end;
+
+procedure TAnsiVersionCombo.WMLButtonUp(var Message: TWMLButtonUp);
+begin
+  FPressed := False;
+  Invalidate;
+  inherited;
+end;
+
+procedure TAnsiVersionCombo.WMSetFocus(var Message: TWMSetFocus);
+begin
+  Invalidate;
+  inherited;
+end;
+
+procedure TAnsiVersionCombo.WMKillFocus(var Message: TWMKillFocus);
+begin
+  Invalidate;
+  inherited;
+end;
+
+procedure TAnsiVersionCombo.WMEraseBkgnd(var Message: TWMEraseBkgnd);
+begin
+  // The whole face is repainted every time - no background erasing needed
+  Message.Result := 1;
+end;
+
+procedure TAnsiVersionCombo.SetDropDownActive(const Value: Boolean);
+begin
+  FActive := Value;
+  if not Value then
+    FPressed := False;
+  Invalidate;
+end;
+
+procedure TAnsiVersionCombo.WMPaint(var Message: TWMPaint);
+var
+  DC, MemDC: HDC;
+  PS: TPaintStruct;
+  Bmp, Old: HBITMAP;
+begin
+  // Paint requests that carry an explicit DC (e.g. WM_PRINT) get the same
+  // custom face, drawn straight into the supplied DC.
+  if Message.DC <> 0 then
+  begin
+    PaintFace(Message.DC);
+    Exit;
+  end;
+
+  // Double-buffered: draw the whole face into a memory bitmap, then blit,
+  // so the hover / focus repaints never flicker.
+  DC := BeginPaint(Handle, PS);
+  try
+    MemDC := CreateCompatibleDC(DC);
+    Bmp := CreateCompatibleBitmap(DC, Width, Height);
+    Old := SelectObject(MemDC, Bmp);
+    try
+      PaintFace(MemDC);
+      BitBlt(DC, 0, 0, Width, Height, MemDC, 0, 0, SRCCOPY);
+    finally
+      SelectObject(MemDC, Old);
+      DeleteObject(Bmp);
+      DeleteDC(MemDC);
+    end;
+  finally
+    EndPaint(Handle, PS);
+  end;
+end;
+
+procedure TAnsiVersionCombo.PaintFace(DC: HDC);
+var
+  C: TCanvas;
+  R, TextR, GlyphR: TRect;
+  Bg, PanelBg, BorderC, TextC, BulletC: TColor;
+  S: string;
+  Cx, Cy: Integer;
+  Pts: array[0..2] of TPoint;
+begin
+  C := TCanvas.Create;
+  try
+    C.Handle := DC;
+    R := ClientRect;
+
+    // ---- palette -------------------------------------------------------------
+    Bg := SysColor(clWindow);
+    if Enabled and (FHovered or FPressed or FActive) then
+      Bg := MixColor(Bg, AccentColor, IfThen(FPressed or FActive, 16, 9));
+
+    if Enabled and (FHovered or FPressed or FActive or Focused) then
+      BorderC := AccentColor
+    else
+      BorderC := SysColor(clBtnShadow);
+
+    TextC := SysColor(clWindowText);
+    BulletC := AccentColor;
+    if not Enabled then
+    begin
+      Bg := SysColor(clBtnFace);
+      BorderC := SysColor(clBtnShadow);
+      TextC := SysColor(clGrayText);
+      BulletC := SysColor(clGrayText);
+    end;
+    PanelBg := SysColor(clBtnFace);
+
+    // ---- rounded face --------------------------------------------------------
+    C.Brush.Color := Bg;
+    C.Brush.Style := bsSolid;
+    C.Pen.Style := psClear;
+    C.FillRect(R);
+
+    // Fake the rounded corners: paint the four corner squares with the colour
+    // of the panel behind, so the round-rect outline reads as the control shape.
+    C.Brush.Color := PanelBg;
+    C.FillRect(Rect(R.Left, R.Top, R.Left + 6, R.Top + 6));
+    C.FillRect(Rect(R.Right - 6, R.Top, R.Right, R.Top + 6));
+    C.FillRect(Rect(R.Left, R.Bottom - 6, R.Left + 6, R.Bottom));
+    C.FillRect(Rect(R.Right - 6, R.Bottom - 6, R.Right, R.Bottom));
+
+    C.Brush.Style := bsClear;
+    C.Pen.Style := psSolid;
+    C.Pen.Color := BorderC;
+    C.Pen.Width := 1;
+    C.RoundRect(R.Left, R.Top, R.Right - 1, R.Bottom - 1, 10, 10);
+
+    // ---- Bangla glyph bullet (the letter "ক" in the app's own ANSI font) -----
+    GlyphR := Rect(R.Left + 7, R.Top + 3, R.Left + 23, R.Bottom - 3);
+    DrawAnsiGlyphBullet(C, GlyphR, BulletC);
+
+    // ---- mapping name ----------------------------------------------------------
+    C.Font := Self.Font;
+    C.Font.Color := TextC;
+    C.Font.Style := [];
+    S := Text;
+    if S = '' then
+      S := 'Default';
+    TextR := Rect(R.Left + 27, R.Top, R.Right - 24, R.Bottom);
+    DrawText(C.Handle, PChar(S), Length(S), TextR,
+      DT_SINGLELINE or DT_VCENTER or DT_END_ELLIPSIS or DT_NOPREFIX);
+
+    // ---- chevron arrow (flips up while the list is open) ------------------------
+    Cx := R.Right - 16;
+    Cy := R.Top + R.Height div 2;
+    C.Pen.Color := AccentColor;
+    C.Pen.Width := 1;
+    C.Pen.Style := psSolid;
+    C.Brush.Color := AccentColor;
+    C.Brush.Style := bsSolid;
+    if FActive then
+    begin
+      Pts[0] := Point(Cx - 4, Cy + 2);
+      Pts[1] := Point(Cx + 4, Cy + 2);
+      Pts[2] := Point(Cx, Cy - 3);
+    end
+    else
+    begin
+      Pts[0] := Point(Cx - 4, Cy - 2);
+      Pts[1] := Point(Cx + 4, Cy - 2);
+      Pts[2] := Point(Cx, Cy + 3);
+    end;
+    C.Polygon(Pts);
+  finally
+    C.Free;
+  end;
+end;
 
 { =============================================================================== }
 
@@ -305,6 +587,7 @@ begin
   MEMO2.Font.Color := StyleServices.GetSystemColor(clWindowText);
   MEMO1Panel.Invalidate;
   MEMO2Panel.Invalidate;
+  cbAnsiVersion.Invalidate;
 end;
 
 { =============================================================================== }
@@ -323,67 +606,141 @@ begin
   MEMO1.Enabled := False;
   MEMO2.Enabled := False;
   Button1.Enabled := False;
+  Button2.Enabled := False;
   Progress.Visible := True;
   Progress.Position := 0;
   MEMO2.Clear;
-  application.ProcessMessages;
-
-  // NOTE: MEMO1.Lines must NOT be used here. With WordWrap enabled, Windows
-  // counts soft-wrapped (visual) lines as separate lines, which would make
-  // each wrapped segment a new paragraph in the output. Split the raw text
-  // on real line breaks (CR/LF) only, so only Enter-pressed lines become
-  // separate paragraphs.
-  Src := MEMO1.Text;
-  TotalLen := Length(Src);
-  OutText := '';
-  P := 1;
-  while P <= TotalLen do
-  begin
-    Q := P;
-    while (Q <= TotalLen) and not CharInSet(Src[Q], [#13, #10]) do
-      Inc(Q);
-
-    Segment := Copy(Src, P, Q - P);
-    OutText := OutText + FUniToBijoy.Convert(Segment);
-
-    if Q <= TotalLen then
+  Application.ProcessMessages;
+  try
+    // NOTE: MEMO1.Lines must NOT be used here. With WordWrap enabled, Windows
+    // counts soft-wrapped (visual) lines as separate lines, which would make
+    // each wrapped segment a new paragraph in the output. Split the raw text
+    // on real line breaks (CR/LF) only, so only Enter-pressed lines become
+    // separate paragraphs.
+    Src := MEMO1.Text;
+    TotalLen := Length(Src);
+    OutText := '';
+    P := 1;
+    while P <= TotalLen do
     begin
-      EOL := Src[Q];
-      Inc(Q);
-      if (EOL = #13) and (Q <= TotalLen) and (Src[Q] = #10) then
-      begin
-        EOL := EOL + #10;
+      Q := P;
+      while (Q <= TotalLen) and not CharInSet(Src[Q], [#13, #10]) do
         Inc(Q);
+
+      Segment := Copy(Src, P, Q - P);
+      OutText := OutText + FUniToBijoy.Convert(Segment);
+
+      if Q <= TotalLen then
+      begin
+        EOL := Src[Q];
+        Inc(Q);
+        if (EOL = #13) and (Q <= TotalLen) and (Src[Q] = #10) then
+        begin
+          EOL := EOL + #10;
+          Inc(Q);
+        end;
+        OutText := OutText + EOL;
       end;
-      OutText := OutText + EOL;
+
+      P := Q;
+      Progress.Position := (P * 100) div (TotalLen + 1);
+      Application.ProcessMessages;
     end;
+    // Preset the default font for the ANSI preview so that every new
+    // run of text starts in Kalpurush ANSI
+    MEMO2.DefAttributes.Name := MEMO2.Font.Name;
+    MEMO2.DefAttributes.Size := MEMO2.Font.Size;
+    MEMO2.DefAttributes.Charset := MEMO2.Font.Charset;
 
-    P := Q;
-    Progress.Position := (P * 100) div (TotalLen + 1);
-    application.ProcessMessages;
+    MEMO2.Text := OutText;
+
+    // Force the selected font (Kalpurush ANSI) over the whole text so that
+    // no part is shown in another font (in its English form)
+    MEMO2.SelectAll;
+    MEMO2.SelAttributes.Name := MEMO2.Font.Name;
+    MEMO2.SelAttributes.Size := MEMO2.Font.Size;
+    MEMO2.SelAttributes.Charset := MEMO2.Font.Charset;
+    MEMO2.SelLength := 0;
+
+    MakeTextJustified(MEMO2);
+  finally
+    Progress.Visible := False;
+    MEMO1.Enabled := True;
+    MEMO2.Enabled := True;
+    Button1.Enabled := True;
+    Button2.Enabled := True;
   end;
-  // Preset the default font for the ANSI preview so that every new
-  // run of text starts in Kalpurush ANSI
-  MEMO2.DefAttributes.Name := MEMO2.Font.Name;
-  MEMO2.DefAttributes.Size := MEMO2.Font.Size;
-  MEMO2.DefAttributes.Charset := MEMO2.Font.Charset;
+end;
 
-  MEMO2.Text := OutText;
+{ =============================================================================== }
 
-  // Force the selected font (Kalpurush ANSI) over the whole text so that
-  // no part is shown in another font (in its English form)
-  MEMO2.SelectAll;
-  MEMO2.SelAttributes.Name := MEMO2.Font.Name;
-  MEMO2.SelAttributes.Size := MEMO2.Font.Size;
-  MEMO2.SelAttributes.Charset := MEMO2.Font.Charset;
-  MEMO2.SelLength := 0;
+procedure TForm1.Button2Click(Sender: TObject);
+var
+  Src, OutText, EOL, Segment: string;
+  P, Q, TotalLen: Integer;
+begin
+  MEMO1.Enabled := False;
+  MEMO2.Enabled := False;
+  Button1.Enabled := False;
+  Button2.Enabled := False;
+  Progress.Visible := True;
+  Progress.Position := 0;
+  MEMO1.Clear;
+  Application.ProcessMessages;
+  try
+    // Same segment splitting as Button1Click (see the note there): only
+    // real CR/LF line breaks become separate paragraphs.
+    Src := MEMO2.Text;
+    TotalLen := Length(Src);
+    OutText := '';
+    P := 1;
+    while P <= TotalLen do
+    begin
+      Q := P;
+      while (Q <= TotalLen) and not CharInSet(Src[Q], [#13, #10]) do
+        Inc(Q);
 
-  MakeTextJustified(MEMO2);
+      Segment := Copy(Src, P, Q - P);
+      OutText := OutText + FBijoyToUni.Convert(Segment);
 
-  Progress.Visible := False;
-  MEMO1.Enabled := True;
-  MEMO2.Enabled := True;
-  Button1.Enabled := True;
+      if Q <= TotalLen then
+      begin
+        EOL := Src[Q];
+        Inc(Q);
+        if (EOL = #13) and (Q <= TotalLen) and (Src[Q] = #10) then
+        begin
+          EOL := EOL + #10;
+          Inc(Q);
+        end;
+        OutText := OutText + EOL;
+      end;
+
+      P := Q;
+      Progress.Position := (P * 100) div (TotalLen + 1);
+      Application.ProcessMessages;
+    end;
+    // Unicode output starts in Siyam Rupali
+    MEMO1.DefAttributes.Name := MEMO1.Font.Name;
+    MEMO1.DefAttributes.Size := MEMO1.Font.Size;
+    MEMO1.DefAttributes.Charset := MEMO1.Font.Charset;
+
+    MEMO1.Text := OutText;
+
+    // Force Siyam Rupali over the whole text
+    MEMO1.SelectAll;
+    MEMO1.SelAttributes.Name := MEMO1.Font.Name;
+    MEMO1.SelAttributes.Size := MEMO1.Font.Size;
+    MEMO1.SelAttributes.Charset := MEMO1.Font.Charset;
+    MEMO1.SelLength := 0;
+
+    MakeTextJustified(MEMO1);
+  finally
+    Progress.Visible := False;
+    MEMO1.Enabled := True;
+    MEMO2.Enabled := True;
+    Button1.Enabled := True;
+    Button2.Enabled := True;
+  end;
 end;
 
 { =============================================================================== }
@@ -391,31 +748,39 @@ end;
 procedure TForm1.PopulateAnsiVersionsCombo;
 var
   SR: TSearchRec;
-  FileTitle: string;
+  Versions: TStringList;
+  I: Integer;
 begin
   cbAnsiVersion.Items.BeginUpdate;
   try
     cbAnsiVersion.Items.Clear;
 
-    // Always offer the built-in Default mapping first
+    // Built-in mapping always stays first
     cbAnsiVersion.Items.Add('Default');
 
-    if DirectoryExists(AnsiMappingDir) then
-      if FindFirst(AnsiMappingDir + '*.json', faAnyFile, SR) = 0 then
-      begin
-        try
-          repeat
-            // Skip directories and the reserved 'Default' name
-            if (SR.Attr and faDirectory <> 0) or SameText(SR.Name, 'Default.json') then
-              Continue;
-
-            FileTitle := ChangeFileExt(SR.Name, '');
-            cbAnsiVersion.Items.Add(FileTitle);
-          until FindNext(SR) <> 0;
-        finally
-          FindClose(SR);
-        end;
+    // Custom mappings, collected and sorted alphabetically
+    Versions := TStringList.Create;
+    try
+      Versions.Sorted := True;
+      Versions.Duplicates := dupIgnore;
+      Versions.CaseSensitive := False;
+      if DirectoryExists(AnsiMappingDir) and
+         (FindFirst(AnsiMappingDir + '*.json', faAnyFile, SR) = 0) then
+      try
+        repeat
+          // Skip directories and the reserved 'Default' name
+          if (SR.Attr and faDirectory <> 0) or SameText(SR.Name, 'Default.json') then
+            Continue;
+          Versions.Add(ChangeFileExt(SR.Name, ''));
+        until FindNext(SR) <> 0;
+      finally
+        FindClose(SR);
       end;
+      for I := 0 to Versions.Count - 1 do
+        cbAnsiVersion.Items.Add(Versions[I]);
+    finally
+      Versions.Free;
+    end;
   finally
     cbAnsiVersion.Items.EndUpdate;
   end;
@@ -437,72 +802,76 @@ end;
 
 { =============================================================================== }
 
+procedure TForm1.cbAnsiVersionDropDown(Sender: TObject);
+begin
+  cbAnsiVersion.SetDropDownActive(True);
+end;
+
+{ =============================================================================== }
+
+procedure TForm1.cbAnsiVersionCloseUp(Sender: TObject);
+begin
+  cbAnsiVersion.SetDropDownActive(False);
+end;
+
+{ =============================================================================== }
+
 procedure TForm1.cbAnsiVersionDrawItem(Control: TWinControl; Index: Integer;
   Rect: TRect; State: TOwnerDrawState);
 var
   Combo: TComboBox;
   Text: string;
-  BgColor, TextColor, AccentColor: TColor;
-  IsSelected, IsChecked: Boolean;
-  RadioRect: TRect;
+  GlyphR, TextR: TRect;
+  Bg: TColor;
+  IsHover, IsChecked, IsDefault: Boolean;
 begin
   Combo := TComboBox(Control);
   Text := Combo.Items[Index];
-  IsSelected := odSelected in State;
-  IsChecked := SameText(AnsiVersion, Text) or
-              ((AnsiVersion = '') and (Text = 'Default'));
+  IsHover := odSelected in State;
+  IsChecked := IsCheckedMapping(Text);
+  IsDefault := SameText(Text, 'Default');
 
-  // ১. ডার্ক/লাইট থিম অনুযায়ী কালার সেটআপ
-  if StyleServices.Enabled then
+  with Combo.Canvas do
   begin
-    if IsSelected then
-      BgColor := StyleServices.GetSystemColor(clHighlight)
+    // Background: soft amber tint on hover, lighter tint on the active mapping
+    if IsHover then
+      Bg := MixColor(SysColor(clWindow), AccentColor, 14)
+    else if IsChecked then
+      Bg := MixColor(SysColor(clWindow), AccentColor, 6)
     else
-      BgColor := StyleServices.GetSystemColor(clWindow);
+      Bg := SysColor(clWindow);
 
-    TextColor := StyleServices.GetSystemColor(
-      IfThen(IsSelected, clHighlightText, clWindowText));
-    AccentColor := StyleServices.GetSystemColor(clHighlight);
-  end
-  else
-  begin
-    if IsSelected then
-      BgColor := $00E67E22 // Modern Accent Color (Blue/Orange)
-    else
-      BgColor := clWindow;
+    Brush.Color := Bg;
+    Brush.Style := bsSolid;
+    Pen.Style := psClear;
+    FillRect(Rect);
 
-    TextColor := IfThen(IsSelected, clWhite, clBlack);
-    AccentColor := $00E67E22;
+    // Bangla glyph bullet (the letter "ক" in the app's own ANSI font)
+    GlyphR := System.Classes.Rect(Rect.Left + 6, Rect.Top + 2,
+                                  Rect.Left + 22, Rect.Bottom - 2);
+    DrawAnsiGlyphBullet(Combo.Canvas, GlyphR,
+      IfThen(IsChecked, AccentColor, SysColor(clWindowText)));
+
+    // Mapping name, bold when it is the active mapping
+    Font := Combo.Font;
+    Font.Color := SysColor(clWindowText);
+    if IsChecked then
+      Font.Style := [fsBold];
+    TextR := System.Classes.Rect(Rect.Left + 26, Rect.Top,
+                                 Rect.Right - 6, Rect.Bottom);
+    DrawText(Handle, PChar(Text), Length(Text), TextR,
+      DT_SINGLELINE or DT_VCENTER or DT_END_ELLIPSIS or DT_NOPREFIX);
+
+    // Hairline separator below the built-in Default entry
+    if IsDefault and (Index < Combo.Items.Count - 1) then
+    begin
+      Pen.Color := MixColor(SysColor(clBtnShadow), SysColor(clWindow), 45);
+      Pen.Style := psSolid;
+      Pen.Width := 1;
+      MoveTo(Rect.Left + 8, Rect.Bottom - 1);
+      LineTo(Rect.Right - 8, Rect.Bottom - 1);
+    end;
   end;
-
-  // ২. আইটেম ব্যাকগ্রাউন্ড ড্র করা
-  Combo.Canvas.Brush.Color := BgColor;
-  Combo.Canvas.Brush.Style := bsSolid;
-  Combo.Canvas.FillRect(Rect);
-
-  // ৩. রেডিও বাটন সাইন (Circle Indicator) ড্র করা
-  RadioRect := System.Classes.Rect(Rect.Left + 6, Rect.Top + (Rect.Height - 12) div 2,
-                                   Rect.Left + 18, Rect.Top + (Rect.Height + 12) div 2);
-
-  Combo.Canvas.Pen.Color := IfThen(IsSelected, TextColor, clGray);
-  Combo.Canvas.Brush.Style := bsClear;
-  Combo.Canvas.Ellipse(RadioRect); // আউটার সার্কেল
-
-  if IsChecked then
-  begin
-    // ইনার সিলেক্টেড ডট (Radio Dot)
-    InflateRect(RadioRect, -3, -3);
-    Combo.Canvas.Brush.Color := IfThen(IsSelected, TextColor, AccentColor);
-    Combo.Canvas.Brush.Style := bsSolid;
-    Combo.Canvas.Pen.Style := psClear;
-    Combo.Canvas.Ellipse(RadioRect);
-  end;
-
-  // ৪. টেক্সট ড্র করা
-  Combo.Canvas.Brush.Style := bsClear;
-  Combo.Canvas.Font := Combo.Font;
-  Combo.Canvas.Font.Color := TextColor;
-  Combo.Canvas.TextOut(Rect.Left + 26, Rect.Top + (Rect.Height - Combo.Canvas.TextHeight(Text)) div 2, Text);
 end;
 
 { =============================================================================== }
@@ -510,6 +879,7 @@ end;
 procedure TForm1.FormClose(Sender: TObject; var Action: TCloseAction);
 begin
   FUniToBijoy.Free;
+  FBijoyToUni.Free;
   Action := caFree;
   Form1 := nil;
 end;
@@ -536,6 +906,7 @@ begin
   FSplitterRatio := MEMO1Panel.Height /
     (ClientHeight - PanelHeader.Height - PanelButton.Height - PanelFooter.Height - Splitter1.Height);
   FUniToBijoy := TUnicodeToBijoy2000.Create;
+  FBijoyToUni := TBijoy2000ToUnicode.Create;
 
   AnsiMappingDir := GetAvroDataDir + 'AnsiMapping\';
   ForceDirectories(AnsiMappingDir);
