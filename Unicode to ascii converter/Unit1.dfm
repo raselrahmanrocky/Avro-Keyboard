@@ -146,9 +146,9 @@ object Form1: TForm1
     object Button1: TButton
       Left = 20
       Top = 3
-      Width = 100
+      Width = 105
       Height = 25
-      Caption = 'Convert'
+      Caption = 'Unicode to ANSI'
       Default = True
       Font.Charset = DEFAULT_CHARSET
       Font.Color = clWindowText
@@ -159,16 +159,38 @@ object Form1: TForm1
       TabOrder = 0
       OnClick = Button1Click
     end
-    object cbAnsiVersion: TComboBox
-      Left = 197
+    object Button2: TButton
+      Left = 131
+      Top = 3
+      Width = 105
+      Height = 25
+      Caption = 'ANSI to Unicode'
+      Font.Charset = DEFAULT_CHARSET
+      Font.Color = clWindowText
+      Font.Height = -11
+      Font.Name = 'Tahoma'
+      Font.Style = [fsBold]
+      ParentFont = False
+      TabOrder = 1
+      OnClick = Button2Click
+    end
+    object cbAnsiVersion: TAnsiVersionCombo
+      Left = 242
       Top = 3
       Width = 160
       Height = 25
       Style = csOwnerDrawFixed
+      Ctl3D = False
+      ParentCtl3D = False
       ItemHeight = 22
-      TabOrder = 1
+      DropDownCount = 12
+      TabOrder = 2
+      ShowHint = True
+      Hint = 'Choose the ANSI encoding used for the converted text'
       OnDrawItem = cbAnsiVersionDrawItem
       OnChange = cbAnsiVersionChange
+      OnDropDown = cbAnsiVersionDropDown
+      OnCloseUp = cbAnsiVersionCloseUp
     end
   end
   object MEMO2Panel: TRoundedPanel
