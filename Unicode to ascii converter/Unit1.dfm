@@ -112,7 +112,8 @@ object Form1: TForm1
       Font.Name = 'Siyam Rupali'
       Font.Style = []
       ParentFont = False
-      ScrollBars = ssVertical
+      ScrollBars = ssBoth
+      WordWrap = True
       TabOrder = 0
       OnEnter = MemoFocusChanged
       OnExit = MemoFocusChanged
@@ -245,7 +246,8 @@ object Form1: TForm1
       Font.Name = 'Kalpurush ANSI'
       Font.Style = []
       ParentFont = False
-      ScrollBars = ssVertical
+      ScrollBars = ssBoth
+      WordWrap = True
       TabOrder = 0
       OnEnter = MemoFocusChanged
       OnExit = MemoFocusChanged
