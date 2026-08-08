@@ -182,7 +182,7 @@ object Form1: TForm1
       Style = csOwnerDrawFixed
       Ctl3D = False
       ParentCtl3D = False
-      ItemHeight = 22
+      ItemHeight = 20
       DropDownCount = 12
       TabOrder = 2
       ShowHint = True
@@ -192,20 +192,21 @@ object Form1: TForm1
       OnDropDown = cbAnsiVersionDropDown
       OnCloseUp = cbAnsiVersionCloseUp
     end
-    object cbFontPicker: TComboBox
+    object cbFontPicker: TFontPickerCombo
       Left = 408
       Top = 3
       Width = 200
       Height = 25
-      Anchors = [akLeft, akTop, akRight]
-      Style = csOwnerDrawFixed
-      ItemHeight = 22
+      Anchors = [akLeft, akTop]
+      Style = csDropDown
+      ItemHeight = 20
       DropDownCount = 14
       TabOrder = 3
       ShowHint = True
-      Hint = 'Choose installed font for ANSI preview'
-      OnDrawItem = cbFontPickerDrawItem
+      Hint = 'Type to search installed fonts for the ANSI preview'
       OnChange = cbFontPickerChange
+      OnDropDown = cbFontPickerDropDown
+      OnCloseUp = cbFontPickerCloseUp
     end
   end
   object MEMO2Panel: TRoundedPanel
