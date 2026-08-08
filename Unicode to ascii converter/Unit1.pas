@@ -79,6 +79,7 @@ type
     FDefEditProc: Pointer;           // Original window proc of the inner EDIT
     FClickWasOpen: Boolean;          // Drop-down was open at WM_LBUTTONDOWN
     FHovered: Boolean;
+    procedure ApplyEditCentering;    // ES_LEFT + vertical centering of the edit text
     procedure CMMouseEnter(var Message: TMessage); message CM_MOUSEENTER;
     procedure CMMouseLeave(var Message: TMessage); message CM_MOUSELEAVE;
     procedure WMSetFocus(var Message: TWMSetFocus); message WM_SETFOCUS;
@@ -172,6 +173,9 @@ type
     FSplitterRatio: Double;
     FPopupTarget: TRichEdit;
 
+    procedure AppEventsMessage(var Msg: TMsg; var Handled: Boolean);
+    function IsMemo1Target(AHwnd: HWND): Boolean;
+    function IsMemo2Target(AHwnd: HWND): Boolean;
     procedure HandleThemes;
     procedure ApplyFontToMemo2(const FontName: string);
     procedure MakeTextJustified(RE: TRichEdit);
@@ -827,6 +831,16 @@ begin
     Exit;
   end;
 
+  // The native combo box selects all of the edit text (EM_SETSEL 0,-1) after
+  // a font is committed; convert that into a deselection (-1,-1) so the picked
+  // font name is never left highlighted in blue.
+  if (uMsg = EM_SETSEL) and (wParam = 0) and
+     ((lParam = -1) or (DWORD(lParam) = $FFFFFFFF)) then
+  begin
+    wParam := $FFFFFFFF;   // WPARAM(-1) - deselect (no selection)
+    lParam := -1;          // LPARAM(-1)
+  end;
+
   // Toggle-on-click state: remember whether the drop-down list was open
   // when a press began, so that same press can toggle it - open while
   // closed, close while open - exactly like the ANSI version combo.
@@ -847,6 +861,11 @@ begin
   // field. If it was already open, the native logic above just closed it
   // and we must not re-open it.
   Result := TFontPickerEditWndProc(Combo.FDefEditProc)(hWnd, uMsg, wParam, lParam);
+
+  // Keep the text vertically/horizontally centered after the combo moves or
+  // resizes the edit, or after its font changes.
+  if (uMsg = WM_WINDOWPOSCHANGED) or (uMsg = WM_SETFONT) then
+    Combo.ApplyEditCentering;
 
   if ((uMsg = WM_LBUTTONDOWN) or (uMsg = WM_LBUTTONDBLCLK))
     and not Combo.FClickWasOpen and not Combo.DroppedDown
@@ -937,6 +956,72 @@ begin
       FDefEditProc := Pointer(SetWindowLongPtr(FEditHandle,
         GWLP_WNDPROC, LONG_PTR(@FontPickerEditProc)));
     end;
+  ApplyEditCentering;
+end;
+
+procedure TFontPickerCombo.ApplyEditCentering;
+var
+  DC: HDC;
+  TM: TTextMetric;
+  HF: HFONT;
+  OldFont: HFONT;
+  CR, WR: TRect;
+  ParentClient: TRect;
+  ClientOrigin: TPoint;
+  RelTop, NewTop, NewH: Integer;
+  Style: LONG_PTR;
+begin
+  if FEditHandle = 0 then Exit;
+  SendMessage(FEditHandle, EM_SETMARGINS, EC_LEFTMARGIN or EC_RIGHTMARGIN, MakeLParam(8, 8));
+  // Horizontal alignment: the inner edit reads ES_LEFT/CENTER/RIGHT from its
+  // window style at paint time. Force left alignment (ES_LEFT = 0) by clearing
+  // the CENTER/RIGHT bits. The native combo already insets the edit's format
+  // rectangle (~14 px on the left), so the text starts clear of the left
+  // border without any extra margins.
+  Style := GetWindowLongPtr(FEditHandle, GWL_STYLE);
+  if (Style and (ES_CENTER or ES_RIGHT)) <> 0 then
+  begin
+    SetWindowLongPtr(FEditHandle, GWL_STYLE,
+      Style and not (ES_CENTER or ES_RIGHT));
+    InvalidateRect(FEditHandle, nil, True);
+  end;
+
+  // Vertical centering. A borderless single-line EDIT top-aligns its line box
+  // and ignores EM_SETRECT/EM_SETRECTNP (those messages only affect multiline
+  // edits), so the text cannot be nudged with messages. Instead, shrink the
+  // edit window to the text's own bounding box (font height + internal
+  // leading) and re-center it inside the combo; the still top-aligned text
+  // then sits vertically centered. Re-applied whenever the edit is moved or
+  // resized (WM_WINDOWPOSCHANGED) or its font changes (WM_SETFONT).
+  HF := HFONT(SendMessage(FEditHandle, WM_GETFONT, 0, 0));
+  if HF = 0 then HF := GetStockObject(DEFAULT_GUI_FONT);
+  DC := GetDC(FEditHandle);
+  try
+    OldFont := SelectObject(DC, HF);
+    try
+      FillChar(TM, SizeOf(TM), 0);
+      GetTextMetrics(DC, TM);
+    finally
+      SelectObject(DC, OldFont);
+    end;
+  finally
+    ReleaseDC(FEditHandle, DC);
+  end;
+
+  Windows.GetClientRect(FEditHandle, CR);
+  NewH := TM.tmHeight + TM.tmInternalLeading; // visible text box height
+  if NewH < 8 then NewH := 8;                 // sanity floor
+  if NewH >= CR.Bottom - 2 then Exit;         // already sized to fit the text
+
+  Windows.GetWindowRect(FEditHandle, WR);
+  Windows.GetClientRect(Handle, ParentClient);
+  ClientOrigin.X := ParentClient.Left;
+  ClientOrigin.Y := ParentClient.Top;
+  Windows.ClientToScreen(Handle, ClientOrigin);
+  RelTop := WR.Top - ClientOrigin.Y;
+  NewTop := RelTop + (CR.Bottom - NewH) div 2 + 1;
+  SetWindowPos(FEditHandle, 0, WR.Left - ClientOrigin.X, NewTop,
+    WR.Right - WR.Left, NewH, SWP_NOZORDER or SWP_NOACTIVATE);
 end;
 
 procedure TFontPickerCombo.DestroyWnd;
@@ -984,8 +1069,10 @@ begin
     FUpdating := True;
     try
       Text := FActiveFont;
-      SelStart := 0;
-      SelLength := Length(FActiveFont);
+      
+      // ✅ ফোকাস সরার সময় যেন সিলেক্ট না হয়:
+      SelStart := Length(FActiveFont);
+      SelLength := 0;
     finally
       FUpdating := False;
     end;
@@ -1189,8 +1276,10 @@ begin
   FUpdating := True;
   try
     Text := AName;
-    SelStart := 0;
-    SelLength := Length(AName);
+    // Caret at the end, no selection - avoid the blue highlight when the
+    // active font is set programmatically.
+    SelStart := Length(AName);
+    SelLength := 0;
   finally
     FUpdating := False;
   end;
@@ -1322,8 +1411,11 @@ begin
     if Idx >= 0 then
       ItemIndex := Idx;
     Text := SaveText;
-    SelStart := 0;
-    SelLength := Length(SaveText);
+    // Caret at the end, no selection - avoids the blue highlight flash when
+    // the drop-down closes (which previously made the text blink as focus
+    // was taken away right after).
+    SelStart := Length(SaveText);
+    SelLength := 0;
   finally
     FUpdating := False;
   end;
@@ -1372,8 +1464,10 @@ begin
     N := Items.IndexOf(FontName);
     if N >= 0 then
       ItemIndex := N;
-    SelStart := 0;
-    SelLength := Length(FontName);
+    // Leave the caret at the end of the committed name with no selection,
+    // so the text is not highlighted in blue after picking a font.
+    SelStart := Length(FontName);
+    SelLength := 0;
   finally
     FUpdating := False;
   end;
@@ -1395,8 +1489,9 @@ begin
   FUpdating := True;
   try
     Text := FActiveFont;
-    SelStart := 0;
-    SelLength := Length(FActiveFont);
+    // Caret at the end, no selection - no blue highlight flash.
+    SelStart := Length(FActiveFont);
+    SelLength := 0;
   finally
     FUpdating := False;
   end;
@@ -1506,13 +1601,20 @@ end;
 { =============================================================================== }
 
 procedure TForm1.cbFontPickerChange(Sender: TObject);
-var
-  FontName: string;
 begin
   if cbFontPicker.IsUpdating then Exit;
-  FontName := cbFontPicker.FilterAndGetExact;
-  if FontName <> '' then
-    ApplyFontToMemo2(FontName);
+
+  // ✅ মাউসে ক্লিক বা Enter চেপে ফন্ট নিশ্চিত (Commit) করা হলেই কেবল ফন্ট অ্যাপ্লাই ও ফোকাস আউট হবে:
+  if SameText(cbFontPicker.Text, cbFontPicker.ActiveFont) then
+  begin
+    ApplyFontToMemo2(cbFontPicker.ActiveFont);
+    ActiveControl := nil; 
+  end
+  else
+  begin
+    // ✅ সার্চ বক্সে টাইপ করার সময় কেবল লাইভ লিস্ট ফিল্টার হবে, অটো-সিলেক্ট হবে না:
+    cbFontPicker.FilterList(cbFontPicker.Text);
+  end;
 end;
 
 procedure TForm1.cbFontPickerDropDown(Sender: TObject);
@@ -1596,6 +1698,60 @@ end;
 
 { =============================================================================== }
 
+function TForm1.IsMemo1Target(AHwnd: HWND): Boolean;
+begin
+  Result := (AHwnd <> 0) and (MEMO1 <> nil) and (MEMO1Panel <> nil) and
+    ((AHwnd = MEMO1.Handle) or (AHwnd = MEMO1Panel.Handle) or IsChild(MEMO1Panel.Handle, AHwnd));
+end;
+
+function TForm1.IsMemo2Target(AHwnd: HWND): Boolean;
+begin
+  Result := (AHwnd <> 0) and (MEMO2 <> nil) and (MEMO2Panel <> nil) and
+    ((AHwnd = MEMO2.Handle) or (AHwnd = MEMO2Panel.Handle) or IsChild(MEMO2Panel.Handle, AHwnd));
+end;
+
+procedure TForm1.AppEventsMessage(var Msg: TMsg; var Handled: Boolean);
+var
+  TargetWnd: HWND;
+  Pt: TPoint;
+  IsPickerDropped, IsAnsiDropped: Boolean;
+begin
+  if (Msg.message = WM_LBUTTONDOWN) or (Msg.message = WM_NCLBUTTONDOWN) then
+  begin
+    IsPickerDropped := (cbFontPicker <> nil) and cbFontPicker.DroppedDown;
+    IsAnsiDropped := (cbAnsiVersion <> nil) and cbAnsiVersion.DroppedDown;
+
+    if IsPickerDropped or IsAnsiDropped then
+    begin
+      TargetWnd := WindowFromPoint(Msg.pt);
+      if IsMemo1Target(TargetWnd) then
+      begin
+        if IsPickerDropped then cbFontPicker.DroppedDown := False;
+        if IsAnsiDropped then cbAnsiVersion.DroppedDown := False;
+
+        MEMO1.SetFocus;
+        Pt := Msg.pt;
+        Windows.ScreenToClient(MEMO1.Handle, Pt);
+        PostMessage(MEMO1.Handle, WM_LBUTTONDOWN, Msg.wParam, MakeLParam(Pt.X, Pt.Y));
+        PostMessage(MEMO1.Handle, WM_LBUTTONUP, Msg.wParam, MakeLParam(Pt.X, Pt.Y));
+        Handled := True;
+      end
+      else if IsMemo2Target(TargetWnd) then
+      begin
+        if IsPickerDropped then cbFontPicker.DroppedDown := False;
+        if IsAnsiDropped then cbAnsiVersion.DroppedDown := False;
+
+        MEMO2.SetFocus;
+        Pt := Msg.pt;
+        Windows.ScreenToClient(MEMO2.Handle, Pt);
+        PostMessage(MEMO2.Handle, WM_LBUTTONDOWN, Msg.wParam, MakeLParam(Pt.X, Pt.Y));
+        PostMessage(MEMO2.Handle, WM_LBUTTONUP, Msg.wParam, MakeLParam(Pt.X, Pt.Y));
+        Handled := True;
+      end;
+    end;
+  end;
+end;
+
 procedure TForm1.FormClose(Sender: TObject; var Action: TCloseAction);
 begin
   FUniToBijoy.Free;
@@ -1617,6 +1773,8 @@ begin
   PanelHeader.DoubleBuffered := True;
   PanelButton.DoubleBuffered := True;
   PanelFooter.DoubleBuffered := True;
+
+  AppEvents.OnMessage := AppEventsMessage;
 
   FSplitterRatio := MEMO1Panel.Height /
     (ClientHeight - PanelHeader.Height - PanelButton.Height - PanelFooter.Height - Splitter1.Height);
