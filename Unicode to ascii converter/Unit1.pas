@@ -31,6 +31,7 @@ uses
   Vcl.AppEvnts,
   uRoundedPanel,
   Math,
+  Registry,
   StrUtils;
 
 type
@@ -179,6 +180,11 @@ type
     procedure HandleThemes;
     procedure ApplyFontToMemo2(const FontName: string);
     procedure MakeTextJustified(RE: TRichEdit);
+    procedure PasteToPopupMemo;
+    procedure SaveConverterSetting(const Name, Value: string);
+    function ReadConverterSettings(out AnsiVer, FontName: string): Boolean;
+    procedure ConvertRtfUnicodeToBijoy(Src, Dst: TStream;
+      Conv: TUnicodeToBijoy2000);
     procedure DrawRoundedFrame(APanel: TPanel; AMemo: TRichEdit);
     function PopupMemo: TRichEdit;
     function CanPasteToMemo: Boolean;
@@ -566,10 +572,21 @@ begin
     PopupMemo.CopyToClipboard;
 end;
 
+procedure TForm1.PasteToPopupMemo;
+var
+  M: TRichEdit;
+begin
+  M := PopupMemo;
+  if (M <> nil) and CanPasteToMemo then
+  begin
+    M.PasteFromClipboard;
+    MakeTextJustified(M);
+  end;
+end;
+
 procedure TForm1.MenuPasteClick(Sender: TObject);
 begin
-  if (PopupMemo <> nil) and CanPasteToMemo then
-    PopupMemo.PasteFromClipboard;
+  PasteToPopupMemo;
 end;
 
 procedure TForm1.MenuSelectAllClick(Sender: TObject);
@@ -597,6 +614,430 @@ begin
   RE.SelLength := 0;
 end;
 
+{ Remember the ANSI mapping version / font the user picked so the next launch
+  opens with the same "last used" values. Shares the AnsiVersion value with the
+  main Avro Keyboard app (uRegistrySettings), so both stay in sync. }
+
+procedure TForm1.SaveConverterSetting(const Name, Value: string);
+var
+  Reg: TRegistry;
+begin
+  Reg := TRegistry.Create;
+  try
+    Reg.RootKey := HKEY_CURRENT_USER;
+    if Reg.OpenKey('Software\OmicronLab\Avro Keyboard', True) then
+      Reg.WriteString(Name, Value);
+  finally
+    Reg.Free;
+  end;
+end;
+
+function TForm1.ReadConverterSettings(out AnsiVer, FontName: string): Boolean;
+var
+  Reg: TRegistry;
+begin
+  AnsiVer := '';
+  FontName := '';
+  Reg := TRegistry.Create;
+  try
+    Reg.RootKey := HKEY_CURRENT_USER;
+    if Reg.OpenKeyReadOnly('Software\OmicronLab\Avro Keyboard') then
+    begin
+      AnsiVer := Reg.ReadString('AnsiVersion');
+      FontName := Reg.ReadString('ConverterAnsiFont');
+    end;
+  finally
+    Reg.Free;
+  end;
+  Result := (AnsiVer <> '') or (FontName <> '');
+end;
+
+{ ---------------------------------------------------------------------------
+  ConvertRtfUnicodeToBijoy
+
+  Converts the Unicode text inside an RTF stream to Bijoy (ANSI) while leaving
+  every RTF structure word intact - table definitions (\trowd, \cl..., \cellx,
+  \cell, \row, \lastcell), fonts, colors, embedded binary (\bin), etc.
+
+  Windows RichEdit stores text that does not fit the ANSI codepage as \uNNNN
+  escapes (a signed 16-bit Unicode value plus \ucN fallback characters). Only
+  those escapes - and literal runs of plain text - are converted; everything
+  else is copied byte-for-byte, so tables pasted from Word/Excel survive the
+  conversion with their cell borders and structure intact.
+--------------------------------------------------------------------------- }
+procedure TForm1.ConvertRtfUnicodeToBijoy(Src, Dst: TStream;
+  Conv: TUnicodeToBijoy2000);
+const
+  // Windows-1252 mappings for bytes $80..$9F (the only range where cp1252
+  // differs from the plain Unicode code point of the same value). Literal
+  // bytes in an RTF stream are interpreted in the declared \ansicpg.
+  Cp1252: array[0..31] of Word = (
+    $20AC, $0081, $201A, $0192, $201E, $2026, $2020, $2021,
+    $02C6, $2030, $0160, $2039, $0152, $008D, $017D, $008F,
+    $0090, $2018, $2019, $201C, $201D, $2022, $2013, $2014,
+    $02DC, $2122, $0161, $203A, $0153, $009D, $017E, $0178);
+
+  // Control words that END a text unit. Everything else (character/run
+  // formatting like \f0, \fs22, \lang9, table structure like \trowd,
+  // \cellx, \cl..., \tr...) is kept verbatim and does NOT split the text
+  // being converted, so a Bengali word that Word splits across font switches
+  // still converts as one unit with full conjunct context.
+  BoundaryWords: array[0..10] of string = (
+    'cell', 'lastcell', 'row', 'par', 'pard', 'line',
+    'sect', 'page', 'column', 'bin', 'tab');
+var
+  InBuf, OutBuf, ConvBuf: TBytes;
+  TextBuf: string;
+  I, J, Len, UC, Fallback, Bin, WordStart, Code, InsertPos, Depth: Integer;
+  B: Byte;
+  W: string;
+  HasParam, HasDelimSpace, IsBoundary: Boolean;
+  Param, Sign: Int64;
+  K: Integer;
+
+  procedure EmitByte(B: Byte);
+  begin
+    SetLength(OutBuf, Length(OutBuf) + 1);
+    OutBuf[Length(OutBuf) - 1] := B;
+  end;
+
+  procedure EmitStr(const S: string);
+  var
+    K: Integer;
+  begin
+    for K := 1 to Length(S) do
+      EmitByte(Ord(S[K]));
+  end;
+
+  // Append converted text bytes to ConvBuf. ASCII goes out literally;
+  // anything above $7F is written back as a \uNNNN escape so the exact code
+  // point survives the load (a literal byte would be re-interpreted through
+  // \ansicpg).
+  procedure EmitConverted(const S: string);
+  var
+    K, V, F: Integer;
+    NumStr: string;
+  begin
+    for K := 1 to Length(S) do
+    begin
+      V := Ord(S[K]);
+      if V <= 127 then
+      begin
+        SetLength(ConvBuf, Length(ConvBuf) + 1);
+        ConvBuf[Length(ConvBuf) - 1] := V;
+      end
+      else
+      begin
+        if V > 32767 then V := V - 65536;  // RTF wants a signed 16-bit value
+        NumStr := '\u' + IntToStr(V);
+        for F := 1 to Length(NumStr) do
+        begin
+          SetLength(ConvBuf, Length(ConvBuf) + 1);
+          ConvBuf[Length(ConvBuf) - 1] := Ord(NumStr[F]);
+        end;
+        for F := 1 to UC do
+        begin
+          SetLength(ConvBuf, Length(ConvBuf) + 1);
+          ConvBuf[Length(ConvBuf) - 1] := Ord('?');  // \ucN fallback chars
+        end;
+      end;
+    end;
+  end;
+
+  // Convert the pending text unit ONCE and splice it into OutBuf at the
+  // position where its first character began. The converter is context
+  // sensitive (conjuncts, half forms, kar toggling), so the whole unit
+  // - all \uNNNN escapes and literal bytes since the last boundary -
+  // must be converted together.
+  procedure FlushUnit;
+  var
+    ConvText: string;
+    OldLen, NewLen, Extra, M: Integer;
+  begin
+    if TextBuf = '' then Exit;
+    ConvText := Conv.Convert(TextBuf);
+    if ConvText = '' then
+    begin
+      TextBuf := '';
+      InsertPos := 0;
+      Exit;
+    end;
+
+    SetLength(ConvBuf, 0);
+    // If the byte just before the insertion point is alphanumeric (the tail
+    // of a control word like \lang1093), emit a delimiter space first so the
+    // text cannot merge into that control word.
+    if (InsertPos > 0) and (OutBuf[InsertPos - 1] in [Ord('a')..Ord('z'),
+      Ord('A')..Ord('Z'), Ord('0')..Ord('9'), Ord('-')]) then
+    begin
+      SetLength(ConvBuf, 1);
+      ConvBuf[0] := Ord(' ');
+    end;
+    EmitConverted(ConvText);
+
+    // Splice ConvBuf into OutBuf at InsertPos.
+    OldLen := Length(OutBuf);
+    Extra := Length(ConvBuf);
+    NewLen := OldLen + Extra;
+    SetLength(OutBuf, NewLen);
+    for M := OldLen - 1 downto InsertPos do
+      OutBuf[M + Extra] := OutBuf[M];
+    for M := 0 to Extra - 1 do
+      OutBuf[InsertPos + M] := ConvBuf[M];
+
+    TextBuf := '';
+    InsertPos := 0;
+  end;
+
+  // Append one decoded Unicode character to the pending text unit.
+  procedure AppendChar(C: Char);
+  begin
+    if TextBuf = '' then
+      InsertPos := Length(OutBuf);
+    TextBuf := TextBuf + C;
+  end;
+
+begin
+  Len := Src.Size - Src.Position;
+  SetLength(InBuf, Len);
+  if Len > 0 then
+    Src.ReadBuffer(InBuf[0], Len);
+
+  SetLength(OutBuf, 0);
+  TextBuf := '';
+  InsertPos := 0;
+  UC := 1;        // \ucN - fallback characters after each \uNNNN (default 1)
+  Fallback := 0;  // source fallback chars still to be skipped
+  Bin := 0;       // remaining raw binary bytes to copy verbatim (\binN)
+
+  I := 0;
+  while I < Len do
+  begin
+    if Bin > 0 then
+    begin
+      // \binN payload: opaque bytes, never converted.
+      EmitByte(InBuf[I]);
+      Dec(Bin);
+      Inc(I);
+      Continue;
+    end;
+    if Fallback > 0 then
+    begin
+      // Drop the source's fallback characters - the converted text carries
+      // its own \ucN fallback chars.
+      Dec(Fallback);
+      Inc(I);
+      Continue;
+    end;
+
+    B := InBuf[I];
+    if (B = Ord('{')) or (B = Ord('}')) then
+    begin
+      FlushUnit;
+      if (B = Ord('{')) and (I + 2 < Len) and (InBuf[I + 1] = Ord('\'))
+        and (InBuf[I + 2] = Ord('*')) then
+      begin
+        // {\*...} star destination (metadata like \mmathPr, \listtable, \pn,
+        // \generator): copy verbatim - never converted, never split. Word
+        // writes camelCase control words here (\mmathPr, \mmathFont13,
+        // \mwrapIndent1440) whose uppercase fragments are technically text;
+        // converting/splicing them glued them into junk like
+        // "PrFont13Indent1440" that RichEdit then showed above the table.
+        Depth := 1;
+        J := I + 1;
+        while (J < Len) and (Depth > 0) do
+        begin
+          if InBuf[J] = Ord('\') then
+          begin
+            if (J + 1 < Len) and ((InBuf[J + 1] = Ord('{')) or (InBuf[J + 1] = Ord('}'))) then
+              Inc(J, 2)
+            else if (J + 5 < Len) and (InBuf[J + 1] = Ord('b')) and (InBuf[J + 2] = Ord('i'))
+              and (InBuf[J + 3] = Ord('n')) and (InBuf[J + 4] in [Ord('0')..Ord('9')]) then
+            begin
+              // skip the digits of a \binN payload length word
+              J := J + 5;
+              while (J < Len) and (InBuf[J] in [Ord('0')..Ord('9')]) do
+                Inc(J);
+            end
+            else
+              Inc(J);
+          end
+          else if InBuf[J] = Ord('{') then
+            Inc(Depth)
+          else if InBuf[J] = Ord('}') then
+            Dec(Depth);
+          Inc(J);
+        end;
+        while I < J do
+        begin
+          EmitByte(InBuf[I]);
+          Inc(I);
+        end;
+        Continue;
+      end;
+      EmitByte(B);
+      Inc(I);
+      Continue;
+    end;
+
+    if (B = Ord(';')) or (B = Ord(#13)) or (B = Ord(#10)) then
+    begin
+      // Group/section delimiters and source line wrapping of the RTF -
+      // pass through verbatim and end the pending text unit so table
+      // terminators (\fonttbl/{\colortbl ...;}) cannot be pulled out of
+      // place or converted (a ";" must never become an \u8212 em-dash run).
+      FlushUnit;
+      EmitByte(B);
+      Inc(I);
+      Continue;
+    end;
+
+    if B = Ord('\') then
+    begin
+      Inc(I);
+      if I >= Len then
+      begin
+        FlushUnit;
+        EmitByte(Ord('\'));
+        Break;
+      end;
+      B := InBuf[I];
+
+      if B in [Ord('a')..Ord('z')] then
+      begin
+        // Control word: read the letters and optional signed numeric parameter.
+        WordStart := I;
+        while (I < Len) and (InBuf[I] in [Ord('a')..Ord('z')]) do
+          Inc(I);
+        W := '';
+        for J := WordStart to I - 1 do
+          W := W + Char(InBuf[J]);
+        HasParam := False;
+        HasDelimSpace := False;
+        Param := 0;
+        Sign := 1;
+        if (I < Len) and (InBuf[I] = Ord('-')) then
+        begin
+          Sign := -1;
+          Inc(I);
+        end;
+        while (I < Len) and (InBuf[I] in [Ord('0')..Ord('9')]) do
+        begin
+          HasParam := True;
+          Param := Param * 10 + (InBuf[I] - Ord('0'));
+          Inc(I);
+        end;
+        Param := Param * Sign;
+        // A space after a control word is its delimiter, not text - consume
+        // it, but re-emit it after the control word: if it were dropped and
+        // the next output byte were a letter, '\cell Hello' would collapse
+        // into the single control word '\cellHello' and the text would vanish.
+        if (I < Len) and (InBuf[I] = Ord(' ')) then
+        begin
+          Inc(I);
+          HasDelimSpace := True;
+        end;
+
+        if (W = 'u') and HasParam then
+        begin
+          // Unicode character escape - the actual text. Queue it for
+          // conversion and skip the \ucN fallback chars that follow.
+          Code := Integer(Param);
+          if Code < 0 then
+            Inc(Code, 65536);
+          AppendChar(Char(Code));
+          Fallback := UC;
+        end
+        else if (W = 'uc') and HasParam then
+          UC := Integer(Param)
+        else if (W = 'bin') and HasParam then
+        begin
+          // Raw binary block follows: copy the payload bytes untouched.
+          FlushUnit;
+          EmitStr('\bin' + IntToStr(Param));
+          Bin := Integer(Param);
+        end
+        else
+        begin
+          // Text-unit boundary? Convert and splice what was accumulated,
+          // then copy the word itself.
+          IsBoundary := False;
+          for K := 0 to High(BoundaryWords) do
+            if W = BoundaryWords[K] then
+            begin
+              IsBoundary := True;
+              Break;
+            end;
+          if IsBoundary then
+            FlushUnit;
+          // Any other control word (\trowd, \cell, \row, \pard, \f0, \fs22,
+          // \lang9, \cl..., ...) is structure/formatting - copy it verbatim.
+          EmitByte(Ord('\'));
+          EmitStr(W);
+          if HasParam then
+            EmitStr(IntToStr(Param));
+          if HasDelimSpace then
+            EmitByte(Ord(' '));
+        end;
+      end
+      else
+      begin
+        // Control symbol. \'hh is a text character (decode it and queue it
+        // for conversion); the rest (\*, \{, \}, \\, \~, \-, ...) is
+        // structure/formatting copied verbatim.
+        if B = Ord('''') then
+        begin
+          Inc(I);
+          Code := 0;
+          if (I < Len) and (InBuf[I] in [Ord('0')..Ord('9'), Ord('a')..Ord('f'),
+            Ord('A')..Ord('F')]) then
+          begin
+            if InBuf[I] <= Ord('9') then Code := InBuf[I] - Ord('0')
+            else if InBuf[I] <= Ord('F') then Code := InBuf[I] - Ord('A') + 10
+            else Code := InBuf[I] - Ord('a') + 10;
+            Inc(I);
+          end;
+          if (I < Len) and (InBuf[I] in [Ord('0')..Ord('9'), Ord('a')..Ord('f'),
+            Ord('A')..Ord('F')]) then
+          begin
+            Code := Code * 16;
+            if InBuf[I] <= Ord('9') then Code := Code + InBuf[I] - Ord('0')
+            else if InBuf[I] <= Ord('F') then Code := Code + InBuf[I] - Ord('A') + 10
+            else Code := Code + InBuf[I] - Ord('a') + 10;
+            Inc(I);
+          end;
+          if Code < $80 then
+            AppendChar(Char(Code))
+          else if Code < $A0 then
+            AppendChar(Char(Cp1252[Code - $80]))
+          else
+            AppendChar(Char(Code));
+        end
+        else
+        begin
+          EmitByte(Ord('\'));
+          EmitByte(B);
+          Inc(I);
+        end;
+      end;
+      Continue;
+    end;
+
+    // Literal text byte - decode from cp1252 and queue for conversion.
+    if B < $80 then
+      AppendChar(Char(B))
+    else if B < $A0 then
+      AppendChar(Char(Cp1252[B - $80]))
+    else
+      AppendChar(Char(B));
+    Inc(I);
+  end;
+
+  FlushUnit;
+  if Length(OutBuf) > 0 then
+    Dst.WriteBuffer(OutBuf[0], Length(OutBuf));
+end;
+
 procedure TForm1.HandleThemes;
 begin
   SetAppropriateThemeMode('Windows10 Dark', 'Windows10');
@@ -617,8 +1058,8 @@ end;
 
 procedure TForm1.Button1Click(Sender: TObject);
 var
-  Src, OutText, EOL, Segment, ActiveFont: string;
-  P, Q, TotalLen: Integer;
+  ActiveFont: string;
+  MS, OutStream: TMemoryStream;
 begin
   MEMO1.Enabled := False;
   MEMO2.Enabled := False;
@@ -630,35 +1071,24 @@ begin
   MEMO2.Clear;
   Application.ProcessMessages;
   try
-    Src := MEMO1.Text;
-    TotalLen := Length(Src);
-    OutText := '';
-    P := 1;
-    while P <= TotalLen do
-    begin
-      Q := P;
-      while (Q <= TotalLen) and not CharInSet(Src[Q], [#13, #10]) do
-        Inc(Q);
-
-      Segment := Copy(Src, P, Q - P);
-      OutText := OutText + FUniToBijoy.Convert(Segment);
-
-      if Q <= TotalLen then
-      begin
-        EOL := Src[Q];
-        Inc(Q);
-        if (EOL = #13) and (Q <= TotalLen) and (Src[Q] = #10) then
-        begin
-          EOL := EOL + #10;
-          Inc(Q);
-        end;
-        OutText := OutText + EOL;
-      end;
-
-      P := Q;
-      Progress.Position := (P * 100) div (TotalLen + 1);
-      Application.ProcessMessages;
+    // Convert through RTF instead of plain text so tables, cell borders and
+    // other formatting pasted into MEMO1 survive the Unicode-to-Bijoy pass:
+    // only the text runs (\uNNNN escapes and literal runs) are converted,
+    // every RTF structure word (\trowd, \cell, \row, ...) is kept intact.
+    MS := TMemoryStream.Create;
+    OutStream := TMemoryStream.Create;
+    try
+      MEMO1.Lines.SaveToStream(MS);       // SF_RTF - full document, not plain text
+      MS.Position := 0;
+      ConvertRtfUnicodeToBijoy(MS, OutStream, FUniToBijoy);
+      OutStream.Position := 0;
+      MEMO2.Lines.LoadFromStream(OutStream);
+    finally
+      OutStream.Free;
+      MS.Free;
     end;
+    Progress.Position := 100;
+    Application.ProcessMessages;
 
     ActiveFont := cbFontPicker.ActiveFont;
     if ActiveFont = '' then
@@ -667,14 +1097,11 @@ begin
       ActiveFont := MEMO2.Font.Name;
 
     MEMO2.DefAttributes.Name := ActiveFont;
-    MEMO2.DefAttributes.Size := MEMO2.Font.Size;
     MEMO2.DefAttributes.Charset := MEMO2.Font.Charset;
 
-    MEMO2.Text := OutText;
-
+    // Apply the picked ANSI font to every text run (including table cells).
     MEMO2.SelectAll;
     MEMO2.SelAttributes.Name := ActiveFont;
-    MEMO2.SelAttributes.Size := MEMO2.Font.Size;
     MEMO2.SelAttributes.Charset := MEMO2.Font.Charset;
     MEMO2.SelLength := 0;
 
@@ -735,14 +1162,12 @@ begin
     end;
 
     MEMO1.DefAttributes.Name := MEMO1.Font.Name;
-    MEMO1.DefAttributes.Size := MEMO1.Font.Size;
     MEMO1.DefAttributes.Charset := MEMO1.Font.Charset;
 
     MEMO1.Text := OutText;
 
     MEMO1.SelectAll;
     MEMO1.SelAttributes.Name := MEMO1.Font.Name;
-    MEMO1.SelAttributes.Size := MEMO1.Font.Size;
     MEMO1.SelAttributes.Charset := MEMO1.Font.Charset;
     MEMO1.SelLength := 0;
 
@@ -802,7 +1227,9 @@ begin
   if VerName = '' then Exit;
 
   if not TrySetAnsiVersion(VerName, ErrMsg) then
-    MessageDlg('Failed to load ANSI mapping: ' + ErrMsg, mtError, [mbOK], 0);
+    MessageDlg('Failed to load ANSI mapping: ' + ErrMsg, mtError, [mbOK], 0)
+  else
+    SaveConverterSetting('AnsiVersion', VerName);
 end;
 
 procedure TForm1.cbAnsiVersionDropDown(Sender: TObject);
@@ -1627,6 +2054,7 @@ begin
   if SameText(cbFontPicker.Text, cbFontPicker.ActiveFont) then
   begin
     ApplyFontToMemo2(cbFontPicker.ActiveFont);
+    SaveConverterSetting('ConverterAnsiFont', cbFontPicker.ActiveFont);
     ActiveControl := nil; 
   end
   else
@@ -1735,7 +2163,14 @@ var
   Pt: TPoint;
   IsPickerDropped, IsAnsiDropped: Boolean;
 begin
-  if (Msg.message = WM_LBUTTONDOWN) or (Msg.message = WM_NCLBUTTONDOWN) then
+  if (Msg.message = WM_KEYDOWN) and (Msg.wParam = Ord('V'))
+    and ((GetKeyState(VK_CONTROL) and $8000) <> 0)
+    and (PopupMemo <> nil) and CanPasteToMemo then
+  begin
+    PasteToPopupMemo;
+    Handled := True;
+  end
+  else if (Msg.message = WM_LBUTTONDOWN) or (Msg.message = WM_NCLBUTTONDOWN) then
   begin
     IsPickerDropped := (cbFontPicker <> nil) and cbFontPicker.DroppedDown;
     IsAnsiDropped := (cbAnsiVersion <> nil) and cbAnsiVersion.DroppedDown;
@@ -1785,6 +2220,9 @@ begin
 end;
 
 procedure TForm1.FormCreate(Sender: TObject);
+var
+  SavedAnsiVersion, SavedFont, ErrMsg: string;
+  Idx: Integer;
 begin
   HandleThemes;
   DoubleBuffered := True;
@@ -1802,10 +2240,23 @@ begin
 
   AnsiMappingDir := GetAvroDataDir + 'AnsiMapping\';
   ForceDirectories(AnsiMappingDir);
+
+  // Populate the combo list first, so ItemIndex can be matched against it
   PopulateAnsiVersionsCombo;
 
-  cbAnsiVersion.ItemIndex := cbAnsiVersion.Items.IndexOf(AnsiVersion);
-  if cbAnsiVersion.ItemIndex < 0 then
+  // Restore the "last used" ANSI mapping version and font from the registry
+  // (AnsiVersion is shared with the main Avro Keyboard app).
+  ReadConverterSettings(SavedAnsiVersion, SavedFont);
+  if SavedAnsiVersion <> '' then
+  begin
+    TrySetAnsiVersion(SavedAnsiVersion, ErrMsg);
+    Idx := cbAnsiVersion.Items.IndexOf(SavedAnsiVersion);
+    if Idx >= 0 then
+      cbAnsiVersion.ItemIndex := Idx
+    else
+      cbAnsiVersion.ItemIndex := 0;
+  end
+  else
     cbAnsiVersion.ItemIndex := 0;
 
   // Load all system fonts into cbFontPicker
@@ -1814,7 +2265,13 @@ begin
   // Set initial active font without triggering OnChange
   cbFontPicker.OnChange := nil;
   try
-    cbFontPicker.SetActiveFont(MEMO2.Font.Name);
+    if SavedFont <> '' then
+    begin
+      cbFontPicker.SetActiveFont(SavedFont);
+      ApplyFontToMemo2(SavedFont);
+    end
+    else
+      cbFontPicker.SetActiveFont(MEMO2.Font.Name);
   finally
     cbFontPicker.OnChange := cbFontPickerChange;
   end;
@@ -1835,6 +2292,8 @@ begin
   MEMO2.PopupMenu := PopupMenu1;
   MEMO1.OnContextPopup := MEMOContextPopup;
   MEMO2.OnContextPopup := MEMOContextPopup;
+  SendMessage(MEMO1.Handle, EM_SETTARGETDEVICE, 0, 0);
+  SendMessage(MEMO2.Handle, EM_SETTARGETDEVICE, 0, 0);
 end;
 
 procedure TForm1.FormResize(Sender: TObject);
