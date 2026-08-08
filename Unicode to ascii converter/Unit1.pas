@@ -831,6 +831,16 @@ begin
     Exit;
   end;
 
+  // Keep the text (I-beam) cursor visible over the edit control - the system
+  // may fail to refresh the cursor icon on WM_SETCURSOR while the drop-down
+  // list holds mouse capture, which would otherwise hide the cursor.
+  if uMsg = WM_SETCURSOR then
+  begin
+    SetCursor(LoadCursor(0, IDC_IBEAM));
+    Result := 1;
+    Exit;
+  end;
+
   // The native combo box selects all of the edit text (EM_SETSEL 0,-1) after
   // a font is committed; convert that into a deselection (-1,-1) so the picked
   // font name is never left highlighted in blue.
@@ -1525,6 +1535,15 @@ var
   Idx: Integer;
 begin
   case Message.Msg of
+    // Keep the standard arrow cursor visible over the combo face and its
+    // dropped-down list - same reason as in FontPickerEditProc: the system
+    // may not refresh the cursor while the list holds mouse capture.
+    WM_SETCURSOR:
+      begin
+        SetCursor(LoadCursor(0, IDC_ARROW));
+        Message.Result := 1;
+        Exit;
+      end;
     WM_KEYDOWN:
       begin
         if HandleEditKey(Message.Msg, Message.WParam, Message.LParam) then
@@ -1820,8 +1839,20 @@ end;
 
 procedure TForm1.FormResize(Sender: TObject);
 var
-  Available, NewHeight: Integer;
+  Available, NewHeight, AvailWidth: Integer;
 begin
+  // Dynamically size cbFontPicker with a max width constraint of 280px,
+  // so it never stretches too wide in full screen mode, nor overflows
+  // the window when it is small.
+  if cbFontPicker <> nil then
+  begin
+    AvailWidth := ClientWidth - cbFontPicker.Left - 20;
+    if AvailWidth > 280 then
+      cbFontPicker.Width := 280
+    else if AvailWidth > 120 then
+      cbFontPicker.Width := AvailWidth;
+  end;
+
   Available := ClientHeight - PanelHeader.Height - PanelButton.Height
     - PanelFooter.Height - Splitter1.Height;
   if Available > 0 then
