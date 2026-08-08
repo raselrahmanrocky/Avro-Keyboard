@@ -50,7 +50,7 @@ object Form1: TForm1
     0000803800008000000090010000FC030000FF1F0000FFFF0000FFFF0000}
   Position = poScreenCenter
   Constraints.MinHeight = 346
-  Constraints.MinWidth = 520
+  Constraints.MinWidth = 580
   OnClose = FormClose
   OnCreate = FormCreate
   OnDestroy = FormDestroy
@@ -191,6 +191,21 @@ object Form1: TForm1
       OnChange = cbAnsiVersionChange
       OnDropDown = cbAnsiVersionDropDown
       OnCloseUp = cbAnsiVersionCloseUp
+    end
+    object cbFontPicker: TComboBox
+      Left = 408
+      Top = 3
+      Width = 200
+      Height = 25
+      Anchors = [akLeft, akTop, akRight]
+      Style = csOwnerDrawFixed
+      ItemHeight = 22
+      DropDownCount = 14
+      TabOrder = 3
+      ShowHint = True
+      Hint = 'Choose installed font for ANSI preview'
+      OnDrawItem = cbFontPickerDrawItem
+      OnChange = cbFontPickerChange
     end
   end
   object MEMO2Panel: TRoundedPanel

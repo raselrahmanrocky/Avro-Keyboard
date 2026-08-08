@@ -72,6 +72,7 @@ type
     Button2: TButton;
     LabelAnsi: TLabel;
     cbAnsiVersion: TAnsiVersionCombo;
+    cbFontPicker: TComboBox;
     Progress: TProgressBar;
     Label_OmicronLab: TLabel;
     AppEvents: TApplicationEvents;
@@ -95,6 +96,9 @@ type
     procedure cbAnsiVersionChange(Sender: TObject);
     procedure cbAnsiVersionDropDown(Sender: TObject);
     procedure cbAnsiVersionCloseUp(Sender: TObject);
+    procedure cbFontPickerChange(Sender: TObject);
+    procedure cbFontPickerDrawItem(Control: TWinControl; Index: Integer;
+      Rect: TRect; State: TOwnerDrawState);
     procedure FormDestroy(Sender: TObject);
     procedure SplitterMoved(Sender: TObject);
     procedure Label_OmicronLabClick(Sender: TObject);
@@ -600,13 +604,14 @@ end;
 
 procedure TForm1.Button1Click(Sender: TObject);
 var
-  Src, OutText, EOL, Segment: string;
+  Src, OutText, EOL, Segment, ActiveFont: string;
   P, Q, TotalLen: Integer;
 begin
   MEMO1.Enabled := False;
   MEMO2.Enabled := False;
   Button1.Enabled := False;
   Button2.Enabled := False;
+  cbFontPicker.Enabled := False;
   Progress.Visible := True;
   Progress.Position := 0;
   MEMO2.Clear;
@@ -646,18 +651,23 @@ begin
       Progress.Position := (P * 100) div (TotalLen + 1);
       Application.ProcessMessages;
     end;
+    // The font chosen in the picker (falls back to the memo's own font)
+    ActiveFont := cbFontPicker.Text;
+    if ActiveFont = '' then
+      ActiveFont := MEMO2.Font.Name;
+
     // Preset the default font for the ANSI preview so that every new
-    // run of text starts in Kalpurush ANSI
-    MEMO2.DefAttributes.Name := MEMO2.Font.Name;
+    // run of text starts in the selected preview font
+    MEMO2.DefAttributes.Name := ActiveFont;
     MEMO2.DefAttributes.Size := MEMO2.Font.Size;
     MEMO2.DefAttributes.Charset := MEMO2.Font.Charset;
 
     MEMO2.Text := OutText;
 
-    // Force the selected font (Kalpurush ANSI) over the whole text so that
-    // no part is shown in another font (in its English form)
+    // Force the selected font over the whole text so that no part is
+    // shown in another font (in its English form)
     MEMO2.SelectAll;
-    MEMO2.SelAttributes.Name := MEMO2.Font.Name;
+    MEMO2.SelAttributes.Name := ActiveFont;
     MEMO2.SelAttributes.Size := MEMO2.Font.Size;
     MEMO2.SelAttributes.Charset := MEMO2.Font.Charset;
     MEMO2.SelLength := 0;
@@ -669,6 +679,7 @@ begin
     MEMO2.Enabled := True;
     Button1.Enabled := True;
     Button2.Enabled := True;
+    cbFontPicker.Enabled := True;
   end;
 end;
 
@@ -683,6 +694,7 @@ begin
   MEMO2.Enabled := False;
   Button1.Enabled := False;
   Button2.Enabled := False;
+  cbFontPicker.Enabled := False;
   Progress.Visible := True;
   Progress.Position := 0;
   MEMO1.Clear;
@@ -740,6 +752,7 @@ begin
     MEMO2.Enabled := True;
     Button1.Enabled := True;
     Button2.Enabled := True;
+    cbFontPicker.Enabled := True;
   end;
 end;
 
@@ -812,6 +825,75 @@ end;
 procedure TForm1.cbAnsiVersionCloseUp(Sender: TObject);
 begin
   cbAnsiVersion.SetDropDownActive(False);
+end;
+
+{ =============================================================================== }
+
+procedure TForm1.cbFontPickerChange(Sender: TObject);
+var
+  SelectedFont: string;
+begin
+  SelectedFont := cbFontPicker.Text;
+  if SelectedFont = '' then
+    Exit;
+
+  // Live preview: switch MEMO2 (the ANSI box) to the picked font, for both
+  // newly entered text and whatever is already on screen. MEMO1 is untouched.
+  MEMO2.Font.Name := SelectedFont;
+  MEMO2.DefAttributes.Name := SelectedFont;
+
+  MEMO2.SelectAll;
+  MEMO2.SelAttributes.Name := SelectedFont;
+  MEMO2.SelLength := 0;
+
+  MakeTextJustified(MEMO2);
+end;
+
+{ =============================================================================== }
+
+procedure TForm1.cbFontPickerDrawItem(Control: TWinControl; Index: Integer;
+  Rect: TRect; State: TOwnerDrawState);
+var
+  Combo: TComboBox;
+  Text: string;
+  TextR: TRect;
+  Bg: TColor;
+  IsHover, IsActive: Boolean;
+begin
+  Combo := TComboBox(Control);
+  Text := Combo.Items[Index];
+  IsHover := odSelected in State;
+  IsActive := SameText(Text, MEMO2.Font.Name);
+
+  with Combo.Canvas do
+  begin
+    // ব্যাকগ্রাউন্ড কালার সেটিং
+    if IsHover then
+      Bg := MixColor(SysColor(clWindow), AccentColor, 14)
+    else if IsActive then
+      Bg := MixColor(SysColor(clWindow), AccentColor, 6)
+    else
+      Bg := SysColor(clWindow);
+
+    Brush.Color := Bg;
+    Brush.Style := bsSolid;
+    Pen.Style := psClear;
+    FillRect(Rect);
+
+    // সমাধান: ফন্টের নাম নিজের ফন্ট দিয়ে না এঁকে স্ট্যান্ডার্ড সিস্টেম ফন্ট (Combo.Font) দিয়ে আঁকা হচ্ছে
+    // এর ফলে SutonnyMJ বা ANSI ফন্টগুলোর নাম বিকৃত না হয়ে ইংরেজিতে আসল নাম হিসেবেই দেখা যাবে
+    Font := Combo.Font;
+    Font.Color := SysColor(clWindowText);
+    if IsActive then
+      Font.Style := [fsBold]
+    else
+      Font.Style := [];
+
+    TextR := System.Classes.Rect(Rect.Left + 8, Rect.Top,
+                                 Rect.Right - 4, Rect.Bottom);
+    DrawText(Handle, PChar(Text), Length(Text), TextR,
+      DT_SINGLELINE or DT_VCENTER or DT_END_ELLIPSIS or DT_NOPREFIX);
+  end;
 end;
 
 { =============================================================================== }
@@ -894,6 +976,8 @@ end;
 { =============================================================================== }
 
 procedure TForm1.FormCreate(Sender: TObject);
+var
+  I: Integer;
 begin
   HandleThemes;
   DoubleBuffered := True;
@@ -916,6 +1000,35 @@ begin
   cbAnsiVersion.ItemIndex := cbAnsiVersion.Items.IndexOf(AnsiVersion);
   if cbAnsiVersion.ItemIndex < 0 then
     cbAnsiVersion.ItemIndex := 0;
+
+  // Populate the font picker with every installed system font
+  cbFontPicker.Sorted := True;
+  cbFontPicker.Items.BeginUpdate;
+  try
+    cbFontPicker.Items.Assign(Screen.Fonts);
+  finally
+    cbFontPicker.Items.EndUpdate;
+  end;
+
+  // Default selection follows the font MEMO2 is currently using. The
+  // ItemIndex assignment is wrapped in a nil OnChange guard so startup
+  // selection can't trigger a live-preview pass (and, in the rare case the
+  // font is missing from the list, can't silently rewrite MEMO2's font).
+  cbFontPicker.OnChange := nil;
+  try
+    cbFontPicker.ItemIndex := cbFontPicker.Items.IndexOf(MEMO2.Font.Name);
+    if cbFontPicker.ItemIndex < 0 then
+      for I := 0 to cbFontPicker.Items.Count - 1 do
+        if SameText(cbFontPicker.Items[I], MEMO2.Font.Name) then
+        begin
+          cbFontPicker.ItemIndex := I;
+          Break;
+        end;
+    if cbFontPicker.ItemIndex < 0 then
+      cbFontPicker.ItemIndex := 0;
+  finally
+    cbFontPicker.OnChange := cbFontPickerChange;
+  end;
 
   // DefAttributes is set so that newly pasted/typed text also
   // uses MEMO1 = Siyam Rupali and MEMO2 = Kalpurush ANSI fonts
