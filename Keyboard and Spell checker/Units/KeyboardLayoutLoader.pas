@@ -728,4 +728,5 @@ begin
 end;
 
 {$WARN IMPLICIT_STRING_CAST ON}
+
 end.

@@ -1,9 +1,8 @@
 {$INCLUDE ../ProjectDefines.inc}
+unit uImageHandler;
 
-Unit uImageHandler;
+interface
 
-Interface
+implementation
 
-Implementation
-
-End.
+end.

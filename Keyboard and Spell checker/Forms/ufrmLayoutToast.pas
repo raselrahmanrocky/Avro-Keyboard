@@ -12,23 +12,30 @@ unit ufrmLayoutToast;
 interface
 
 uses
-  Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms,
-  ExtCtrls, StdCtrls;
+  Windows,
+  Messages,
+  SysUtils,
+  Classes,
+  Graphics,
+  Controls,
+  Forms,
+  ExtCtrls,
+  StdCtrls;
 
 type
   TfrmLayoutToast = class(TForm)
-  private
-    FLabel: TLabel;
-    FTimer: TTimer;
-    procedure TimerHandler(Sender: TObject);
-    procedure FormDeactivate(Sender: TObject);
-    procedure FormClose(Sender: TObject; var Action: TCloseAction);
-    procedure ClickHandler(Sender: TObject);
-  protected
-    procedure CreateParams(var Params: TCreateParams); override;
-  public
-    procedure Setup;
-    procedure ShowToast(const AText: string);
+    private
+      FLabel: TLabel;
+      FTimer: TTimer;
+      procedure TimerHandler(Sender: TObject);
+      procedure FormDeactivate(Sender: TObject);
+      procedure FormClose(Sender: TObject; var Action: TCloseAction);
+      procedure ClickHandler(Sender: TObject);
+    protected
+      procedure CreateParams(var Params: TCreateParams); override;
+    public
+      procedure Setup;
+      procedure ShowToast(const AText: string);
   end;
 
 procedure ShowLayoutToastNotification(const AText: string);
@@ -92,8 +99,7 @@ begin
   Left := Screen.Width - Width - 20;
   Top := Screen.Height - Height - 50;
 
-  SetWindowPos(Handle, HWND_TOPMOST, Left, Top, Width, Height,
-    SWP_NOACTIVATE or SWP_SHOWWINDOW);
+  SetWindowPos(Handle, HWND_TOPMOST, Left, Top, Width, Height, SWP_NOACTIVATE or SWP_SHOWWINDOW);
   FTimer.Enabled := True;
 end;
 

@@ -33,7 +33,7 @@ type
       DetermineZWNJ_ZWJ:          string;
       LastChars:                  array [1 .. TrackL] of string;
       PrevBanglaT, NewBanglaText: string;
-      CommittedBanglaT:          string;
+      CommittedBanglaT:           string;
 
       procedure InternalBackspace(KeyRepeat: Integer = 1);
       procedure DoBackspace(var Block: Boolean);
@@ -175,10 +175,7 @@ begin
       else if CommittedBanglaT <> '' then
       begin
         L := Length(CommittedBanglaT);
-        if (L >= 3)
-          and (CommittedBanglaT[L - 2] = b_R)
-          and (CommittedBanglaT[L - 1] = b_Hasanta)
-          and IsPureConsonent(CommittedBanglaT[L]) then
+        if (L >= 3) and (CommittedBanglaT[L - 2] = b_R) and (CommittedBanglaT[L - 1] = b_Hasanta) and IsPureConsonent(CommittedBanglaT[L]) then
         begin
           SavedChar := CommittedBanglaT[L];
           Backspace(3);
@@ -214,10 +211,8 @@ begin
   else
   begin
     Block := True;
-    if (Length(PrevBanglaT) >= 3)
-      and (PrevBanglaT[Length(PrevBanglaT) - 2] = b_R)
-      and (PrevBanglaT[Length(PrevBanglaT) - 1] = b_Hasanta)
-      and IsPureConsonent(PrevBanglaT[Length(PrevBanglaT)]) then
+    if (Length(PrevBanglaT) >= 3) and (PrevBanglaT[Length(PrevBanglaT) - 2] = b_R) and (PrevBanglaT[Length(PrevBanglaT) - 1] = b_Hasanta) and
+      IsPureConsonent(PrevBanglaT[Length(PrevBanglaT)]) then
     begin
       SavedChar := PrevBanglaT[Length(PrevBanglaT)];
       if OutputIsBijoy = 'YES' then
@@ -382,7 +377,8 @@ end;
 {$HINTS ON}
 { =============================================================================== }
 
-function TGenericLayoutModern.MyProcessVKeyDown(const KeyCode: Integer; var Block: Boolean; const var_IsLogicalShift, var_IsTrueShift, var_IsAltGr: Boolean): string;
+function TGenericLayoutModern.MyProcessVKeyDown(const KeyCode: Integer; var Block: Boolean;
+  const var_IsLogicalShift, var_IsTrueShift, var_IsAltGr: Boolean): string;
 var
   CharForKey: string;
 begin
@@ -396,8 +392,8 @@ begin
   else if AvroMainForm1.GetMyCurrentKeyboardMode = bangla then
   begin
     CharForKey := GetCharForKey(KeyCode, var_IsLogicalShift, var_IsTrueShift, var_IsAltGr);
-    Log(Format('Keycode: %d, CharForKey:%s, var_IsLogicalShift:%s, var_IsTrueShift:%s, var_IsAltGr:%s', [KeyCode, CharForKey, BoolToStr(var_IsLogicalShift, True),
-          BoolToStr(var_IsTrueShift, True), BoolToStr(var_IsAltGr, True)]));
+    Log(Format('Keycode: %d, CharForKey:%s, var_IsLogicalShift:%s, var_IsTrueShift:%s, var_IsAltGr:%s',
+        [KeyCode, CharForKey, BoolToStr(var_IsLogicalShift, True), BoolToStr(var_IsTrueShift, True), BoolToStr(var_IsAltGr, True)]));
 
     if VowelFormating = 'NO' then
       DeadKey := False;

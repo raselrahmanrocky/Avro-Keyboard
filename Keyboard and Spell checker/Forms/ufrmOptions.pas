@@ -180,7 +180,7 @@ uses
 const
   Show_Window_in_Taskbar = True;
 
-{ =============================================================================== }
+  { =============================================================================== }
 
 function IsHotkeyNone(const Text: string): Boolean;
 var
@@ -268,12 +268,18 @@ begin
   GlobalOutput_Panel.Visible := False;
 
   case CategoryTree.Selected.Index of
-    0: General_Panel.Visible := True;
-    1: Interface_Panel.Visible := True;
-    2: KeyboardMode_Panel.Visible := True;     { "Global Hotkeys" }
-    3: AvroPhonetic_Panel.Visible := True;
-    4: FixedLayout_Panel.Visible := True;
-    5: GlobalOutput_Panel.Visible := True;
+    0:
+      General_Panel.Visible := True;
+    1:
+      Interface_Panel.Visible := True;
+    2:
+      KeyboardMode_Panel.Visible := True; { "Global Hotkeys" }
+    3:
+      AvroPhonetic_Panel.Visible := True;
+    4:
+      FixedLayout_Panel.Visible := True;
+    5:
+      GlobalOutput_Panel.Visible := True;
   end;
 
   TopLabel.Caption := CategoryTree.Selected.Text + ' Settings...';
@@ -408,9 +414,9 @@ end;
 
 procedure TfrmOptions.FormCreate(Sender: TObject);
 const
-  LEFT_MARGIN = 24;
-  EDIT_WIDTH = 180;
-  GROUP_HEIGHT = 75;
+  LEFT_MARGIN   = 24;
+  EDIT_WIDTH    = 180;
+  GROUP_HEIGHT  = 75;
   GROUP_SPACING = 12;
 begin
 
@@ -838,7 +844,6 @@ begin
     CheckEnableJoNukta.Checked := True
   else
     CheckEnableJoNukta.Checked := False;
-
 
   // =========================================================
   // Fixed Layout Options

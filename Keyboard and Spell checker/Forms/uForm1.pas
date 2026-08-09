@@ -350,13 +350,13 @@ type
     procedure AppEventsSettingChange(Sender: TObject; Flag: Integer; const Section: string; var Result: LongInt);
     private
       { Private declarations }
-      WindowDict:            TDictionary<HWND, TWindowRecord>;
-      MyCurrentLayout:       string;
-      MyCurrentKeyboardMode: enumMode;
-      LastWindow:            HWND;
-      PendingANSISwitch:     Boolean;
+      WindowDict:                   TDictionary<HWND, TWindowRecord>;
+      MyCurrentLayout:              string;
+      MyCurrentKeyboardMode:        enumMode;
+      LastWindow:                   HWND;
+      PendingANSISwitch:            Boolean;
       PreviousModeBeforeANSISwitch: enumMode;
-      FActiveMappingLastWriteTime: TDateTime;
+      FActiveMappingLastWriteTime:  TDateTime;
 
       procedure ChangeTypingStyle(const sStyle: string);
       function IgnorableWindow(const lngHWND: HWND): Boolean;
@@ -393,8 +393,8 @@ type
       Updater:             TUpdateCheck;
       AnsiVersionSubmenu1: TMenuItem;
       AnsiVersionSubmenu2: TMenuItem;
-      IgnoreCapsLock1: TMenuItem;
-      IgnoreCapsLock2: TMenuItem;
+      IgnoreCapsLock1:     TMenuItem;
+      IgnoreCapsLock2:     TMenuItem;
 
       function GetMyCurrentKeyboardMode: enumMode;
       procedure ExitApp;
@@ -994,7 +994,7 @@ end;
 
 procedure TAvroMainForm1.KeyLayout_KeyboardModeChanged(CurrentMode: enumMode);
 var
-  hforewnd:                                         Integer;
+  hforewnd:                      Integer;
   WindowRecord, NewWindowRecord: TWindowRecord;
 begin
   { This is for Top Bar, when Keyboard Mode is changed,
@@ -1061,7 +1061,6 @@ begin
 end;
 
 { =============================================================================== }
-
 
 procedure TAvroMainForm1.LoadApp;
 var
@@ -1157,8 +1156,8 @@ begin
     else
       FActiveMappingLastWriteTime := 0;
   end
-    else
-      FActiveMappingLastWriteTime := 0;
+  else
+    FActiveMappingLastWriteTime := 0;
 
   // Apply the loaded ANSI mapping
   if AnsiMappingDir = '' then
@@ -1796,25 +1795,25 @@ end;
 
 procedure TAvroMainForm1.SetBengaliUnicodeMode;
 begin
-  if (KeyLayout.KeyboardMode = Bangla) and (OutputIsBijoy = 'NO') then
+  if (KeyLayout.KeyboardMode = bangla) and (OutputIsBijoy = 'NO') then
     KeyLayout.KeyboardMode := SysDefault
   else
   begin
-    if KeyLayout.KeyboardMode <> Bangla then
-      KeyLayout.KeyboardMode := Bangla;
-      if OutputIsBijoy = 'YES' then
-      begin
-        OutputIsBijoy := 'NO';
-        OptimizeMemoryUsage;
-        RefreshSettings;
-      end;
+    if KeyLayout.KeyboardMode <> bangla then
+      KeyLayout.KeyboardMode := bangla;
+    if OutputIsBijoy = 'YES' then
+    begin
+      OutputIsBijoy := 'NO';
+      OptimizeMemoryUsage;
+      RefreshSettings;
+    end;
   end;
 
 end;
 
 procedure TAvroMainForm1.SetBengaliANSIMode;
 begin
-  if (KeyLayout.KeyboardMode = Bangla) and (OutputIsBijoy = 'YES') then
+  if (KeyLayout.KeyboardMode = bangla) and (OutputIsBijoy = 'YES') then
   begin
     { Already in Bangla+ANSI: toggle off to English. No warning needed. }
     KeyLayout.KeyboardMode := SysDefault;
@@ -1826,8 +1825,8 @@ begin
       Bangla if they were already typing Bangla in Unicode). }
     PreviousModeBeforeANSISwitch := KeyLayout.KeyboardMode;
 
-    if KeyLayout.KeyboardMode <> Bangla then
-      KeyLayout.KeyboardMode := Bangla;
+    if KeyLayout.KeyboardMode <> bangla then
+      KeyLayout.KeyboardMode := bangla;
 
     if ShowOutputwarning <> 'NO' then
     begin
@@ -1916,7 +1915,8 @@ end;
 
 procedure TAvroMainForm1.ToggleOutputEncoding;
 begin
-  if KeyLayout.KeyboardMode = SysDefault then Exit;
+  if KeyLayout.KeyboardMode = SysDefault then
+    exit;
   if OutputIsBijoy = 'YES' then
     OutputasUnicodeRecommended1Click(nil)
   else
@@ -2183,10 +2183,11 @@ end;
 procedure TAvroMainForm1.AnsiVersionMenuClick(Sender: TObject);
 var
   ClickedItem, PrevCheckedItem: TMenuItem;
-  I: Integer;
-  SelectedVersion, ErrorMsg: string;
+  I:                            Integer;
+  SelectedVersion, ErrorMsg:    string;
 begin
-  if not (Sender is TMenuItem) then Exit;
+  if not(Sender is TMenuItem) then
+    exit;
   ClickedItem := TMenuItem(Sender);
 
   PrevCheckedItem := nil;
@@ -2211,13 +2212,8 @@ begin
       PrevCheckedItem.Checked := True;
     ClickedItem.Checked := False;
 
-    Application.MessageBox(
-      PChar('Could not load the selected ANSI mapping.' + sLineBreak +
-            'Please check your mapping file.' + sLineBreak + sLineBreak +
-            'Error: ' + ErrorMsg),
-      'ANSI Mapping Error',
-      MB_ICONWARNING or MB_OK
-    );
+    Application.MessageBox(PChar('Could not load the selected ANSI mapping.' + sLineBreak + 'Please check your mapping file.' + sLineBreak + sLineBreak +
+          'Error: ' + ErrorMsg), 'ANSI Mapping Error', MB_ICONWARNING or MB_OK);
   end
   else
   begin
@@ -2235,10 +2231,10 @@ end;
 
 procedure TAvroMainForm1.ImportAnsiMappingClick(Sender: TObject);
 var
-  OpenDialog: TOpenDialog;
+  OpenDialog:                TOpenDialog;
   DestPath, ErrMsg, NewName: string;
-  ErrorLog: TStringList;
-  I: Integer;
+  ErrorLog:                  TStringList;
+  I:                         Integer;
 begin
   OpenDialog := TOpenDialog.Create(nil);
   try
@@ -2249,7 +2245,7 @@ begin
       if not ValidateAnsiMappingFile(OpenDialog.FileName, ErrMsg) then
       begin
         MessageDlg('ANSI mapping import failed:'#13#10#13#10 + ErrMsg, mtError, [mbOK], 0);
-        Exit;
+        exit;
       end;
 
       ForceDirectories(AnsiMappingDir);
@@ -2258,20 +2254,18 @@ begin
       for I := 0 to AnsiVersionSubmenu1.Count - 1 do
         if SameText(AnsiVersionSubmenu1.Items[I].Caption, NewName) then
         begin
-          MessageDlg('A mapping with this name already exists.'#13#10 +
-            'Please rename the file or delete the existing one first.', mtError, [mbOK], 0);
-          Exit;
+          MessageDlg('A mapping with this name already exists.'#13#10 + 'Please rename the file or delete the existing one first.', mtError, [mbOK], 0);
+          exit;
         end;
       if FileExists(DestPath) then
       begin
-        MessageDlg('A mapping with this name already exists.'#13#10 +
-          'Please rename the file and try again.', mtError, [mbOK], 0);
-        Exit;
+        MessageDlg('A mapping with this name already exists.'#13#10 + 'Please rename the file and try again.', mtError, [mbOK], 0);
+        exit;
       end;
       if not CopyFile(PChar(OpenDialog.FileName), PChar(DestPath), False) then
       begin
         MessageDlg('Failed to copy file to the mapping directory.', mtError, [mbOK], 0);
-        Exit;
+        exit;
       end;
 
       AnsiVersion := ChangeFileExt(ExtractFileName(OpenDialog.FileName), '');
@@ -2311,9 +2305,8 @@ begin
     if SaveDialog.Execute then
     begin
       ExportAnsiMapping(SaveDialog.FileName);
-      
-      MessageDlg('Current mapping successfully exported to:'#13#10 + SaveDialog.FileName, 
-                 mtInformation, [mbOK], 0);
+
+      MessageDlg('Current mapping successfully exported to:'#13#10 + SaveDialog.FileName, mtInformation, [mbOK], 0);
     end;
   finally
     SaveDialog.Free;
@@ -2333,12 +2326,12 @@ procedure TAvroMainForm1.DeleteAnsiMappingClick(Sender: TObject);
 var
   Name: string;
 begin
-  Name := (Sender as TMenuItem).Caption;
-  if MessageDlg('Delete mapping "' + Name + '"?', mtConfirmation, [mbYes, mbNo], 0) = mrYes then
+  name := (Sender as TMenuItem).Caption;
+  if MessageDlg('Delete mapping "' + name + '"?', mtConfirmation, [mbYes, mbNo], 0) = mrYes then
   begin
-    if DeleteFile(AnsiMappingDir + Name + '.json') then
+    if DeleteFile(AnsiMappingDir + name + '.json') then
     begin
-      if AnsiVersion = Name then
+      if AnsiVersion = name then
         AnsiVersion := 'Default';
       SaveSettings;
       LoadCurrentActiveMapping;
@@ -2367,20 +2360,21 @@ end;
 procedure TAvroMainForm1.CleanupDuplicateMappings;
 var
   SearchRec: TSearchRec;
-  NameMap: TDictionary<string, string>;
+  NameMap:   TDictionary<string, string>;
   FileTitle: string;
 begin
-  if not DirectoryExists(AnsiMappingDir) then Exit;
+  if not DirectoryExists(AnsiMappingDir) then
+    exit;
   NameMap := TDictionary<string, string>.Create;
   try
     if FindFirst(AnsiMappingDir + '*.json', faAnyFile, SearchRec) = 0 then
     begin
       repeat
         FileTitle := ChangeFileExt(SearchRec.Name, '');
-        if NameMap.ContainsKey(LowerCase(FileTitle)) then
+        if NameMap.ContainsKey(Lowercase(FileTitle)) then
           DeleteFile(AnsiMappingDir + SearchRec.Name)
         else
-          NameMap.Add(LowerCase(FileTitle), SearchRec.Name);
+          NameMap.Add(Lowercase(FileTitle), SearchRec.Name);
       until FindNext(SearchRec) <> 0;
       FindClose(SearchRec);
     end;
@@ -2395,7 +2389,7 @@ procedure TAvroMainForm1.BuildAnsiVersionMenus;
 var
   SearchRec: TSearchRec;
   FileTitle: string;
-  Sep: TMenuItem;
+  Sep:       TMenuItem;
 
   procedure AddVersionItem(ParentMenu: TMenuItem; const ACaption: string; AChecked: Boolean);
   var
@@ -2411,9 +2405,9 @@ var
 
   procedure BuildSingleMenu(AMenu: TMenuItem);
   var
-    Item: TMenuItem;
+    Item:       TMenuItem;
     DeleteMenu: TMenuItem;
-    HasFiles: Boolean;
+    HasFiles:   Boolean;
   begin
     AMenu.Clear;
     AddVersionItem(AMenu, 'Default', AnsiVersion = 'Default');

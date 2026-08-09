@@ -236,7 +236,7 @@ var
   TempStr:     string;
 begin
   Xml := TXMLDocument.Create(nil);
-  XML.Options := [doNodeAutoIndent];
+  Xml.Options := [doNodeAutoIndent];
   Xml.Active := True;
   Xml.Encoding := 'UTF-8';
 

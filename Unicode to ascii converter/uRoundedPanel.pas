@@ -21,16 +21,16 @@ uses
 
 type
   TRoundedPanel = class(TPanel)
-  private
-    FOnDraw: TNotifyEvent;
-    procedure WMEraseBkgnd(var Message: TWMEraseBkgnd); message WM_ERASEBKGND;
-  protected
-    procedure Paint; override;
-    procedure CreateParams(var Params: TCreateParams); override;
-  public
-    function Surface: TCanvas;
-  published
-    property OnDraw: TNotifyEvent read FOnDraw write FOnDraw;
+    private
+      FOnDraw: TNotifyEvent;
+      procedure WMEraseBkgnd(var Message: TWMEraseBkgnd); message WM_ERASEBKGND;
+    protected
+      procedure Paint; override;
+      procedure CreateParams(var Params: TCreateParams); override;
+    public
+      function Surface: TCanvas;
+    published
+      property OnDraw: TNotifyEvent read FOnDraw write FOnDraw;
   end;
 
 implementation
@@ -49,7 +49,7 @@ end;
 procedure TRoundedPanel.WMEraseBkgnd(var Message: TWMEraseBkgnd);
 begin
   // Prevent background erasing to stop flicker during resize
-  Message.Result := 1;
+  message.Result := 1;
 end;
 
 { =============================================================================== }
@@ -69,6 +69,7 @@ begin
 end;
 
 initialization
-  Classes.RegisterClass(TRoundedPanel);
+
+Classes.RegisterClass(TRoundedPanel);
 
 end.

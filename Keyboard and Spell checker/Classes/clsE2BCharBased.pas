@@ -347,10 +347,7 @@ begin
       else if CommittedBanglaT <> '' then
       begin
         L := Length(CommittedBanglaT);
-        if (L >= 3)
-          and (CommittedBanglaT[L - 2] = b_R)
-          and (CommittedBanglaT[L - 1] = b_Hasanta)
-          and IsPureConsonent(CommittedBanglaT[L]) then
+        if (L >= 3) and (CommittedBanglaT[L - 2] = b_R) and (CommittedBanglaT[L - 1] = b_Hasanta) and IsPureConsonent(CommittedBanglaT[L]) then
         begin
           SavedConsonant := CommittedBanglaT[L];
           Backspace(3);
@@ -387,10 +384,8 @@ begin
   begin
     Block := True;
     EnglishT := LeftStr(EnglishT, Length(EnglishT) - 1);
-    if (Length(PrevBanglaT) >= 3)
-      and (PrevBanglaT[Length(PrevBanglaT) - 2] = b_R)
-      and (PrevBanglaT[Length(PrevBanglaT) - 1] = b_Hasanta)
-      and IsPureConsonent(PrevBanglaT[Length(PrevBanglaT)]) then
+    if (Length(PrevBanglaT) >= 3) and (PrevBanglaT[Length(PrevBanglaT) - 2] = b_R) and (PrevBanglaT[Length(PrevBanglaT) - 1] = b_Hasanta) and
+      IsPureConsonent(PrevBanglaT[Length(PrevBanglaT)]) then
     begin
       SavedConsonant := PrevBanglaT[Length(PrevBanglaT)];
       if OutputIsBijoy = 'YES' then
@@ -400,7 +395,7 @@ begin
       end
       else
       begin
-        Backspace(3) ;
+        Backspace(3);
         SendKey_Char(SavedConsonant);
       end;
       PrevBanglaT := LeftStr(PrevBanglaT, Length(PrevBanglaT) - 3) + SavedConsonant;
@@ -485,7 +480,7 @@ begin
   EndCounter := rList.Count - 1;
 
   if EndCounter <= 0 then
-    exit;
+    Exit;
 
   rList.Sorted := False;
 
@@ -511,7 +506,7 @@ var
   tmpList:               TStringList;
 begin
   if FileExists(GetAvroDataDir + 'CandidateOptions.dat') = False then
-    exit;
+    Exit;
   try
     try
       tmpList := TStringList.Create;
@@ -549,31 +544,31 @@ begin
       begin
         AddStr('.`');
         Block := True;
-        exit;
+        Exit;
       end;
     VK_DIVIDE:
       begin
         AddStr('/');
         Block := True;
-        exit;
+        Exit;
       end;
     VK_MULTIPLY:
       begin
         AddStr('*');
         Block := True;
-        exit;
+        Exit;
       end;
     VK_SUBTRACT:
       begin
         AddStr('-');
         Block := True;
-        exit;
+        Exit;
       end;
     VK_ADD:
       begin
         AddStr('+');
         Block := True;
-        exit;
+        Exit;
       end;
 
     VK_OEM_1:
@@ -583,7 +578,7 @@ begin
         if var_IsTrueShift = False then
           AddStr(';');
         Block := True;
-        exit;
+        Exit;
       end;
     VK_OEM_2:
       begin // key /?
@@ -598,7 +593,7 @@ begin
           AddStr('/');
           Block := True;
         end;
-        exit;
+        Exit;
       end;
 
     VK_OEM_3:
@@ -608,7 +603,7 @@ begin
         if var_IsTrueShift = False then
           AddStr('`');
         Block := True;
-        exit;
+        Exit;
       end;
 
     VK_OEM_4:
@@ -618,7 +613,7 @@ begin
         if var_IsTrueShift = False then
           AddStr('[');
         Block := True;
-        exit;
+        Exit;
       end;
 
     VK_OEM_5:
@@ -633,7 +628,7 @@ begin
         if var_IsTrueShift = False then
           AddStr('\');
         Block := True;
-        exit;
+        Exit;
       end;
     VK_OEM_6:
       begin // key ]}
@@ -642,7 +637,7 @@ begin
         if var_IsTrueShift = False then
           AddStr(']');
         Block := True;
-        exit;
+        Exit;
       end;
     VK_OEM_7:
       begin // key '"
@@ -651,7 +646,7 @@ begin
         if var_IsTrueShift = False then
           AddStr(#39);
         Block := True;
-        exit;
+        Exit;
       end;
     VK_OEM_COMMA:
       begin // key ,<
@@ -660,7 +655,7 @@ begin
         if var_IsTrueShift = False then
           AddStr(',');
         Block := True;
-        exit;
+        Exit;
       end;
     VK_OEM_MINUS:
       begin // key - underscore
@@ -669,7 +664,7 @@ begin
         if var_IsTrueShift = False then
           AddStr('-');
         Block := True;
-        exit;
+        Exit;
       end;
     VK_OEM_PERIOD:
       begin // key . >
@@ -678,7 +673,7 @@ begin
         if var_IsTrueShift = False then
           AddStr('.');
         Block := True;
-        exit;
+        Exit;
       end;
     VK_OEM_PLUS:
       begin // key =+
@@ -687,7 +682,7 @@ begin
         if var_IsTrueShift = False then
           AddStr('=');
         Block := True;
-        exit;
+        Exit;
       end;
 
     VK_0:
@@ -697,7 +692,7 @@ begin
         if var_IsTrueShift = False then
           AddStr('0');
         Block := True;
-        exit;
+        Exit;
       end;
     VK_1:
       begin
@@ -706,7 +701,7 @@ begin
         if var_IsTrueShift = False then
           AddStr('1');
         Block := True;
-        exit;
+        Exit;
       end;
     VK_2:
       begin
@@ -715,7 +710,7 @@ begin
         if var_IsTrueShift = False then
           AddStr('2');
         Block := True;
-        exit;
+        Exit;
       end;
     VK_3:
       begin
@@ -724,7 +719,7 @@ begin
         if var_IsTrueShift = False then
           AddStr('3');
         Block := True;
-        exit;
+        Exit;
       end;
     VK_4:
       begin
@@ -733,7 +728,7 @@ begin
         if var_IsTrueShift = False then
           AddStr('4');
         Block := True;
-        exit;
+        Exit;
       end;
     VK_5:
       begin
@@ -742,7 +737,7 @@ begin
         if var_IsTrueShift = False then
           AddStr('5');
         Block := True;
-        exit;
+        Exit;
       end;
     VK_6:
       begin
@@ -751,7 +746,7 @@ begin
         if var_IsTrueShift = False then
           AddStr('6');
         Block := True;
-        exit;
+        Exit;
       end;
     VK_7:
       begin
@@ -760,7 +755,7 @@ begin
         if var_IsTrueShift = False then
           AddStr('7');
         Block := True;
-        exit;
+        Exit;
       end;
     VK_8:
       begin
@@ -769,7 +764,7 @@ begin
         if var_IsTrueShift = False then
           AddStr('8');
         Block := True;
-        exit;
+        Exit;
       end;
     VK_9:
       begin
@@ -778,68 +773,68 @@ begin
         if var_IsTrueShift = False then
           AddStr('9');
         Block := True;
-        exit;
+        Exit;
       end;
 
     VK_NUMPAD0:
       begin
         AddStr('0');
         Block := True;
-        exit;
+        Exit;
       end;
     VK_NUMPAD1:
       begin
         AddStr('1');
         Block := True;
-        exit;
+        Exit;
       end;
     VK_NUMPAD2:
       begin
         AddStr('2');
         Block := True;
-        exit;
+        Exit;
       end;
     VK_NUMPAD3:
       begin
         AddStr('3');
         Block := True;
-        exit;
+        Exit;
       end;
     VK_NUMPAD4:
       begin
         AddStr('4');
         Block := True;
-        exit;
+        Exit;
       end;
     VK_NUMPAD5:
       begin
         AddStr('5');
         Block := True;
-        exit;
+        Exit;
       end;
     VK_NUMPAD6:
       begin
         AddStr('6');
         Block := True;
-        exit;
+        Exit;
       end;
     VK_NUMPAD7:
       begin
         AddStr('7');
         Block := True;
-        exit;
+        Exit;
       end;
     VK_NUMPAD8:
       begin
         AddStr('8');
         Block := True;
-        exit;
+        Exit;
       end;
     VK_NUMPAD9:
       begin
         AddStr('9');
         Block := True;
-        exit;
+        Exit;
       end;
 
     A_Key:
@@ -849,7 +844,7 @@ begin
         if var_IsLogicalShift = False then
           AddStr('a');
         Block := True;
-        exit;
+        Exit;
       end;
     B_Key:
       begin
@@ -858,7 +853,7 @@ begin
         if var_IsLogicalShift = False then
           AddStr('b');
         Block := True;
-        exit;
+        Exit;
       end;
     C_Key:
       begin
@@ -867,7 +862,7 @@ begin
         if var_IsLogicalShift = False then
           AddStr('c');
         Block := True;
-        exit;
+        Exit;
       end;
     D_Key:
       begin
@@ -876,7 +871,7 @@ begin
         if var_IsLogicalShift = False then
           AddStr('d');
         Block := True;
-        exit;
+        Exit;
       end;
     E_Key:
       begin
@@ -885,7 +880,7 @@ begin
         if var_IsLogicalShift = False then
           AddStr('e');
         Block := True;
-        exit;
+        Exit;
       end;
     F_Key:
       begin
@@ -894,7 +889,7 @@ begin
         if var_IsLogicalShift = False then
           AddStr('f');
         Block := True;
-        exit;
+        Exit;
       end;
     G_Key:
       begin
@@ -903,7 +898,7 @@ begin
         if var_IsLogicalShift = False then
           AddStr('g');
         Block := True;
-        exit;
+        Exit;
       end;
     H_Key:
       begin
@@ -912,7 +907,7 @@ begin
         if var_IsLogicalShift = False then
           AddStr('h');
         Block := True;
-        exit;
+        Exit;
       end;
     I_Key:
       begin
@@ -921,7 +916,7 @@ begin
         if var_IsLogicalShift = False then
           AddStr('i');
         Block := True;
-        exit;
+        Exit;
       end;
     J_Key:
       begin
@@ -930,7 +925,7 @@ begin
         if var_IsLogicalShift = False then
           AddStr('j');
         Block := True;
-        exit;
+        Exit;
       end;
     K_Key:
       begin
@@ -939,7 +934,7 @@ begin
         if var_IsLogicalShift = False then
           AddStr('k');
         Block := True;
-        exit;
+        Exit;
       end;
     L_Key:
       begin
@@ -948,7 +943,7 @@ begin
         if var_IsLogicalShift = False then
           AddStr('l');
         Block := True;
-        exit;
+        Exit;
       end;
     M_Key:
       begin
@@ -957,7 +952,7 @@ begin
         if var_IsLogicalShift = False then
           AddStr('m');
         Block := True;
-        exit;
+        Exit;
       end;
     N_Key:
       begin
@@ -966,7 +961,7 @@ begin
         if var_IsLogicalShift = False then
           AddStr('n');
         Block := True;
-        exit;
+        Exit;
       end;
     O_Key:
       begin
@@ -975,7 +970,7 @@ begin
         if var_IsLogicalShift = False then
           AddStr('o');
         Block := True;
-        exit;
+        Exit;
       end;
     P_Key:
       begin
@@ -984,7 +979,7 @@ begin
         if var_IsLogicalShift = False then
           AddStr('p');
         Block := True;
-        exit;
+        Exit;
       end;
     Q_Key:
       begin
@@ -993,7 +988,7 @@ begin
         if var_IsLogicalShift = False then
           AddStr('q');
         Block := True;
-        exit;
+        Exit;
       end;
     R_Key:
       begin
@@ -1002,7 +997,7 @@ begin
         if var_IsLogicalShift = False then
           AddStr('r');
         Block := True;
-        exit;
+        Exit;
       end;
     S_Key:
       begin
@@ -1011,7 +1006,7 @@ begin
         if var_IsLogicalShift = False then
           AddStr('s');
         Block := True;
-        exit;
+        Exit;
       end;
     T_Key:
       begin
@@ -1020,7 +1015,7 @@ begin
         if var_IsLogicalShift = False then
           AddStr('t');
         Block := True;
-        exit;
+        Exit;
       end;
     U_Key:
       begin
@@ -1029,7 +1024,7 @@ begin
         if var_IsLogicalShift = False then
           AddStr('u');
         Block := True;
-        exit;
+        Exit;
       end;
     V_Key:
       begin
@@ -1038,7 +1033,7 @@ begin
         if var_IsLogicalShift = False then
           AddStr('v');
         Block := True;
-        exit;
+        Exit;
       end;
     W_Key:
       begin
@@ -1047,7 +1042,7 @@ begin
         if var_IsLogicalShift = False then
           AddStr('w');
         Block := True;
-        exit;
+        Exit;
       end;
     X_Key:
       begin
@@ -1056,7 +1051,7 @@ begin
         if var_IsLogicalShift = False then
           AddStr('x');
         Block := True;
-        exit;
+        Exit;
       end;
     Y_Key:
       begin
@@ -1065,7 +1060,7 @@ begin
         if var_IsLogicalShift = False then
           AddStr('y');
         Block := True;
-        exit;
+        Exit;
       end;
     Z_Key:
       begin
@@ -1074,7 +1069,7 @@ begin
         if var_IsLogicalShift = False then
           AddStr('z');
         Block := True;
-        exit;
+        Exit;
       end;
 
     // Special cases-------------------->
@@ -1082,25 +1077,25 @@ begin
       begin
         Block := False;
         ResetDeadKey;
-        exit;
+        Exit;
       end;
     VK_END:
       begin
         Block := False;
         ResetDeadKey;
-        exit;
+        Exit;
       end;
     VK_PRIOR:
       begin
         Block := False;
         ResetDeadKey;
-        exit;
+        Exit;
       end;
     VK_NEXT:
       begin
         Block := False;
         ResetDeadKey;
-        exit;
+        Exit;
       end;
     VK_UP:
       begin
@@ -1109,13 +1104,13 @@ begin
           Block := True;
           frmPrevW.SelectPrevItem;
           UpdateCandidateOption;
-          exit;
+          Exit;
         end
         else
         begin
           Block := False;
           ResetDeadKey;
-          exit;
+          Exit;
         end;
       end;
     VK_DOWN:
@@ -1125,37 +1120,37 @@ begin
           Block := True;
           frmPrevW.SelectNextItem;
           UpdateCandidateOption;
-          exit;
+          Exit;
         end
         else
         begin
           Block := False;
           ResetDeadKey;
-          exit;
+          Exit;
         end;
       end;
     VK_RIGHT:
       begin
         Block := False;
         ResetDeadKey;
-        exit;
+        Exit;
       end;
     VK_LEFT:
       begin
         Block := False;
         ResetDeadKey;
-        exit;
+        Exit;
       end;
     VK_BACK:
       begin
         DoBackspace(Block);
-        exit;
+        Exit;
       end;
     VK_DELETE:
       begin
         Block := False;
         ResetDeadKey;
-        exit;
+        Exit;
       end;
     VK_ESCAPE:
       begin
@@ -1163,14 +1158,14 @@ begin
         begin
           Block := True;
           ResetDeadKey;
-          exit;
+          Exit;
         end;
       end;
 
     VK_INSERT:
       begin
         Block := True;
-        exit;
+        Exit;
       end;
   end;
 end;
@@ -1450,7 +1445,7 @@ begin
     CommittedBanglaT := '';
     ResetDeadKey;
     ProcessVKeyDown := '';
-    exit;
+    Exit;
   end;
 
   if IsIgnorableModifierKey(KeyCode) then
@@ -1458,7 +1453,7 @@ begin
     Block := False;
     BlockLast := False;
     ProcessVKeyDown := '';
-    exit;
+    Exit;
   end;
 
   if AvroMainForm1.GetMyCurrentKeyboardMode = SysDefault then
@@ -1466,7 +1461,7 @@ begin
     Block := False;
     BlockLast := False;
     ProcessVKeyDown := '';
-    exit;
+    Exit;
   end
   else if AvroMainForm1.GetMyCurrentKeyboardMode = bangla then
   begin
@@ -1474,7 +1469,7 @@ begin
     begin
       ProcessSpace(Block);
       ProcessVKeyDown := '';
-      exit;
+      Exit;
     end
     else if KeyCode = VK_TAB then
     begin
@@ -1485,14 +1480,14 @@ begin
           Block := True;
           frmPrevW.SelectNextItem;
           UpdateCandidateOption;
-          exit;
+          Exit;
         end
         else
         begin
           ResetDeadKey;
           Block := False;
           ProcessVKeyDown := '';
-          exit;
+          Exit;
         end;
       end
       else
@@ -1500,14 +1495,14 @@ begin
         ResetDeadKey;
         Block := False;
         ProcessVKeyDown := '';
-        exit;
+        Exit;
       end;
     end
     else if KeyCode = VK_RETURN then
     begin
       ProcessEnter(Block);
       ProcessVKeyDown := '';
-      exit;
+      Exit;
     end
     else
     begin
@@ -1530,7 +1525,7 @@ begin
   begin
     Block := False;
     BlockLast := False;
-    exit;
+    Exit;
   end;
 
   if AvroMainForm1.GetMyCurrentKeyboardMode = SysDefault then

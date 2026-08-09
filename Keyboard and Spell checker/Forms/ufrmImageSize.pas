@@ -1,33 +1,32 @@
 {$INCLUDE ../ProjectDefines.inc}
+unit ufrmImageSize;
 
-Unit ufrmImageSize;
+interface
 
-Interface
+uses
+  Windows,
+  Messages,
+  SysUtils,
+  Variants,
+  Classes,
+  Graphics,
+  Controls,
+  Forms,
+  Dialogs;
 
-Uses
-     Windows,
-     Messages,
-     SysUtils,
-     Variants,
-     Classes,
-     Graphics,
-     Controls,
-     Forms,
-     Dialogs;
+type
+  TfrmImageSize = class(TForm)
+    private
+      { Private declarations }
+    public
+      { Public declarations }
+  end;
 
-Type
-     TfrmImageSize = Class(TForm)
-     Private
-          { Private declarations }
-     Public
-          { Public declarations }
-     End;
+var
+  frmImageSize: TfrmImageSize;
 
-Var
-     frmImageSize             : TfrmImageSize;
-
-Implementation
+implementation
 
 {$R *.dfm}
 
-End.
+end.
