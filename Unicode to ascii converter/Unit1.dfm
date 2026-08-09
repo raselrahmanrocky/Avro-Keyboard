@@ -76,9 +76,85 @@ object Form1: TForm1
       Caption = 'Type or Paste Unicode Bangla text here:'
     end
   end
+  object PanelButton: TPanel
+    Left = 0
+    Top = 24
+    Width = 665
+    Height = 32
+    Align = alTop
+    BevelOuter = bvNone
+    DoubleBuffered = True
+    FullRepaint = False
+    ParentDoubleBuffered = False
+    TabOrder = 1
+    object Button1: TButton
+      Left = 20
+      Top = 3
+      Width = 105
+      Height = 25
+      Caption = 'Unicode to ANSI'
+      Font.Charset = DEFAULT_CHARSET
+      Font.Color = clWindowText
+      Font.Height = -11
+      Font.Name = 'Tahoma'
+      Font.Style = [fsBold]
+      ParentFont = False
+      TabOrder = 0
+      OnClick = Button1Click
+    end
+    object cbAnsiVersion: TAnsiVersionCombo
+      Left = 131
+      Top = 3
+      Width = 160
+      Height = 25
+      Style = csOwnerDrawFixed
+      Ctl3D = False
+      ParentCtl3D = False
+      ItemHeight = 20
+      DropDownCount = 12
+      TabOrder = 1
+      ShowHint = True
+      Hint = 'Choose the ANSI encoding used for the converted text'
+      OnDrawItem = cbAnsiVersionDrawItem
+      OnChange = cbAnsiVersionChange
+      OnDropDown = cbAnsiVersionDropDown
+      OnCloseUp = cbAnsiVersionCloseUp
+    end
+    object Button2: TButton
+      Left = 297
+      Top = 3
+      Width = 105
+      Height = 25
+      Caption = 'ANSI to Unicode'
+      Font.Charset = DEFAULT_CHARSET
+      Font.Color = clWindowText
+      Font.Height = -11
+      Font.Name = 'Tahoma'
+      Font.Style = [fsBold]
+      ParentFont = False
+      TabOrder = 2
+      OnClick = Button2Click
+    end
+    object cbFontPicker: TFontPickerCombo
+      Left = 408
+      Top = 3
+      Width = 200
+      Height = 25
+      Anchors = [akLeft, akTop]
+      Style = csDropDown
+      ItemHeight = 20
+      DropDownCount = 14
+      TabOrder = 3
+      ShowHint = True
+      Hint = 'Type to search installed fonts for the ANSI preview'
+      OnChange = cbFontPickerChange
+      OnDropDown = cbFontPickerDropDown
+      OnCloseUp = cbFontPickerCloseUp
+    end
+  end
   object MEMO1Panel: TRoundedPanel
     Left = 8
-    Top = 24
+    Top = 56
     Width = 649
     Height = 125
     Align = alTop
@@ -91,7 +167,7 @@ object Form1: TForm1
     DoubleBuffered = True
     FullRepaint = True
     ParentDoubleBuffered = False
-    TabOrder = 1
+    TabOrder = 2
     OnDraw = MemoPanelPaint
     OnMouseDown = MemoPanelMouseDown
     object MEMO1: TRichEdit
@@ -121,9 +197,9 @@ object Form1: TForm1
   end
   object Splitter1: TSplitter
     Left = 8
-    Top = 129
+    Top = 181
     Width = 649
-    Height = 5
+    Height = 10
     Cursor = crVSplit
     Align = alTop
     AlignWithMargins = True
@@ -133,86 +209,9 @@ object Form1: TForm1
     Margins.Bottom = 0
     OnMoved = SplitterMoved
   end
-  object PanelButton: TPanel
-    Left = 0
-    Top = 134
-    Width = 665
-    Height = 32
-    Align = alTop
-    BevelOuter = bvNone
-    DoubleBuffered = True
-    FullRepaint = False
-    ParentDoubleBuffered = False
-    TabOrder = 2
-    object Button1: TButton
-      Left = 20
-      Top = 3
-      Width = 105
-      Height = 25
-      Caption = 'Unicode to ANSI'
-      Default = True
-      Font.Charset = DEFAULT_CHARSET
-      Font.Color = clWindowText
-      Font.Height = -11
-      Font.Name = 'Tahoma'
-      Font.Style = [fsBold]
-      ParentFont = False
-      TabOrder = 0
-      OnClick = Button1Click
-    end
-    object Button2: TButton
-      Left = 131
-      Top = 3
-      Width = 105
-      Height = 25
-      Caption = 'ANSI to Unicode'
-      Font.Charset = DEFAULT_CHARSET
-      Font.Color = clWindowText
-      Font.Height = -11
-      Font.Name = 'Tahoma'
-      Font.Style = [fsBold]
-      ParentFont = False
-      TabOrder = 1
-      OnClick = Button2Click
-    end
-    object cbAnsiVersion: TAnsiVersionCombo
-      Left = 242
-      Top = 3
-      Width = 160
-      Height = 25
-      Style = csOwnerDrawFixed
-      Ctl3D = False
-      ParentCtl3D = False
-      ItemHeight = 20
-      DropDownCount = 12
-      TabOrder = 2
-      ShowHint = True
-      Hint = 'Choose the ANSI encoding used for the converted text'
-      OnDrawItem = cbAnsiVersionDrawItem
-      OnChange = cbAnsiVersionChange
-      OnDropDown = cbAnsiVersionDropDown
-      OnCloseUp = cbAnsiVersionCloseUp
-    end
-    object cbFontPicker: TFontPickerCombo
-      Left = 408
-      Top = 3
-      Width = 200
-      Height = 25
-      Anchors = [akLeft, akTop]
-      Style = csDropDown
-      ItemHeight = 20
-      DropDownCount = 14
-      TabOrder = 3
-      ShowHint = True
-      Hint = 'Type to search installed fonts for the ANSI preview'
-      OnChange = cbFontPickerChange
-      OnDropDown = cbFontPickerDropDown
-      OnCloseUp = cbFontPickerCloseUp
-    end
-  end
   object MEMO2Panel: TRoundedPanel
     Left = 8
-    Top = 166
+    Top = 191
     Width = 649
     Height = 207
     Align = alClient
@@ -255,7 +254,7 @@ object Form1: TForm1
   end
   object PanelFooter: TPanel
     Left = 0
-    Top = 373
+    Top = 398
     Width = 665
     Height = 25
     Align = alBottom
@@ -264,7 +263,6 @@ object Form1: TForm1
     FullRepaint = False
     ParentDoubleBuffered = False
     TabOrder = 4
-
     object Progress: TProgressBar
       Left = 12
       Top = 6
