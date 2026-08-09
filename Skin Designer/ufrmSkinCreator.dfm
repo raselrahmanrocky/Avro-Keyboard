@@ -422,7 +422,7 @@ object frmSkinCreator: TfrmSkinCreator
       inline FrameImageAdd1: TFrameImageAdd
         Left = 0
         Top = 0
-        Width = 377
+        Width = 554
         Height = 1250
         Margins.Left = 5
         Margins.Top = 5
@@ -440,7 +440,7 @@ object frmSkinCreator: TfrmSkinCreator
         ParentColor = False
         ParentFont = False
         TabOrder = 0
-        ExplicitWidth = 377
+        ExplicitWidth = 554
         ExplicitHeight = 1250
         inherited PanelTopBar: TPanel
           inherited ImagePath_TopBar: TEdit
