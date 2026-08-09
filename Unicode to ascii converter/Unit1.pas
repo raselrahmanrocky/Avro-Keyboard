@@ -215,6 +215,7 @@ uses
 const
   AccentColor = $00E67E22;
   CB_GETCOMBOBOXINFO = $0164;
+  EM_SETCUEBANNER = $1505;
 
 function SysColor(AColor: TColor): TColor;
 begin
@@ -1271,11 +1272,13 @@ begin
   // The native combo box selects all of the edit text (EM_SETSEL 0,-1) after
   // a font is committed; convert that into a deselection (-1,-1) so the picked
   // font name is never left highlighted in blue.
-  if (uMsg = EM_SETSEL) and (wParam = 0) and
-     ((lParam = -1) or (DWORD(lParam) = $FFFFFFFF)) then
+  if (uMsg = EM_SETSEL) and (wParam = 0) and (lParam <> 0) then
   begin
-    wParam := $FFFFFFFF;   // WPARAM(-1) - deselect (no selection)
-    lParam := -1;          // LPARAM(-1)
+    if (GetKeyState(VK_LBUTTON) and $8000) = 0 then
+    begin
+      wParam := $FFFFFFFF; // WPARAM(-1) - deselect
+      lParam := -1;        // LPARAM(-1)
+    end;
   end;
 
   // Toggle-on-click state: remember whether the drop-down list was open
@@ -1995,12 +1998,8 @@ begin
               Message.Result := 0;
               Exit;
             end;
-          CBN_SELENDCANCEL:
+CBN_SELENDCANCEL:
             begin
-              // If the drop-down is cancelled while the control is focused
-              // and the native combo wiped the edit text (ItemIndex fell to
-              // -1), restore the active font and re-sync ItemIndex so the
-              // box never stays blank.
               if (not FUpdating) and not FCommitting then
               begin
                 if (Text = '') or (Text <> FActiveFont) then
@@ -2011,8 +2010,8 @@ begin
                     Idx := Items.IndexOf(FActiveFont);
                     if Idx >= 0 then
                       ItemIndex := Idx;
-                    SelStart := 0;
-                    SelLength := Length(FActiveFont);
+                    SelStart := Length(FActiveFont);
+                    SelLength := 0;
                   finally
                     FUpdating := False;
                   end;
@@ -2294,6 +2293,10 @@ begin
   MEMO2.OnContextPopup := MEMOContextPopup;
   SendMessage(MEMO1.Handle, EM_SETTARGETDEVICE, 0, 0);
   SendMessage(MEMO2.Handle, EM_SETTARGETDEVICE, 0, 0);
+
+  SendMessage(MEMO1.Handle, EM_SETCUEBANNER, 1, LPARAM(PChar('Type or paste Unicode Bangla text here...')));
+  SendMessage(MEMO2.Handle, EM_SETCUEBANNER, 1, LPARAM(PChar('Converted ANSI text will appear here...')));
+  ActiveControl := MEMO1;
 end;
 
 procedure TForm1.FormResize(Sender: TObject);
