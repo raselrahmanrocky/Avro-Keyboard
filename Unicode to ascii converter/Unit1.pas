@@ -120,7 +120,6 @@ type
     MEMO2: TRichEdit;
     MEMO1Panel: TRoundedPanel;
     MEMO2Panel: TRoundedPanel;
-    Label1: TLabel;
     Button1: TButton;
     Button2: TButton;
     LabelAnsi: TLabel;
@@ -1087,11 +1086,13 @@ begin
       ActiveFont := MEMO2.Font.Name;
 
     MEMO2.DefAttributes.Name := ActiveFont;
+    MEMO2.DefAttributes.Size := 18;
     MEMO2.DefAttributes.Charset := MEMO2.Font.Charset;
 
     // Apply the picked ANSI font to every text run (including table cells).
     MEMO2.SelectAll;
     MEMO2.SelAttributes.Name := ActiveFont;
+    MEMO2.SelAttributes.Size := 18;
     MEMO2.SelAttributes.Charset := MEMO2.Font.Charset;
     MEMO2.SelLength := 0;
 
@@ -1152,12 +1153,14 @@ begin
     end;
 
     MEMO1.DefAttributes.Name := MEMO1.Font.Name;
+    MEMO1.DefAttributes.Size := 18;
     MEMO1.DefAttributes.Charset := MEMO1.Font.Charset;
 
     MEMO1.Text := OutText;
 
     MEMO1.SelectAll;
     MEMO1.SelAttributes.Name := MEMO1.Font.Name;
+    MEMO1.SelAttributes.Size := 18;
     MEMO1.SelAttributes.Charset := MEMO1.Font.Charset;
     MEMO1.SelLength := 0;
 
@@ -2073,7 +2076,7 @@ begin
 
   MEMO2.SelectAll;
   MEMO2.SelAttributes.Name := FontName;
-  MEMO2.SelAttributes.Size := MEMO2.Font.Size;
+  MEMO2.SelAttributes.Size := 18;
   MEMO2.SelAttributes.Charset := MEMO2.Font.Charset;
   MEMO2.SelLength := 0;
 
@@ -2263,6 +2266,9 @@ begin
   finally
     cbFontPicker.OnChange := cbFontPickerChange;
   end;
+
+  MEMO1.Font.Size := 18;
+  MEMO2.Font.Size := 18;
 
   MEMO1.DefAttributes.Name := MEMO1.Font.Name;
   MEMO1.DefAttributes.Size := MEMO1.Font.Size;

@@ -61,20 +61,14 @@ object Form1: TForm1
     Left = 0
     Top = 0
     Width = 665
-    Height = 24
+    Height = 1
     Align = alTop
     BevelOuter = bvNone
     DoubleBuffered = True
     FullRepaint = False
     ParentDoubleBuffered = False
     TabOrder = 0
-    object Label1: TLabel
-      Left = 8
-      Top = 5
-      Width = 195
-      Height = 13
-      Caption = 'Type or Paste Unicode Bangla text here:'
-    end
+
   end
   object PanelButton: TPanel
     Left = 0
@@ -241,7 +235,7 @@ object Form1: TForm1
       BorderStyle = bsNone
       Font.Charset = ANSI_CHARSET
       Font.Color = clWindowText
-      Font.Height = -21
+      Font.Height = -13
       Font.Name = 'Kalpurush ANSI'
       Font.Style = []
       ParentFont = False
