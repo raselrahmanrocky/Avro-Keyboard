@@ -8,7 +8,7 @@
         <TargetedPlatforms>3</TargetedPlatforms>
         <AppType>Application</AppType>
         <FrameworkType>VCL</FrameworkType>
-        <Platform Condition="'$(Platform)'==''">Win32</Platform>
+        <Platform Condition="'$(Platform)'==''">Win64</Platform>
         <ProjectVersion>20.1</ProjectVersion>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Config)'=='Base' or '$(Base)'!=''">
@@ -97,8 +97,6 @@
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_1_Win32)'!=''">
         <BT_BuildType>Debug</BT_BuildType>
-        <VerInfo_Build>2</VerInfo_Build>
-        <VerInfo_Keys>CompanyName=OmicronLab;FileDescription=Avro Keyboard - UNICODE compliant Open source Bangla typing software for Windows;FileVersion=5.7.0.2;InternalName=Avro Keyboard;LegalCopyright=© OmicronLab. All rights reserved.;LegalTrademarks=Avro Keyboard;OriginalFilename=Avro Keyboard.exe;ProductName=Avro Keyboard;ProductVersion=5.7.0.0;Comments=Avro Keyboard - UNICODE compliant Open source Bangla typing software for Windows</VerInfo_Keys>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_1_Win64)'!=''">
         <VerInfo_Build>12</VerInfo_Build>
@@ -164,10 +162,6 @@
         <DCCReference Include="Forms\ufrmAutoCorrect.pas">
             <Form>frmAutoCorrect</Form>
         </DCCReference>
-        <DCCReference Include="Forms\ufrmAnsiVersionPicker.pas">
-            <Form>frmAnsiVersionPicker</Form>
-        </DCCReference>
-        <DCCReference Include="Forms\ufrmAnsiToast.pas"/>
         <DCCReference Include="Forms\ufrmAvroMouse.pas">
             <Form>frmAvroMouse</Form>
         </DCCReference>
@@ -211,7 +205,6 @@
         </DCCReference>
         <DCCReference Include="Units\DebugLog.pas"/>
         <DCCReference Include="Units\WindowsDarkMode.pas"/>
-        <DCCReference Include="Units\uKeyboardMacro.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>

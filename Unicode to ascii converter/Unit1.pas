@@ -37,84 +37,82 @@ uses
 type
   // Interceptor class to stop TRichEdit flicker during live resize
   TRichEdit = class(ComCtrls.TRichEdit)
-  private
-    procedure WMEraseBkgnd(var Message: TWMEraseBkgnd); message WM_ERASEBKGND;
+    private
+      procedure WMEraseBkgnd(var Message: TWMEraseBkgnd); message WM_ERASEBKGND;
   end;
 
   // Fully custom-painted drop-down used to pick the ANSI mapping version.
   TAnsiVersionCombo = class(StdCtrls.TComboBox)
-  private
-    FHovered: Boolean;
-    FPressed: Boolean;
-    FActive: Boolean;  // drop-down list is open
-    procedure CMMouseEnter(var Message: TMessage); message CM_MOUSEENTER;
-    procedure CMMouseLeave(var Message: TMessage); message CM_MOUSELEAVE;
-    procedure WMLButtonDown(var Message: TWMLButtonDown); message WM_LBUTTONDOWN;
-    procedure WMLButtonUp(var Message: TWMLButtonUp); message WM_LBUTTONUP;
-    procedure WMSetFocus(var Message: TWMSetFocus); message WM_SETFOCUS;
-    procedure WMKillFocus(var Message: TWMKillFocus); message WM_KILLFOCUS;
-    procedure WMPaint(var Message: TWMPaint); message WM_PAINT;
-    procedure WMEraseBkgnd(var Message: TWMEraseBkgnd); message WM_ERASEBKGND;
-    procedure PaintFace(DC: HDC);
-  public
-    procedure SetDropDownActive(const Value: Boolean);
+    private
+      FHovered: Boolean;
+      FPressed: Boolean;
+      FActive:  Boolean; // drop-down list is open
+      procedure CMMouseEnter(var Message: TMessage); message CM_MOUSEENTER;
+      procedure CMMouseLeave(var Message: TMessage); message CM_MOUSELEAVE;
+      procedure WMLButtonDown(var Message: TWMLButtonDown); message WM_LBUTTONDOWN;
+      procedure WMLButtonUp(var Message: TWMLButtonUp); message WM_LBUTTONUP;
+      procedure WMSetFocus(var Message: TWMSetFocus); message WM_SETFOCUS;
+      procedure WMKillFocus(var Message: TWMKillFocus); message WM_KILLFOCUS;
+      procedure WMPaint(var Message: TWMPaint); message WM_PAINT;
+      procedure WMEraseBkgnd(var Message: TWMEraseBkgnd); message WM_ERASEBKGND;
+      procedure PaintFace(DC: HDC);
+    public
+      procedure SetDropDownActive(const Value: Boolean);
   end;
 
   // Original window procedure of the combo's inner EDIT control.
-  TFontPickerEditWndProc = function(hWnd: HWND; uMsg: UINT; wParam: WPARAM;
-    lParam: LPARAM): LRESULT stdcall;
+  TFontPickerEditWndProc = function(hWnd: hWnd; uMsg: UINT; wParam: wParam; lParam: lParam): LRESULT stdcall;
 
   // Editable combo (csDropDown face) whose drop-down list is owner-drawn with
   // the app's amber design language, supporting live type-to-search filtering,
   // click-to-open, and keyboard navigation (Up/Down/Enter/Escape).
   TFontPickerCombo = class(StdCtrls.TComboBox)
-  private
-    FFullFontList: TStringList;      // Master list of every installed font
-    FActiveFont: string;             // Last committed font
-    FSearchText: string;             // Search text kept while navigating
-    FCursorIndex: Integer;           // Highlighted suggestion index
-    FUpdating: Boolean;              // Re-entrancy guard
-    FCommitting: Boolean;            // A selection is being committed
-    FOpenByFilter: Boolean;          // List was opened by live filtering
-    FEditHandle: HWND;               // Inner EDIT control (keyboard/mouse focus target)
-    FDefEditProc: Pointer;           // Original window proc of the inner EDIT
-    FClickWasOpen: Boolean;          // Drop-down was open at WM_LBUTTONDOWN
-    FHovered: Boolean;
-    procedure ApplyEditCentering;    // ES_LEFT + vertical centering of the edit text
-    procedure CMMouseEnter(var Message: TMessage); message CM_MOUSEENTER;
-    procedure CMMouseLeave(var Message: TMessage); message CM_MOUSELEAVE;
-    procedure WMSetFocus(var Message: TWMSetFocus); message WM_SETFOCUS;
-    procedure WMKillFocus(var Message: TWMKillFocus); message WM_KILLFOCUS;
-    procedure WMPaint(var Message: TWMPaint); message WM_PAINT;
-    procedure WMEraseBkgnd(var Message: TWMEraseBkgnd); message WM_ERASEBKGND;
-    procedure PaintBorder(DC: HDC);
-    procedure DrawDropDownItem(DC: HDC; Index: Integer; Rect: TRect;
-      State: TOwnerDrawState);
-    function ListHandle: HWND;
-    function HasInputFocus: Boolean;
-    procedure UpdateListCursor;
-    procedure MoveCursor(Delta: Integer);
-    function HandleEditKey(uMsg: UINT; wParam: WPARAM; lParam: LPARAM): Boolean;
-  protected
-    procedure CreateParams(var Params: TCreateParams); override;
-    procedure CreateWnd; override;
-    procedure DestroyWnd; override;
-    procedure WndProc(var Message: TMessage); override;
-  public
-    constructor Create(AOwner: TComponent); override;
-    destructor Destroy; override;
-    procedure LoadFonts;
-    function FindFontIndex(const AName: string): Integer;
-    procedure SetActiveFont(const AName: string);
-    procedure HandleDropDown;
-    procedure FilterList(const AText: string);
-    procedure RestoreFullList;
-    procedure CommitCursor(ACloseDropDown: Boolean = True);
-    procedure CancelFilter;
-    function FilterAndGetExact: string;
-    function FontExists(const AName: string): Boolean;
-    property ActiveFont: string read FActiveFont write FActiveFont;
-    property IsUpdating: Boolean read FUpdating;
+    private
+      FFullFontList: TStringList; // Master list of every installed font
+      FActiveFont:   string;      // Last committed font
+      FSearchText:   string;      // Search text kept while navigating
+      FCursorIndex:  Integer;     // Highlighted suggestion index
+      FUpdating:     Boolean;     // Re-entrancy guard
+      FCommitting:   Boolean;     // A selection is being committed
+      FOpenByFilter: Boolean;     // List was opened by live filtering
+      FEditHandle:   hWnd;        // Inner EDIT control (keyboard/mouse focus target)
+      FDefEditProc:  Pointer;     // Original window proc of the inner EDIT
+      FClickWasOpen: Boolean;     // Drop-down was open at WM_LBUTTONDOWN
+      FHovered:      Boolean;
+      procedure ApplyEditCentering; // ES_LEFT + vertical centering of the edit text
+      procedure CMMouseEnter(var Message: TMessage); message CM_MOUSEENTER;
+      procedure CMMouseLeave(var Message: TMessage); message CM_MOUSELEAVE;
+      procedure WMSetFocus(var Message: TWMSetFocus); message WM_SETFOCUS;
+      procedure WMKillFocus(var Message: TWMKillFocus); message WM_KILLFOCUS;
+      procedure WMPaint(var Message: TWMPaint); message WM_PAINT;
+      procedure WMEraseBkgnd(var Message: TWMEraseBkgnd); message WM_ERASEBKGND;
+      procedure PaintBorder(DC: HDC);
+      procedure DrawDropDownItem(DC: HDC; Index: Integer; Rect: TRect; State: TOwnerDrawState);
+      function ListHandle: hWnd;
+      function HasInputFocus: Boolean;
+      procedure UpdateListCursor;
+      procedure MoveCursor(Delta: Integer);
+      function HandleEditKey(uMsg: UINT; wParam: wParam; lParam: lParam): Boolean;
+    protected
+      procedure CreateParams(var Params: TCreateParams); override;
+      procedure CreateWnd; override;
+      procedure DestroyWnd; override;
+      procedure WndProc(var Message: TMessage); override;
+    public
+      constructor Create(AOwner: TComponent); override;
+      destructor Destroy; override;
+      procedure LoadFonts;
+      function FindFontIndex(const AName: string): Integer;
+      procedure SetActiveFont(const AName: string);
+      procedure HandleDropDown;
+      procedure FilterList(const AText: string);
+      procedure RestoreFullList;
+      procedure CommitCursor(ACloseDropDown: Boolean = True);
+      procedure CancelFilter;
+      function FilterAndGetExact: string;
+      function FontExists(const AName: string): Boolean;
+      property ActiveFont: string read FActiveFont write FActiveFont;
+      property IsUpdating: Boolean read FUpdating;
   end;
 
   TForm1 = class(TForm)
@@ -146,8 +144,7 @@ type
     procedure FormResize(Sender: TObject);
     procedure Button1Click(Sender: TObject);
     procedure Button2Click(Sender: TObject);
-    procedure cbAnsiVersionDrawItem(Control: TWinControl; Index: Integer;
-      Rect: TRect; State: TOwnerDrawState);
+    procedure cbAnsiVersionDrawItem(Control: TWinControl; Index: Integer; Rect: TRect; State: TOwnerDrawState);
     procedure cbAnsiVersionChange(Sender: TObject);
     procedure cbAnsiVersionDropDown(Sender: TObject);
     procedure cbAnsiVersionCloseUp(Sender: TObject);
@@ -168,31 +165,30 @@ type
     procedure MenuSelectAllClick(Sender: TObject);
     procedure MenuClearClick(Sender: TObject);
     procedure MEMOContextPopup(Sender: TObject; MousePos: TPoint; var Handled: Boolean);
-  private
-    FUniToBijoy: TUnicodeToBijoy2000;
-    FBijoyToUni: TBijoy2000ToUnicode;
-    FSplitterRatio: Double;
-    FPopupTarget: TRichEdit;
+    private
+      FUniToBijoy:    TUnicodeToBijoy2000;
+      FBijoyToUni:    TBijoy2000ToUnicode;
+      FSplitterRatio: Double;
+      FPopupTarget:   TRichEdit;
 
-    procedure AppEventsMessage(var Msg: TMsg; var Handled: Boolean);
-    function IsMemo1Target(AHwnd: HWND): Boolean;
-    function IsMemo2Target(AHwnd: HWND): Boolean;
-    procedure HandleThemes;
-    procedure ApplyFontToMemo2(const FontName: string);
-    procedure MakeTextJustified(RE: TRichEdit);
-    procedure PasteToPopupMemo;
-    procedure SaveConverterSetting(const Name, Value: string);
-    function ReadConverterSettings(out AnsiVer, FontName: string): Boolean;
-    procedure ConvertRtfUnicodeToBijoy(Src, Dst: TStream;
-      Conv: TUnicodeToBijoy2000);
-    procedure DrawRoundedFrame(APanel: TPanel; AMemo: TRichEdit);
-    function PopupMemo: TRichEdit;
-    function CanPasteToMemo: Boolean;
-    procedure PopulateAnsiVersionsCombo;
-  protected
-    procedure CreateParams(var Params: TCreateParams); override;
-  public
-    { Public declarations }
+      procedure AppEventsMessage(var Msg: TMsg; var Handled: Boolean);
+      function IsMemo1Target(AHwnd: hWnd): Boolean;
+      function IsMemo2Target(AHwnd: hWnd): Boolean;
+      procedure HandleThemes;
+      procedure ApplyFontToMemo2(const FontName: string);
+      procedure MakeTextJustified(RE: TRichEdit);
+      procedure PasteToPopupMemo;
+      procedure SaveConverterSetting(const Name, Value: string);
+      function ReadConverterSettings(out AnsiVer, FontName: string): Boolean;
+      procedure ConvertRtfUnicodeToBijoy(Src, Dst: TStream; Conv: TUnicodeToBijoy2000);
+      procedure DrawRoundedFrame(APanel: TPanel; AMemo: TRichEdit);
+      function PopupMemo: TRichEdit;
+      function CanPasteToMemo: Boolean;
+      procedure PopulateAnsiVersionsCombo;
+    protected
+      procedure CreateParams(var Params: TCreateParams); override;
+    public
+      { Public declarations }
   end;
 
 var
@@ -209,13 +205,13 @@ uses
   Themes;
 
 { =============================================================================== }
-{ Small colour helpers shared by the mapping picker                             }
+{ Small colour helpers shared by the mapping picker }
 { =============================================================================== }
 
 const
-  AccentColor = $00E67E22;
+  AccentColor        = $00E67E22;
   CB_GETCOMBOBOXINFO = $0164;
-  EM_SETCUEBANNER = $1505;
+  EM_SETCUEBANNER    = $1505;
 
 function SysColor(AColor: TColor): TColor;
 begin
@@ -229,29 +225,28 @@ function MixColor(C1, C2: TColor; Percent2: Integer): TColor;
 var
   R1, G1, B1, R2, G2, B2: Integer;
 begin
-  if Percent2 <= 0 then Exit(C1);
-  if Percent2 >= 100 then Exit(C2);
+  if Percent2 <= 0 then
+    Exit(C1);
+  if Percent2 >= 100 then
+    Exit(C2);
   R1 := GetRValue(ColorToRGB(C1));
   G1 := GetGValue(ColorToRGB(C1));
   B1 := GetBValue(ColorToRGB(C1));
   R2 := GetRValue(ColorToRGB(C2));
   G2 := GetGValue(ColorToRGB(C2));
   B2 := GetBValue(ColorToRGB(C2));
-  Result := RGB(R1 + (R2 - R1) * Percent2 div 100,
-                G1 + (G2 - G1) * Percent2 div 100,
-                B1 + (B2 - B1) * Percent2 div 100);
+  Result := RGB(R1 + (R2 - R1) * Percent2 div 100, G1 + (G2 - G1) * Percent2 div 100, B1 + (B2 - B1) * Percent2 div 100);
 end;
 
 function IsCheckedMapping(const AText: string): Boolean;
 begin
-  Result := SameText(AnsiVersion, AText) or
-            ((AnsiVersion = '') and SameText(AText, 'Default'));
+  Result := SameText(AnsiVersion, AText) or ((AnsiVersion = '') and SameText(AText, 'Default'));
 end;
 
 procedure DrawAnsiGlyphBullet(C: TCanvas; const ARect: TRect; AColor: TColor);
 var
   Glyph: string;
-  R: TRect;
+  R:     TRect;
 begin
   Glyph := #$0995; // ক
   C.Font.Name := 'Kalpurush ANSI';
@@ -261,12 +256,11 @@ begin
   C.Font.Color := AColor;
   C.Brush.Style := bsClear;
   R := ARect;
-  DrawText(C.Handle, PChar(Glyph), Length(Glyph), R,
-    DT_SINGLELINE or DT_VCENTER or DT_NOPREFIX);
+  DrawText(C.Handle, PChar(Glyph), Length(Glyph), R, DT_SINGLELINE or DT_VCENTER or DT_NOPREFIX);
 end;
 
 { =============================================================================== }
-{ TAnsiVersionCombo                                                               }
+{ TAnsiVersionCombo }
 { =============================================================================== }
 
 procedure TAnsiVersionCombo.CMMouseEnter(var Message: TMessage);
@@ -311,7 +305,7 @@ end;
 
 procedure TAnsiVersionCombo.WMEraseBkgnd(var Message: TWMEraseBkgnd);
 begin
-  Message.Result := 1;
+  message.Result := 1;
 end;
 
 procedure TAnsiVersionCombo.SetDropDownActive(const Value: Boolean);
@@ -325,12 +319,12 @@ end;
 procedure TAnsiVersionCombo.WMPaint(var Message: TWMPaint);
 var
   DC, MemDC: HDC;
-  PS: TPaintStruct;
-  Bmp, Old: HBITMAP;
+  PS:        TPaintStruct;
+  Bmp, Old:  HBITMAP;
 begin
-  if Message.DC <> 0 then
+  if message.DC <> 0 then
   begin
-    PaintFace(Message.DC);
+    PaintFace(message.DC);
     Exit;
   end;
 
@@ -354,12 +348,12 @@ end;
 
 procedure TAnsiVersionCombo.PaintFace(DC: HDC);
 var
-  C: TCanvas;
-  R, TextR, GlyphR: TRect;
+  C:                                    TCanvas;
+  R, TextR, GlyphR:                     TRect;
   Bg, PanelBg, BorderC, TextC, BulletC: TColor;
-  S: string;
-  Cx, Cy: Integer;
-  Pts: array[0..2] of TPoint;
+  S:                                    string;
+  Cx, Cy:                               Integer;
+  Pts:                                  array [0 .. 2] of TPoint;
 begin
   C := TCanvas.Create;
   try
@@ -413,8 +407,7 @@ begin
     if S = '' then
       S := 'Default';
     TextR := Rect(R.Left + 27, R.Top, R.Right - 24, R.Bottom);
-    DrawText(C.Handle, PChar(S), Length(S), TextR,
-      DT_SINGLELINE or DT_VCENTER or DT_END_ELLIPSIS or DT_NOPREFIX);
+    DrawText(C.Handle, PChar(S), Length(S), TextR, DT_SINGLELINE or DT_VCENTER or DT_END_ELLIPSIS or DT_NOPREFIX);
 
     Cx := R.Right - 16;
     Cy := R.Top + R.Height div 2;
@@ -445,7 +438,7 @@ end;
 
 procedure TRichEdit.WMEraseBkgnd(var Message: TWMEraseBkgnd);
 begin
-  Message.Result := 1;
+  message.Result := 1;
 end;
 
 procedure TForm1.CreateParams(var Params: TCreateParams);
@@ -456,7 +449,7 @@ end;
 
 procedure TForm1.DrawRoundedFrame(APanel: TPanel; AMemo: TRichEdit);
 var
-  R: TRect;
+  R:           TRect;
   Bg, BorderC: TColor;
 begin
   if StyleServices.Enabled then
@@ -508,8 +501,7 @@ begin
     DrawRoundedFrame(MEMO2Panel, MEMO2);
 end;
 
-procedure TForm1.MemoPanelMouseDown(Sender: TObject; Button: TMouseButton;
-  Shift: TShiftState; X, Y: Integer);
+procedure TForm1.MemoPanelMouseDown(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
 begin
   if Sender = MEMO1Panel then
     MEMO1.SetFocus
@@ -542,8 +534,7 @@ begin
   Result := Clipboard.HasFormat(CF_UNICODETEXT) or Clipboard.HasFormat(CF_TEXT);
 end;
 
-procedure TForm1.MEMOContextPopup(Sender: TObject; MousePos: TPoint;
-  var Handled: Boolean);
+procedure TForm1.MEMOContextPopup(Sender: TObject; MousePos: TPoint; var Handled: Boolean);
 begin
   if Sender is TRichEdit then
     FPopupTarget := TRichEdit(Sender);
@@ -611,7 +602,7 @@ begin
   ParaFormat.dwMask := PFM_ALIGNMENT;
   ParaFormat.wAlignment := PFA_JUSTIFY;
   RE.SelectAll;
-  SendMessage(RE.Handle, EM_SETPARAFORMAT, 0, LPARAM(@ParaFormat));
+  SendMessage(RE.Handle, EM_SETPARAFORMAT, 0, lParam(@ParaFormat));
   RE.SelLength := 0;
 end;
 
@@ -627,7 +618,7 @@ begin
   try
     Reg.RootKey := HKEY_CURRENT_USER;
     if Reg.OpenKey('Software\OmicronLab\Avro Keyboard', True) then
-      Reg.WriteString(Name, Value);
+      Reg.WriteString(name, Value);
   finally
     Reg.Free;
   end;
@@ -665,36 +656,30 @@ end;
   those escapes - and literal runs of plain text - are converted; everything
   else is copied byte-for-byte, so tables pasted from Word/Excel survive the
   conversion with their cell borders and structure intact.
---------------------------------------------------------------------------- }
-procedure TForm1.ConvertRtfUnicodeToBijoy(Src, Dst: TStream;
-  Conv: TUnicodeToBijoy2000);
+  --------------------------------------------------------------------------- }
+procedure TForm1.ConvertRtfUnicodeToBijoy(Src, Dst: TStream; Conv: TUnicodeToBijoy2000);
 const
   // Windows-1252 mappings for bytes $80..$9F (the only range where cp1252
   // differs from the plain Unicode code point of the same value). Literal
   // bytes in an RTF stream are interpreted in the declared \ansicpg.
-  Cp1252: array[0..31] of Word = (
-    $20AC, $0081, $201A, $0192, $201E, $2026, $2020, $2021,
-    $02C6, $2030, $0160, $2039, $0152, $008D, $017D, $008F,
-    $0090, $2018, $2019, $201C, $201D, $2022, $2013, $2014,
-    $02DC, $2122, $0161, $203A, $0153, $009D, $017E, $0178);
+  Cp1252: array [0 .. 31] of Word = ($20AC, $0081, $201A, $0192, $201E, $2026, $2020, $2021, $02C6, $2030, $0160, $2039, $0152, $008D, $017D, $008F, $0090,
+    $2018, $2019, $201C, $201D, $2022, $2013, $2014, $02DC, $2122, $0161, $203A, $0153, $009D, $017E, $0178);
 
   // Control words that END a text unit. Everything else (character/run
   // formatting like \f0, \fs22, \lang9, table structure like \trowd,
   // \cellx, \cl..., \tr...) is kept verbatim and does NOT split the text
   // being converted, so a Bengali word that Word splits across font switches
   // still converts as one unit with full conjunct context.
-  BoundaryWords: array[0..10] of string = (
-    'cell', 'lastcell', 'row', 'par', 'pard', 'line',
-    'sect', 'page', 'column', 'bin', 'tab');
+  BoundaryWords: array [0 .. 10] of string = ('cell', 'lastcell', 'row', 'par', 'pard', 'line', 'sect', 'page', 'column', 'bin', 'tab');
 var
-  InBuf, OutBuf, ConvBuf: TBytes;
-  TextBuf: string;
+  InBuf, OutBuf, ConvBuf:                                          TBytes;
+  TextBuf:                                                         string;
   I, J, Len, UC, Fallback, Bin, WordStart, Code, InsertPos, Depth: Integer;
-  B: Byte;
-  W: string;
-  HasParam, HasDelimSpace, IsBoundary: Boolean;
-  Param, Sign: Int64;
-  K: Integer;
+  B:                                                               Byte;
+  W:                                                               string;
+  HasParam, HasDelimSpace, IsBoundary:                             Boolean;
+  Param, Sign:                                                     Int64;
+  K:                                                               Integer;
 
   procedure EmitByte(B: Byte);
   begin
@@ -710,14 +695,14 @@ var
       EmitByte(Ord(S[K]));
   end;
 
-  // Append converted text bytes to ConvBuf. ASCII goes out literally;
-  // anything above $7F is written back as a \uNNNN escape so the exact code
-  // point survives the load (a literal byte would be re-interpreted through
-  // \ansicpg).
+// Append converted text bytes to ConvBuf. ASCII goes out literally;
+// anything above $7F is written back as a \uNNNN escape so the exact code
+// point survives the load (a literal byte would be re-interpreted through
+// \ansicpg).
   procedure EmitConverted(const S: string);
   var
     K, V, F: Integer;
-    NumStr: string;
+    NumStr:  string;
   begin
     for K := 1 to Length(S) do
     begin
@@ -729,7 +714,8 @@ var
       end
       else
       begin
-        if V > 32767 then V := V - 65536;  // RTF wants a signed 16-bit value
+        if V > 32767 then
+          V := V - 65536; // RTF wants a signed 16-bit value
         NumStr := '\u' + IntToStr(V);
         for F := 1 to Length(NumStr) do
         begin
@@ -739,23 +725,24 @@ var
         for F := 1 to UC do
         begin
           SetLength(ConvBuf, Length(ConvBuf) + 1);
-          ConvBuf[Length(ConvBuf) - 1] := Ord('?');  // \ucN fallback chars
+          ConvBuf[Length(ConvBuf) - 1] := Ord('?'); // \ucN fallback chars
         end;
       end;
     end;
   end;
 
-  // Convert the pending text unit ONCE and splice it into OutBuf at the
-  // position where its first character began. The converter is context
-  // sensitive (conjuncts, half forms, kar toggling), so the whole unit
-  // - all \uNNNN escapes and literal bytes since the last boundary -
-  // must be converted together.
+// Convert the pending text unit ONCE and splice it into OutBuf at the
+// position where its first character began. The converter is context
+// sensitive (conjuncts, half forms, kar toggling), so the whole unit
+// - all \uNNNN escapes and literal bytes since the last boundary -
+// must be converted together.
   procedure FlushUnit;
   var
-    ConvText: string;
+    ConvText:                 string;
     OldLen, NewLen, Extra, M: Integer;
   begin
-    if TextBuf = '' then Exit;
+    if TextBuf = '' then
+      Exit;
     ConvText := Conv.Convert(TextBuf);
     if ConvText = '' then
     begin
@@ -768,8 +755,7 @@ var
     // If the byte just before the insertion point is alphanumeric (the tail
     // of a control word like \lang1093), emit a delimiter space first so the
     // text cannot merge into that control word.
-    if (InsertPos > 0) and (OutBuf[InsertPos - 1] in [Ord('a')..Ord('z'),
-      Ord('A')..Ord('Z'), Ord('0')..Ord('9'), Ord('-')]) then
+    if (InsertPos > 0) and (OutBuf[InsertPos - 1] in [Ord('a') .. Ord('z'), Ord('A') .. Ord('Z'), Ord('0') .. Ord('9'), Ord('-')]) then
     begin
       SetLength(ConvBuf, 1);
       ConvBuf[0] := Ord(' ');
@@ -790,7 +776,7 @@ var
     InsertPos := 0;
   end;
 
-  // Append one decoded Unicode character to the pending text unit.
+// Append one decoded Unicode character to the pending text unit.
   procedure AppendChar(C: Char);
   begin
     if TextBuf = '' then
@@ -807,9 +793,9 @@ begin
   SetLength(OutBuf, 0);
   TextBuf := '';
   InsertPos := 0;
-  UC := 1;        // \ucN - fallback characters after each \uNNNN (default 1)
-  Fallback := 0;  // source fallback chars still to be skipped
-  Bin := 0;       // remaining raw binary bytes to copy verbatim (\binN)
+  UC := 1;       // \ucN - fallback characters after each \uNNNN (default 1)
+  Fallback := 0; // source fallback chars still to be skipped
+  Bin := 0;      // remaining raw binary bytes to copy verbatim (\binN)
 
   I := 0;
   while I < Len do
@@ -835,8 +821,7 @@ begin
     if (B = Ord('{')) or (B = Ord('}')) then
     begin
       FlushUnit;
-      if (B = Ord('{')) and (I + 2 < Len) and (InBuf[I + 1] = Ord('\'))
-        and (InBuf[I + 2] = Ord('*')) then
+      if (B = Ord('{')) and (I + 2 < Len) and (InBuf[I + 1] = Ord('\')) and (InBuf[I + 2] = Ord('*')) then
       begin
         // {\*...} star destination (metadata like \mmathPr, \listtable, \pn,
         // \generator): copy verbatim - never converted, never split. Word
@@ -852,12 +837,12 @@ begin
           begin
             if (J + 1 < Len) and ((InBuf[J + 1] = Ord('{')) or (InBuf[J + 1] = Ord('}'))) then
               Inc(J, 2)
-            else if (J + 5 < Len) and (InBuf[J + 1] = Ord('b')) and (InBuf[J + 2] = Ord('i'))
-              and (InBuf[J + 3] = Ord('n')) and (InBuf[J + 4] in [Ord('0')..Ord('9')]) then
+            else if (J + 5 < Len) and (InBuf[J + 1] = Ord('b')) and (InBuf[J + 2] = Ord('i')) and (InBuf[J + 3] = Ord('n')) and
+              (InBuf[J + 4] in [Ord('0') .. Ord('9')]) then
             begin
               // skip the digits of a \binN payload length word
               J := J + 5;
-              while (J < Len) and (InBuf[J] in [Ord('0')..Ord('9')]) do
+              while (J < Len) and (InBuf[J] in [Ord('0') .. Ord('9')]) do
                 Inc(J);
             end
             else
@@ -904,11 +889,11 @@ begin
       end;
       B := InBuf[I];
 
-      if B in [Ord('a')..Ord('z')] then
+      if B in [Ord('a') .. Ord('z')] then
       begin
         // Control word: read the letters and optional signed numeric parameter.
         WordStart := I;
-        while (I < Len) and (InBuf[I] in [Ord('a')..Ord('z')]) do
+        while (I < Len) and (InBuf[I] in [Ord('a') .. Ord('z')]) do
           Inc(I);
         W := '';
         for J := WordStart to I - 1 do
@@ -922,7 +907,7 @@ begin
           Sign := -1;
           Inc(I);
         end;
-        while (I < Len) and (InBuf[I] in [Ord('0')..Ord('9')]) do
+        while (I < Len) and (InBuf[I] in [Ord('0') .. Ord('9')]) do
         begin
           HasParam := True;
           Param := Param * 10 + (InBuf[I] - Ord('0'));
@@ -963,7 +948,7 @@ begin
           // Text-unit boundary? Convert and splice what was accumulated,
           // then copy the word itself.
           IsBoundary := False;
-          for K := 0 to High(BoundaryWords) do
+          for K := 0 to high(BoundaryWords) do
             if W = BoundaryWords[K] then
             begin
               IsBoundary := True;
@@ -990,21 +975,25 @@ begin
         begin
           Inc(I);
           Code := 0;
-          if (I < Len) and (InBuf[I] in [Ord('0')..Ord('9'), Ord('a')..Ord('f'),
-            Ord('A')..Ord('F')]) then
+          if (I < Len) and (InBuf[I] in [Ord('0') .. Ord('9'), Ord('a') .. Ord('f'), Ord('A') .. Ord('F')]) then
           begin
-            if InBuf[I] <= Ord('9') then Code := InBuf[I] - Ord('0')
-            else if InBuf[I] <= Ord('F') then Code := InBuf[I] - Ord('A') + 10
-            else Code := InBuf[I] - Ord('a') + 10;
+            if InBuf[I] <= Ord('9') then
+              Code := InBuf[I] - Ord('0')
+            else if InBuf[I] <= Ord('F') then
+              Code := InBuf[I] - Ord('A') + 10
+            else
+              Code := InBuf[I] - Ord('a') + 10;
             Inc(I);
           end;
-          if (I < Len) and (InBuf[I] in [Ord('0')..Ord('9'), Ord('a')..Ord('f'),
-            Ord('A')..Ord('F')]) then
+          if (I < Len) and (InBuf[I] in [Ord('0') .. Ord('9'), Ord('a') .. Ord('f'), Ord('A') .. Ord('F')]) then
           begin
             Code := Code * 16;
-            if InBuf[I] <= Ord('9') then Code := Code + InBuf[I] - Ord('0')
-            else if InBuf[I] <= Ord('F') then Code := Code + InBuf[I] - Ord('A') + 10
-            else Code := Code + InBuf[I] - Ord('a') + 10;
+            if InBuf[I] <= Ord('9') then
+              Code := Code + InBuf[I] - Ord('0')
+            else if InBuf[I] <= Ord('F') then
+              Code := Code + InBuf[I] - Ord('A') + 10
+            else
+              Code := Code + InBuf[I] - Ord('a') + 10;
             Inc(I);
           end;
           if Code < $80 then
@@ -1059,7 +1048,7 @@ end;
 
 procedure TForm1.Button1Click(Sender: TObject);
 var
-  ActiveFont: string;
+  ActiveFont:    string;
   MS, OutStream: TMemoryStream;
 begin
   MEMO1.Enabled := False;
@@ -1079,7 +1068,7 @@ begin
     MS := TMemoryStream.Create;
     OutStream := TMemoryStream.Create;
     try
-      MEMO1.Lines.SaveToStream(MS);       // SF_RTF - full document, not plain text
+      MEMO1.Lines.SaveToStream(MS); // SF_RTF - full document, not plain text
       MS.Position := 0;
       ConvertRtfUnicodeToBijoy(MS, OutStream, FUniToBijoy);
       OutStream.Position := 0;
@@ -1120,7 +1109,7 @@ end;
 procedure TForm1.Button2Click(Sender: TObject);
 var
   Src, OutText, EOL, Segment: string;
-  P, Q, TotalLen: Integer;
+  P, Q, TotalLen:             Integer;
 begin
   MEMO1.Enabled := False;
   MEMO2.Enabled := False;
@@ -1185,9 +1174,9 @@ end;
 
 procedure TForm1.PopulateAnsiVersionsCombo;
 var
-  SR: TSearchRec;
+  SR:       TSearchRec;
   Versions: TStringList;
-  I: Integer;
+  I:        Integer;
 begin
   cbAnsiVersion.Items.BeginUpdate;
   try
@@ -1199,17 +1188,16 @@ begin
       Versions.Sorted := True;
       Versions.Duplicates := dupIgnore;
       Versions.CaseSensitive := False;
-      if DirectoryExists(AnsiMappingDir) and
-         (FindFirst(AnsiMappingDir + '*.json', faAnyFile, SR) = 0) then
-      try
-        repeat
-          if (SR.Attr and faDirectory <> 0) or SameText(SR.Name, 'Default.json') then
-            Continue;
-          Versions.Add(ChangeFileExt(SR.Name, ''));
-        until FindNext(SR) <> 0;
-      finally
-        FindClose(SR);
-      end;
+      if DirectoryExists(AnsiMappingDir) and (FindFirst(AnsiMappingDir + '*.json', faAnyFile, SR) = 0) then
+        try
+          repeat
+            if (SR.Attr and faDirectory <> 0) or SameText(SR.Name, 'Default.json') then
+              Continue;
+            Versions.Add(ChangeFileExt(SR.Name, ''));
+          until FindNext(SR) <> 0;
+        finally
+          FindClose(SR);
+        end;
       for I := 0 to Versions.Count - 1 do
         cbAnsiVersion.Items.Add(Versions[I]);
     finally
@@ -1225,7 +1213,8 @@ var
   VerName, ErrMsg: string;
 begin
   VerName := cbAnsiVersion.Text;
-  if VerName = '' then Exit;
+  if VerName = '' then
+    Exit;
 
   if not TrySetAnsiVersion(VerName, ErrMsg) then
     MessageDlg('Failed to load ANSI mapping: ' + ErrMsg, mtError, [mbOK], 0)
@@ -1244,11 +1233,10 @@ begin
 end;
 
 { =============================================================================== }
-{ TFontPickerCombo: editable, owner-drawn, type-to-search font picker            }
+{ TFontPickerCombo: editable, owner-drawn, type-to-search font picker }
 { =============================================================================== }
 
-function FontPickerEditProc(hWnd: HWND; uMsg: UINT; wParam: WPARAM;
-  lParam: LPARAM): LRESULT stdcall;
+function FontPickerEditProc(hWnd: hWnd; uMsg: UINT; wParam: wParam; lParam: lParam): LRESULT stdcall;
 var
   Combo: TFontPickerCombo;
 begin
@@ -1307,22 +1295,20 @@ begin
   if (uMsg = WM_WINDOWPOSCHANGED) or (uMsg = WM_SETFONT) then
     Combo.ApplyEditCentering;
 
-  if ((uMsg = WM_LBUTTONDOWN) or (uMsg = WM_LBUTTONDBLCLK))
-    and not Combo.FClickWasOpen and not Combo.DroppedDown
-    and not Combo.IsUpdating then
+  if ((uMsg = WM_LBUTTONDOWN) or (uMsg = WM_LBUTTONDBLCLK)) and not Combo.FClickWasOpen and not Combo.DroppedDown and not Combo.IsUpdating then
   begin
     Combo.HandleDropDown;
     Combo.DroppedDown := True;
   end;
 end;
 
-function TFontPickerCombo.HandleEditKey(uMsg: UINT; wParam: WPARAM;
-  lParam: LPARAM): Boolean;
+function TFontPickerCombo.HandleEditKey(uMsg: UINT; wParam: wParam; lParam: lParam): Boolean;
 var
   Key: Word;
 begin
   Result := False;
-  if uMsg <> WM_KEYDOWN then Exit;
+  if uMsg <> WM_KEYDOWN then
+    Exit;
   Key := Word(wParam);
   case Key of
     VK_UP, VK_DOWN:
@@ -1387,31 +1373,31 @@ begin
 
   FillChar(Info, SizeOf(Info), 0);
   Info.cbSize := SizeOf(Info);
-  if SendMessage(Handle, CB_GETCOMBOBOXINFO, 0, LPARAM(@Info)) <> 0 then
+  if SendMessage(Handle, CB_GETCOMBOBOXINFO, 0, lParam(@Info)) <> 0 then
     if (Info.hwndItem <> 0) and (Info.hwndItem <> Handle) then
     begin
       FEditHandle := Info.hwndItem;
       RemoveProp(FEditHandle, 'AvroFontPicker');
       SetProp(FEditHandle, 'AvroFontPicker', THandle(Self));
-      FDefEditProc := Pointer(SetWindowLongPtr(FEditHandle,
-        GWLP_WNDPROC, LONG_PTR(@FontPickerEditProc)));
+      FDefEditProc := Pointer(SetWindowLongPtr(FEditHandle, GWLP_WNDPROC, LONG_PTR(@FontPickerEditProc)));
     end;
   ApplyEditCentering;
 end;
 
 procedure TFontPickerCombo.ApplyEditCentering;
 var
-  DC: HDC;
-  TM: TTextMetric;
-  HF: HFONT;
-  OldFont: HFONT;
-  CR, WR: TRect;
-  ParentClient: TRect;
-  ClientOrigin: TPoint;
+  DC:                   HDC;
+  TM:                   TTextMetric;
+  HF:                   HFONT;
+  OldFont:              HFONT;
+  CR, WR:               TRect;
+  ParentClient:         TRect;
+  ClientOrigin:         TPoint;
   RelTop, NewTop, NewH: Integer;
-  Style: LONG_PTR;
+  Style:                LONG_PTR;
 begin
-  if FEditHandle = 0 then Exit;
+  if FEditHandle = 0 then
+    Exit;
   SendMessage(FEditHandle, EM_SETMARGINS, EC_LEFTMARGIN or EC_RIGHTMARGIN, MakeLParam(8, 8));
   // Horizontal alignment: the inner edit reads ES_LEFT/CENTER/RIGHT from its
   // window style at paint time. Force left alignment (ES_LEFT = 0) by clearing
@@ -1421,8 +1407,7 @@ begin
   Style := GetWindowLongPtr(FEditHandle, GWL_STYLE);
   if (Style and (ES_CENTER or ES_RIGHT)) <> 0 then
   begin
-    SetWindowLongPtr(FEditHandle, GWL_STYLE,
-      Style and not (ES_CENTER or ES_RIGHT));
+    SetWindowLongPtr(FEditHandle, GWL_STYLE, Style and not(ES_CENTER or ES_RIGHT));
     InvalidateRect(FEditHandle, nil, True);
   end;
 
@@ -1434,7 +1419,8 @@ begin
   // then sits vertically centered. Re-applied whenever the edit is moved or
   // resized (WM_WINDOWPOSCHANGED) or its font changes (WM_SETFONT).
   HF := HFONT(SendMessage(FEditHandle, WM_GETFONT, 0, 0));
-  if HF = 0 then HF := GetStockObject(DEFAULT_GUI_FONT);
+  if HF = 0 then
+    HF := GetStockObject(DEFAULT_GUI_FONT);
   DC := GetDC(FEditHandle);
   try
     OldFont := SelectObject(DC, HF);
@@ -1450,8 +1436,10 @@ begin
 
   Windows.GetClientRect(FEditHandle, CR);
   NewH := TM.tmHeight + TM.tmInternalLeading; // visible text box height
-  if NewH < 8 then NewH := 8;                 // sanity floor
-  if NewH >= CR.Bottom - 2 then Exit;         // already sized to fit the text
+  if NewH < 8 then
+    NewH := 8; // sanity floor
+  if NewH >= CR.Bottom - 2 then
+    Exit; // already sized to fit the text
 
   Windows.GetWindowRect(FEditHandle, WR);
   Windows.GetClientRect(Handle, ParentClient);
@@ -1460,8 +1448,7 @@ begin
   Windows.ClientToScreen(Handle, ClientOrigin);
   RelTop := WR.Top - ClientOrigin.Y;
   NewTop := RelTop + (CR.Bottom - NewH) div 2 + 1;
-  SetWindowPos(FEditHandle, 0, WR.Left - ClientOrigin.X, NewTop,
-    WR.Right - WR.Left, NewH, SWP_NOZORDER or SWP_NOACTIVATE);
+  SetWindowPos(FEditHandle, 0, WR.Left - ClientOrigin.X, NewTop, WR.Right - WR.Left, NewH, SWP_NOZORDER or SWP_NOACTIVATE);
 end;
 
 procedure TFontPickerCombo.DestroyWnd;
@@ -1509,7 +1496,7 @@ begin
     FUpdating := True;
     try
       Text := FActiveFont;
-      
+
       // ✅ ফোকাস সরার সময় যেন সিলেক্ট না হয়:
       SelStart := Length(FActiveFont);
       SelLength := 0;
@@ -1521,7 +1508,7 @@ end;
 
 procedure TFontPickerCombo.WMEraseBkgnd(var Message: TWMEraseBkgnd);
 begin
-  Message.Result := 1;
+  message.Result := 1;
 end;
 
 function TFontPickerCombo.HasInputFocus: Boolean;
@@ -1531,8 +1518,8 @@ end;
 
 procedure TFontPickerCombo.PaintBorder(DC: HDC);
 var
-  C: TCanvas;
-  R: TRect;
+  C:           TCanvas;
+  R:           TRect;
   Bg, BorderC: TColor;
 begin
   C := TCanvas.Create;
@@ -1564,12 +1551,12 @@ end;
 procedure TFontPickerCombo.WMPaint(var Message: TWMPaint);
 var
   DC, MemDC: HDC;
-  PS: TPaintStruct;
-  Bmp, Old: HBITMAP;
+  PS:        TPaintStruct;
+  Bmp, Old:  HBITMAP;
 begin
-  if Message.DC <> 0 then
+  if message.DC <> 0 then
   begin
-    PaintBorder(Message.DC);
+    PaintBorder(message.DC);
     Exit;
   end;
 
@@ -1591,19 +1578,18 @@ begin
   end;
 end;
 
-procedure TFontPickerCombo.DrawDropDownItem(DC: HDC; Index: Integer;
-  Rect: TRect; State: TOwnerDrawState);
+procedure TFontPickerCombo.DrawDropDownItem(DC: HDC; Index: Integer; Rect: TRect; State: TOwnerDrawState);
 var
-  C: TCanvas;
-  Text: string;
-  TextR: TRect;
-  Bg: TColor;
+  C:                 TCanvas;
+  Text:              string;
+  TextR:             TRect;
+  Bg:                TColor;
   IsHover, IsActive: Boolean;
 begin
   C := TCanvas.Create;
   try
     C.Handle := DC;
-    Text := Items[Index];
+    Text := Items[index];
     IsHover := odSelected in State;
     IsActive := SameText(Text, FActiveFont);
 
@@ -1628,34 +1614,35 @@ begin
       else
         Font.Style := [];
 
-      TextR := System.Classes.Rect(Rect.Left + 8, Rect.Top,
-                                   Rect.Right - 4, Rect.Bottom);
-      DrawText(Handle, PChar(Text), Length(Text), TextR,
-        DT_SINGLELINE or DT_VCENTER or DT_END_ELLIPSIS or DT_NOPREFIX);
+      TextR := System.Classes.Rect(Rect.Left + 8, Rect.Top, Rect.Right - 4, Rect.Bottom);
+      DrawText(Handle, PChar(Text), Length(Text), TextR, DT_SINGLELINE or DT_VCENTER or DT_END_ELLIPSIS or DT_NOPREFIX);
     end;
   finally
     C.Free;
   end;
 end;
 
-function TFontPickerCombo.ListHandle: HWND;
+function TFontPickerCombo.ListHandle: hWnd;
 var
   Info: TComboBoxInfo;
 begin
   Result := 0;
   FillChar(Info, SizeOf(Info), 0);
   Info.cbSize := SizeOf(Info);
-  if SendMessage(Handle, CB_GETCOMBOBOXINFO, 0, LPARAM(@Info)) <> 0 then
+  if SendMessage(Handle, CB_GETCOMBOBOXINFO, 0, lParam(@Info)) <> 0 then
     Result := Info.hwndList;
 end;
 
 procedure TFontPickerCombo.UpdateListCursor;
 var
-  LH: HWND;
+  LH: hWnd;
 begin
-  if Items.Count = 0 then Exit;
-  if FCursorIndex < 0 then FCursorIndex := 0;
-  if FCursorIndex >= Items.Count then FCursorIndex := Items.Count - 1;
+  if Items.Count = 0 then
+    Exit;
+  if FCursorIndex < 0 then
+    FCursorIndex := 0;
+  if FCursorIndex >= Items.Count then
+    FCursorIndex := Items.Count - 1;
   LH := ListHandle;
   if LH <> 0 then
     SendMessage(LH, LB_SETCURSEL, FCursorIndex, 0);
@@ -1663,10 +1650,11 @@ end;
 
 procedure TFontPickerCombo.MoveCursor(Delta: Integer);
 var
-  SaveText: string;
+  SaveText:               string;
   OldSelStart, OldSelLen: Integer;
 begin
-  if Items.Count = 0 then Exit;
+  if Items.Count = 0 then
+    Exit;
   SaveText := FSearchText;
   if SaveText = '' then
     SaveText := Text;
@@ -1675,8 +1663,10 @@ begin
   OldSelLen := SelLength;
 
   FCursorIndex := FCursorIndex + Delta;
-  if FCursorIndex < 0 then FCursorIndex := 0;
-  if FCursorIndex >= Items.Count then FCursorIndex := Items.Count - 1;
+  if FCursorIndex < 0 then
+    FCursorIndex := 0;
+  if FCursorIndex >= Items.Count then
+    FCursorIndex := Items.Count - 1;
 
   FUpdating := True;
   try
@@ -1749,10 +1739,11 @@ end;
 procedure TFontPickerCombo.FilterList(const AText: string);
 var
   I, OldSelStart, OldSelLen: Integer;
-  MatchingFonts: TStringList;
-  NeedRefresh: Boolean;
+  MatchingFonts:             TStringList;
+  NeedRefresh:               Boolean;
 begin
-  if FUpdating then Exit;
+  if FUpdating then
+    Exit;
 
   FSearchText := AText;
   OldSelStart := SelStart;
@@ -1793,10 +1784,10 @@ begin
       end;
 
       FCursorIndex := MatchingFonts.IndexOf(AText);
-      if FCursorIndex < 0 then FCursorIndex := 0;
+      if FCursorIndex < 0 then
+        FCursorIndex := 0;
 
-      if HasInputFocus and (MatchingFonts.Count > 0) and not FCommitting
-        and not SameText(AText, FActiveFont) then
+      if HasInputFocus and (MatchingFonts.Count > 0) and not FCommitting and not SameText(AText, FActiveFont) then
         if not DroppedDown then
         begin
           FOpenByFilter := True;
@@ -1835,11 +1826,12 @@ end;
 procedure TFontPickerCombo.RestoreFullList;
 var
   SaveText: string;
-  Idx: Integer;
+  Idx:      Integer;
 begin
   FOpenByFilter := False;
   SaveText := FActiveFont;
-  if SaveText = '' then SaveText := Text;
+  if SaveText = '' then
+    SaveText := Text;
 
   FUpdating := True;
   try
@@ -1863,8 +1855,8 @@ end;
 
 procedure TFontPickerCombo.CommitCursor(ACloseDropDown: Boolean);
 var
-  LH: HWND;
-  N: Integer;
+  LH:       hWnd;
+  N:        Integer;
   FontName: string;
 begin
   LH := ListHandle;
@@ -1948,7 +1940,8 @@ var
   Idx: Integer;
 begin
   Result := '';
-  if FUpdating then Exit;
+  if FUpdating then
+    Exit;
   FilterList(Text);
   Idx := FindFontIndex(Text);
   if (Text <> '') and (Idx >= 0) then
@@ -1964,30 +1957,30 @@ procedure TFontPickerCombo.WndProc(var Message: TMessage);
 var
   Idx: Integer;
 begin
-  case Message.Msg of
+  case message.Msg of
     // Keep the standard arrow cursor visible over the combo face and its
     // dropped-down list - same reason as in FontPickerEditProc: the system
     // may not refresh the cursor while the list holds mouse capture.
     WM_SETCURSOR:
       begin
         SetCursor(LoadCursor(0, IDC_ARROW));
-        Message.Result := 1;
+        message.Result := 1;
         Exit;
       end;
     WM_KEYDOWN:
       begin
-        if HandleEditKey(Message.Msg, Message.WParam, Message.LParam) then
+        if HandleEditKey(message.Msg, message.wParam, message.lParam) then
         begin
-          Message.Result := 0;
+          message.Result := 0;
           Exit;
         end;
       end;
     CN_COMMAND:
       begin
-        case TWMCommand(Message).NotifyCode of
+        case TWMCommand(message).NotifyCode of
           CBN_SELCHANGE:
             begin
-              Message.Result := 0;
+              message.Result := 0;
               Exit;
             end;
           CBN_SELENDOK:
@@ -1995,10 +1988,10 @@ begin
               // Single mouse click or Enter key commits immediately
               if not FUpdating then
                 CommitCursor(True);
-              Message.Result := 0;
+              message.Result := 0;
               Exit;
             end;
-CBN_SELENDCANCEL:
+          CBN_SELENDCANCEL:
             begin
               if (not FUpdating) and not FCommitting then
               begin
@@ -2019,18 +2012,17 @@ CBN_SELENDCANCEL:
                   Invalidate;
                 end;
               end;
-              Message.Result := 0;
+              message.Result := 0;
               Exit;
             end;
         end;
       end;
     CN_DRAWITEM:
       begin
-        with PDrawItemStruct(Message.LParam)^ do
+        with PDrawItemStruct(message.lParam)^ do
           if Integer(itemID) >= 0 then
-            DrawDropDownItem(hDC, Integer(itemID), rcItem,
-              TOwnerDrawState(LoWord(itemState)));
-        Message.Result := 1;
+            DrawDropDownItem(HDC, Integer(itemID), rcItem, TOwnerDrawState(LoWord(itemState)));
+        message.Result := 1;
         Exit;
       end;
     WM_LBUTTONDOWN:
@@ -2038,23 +2030,24 @@ CBN_SELENDCANCEL:
     WM_LBUTTONDBLCLK:
       Invalidate;
   end;
-  inherited WndProc(Message);
+  inherited WndProc(message);
 end;
 
 { =============================================================================== }
-{ cbFontPicker form event handlers                                                }
+{ cbFontPicker form event handlers }
 { =============================================================================== }
 
 procedure TForm1.cbFontPickerChange(Sender: TObject);
 begin
-  if cbFontPicker.IsUpdating then Exit;
+  if cbFontPicker.IsUpdating then
+    Exit;
 
   // ✅ মাউসে ক্লিক বা Enter চেপে ফন্ট নিশ্চিত (Commit) করা হলেই কেবল ফন্ট অ্যাপ্লাই ও ফোকাস আউট হবে:
   if SameText(cbFontPicker.Text, cbFontPicker.ActiveFont) then
   begin
     ApplyFontToMemo2(cbFontPicker.ActiveFont);
     SaveConverterSetting('ConverterAnsiFont', cbFontPicker.ActiveFont);
-    ActiveControl := nil; 
+    ActiveControl := nil;
   end
   else
   begin
@@ -2088,17 +2081,16 @@ begin
   cbFontPicker.ActiveFont := FontName;
 end;
 
-procedure TForm1.cbAnsiVersionDrawItem(Control: TWinControl; Index: Integer;
-  Rect: TRect; State: TOwnerDrawState);
+procedure TForm1.cbAnsiVersionDrawItem(Control: TWinControl; Index: Integer; Rect: TRect; State: TOwnerDrawState);
 var
-  Combo: TComboBox;
-  Text: string;
-  GlyphR, TextR: TRect;
-  Bg: TColor;
+  Combo:                         TComboBox;
+  Text:                          string;
+  GlyphR, TextR:                 TRect;
+  Bg:                            TColor;
   IsHover, IsChecked, IsDefault: Boolean;
 begin
   Combo := TComboBox(Control);
-  Text := Combo.Items[Index];
+  Text := Combo.Items[index];
   IsHover := odSelected in State;
   IsChecked := IsCheckedMapping(Text);
   IsDefault := SameText(Text, 'Default');
@@ -2117,21 +2109,17 @@ begin
     Pen.Style := psClear;
     FillRect(Rect);
 
-    GlyphR := System.Classes.Rect(Rect.Left + 6, Rect.Top + 2,
-                                  Rect.Left + 22, Rect.Bottom - 2);
-    DrawAnsiGlyphBullet(Combo.Canvas, GlyphR,
-      IfThen(IsChecked, AccentColor, SysColor(clWindowText)));
+    GlyphR := System.Classes.Rect(Rect.Left + 6, Rect.Top + 2, Rect.Left + 22, Rect.Bottom - 2);
+    DrawAnsiGlyphBullet(Combo.Canvas, GlyphR, IfThen(IsChecked, AccentColor, SysColor(clWindowText)));
 
     Font := Combo.Font;
     Font.Color := SysColor(clWindowText);
     if IsChecked then
       Font.Style := [fsBold];
-    TextR := System.Classes.Rect(Rect.Left + 26, Rect.Top,
-                                 Rect.Right - 6, Rect.Bottom);
-    DrawText(Handle, PChar(Text), Length(Text), TextR,
-      DT_SINGLELINE or DT_VCENTER or DT_END_ELLIPSIS or DT_NOPREFIX);
+    TextR := System.Classes.Rect(Rect.Left + 26, Rect.Top, Rect.Right - 6, Rect.Bottom);
+    DrawText(Handle, PChar(Text), Length(Text), TextR, DT_SINGLELINE or DT_VCENTER or DT_END_ELLIPSIS or DT_NOPREFIX);
 
-    if IsDefault and (Index < Combo.Items.Count - 1) then
+    if IsDefault and (index < Combo.Items.Count - 1) then
     begin
       Pen.Color := MixColor(SysColor(clBtnShadow), SysColor(clWindow), 45);
       Pen.Style := psSolid;
@@ -2144,13 +2132,13 @@ end;
 
 { =============================================================================== }
 
-function TForm1.IsMemo1Target(AHwnd: HWND): Boolean;
+function TForm1.IsMemo1Target(AHwnd: hWnd): Boolean;
 begin
   Result := (AHwnd <> 0) and (MEMO1 <> nil) and (MEMO1Panel <> nil) and
     ((AHwnd = MEMO1.Handle) or (AHwnd = MEMO1Panel.Handle) or IsChild(MEMO1Panel.Handle, AHwnd));
 end;
 
-function TForm1.IsMemo2Target(AHwnd: HWND): Boolean;
+function TForm1.IsMemo2Target(AHwnd: hWnd): Boolean;
 begin
   Result := (AHwnd <> 0) and (MEMO2 <> nil) and (MEMO2Panel <> nil) and
     ((AHwnd = MEMO2.Handle) or (AHwnd = MEMO2Panel.Handle) or IsChild(MEMO2Panel.Handle, AHwnd));
@@ -2158,32 +2146,32 @@ end;
 
 procedure TForm1.AppEventsMessage(var Msg: TMsg; var Handled: Boolean);
 var
-  TargetWnd: HWND;
-  Pt: TPoint;
+  TargetWnd:                      hWnd;
+  Pt:                             TPoint;
   IsPickerDropped, IsAnsiDropped: Boolean;
 begin
-  if (Msg.message = WM_KEYDOWN) and (Msg.wParam = Ord('V'))
-    and ((GetKeyState(VK_CONTROL) and $8000) <> 0)
-    and (PopupMemo <> nil) and CanPasteToMemo then
+  if (Msg.Message = WM_KEYDOWN) and (Msg.wParam = Ord('V')) and ((GetKeyState(VK_CONTROL) and $8000) <> 0) and (PopupMemo <> nil) and CanPasteToMemo then
   begin
     PasteToPopupMemo;
     Handled := True;
   end
-  else if (Msg.message = WM_LBUTTONDOWN) or (Msg.message = WM_NCLBUTTONDOWN) then
+  else if (Msg.Message = WM_LBUTTONDOWN) or (Msg.Message = WM_NCLBUTTONDOWN) then
   begin
     IsPickerDropped := (cbFontPicker <> nil) and cbFontPicker.DroppedDown;
     IsAnsiDropped := (cbAnsiVersion <> nil) and cbAnsiVersion.DroppedDown;
 
     if IsPickerDropped or IsAnsiDropped then
     begin
-      TargetWnd := WindowFromPoint(Msg.pt);
+      TargetWnd := WindowFromPoint(Msg.Pt);
       if IsMemo1Target(TargetWnd) then
       begin
-        if IsPickerDropped then cbFontPicker.DroppedDown := False;
-        if IsAnsiDropped then cbAnsiVersion.DroppedDown := False;
+        if IsPickerDropped then
+          cbFontPicker.DroppedDown := False;
+        if IsAnsiDropped then
+          cbAnsiVersion.DroppedDown := False;
 
         MEMO1.SetFocus;
-        Pt := Msg.pt;
+        Pt := Msg.Pt;
         Windows.ScreenToClient(MEMO1.Handle, Pt);
         PostMessage(MEMO1.Handle, WM_LBUTTONDOWN, Msg.wParam, MakeLParam(Pt.X, Pt.Y));
         PostMessage(MEMO1.Handle, WM_LBUTTONUP, Msg.wParam, MakeLParam(Pt.X, Pt.Y));
@@ -2191,11 +2179,13 @@ begin
       end
       else if IsMemo2Target(TargetWnd) then
       begin
-        if IsPickerDropped then cbFontPicker.DroppedDown := False;
-        if IsAnsiDropped then cbAnsiVersion.DroppedDown := False;
+        if IsPickerDropped then
+          cbFontPicker.DroppedDown := False;
+        if IsAnsiDropped then
+          cbAnsiVersion.DroppedDown := False;
 
         MEMO2.SetFocus;
-        Pt := Msg.pt;
+        Pt := Msg.Pt;
         Windows.ScreenToClient(MEMO2.Handle, Pt);
         PostMessage(MEMO2.Handle, WM_LBUTTONDOWN, Msg.wParam, MakeLParam(Pt.X, Pt.Y));
         PostMessage(MEMO2.Handle, WM_LBUTTONUP, Msg.wParam, MakeLParam(Pt.X, Pt.Y));
@@ -2221,19 +2211,18 @@ end;
 procedure TForm1.FormCreate(Sender: TObject);
 var
   SavedAnsiVersion, SavedFont, ErrMsg: string;
-  Idx: Integer;
+  Idx:                                 Integer;
 begin
   HandleThemes;
   DoubleBuffered := True;
-  
+
   PanelHeader.DoubleBuffered := True;
   PanelButton.DoubleBuffered := True;
   PanelFooter.DoubleBuffered := True;
 
   AppEvents.OnMessage := AppEventsMessage;
 
-  FSplitterRatio := MEMO1Panel.Height /
-    (ClientHeight - PanelHeader.Height - PanelButton.Height - PanelFooter.Height - Splitter1.Height);
+  FSplitterRatio := MEMO1Panel.Height / (ClientHeight - PanelHeader.Height - PanelButton.Height - PanelFooter.Height - Splitter1.Height);
   FUniToBijoy := TUnicodeToBijoy2000.Create;
   FBijoyToUni := TBijoy2000ToUnicode.Create;
 
@@ -2294,8 +2283,8 @@ begin
   SendMessage(MEMO1.Handle, EM_SETTARGETDEVICE, 0, 0);
   SendMessage(MEMO2.Handle, EM_SETTARGETDEVICE, 0, 0);
 
-  SendMessage(MEMO1.Handle, EM_SETCUEBANNER, 1, LPARAM(PChar('Type or paste Unicode Bangla text here...')));
-  SendMessage(MEMO2.Handle, EM_SETCUEBANNER, 1, LPARAM(PChar('Converted ANSI text will appear here...')));
+  SendMessage(MEMO1.Handle, EM_SETCUEBANNER, 1, lParam(PChar('Type or paste Unicode Bangla text here...')));
+  SendMessage(MEMO2.Handle, EM_SETCUEBANNER, 1, lParam(PChar('Converted ANSI text will appear here...')));
   ActiveControl := MEMO1;
 end;
 
@@ -2315,8 +2304,7 @@ begin
       cbFontPicker.Width := AvailWidth;
   end;
 
-  Available := ClientHeight - PanelHeader.Height - PanelButton.Height
-    - PanelFooter.Height - Splitter1.Height;
+  Available := ClientHeight - PanelHeader.Height - PanelButton.Height - PanelFooter.Height - Splitter1.Height;
   if Available > 0 then
   begin
     NewHeight := Round(Available * FSplitterRatio);
@@ -2347,8 +2335,7 @@ procedure TForm1.SplitterMoved(Sender: TObject);
 var
   Available: Integer;
 begin
-  Available := ClientHeight - PanelHeader.Height - PanelButton.Height
-    - PanelFooter.Height - Splitter1.Height;
+  Available := ClientHeight - PanelHeader.Height - PanelButton.Height - PanelFooter.Height - Splitter1.Height;
   if Available > 0 then
   begin
     FSplitterRatio := MEMO1Panel.Height / Available;

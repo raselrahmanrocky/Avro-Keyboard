@@ -12,8 +12,17 @@ unit ufrmLayoutPicker;
 interface
 
 uses
-  Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms,
-  Dialogs, StdCtrls, System.Types, uRegistrySettings;
+  Windows,
+  Messages,
+  SysUtils,
+  Classes,
+  Graphics,
+  Controls,
+  Forms,
+  Dialogs,
+  StdCtrls,
+  System.Types,
+  uRegistrySettings;
 
 const
   WM_FOCUS_LAYOUT_PICKER = WM_APP + 4;
@@ -25,29 +34,27 @@ type
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
     procedure ListBoxKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
     procedure ListBoxClick(Sender: TObject);
-    procedure ListBoxDrawItem(Control: TWinControl; Index: Integer;
-      Rect: TRect; State: TOwnerDrawState);
-    procedure ListBoxMouseMove(Sender: TObject; Shift: TShiftState;
-      X, Y: Integer);
+    procedure ListBoxDrawItem(Control: TWinControl; Index: Integer; Rect: TRect; State: TOwnerDrawState);
+    procedure ListBoxMouseMove(Sender: TObject; Shift: TShiftState; X, Y: Integer);
     procedure ListBoxMouseLeave(Sender: TObject);
-  private
-    FHoverIndex: Integer;
-    FPrevFocusedWindow: HWND;
-    FPrevForegroundWindow: HWND;
-    FLayoutNames: TStringList;
-    FLayoutValues: TStringList;
-    function GetSelectedLayoutValue: string;
-    procedure AutoSizeForm;
-    procedure WMNCActivate(var Msg: TWMNCActivate); message WM_NCACTIVATE;
-    procedure WMFocusPicker(var Msg: TMessage); message WM_FOCUS_LAYOUT_PICKER;
-    procedure WMTimer(var Msg: TMessage); message WM_TIMER;
-  public
-    procedure Setup;
-    procedure PopulateLayouts;
-    procedure PositionFormNearCursor;
-  protected
-    procedure CreateParams(var Params: TCreateParams); override;
-    destructor Destroy; override;
+    private
+      FHoverIndex:           Integer;
+      FPrevFocusedWindow:    HWND;
+      FPrevForegroundWindow: HWND;
+      FLayoutNames:          TStringList;
+      FLayoutValues:         TStringList;
+      function GetSelectedLayoutValue: string;
+      procedure AutoSizeForm;
+      procedure WMNCActivate(var Msg: TWMNCActivate); message WM_NCACTIVATE;
+      procedure WMFocusPicker(var Msg: TMessage); message WM_FOCUS_LAYOUT_PICKER;
+      procedure WMTimer(var Msg: TMessage); message WM_TIMER;
+    public
+      procedure Setup;
+      procedure PopulateLayouts;
+      procedure PositionFormNearCursor;
+    protected
+      procedure CreateParams(var Params: TCreateParams); override;
+      destructor Destroy; override;
   end;
 
 procedure ShowLayoutPickerPopup;
@@ -62,29 +69,30 @@ uses
   ufrmLayoutToast,
   KeyboardLayoutLoader;
 
-procedure ForceForegroundWindow(hWnd: HWND);
+procedure ForceForegroundWindow(HWND: HWND);
 var
   ForeThread, ThisThread: DWORD;
 begin
-  if not IsWindow(hWnd) then Exit;
+  if not IsWindow(HWND) then
+    Exit;
   ForeThread := GetWindowThreadProcessId(GetForegroundWindow, nil);
   ThisThread := GetCurrentThreadId;
   if ForeThread <> ThisThread then
   begin
     AttachThreadInput(ForeThread, ThisThread, True);
     try
-      SetForegroundWindow(hWnd);
-      BringWindowToTop(hWnd);
-      Windows.SetFocus(hWnd);
+      SetForegroundWindow(HWND);
+      BringWindowToTop(HWND);
+      Windows.SetFocus(HWND);
     finally
       AttachThreadInput(ForeThread, ThisThread, False);
     end;
   end
   else
   begin
-    SetForegroundWindow(hWnd);
-    BringWindowToTop(hWnd);
-    Windows.SetFocus(hWnd);
+    SetForegroundWindow(HWND);
+    BringWindowToTop(HWND);
+    Windows.SetFocus(HWND);
   end;
 end;
 
@@ -185,8 +193,7 @@ begin
   end;
 end;
 
-procedure TfrmLayoutPicker.FormClose(Sender: TObject;
-  var Action: TCloseAction);
+procedure TfrmLayoutPicker.FormClose(Sender: TObject; var Action: TCloseAction);
 begin
   KillTimer(Handle, 1);
   Action := caFree;
@@ -205,9 +212,9 @@ end;
 
 procedure TfrmLayoutPicker.PopulateLayouts;
 var
-  I: Integer;
+  I:                                      Integer;
   CurrentLayout, LayoutName, LayoutValue: string;
-  ItemFound: Boolean;
+  ItemFound:                              Boolean;
 begin
   CurrentLayout := AvroMainForm1.GetMyCurrentLayout;
   ListBox.Items.BeginUpdate;
@@ -256,14 +263,16 @@ end;
 procedure TfrmLayoutPicker.AutoSizeForm;
 var
   I, W, MaxW: Integer;
-  TempStr: string;
+  TempStr:    string;
 begin
   MaxW := 0;
   Canvas.Font := ListBox.Font;
   for I := 0 to ListBox.Items.Count - 1 do
   begin
-    if I < 9 then TempStr := IntToStr(I + 1) + '. ' + ListBox.Items[I]
-    else TempStr := ListBox.Items[I];
+    if I < 9 then
+      TempStr := IntToStr(I + 1) + '. ' + ListBox.Items[I]
+    else
+      TempStr := ListBox.Items[I];
     W := Canvas.TextWidth(TempStr);
     if W > MaxW then
       MaxW := W;
@@ -276,7 +285,7 @@ end;
 procedure TfrmLayoutPicker.PositionFormNearCursor;
 var
   CursorPos: TPoint;
-  Monitor: TMonitor;
+  Monitor:   TMonitor;
 begin
   GetCursorPos(CursorPos);
   Monitor := Screen.MonitorFromPoint(CursorPos);
@@ -300,15 +309,14 @@ begin
     Result := FLayoutValues[ListBox.ItemIndex];
 end;
 
-procedure TfrmLayoutPicker.ListBoxDrawItem(Control: TWinControl;
-  Index: Integer; Rect: TRect; State: TOwnerDrawState);
+procedure TfrmLayoutPicker.ListBoxDrawItem(Control: TWinControl; Index: Integer; Rect: TRect; State: TOwnerDrawState);
 var
   IsActive, IsHovered: Boolean;
-  GutterRect: TRect;
-  DisplayText: string;
-  CurrentLayout: string;
+  GutterRect:          TRect;
+  DisplayText:         string;
+  CurrentLayout:       string;
 begin
-  if (Index < 0) or (Index >= ListBox.Items.Count) then
+  if (index < 0) or (index >= ListBox.Items.Count) then
   begin
     ListBox.Canvas.Brush.Color := RGB(242, 242, 242);
     ListBox.Canvas.FillRect(Rect);
@@ -316,8 +324,8 @@ begin
   end;
 
   CurrentLayout := AvroMainForm1.GetMyCurrentLayout;
-  IsActive := (LowerCase(FLayoutValues[Index]) = LowerCase(CurrentLayout));
-  IsHovered := (Index = FHoverIndex) or (odSelected in State);
+  IsActive := (LowerCase(FLayoutValues[index]) = LowerCase(CurrentLayout));
+  IsHovered := (index = FHoverIndex) or (odSelected in State);
 
   ListBox.Canvas.Brush.Color := RGB(242, 242, 242);
   ListBox.Canvas.FillRect(Rect);
@@ -337,22 +345,21 @@ begin
     ListBox.Canvas.FillRect(GutterRect);
     ListBox.Canvas.Font.Color := RGB(51, 51, 51);
     ListBox.Canvas.Font.Style := [fsBold];
-      DrawText(ListBox.Canvas.Handle, #$2713, -1, GutterRect, DT_CENTER or DT_VCENTER or DT_SINGLELINE);
+    DrawText(ListBox.Canvas.Handle, #$2713, -1, GutterRect, DT_CENTER or DT_VCENTER or DT_SINGLELINE);
     ListBox.Canvas.Font.Style := [];
   end;
 
   ListBox.Canvas.Brush.Style := bsClear;
   ListBox.Canvas.Font.Color := RGB(0, 0, 0);
-  if Index < 9 then
-    DisplayText := IntToStr(Index + 1) + '. ' + ListBox.Items[Index]
+  if index < 9 then
+    DisplayText := IntToStr(index + 1) + '. ' + ListBox.Items[index]
   else
-    DisplayText := ListBox.Items[Index];
+    DisplayText := ListBox.Items[index];
   ListBox.Canvas.TextOut(Rect.Left + 35, Rect.Top + 3, DisplayText);
   ListBox.Canvas.Brush.Style := bsSolid;
 end;
 
-procedure TfrmLayoutPicker.ListBoxMouseMove(Sender: TObject;
-  Shift: TShiftState; X, Y: Integer);
+procedure TfrmLayoutPicker.ListBoxMouseMove(Sender: TObject; Shift: TShiftState; X, Y: Integer);
 var
   Idx: Integer;
 begin
@@ -374,9 +381,11 @@ procedure TfrmLayoutPicker.ListBoxClick(Sender: TObject);
 var
   SelectedLayout: string;
 begin
-  if not Assigned(CurrentLayoutPicker) then Exit;
+  if not Assigned(CurrentLayoutPicker) then
+    Exit;
   SelectedLayout := GetSelectedLayoutValue;
-  if SelectedLayout = '' then Exit;
+  if SelectedLayout = '' then
+    Exit;
 
   AvroMainForm1.KeyLayout.CurrentKeyboardLayout := SelectedLayout;
 
@@ -391,8 +400,7 @@ begin
   Release;
 end;
 
-procedure TfrmLayoutPicker.ListBoxKeyDown(Sender: TObject;
-  var Key: Word; Shift: TShiftState);
+procedure TfrmLayoutPicker.ListBoxKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
 var
   TargetIdx: Integer;
 begin
@@ -400,10 +408,12 @@ begin
   case Key of
     VK_ESCAPE:
       begin
-        if Assigned(CurrentLayoutPicker) then Close;
+        if Assigned(CurrentLayoutPicker) then
+          Close;
       end;
     VK_RETURN:
-      if ListBox.ItemIndex >= 0 then ListBoxClick(nil);
+      if ListBox.ItemIndex >= 0 then
+        ListBoxClick(nil);
     VK_UP:
       begin
         if ListBox.ItemIndex <= 0 then
@@ -420,9 +430,9 @@ begin
           ListBox.ItemIndex := ListBox.ItemIndex + 1;
         Key := 0;
       end;
-    Ord('1')..Ord('9'):
+    Ord('1') .. Ord('9'):
       TargetIdx := Key - Ord('1');
-    VK_NUMPAD1..VK_NUMPAD9:
+    VK_NUMPAD1 .. VK_NUMPAD9:
       TargetIdx := Key - VK_NUMPAD1;
   end;
   if (TargetIdx >= 0) and (TargetIdx < ListBox.Items.Count) then

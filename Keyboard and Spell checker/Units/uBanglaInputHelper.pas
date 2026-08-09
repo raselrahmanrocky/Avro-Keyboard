@@ -7,7 +7,6 @@
 }
 
 {$INCLUDE ../../ProjectDefines.inc}
-
 unit uBanglaInputHelper;
 
 interface

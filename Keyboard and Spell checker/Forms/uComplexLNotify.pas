@@ -7,93 +7,90 @@
 }
 
 {$INCLUDE ../ProjectDefines.inc}
+unit uComplexLNotify;
 
-Unit uComplexLNotify;
+interface
 
-Interface
+uses
+  Windows,
+  Messages,
+  SysUtils,
+  Variants,
+  Classes,
+  Graphics,
+  Controls,
+  Forms,
+  Dialogs,
+  StdCtrls,
+  ExtCtrls;
 
-Uses
-     Windows,
-     Messages,
-     SysUtils,
-     Variants,
-     Classes,
-     Graphics,
-     Controls,
-     Forms,
-     Dialogs,
-     StdCtrls,
-     ExtCtrls;
+type
+  TComplexLNotify = class(TForm)
+    Label1: TLabel;
+    Image1: TImage;
+    Label2: TLabel;
+    Label3: TLabel;
+    ButtonOk: TButton;
+    ButtonSkip: TButton;
+    CheckNotDisplay: TCheckBox;
+    procedure FormClose(Sender: TObject; var Action: TCloseAction);
+    procedure ButtonOkClick(Sender: TObject);
+    procedure FormCreate(Sender: TObject);
+    procedure ButtonSkipClick(Sender: TObject);
+    private
+      { Private declarations }
+    public
+      { Public declarations }
+  end;
 
-Type
-     TComplexLNotify = Class(TForm)
-          Label1: TLabel;
-          Image1: TImage;
-          Label2: TLabel;
-          Label3: TLabel;
-          ButtonOk: TButton;
-          ButtonSkip: TButton;
-          CheckNotDisplay: TCheckBox;
-          Procedure FormClose(Sender: TObject; Var Action: TCloseAction);
-          Procedure ButtonOkClick(Sender: TObject);
-          Procedure FormCreate(Sender: TObject);
-          Procedure ButtonSkipClick(Sender: TObject);
-     Private
-          { Private declarations }
-     Public
-          { Public declarations }
-     End;
+var
+  ComplexLNotify: TComplexLNotify;
 
-Var
-     ComplexLNotify           : TComplexLNotify;
-
-Implementation
+implementation
 
 {$R *.dfm}
 
-Uses
-     uFileFolderHandling,
-     uRegistrySettings;
+uses
+  uFileFolderHandling,
+  uRegistrySettings;
 
-{==========================================Z=====================================}
+{ ==========================================Z===================================== }
 
-Procedure TComplexLNotify.ButtonOkClick(Sender: TObject);
-Begin
-     Execute_Something(ExtractFilePath(Application.ExeName) + 'iComplex\IComplex.exe');
-     ModalResult := mrOK;
-End;
+procedure TComplexLNotify.ButtonOkClick(Sender: TObject);
+begin
+  Execute_Something(ExtractFilePath(Application.ExeName) + 'iComplex\IComplex.exe');
+  ModalResult := mrOK;
+end;
 
-{===============================================================================}
+{ =============================================================================== }
 
-Procedure TComplexLNotify.ButtonSkipClick(Sender: TObject);
-Begin
-     If CheckNotDisplay.Checked Then
-          DontShowComplexLNotification := 'YES';
-     ModalResult := mrCancel;
-End;
+procedure TComplexLNotify.ButtonSkipClick(Sender: TObject);
+begin
+  if CheckNotDisplay.Checked then
+    DontShowComplexLNotification := 'YES';
+  ModalResult := mrCancel;
+end;
 
-{===============================================================================}
+{ =============================================================================== }
 
-Procedure TComplexLNotify.FormClose(Sender: TObject;
-     Var Action: TCloseAction);
-Begin
-     Action := caFree;
+procedure TComplexLNotify.FormClose(Sender: TObject; var Action: TCloseAction);
+begin
+  Action := caFree;
 
-     ComplexLNotify := Nil;
-End;
+  ComplexLNotify := nil;
+end;
 
-{===============================================================================}
+{ =============================================================================== }
 
-Procedure TComplexLNotify.FormCreate(Sender: TObject);
-Begin
-     {$IFDEF PortableOn}
-     CheckNotDisplay.Enabled := True;
-     {$ELSE}
-     CheckNotDisplay.Enabled := False;
-     {$ENDIF}
-End;
+procedure TComplexLNotify.FormCreate(Sender: TObject);
+begin
+  {$IFDEF PortableOn}
+  CheckNotDisplay.Enabled := True;
+  {$ELSE}
+  CheckNotDisplay.Enabled := False;
+  {$ENDIF}
+end;
 
-{===============================================================================}
+{ =============================================================================== }
 
-End.
-
+end.

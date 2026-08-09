@@ -57,10 +57,10 @@ var
 
 var
   // Manually tracked modifier key state (more reliable than GetAsyncKeyState inside WH_KEYBOARD_LL hook)
-  TrackedCtrl: Boolean = False;
+  TrackedCtrl:  Boolean = False;
   TrackedShift: Boolean = False;
-  TrackedAlt: Boolean = False;
-  TrackedWin: Boolean = False;
+  TrackedAlt:   Boolean = False;
+  TrackedWin:   Boolean = False;
 
 const
   // Unassigned VK code used to suppress Start Menu when a Win-based hotkey fires
@@ -122,9 +122,9 @@ end;
 // auto-recovery failsafe for stuck trackers.
 function MatchesHotkeySettingTracked(const Setting: string; vkCode: Integer): Boolean;
 var
-  NeedMods: Byte;
-  NeedKey: Integer;
-  CurrentMods: Byte;
+  NeedMods:                              Byte;
+  NeedKey:                               Integer;
+  CurrentMods:                           Byte;
   RealCtrl, RealShift, RealAlt, RealWin: Boolean;
 begin
   Result := False;
@@ -138,21 +138,28 @@ begin
   RealCtrl := (GetAsyncKeyState(VK_CONTROL) and $8000) <> 0;
   RealShift := (GetAsyncKeyState(VK_SHIFT) and $8000) <> 0;
   RealAlt := (GetAsyncKeyState(VK_MENU) and $8000) <> 0;
-  RealWin := ((GetAsyncKeyState(VK_LWIN) and $8000) <> 0) or
-             ((GetAsyncKeyState(VK_RWIN) and $8000) <> 0);
+  RealWin := ((GetAsyncKeyState(VK_LWIN) and $8000) <> 0) or ((GetAsyncKeyState(VK_RWIN) and $8000) <> 0);
 
   // Auto-recovery: If key is physically up, force-reset stuck manual trackers
-  if not RealCtrl then TrackedCtrl := False;
-  if not RealShift then TrackedShift := False;
-  if not RealAlt then TrackedAlt := False;
-  if not RealWin then TrackedWin := False;
+  if not RealCtrl then
+    TrackedCtrl := False;
+  if not RealShift then
+    TrackedShift := False;
+  if not RealAlt then
+    TrackedAlt := False;
+  if not RealWin then
+    TrackedWin := False;
 
   // Build current modifier mask from both sources (OR = belt-and-suspenders)
   CurrentMods := 0;
-  if TrackedCtrl or RealCtrl then CurrentMods := CurrentMods or MOD_CTRL;
-  if TrackedShift or RealShift then CurrentMods := CurrentMods or MOD_SHIFT;
-  if TrackedAlt or RealAlt then CurrentMods := CurrentMods or MOD_ALT;
-  if TrackedWin or RealWin then CurrentMods := CurrentMods or MOD_WIN;
+  if TrackedCtrl or RealCtrl then
+    CurrentMods := CurrentMods or MOD_CTRL;
+  if TrackedShift or RealShift then
+    CurrentMods := CurrentMods or MOD_SHIFT;
+  if TrackedAlt or RealAlt then
+    CurrentMods := CurrentMods or MOD_ALT;
+  if TrackedWin or RealWin then
+    CurrentMods := CurrentMods or MOD_WIN;
 
   Result := (NeedMods = CurrentMods) and (NeedKey = vkCode);
 end;
@@ -161,12 +168,12 @@ end;
 
 function LowLevelKeyboardProc(nCode: Integer; wParam: wParam; lParam: lParam): longword; stdcall;
 var
-  kbdllhs:     pKBDLLHOOKSTRUCT;
-  ShouldBlock: Boolean;
-  T:           string;
+  kbdllhs:      pKBDLLHOOKSTRUCT;
+  ShouldBlock:  Boolean;
+  T:            string;
   ShortcutText: string;
-  ConflictIdx: Integer;
-  IsModifier:  Boolean;
+  ConflictIdx:  Integer;
+  IsModifier:   Boolean;
 label
   ExitHere;
 
@@ -218,17 +225,23 @@ begin
     // ----------------------------------------------
     if (wParam = 256) or (wParam = 260) then // KeyDown
     begin
-      if kbdllhs.vkCode in [VK_CONTROL, VK_LCONTROL, VK_RCONTROL] then TrackedCtrl := True
-      else if kbdllhs.vkCode in [VK_SHIFT, VK_LSHIFT, VK_RSHIFT] then TrackedShift := True
-      else if kbdllhs.vkCode in [VK_MENU, VK_LMENU, VK_RMENU] then TrackedAlt := True
+      if kbdllhs.vkCode in [VK_CONTROL, VK_LCONTROL, VK_RCONTROL] then
+        TrackedCtrl := True
+      else if kbdllhs.vkCode in [VK_SHIFT, VK_LSHIFT, VK_RSHIFT] then
+        TrackedShift := True
+      else if kbdllhs.vkCode in [VK_MENU, VK_LMENU, VK_RMENU] then
+        TrackedAlt := True
       else if kbdllhs.vkCode in [VK_LWIN, VK_RWIN] then
         TrackedWin := True;
     end
     else if (wParam = 257) or (wParam = 261) then // KeyUp
     begin
-      if kbdllhs.vkCode in [VK_CONTROL, VK_LCONTROL, VK_RCONTROL] then TrackedCtrl := False
-      else if kbdllhs.vkCode in [VK_SHIFT, VK_LSHIFT, VK_RSHIFT] then TrackedShift := False
-      else if kbdllhs.vkCode in [VK_MENU, VK_LMENU, VK_RMENU] then TrackedAlt := False
+      if kbdllhs.vkCode in [VK_CONTROL, VK_LCONTROL, VK_RCONTROL] then
+        TrackedCtrl := False
+      else if kbdllhs.vkCode in [VK_SHIFT, VK_LSHIFT, VK_RSHIFT] then
+        TrackedShift := False
+      else if kbdllhs.vkCode in [VK_MENU, VK_LMENU, VK_RMENU] then
+        TrackedAlt := False
       else if kbdllhs.vkCode in [VK_LWIN, VK_RWIN] then
         TrackedWin := False;
     end;
@@ -239,16 +252,13 @@ begin
     // ----------------------------------------------
     if (kbdllhs.vkCode = VK_F10) and ((wParam = 260) or (wParam = 261)) then
     begin
-      if MatchesHotkeySettingTracked(ModeSwitchKey, kbdllhs.vkCode) or
-         MatchesHotkeySettingTracked(ToggleOutputModeKey, kbdllhs.vkCode) or
-         MatchesHotkeySettingTracked(SpellerLauncherKey, kbdllhs.vkCode) or
-         MatchesHotkeySettingTracked(AnsiVersionSwitchKey, kbdllhs.vkCode) then
+      if MatchesHotkeySettingTracked(ModeSwitchKey, kbdllhs.vkCode) or MatchesHotkeySettingTracked(ToggleOutputModeKey, kbdllhs.vkCode) or
+        MatchesHotkeySettingTracked(SpellerLauncherKey, kbdllhs.vkCode) or MatchesHotkeySettingTracked(AnsiVersionSwitchKey, kbdllhs.vkCode) then
       begin
         LowLevelKeyboardProc := 1;
         Exit;
       end;
     end;
-
 
     // ----------------------------------------------
     // Hotkey Recording Mode (with live preview)
@@ -256,10 +266,7 @@ begin
     if IsRecordingHotkey and ((wParam = 256) or (wParam = 257) or (wParam = 260) or (wParam = 261)) then
     begin
       // Determine if current key is a modifier
-      IsModifier := kbdllhs.vkCode in [VK_CONTROL, VK_LCONTROL, VK_RCONTROL,
-                                        VK_SHIFT, VK_LSHIFT, VK_RSHIFT,
-                                        VK_MENU, VK_LMENU, VK_RMENU,
-                                        VK_LWIN, VK_RWIN];
+      IsModifier := kbdllhs.vkCode in [VK_CONTROL, VK_LCONTROL, VK_RCONTROL, VK_SHIFT, VK_LSHIFT, VK_RSHIFT, VK_MENU, VK_LMENU, VK_RMENU, VK_LWIN, VK_RWIN];
 
       // Build preview string from tracked modifier state
       ShortcutText := '';
@@ -283,8 +290,7 @@ begin
           ShortcutText := 'None';
 
         // Validate: non-F keys require at least one modifier
-        if (not TrackedCtrl) and (not TrackedShift) and (not TrackedAlt) and (not TrackedWin) and
-           ((kbdllhs.vkCode < $70) or (kbdllhs.vkCode > $7B)) then
+        if (not TrackedCtrl) and (not TrackedShift) and (not TrackedAlt) and (not TrackedWin) and ((kbdllhs.vkCode < $70) or (kbdllhs.vkCode > $7B)) then
         begin
           // Reject this keypress but keep recording session alive
           LowLevelKeyboardProc := CallNextHookEx(HookRetVal, nCode, wParam, lParam);
@@ -535,7 +541,6 @@ begin
       end;
     end;
     {$ENDREGION}
-
   end; { nCode = HC_ACTION }
 
 ExitHere:

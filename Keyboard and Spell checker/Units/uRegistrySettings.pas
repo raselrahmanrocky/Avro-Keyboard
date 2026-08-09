@@ -49,17 +49,17 @@ var
   AvroUpdateLastCheck: TDateTime;
 
   // Hotkey settings
-  ModeSwitchKey:          string;
-  ToggleOutputModeKey:    string;
-  SpellerLauncherKey:     string;
+  ModeSwitchKey:                string;
+  ToggleOutputModeKey:          string;
+  SpellerLauncherKey:           string;
   LayoutSwitchKey:              string;
   ShowLayoutSwitchNotification: string;
-  AnsiVersionSwitchKey:   string;
-  ShowAnsiSwitchNotification: string;
+  AnsiVersionSwitchKey:         string;
+  ShowAnsiSwitchNotification:   string;
 
   // Avro Mouse Settings
-  AvroMousePosX:             string;
-  AvroMousePosY:             string;
+  AvroMousePosX: string;
+  AvroMousePosY: string;
 
   // Avro Phonetic Settings
   PhoneticAutoCorrect:  string;
@@ -88,11 +88,11 @@ var
   LayoutViewerSize:    string;
 
   // Global Output settings
-  OutputIsBijoy:     string;
-  ShowOutputwarning: string;
+  OutputIsBijoy:         string;
+  ShowOutputwarning:     string;
   UnicodeToggleShortcut: string;
-  ANSIToggleShortcut: string;
-  IgnoreCapsLock:    string;
+  ANSIToggleShortcut:    string;
+  IgnoreCapsLock:        string;
 
 procedure SaveUISettings;
 procedure LoadSettings;
@@ -523,7 +523,7 @@ end;
 
 procedure DeduplicateHotkeys;
 var
-  Keys: array[0..4] of ^string;
+  Keys: array [0 .. 4] of ^string;
   I, J: Integer;
 begin
   // Priority: ModeSwitch > ToggleOutput > SpellerLauncher > LayoutSwitch > AnsiVersion
@@ -540,9 +540,8 @@ begin
       Continue;
     for J := I + 1 to 4 do
     begin
-      if (Keys[J]^ <> '') and (Keys[J]^ <> 'NONE') and
-         (HotkeyStringToModifiers(Keys[I]^) = HotkeyStringToModifiers(Keys[J]^)) and
-         (HotkeyStringToKey(Keys[I]^) = HotkeyStringToKey(Keys[J]^)) then
+      if (Keys[J]^ <> '') and (Keys[J]^ <> 'NONE') and (HotkeyStringToModifiers(Keys[I]^) = HotkeyStringToModifiers(Keys[J]^)) and
+        (HotkeyStringToKey(Keys[I]^) = HotkeyStringToKey(Keys[J]^)) then
         Keys[J]^ := '';
     end;
   end;
@@ -575,7 +574,6 @@ begin
     ShowLayoutSwitchNotification := 'YES';
   if not((ShowAnsiSwitchNotification = 'YES') or (ShowAnsiSwitchNotification = 'NO')) then
     ShowAnsiSwitchNotification := 'YES';
-
 
   // Avro Mouse Settings
   if not(StrToInt(AvroMousePosX) > 0) then

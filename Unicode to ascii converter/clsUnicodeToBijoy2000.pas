@@ -21,8 +21,8 @@ type
     Value: string;
     Alt: string;
     ToggleOnBackspace: Boolean;
-    MatchMode: Integer;       // 0 = Full Cluster (default), 1 = Last Char only
-    ProcessPhase: string;     // 'pre' or 'post' (empty = main, existing behavior)
+    MatchMode: Integer;   // 0 = Full Cluster (default), 1 = Last Char only
+    ProcessPhase: string; // 'pre' or 'post' (empty = main, existing behavior)
   end;
 
   TVowelRule = record
@@ -69,10 +69,9 @@ type
       function GetToggleState(const Context, Key: string; OccurrenceIndex: Integer): Boolean;
       procedure SetToggleState(const Context, Key: string; OccurrenceIndex: Integer; Value: Boolean);
       function RuleHasAnyToggle(const Rule: TVowelRule): Boolean;
-      function FindMappingToggle(const Rule: TVowelRule; const ConsonantPart: string;
-        out MappingToggleOnBackspace: Boolean; out MatchedCluster: string): Boolean;
-      function FindBestClusterMatch(const Text: string; KarPos: Integer;
-        const Rule: TVowelRule): TClusterMatchInfo;
+      function FindMappingToggle(const Rule: TVowelRule; const ConsonantPart: string; out MappingToggleOnBackspace: Boolean;
+        out MatchedCluster: string): Boolean;
+      function FindBestClusterMatch(const Text: string; KarPos: Integer; const Rule: TVowelRule): TClusterMatchInfo;
       procedure ApplyRuleForKar(const KarChar: string; const Phase: string = '');
     public
       destructor Destroy; override;
@@ -128,25 +127,24 @@ type
   end;
 
 var
-  CustomFullForms: TArray<TReplacementPair>;
-  CustomPreReplacements: TArray<TReplacementPair>;
-  CustomPostReplacements: TArray<TReplacementPair>; 
-  AnsiVersion: string = 'Default';
-  AnsiMappingDir: string = '';
-  AnsiRegistry: TList<TAnsiVarRec>;
-  AnsiRegistryMap: TDictionary<string, TAnsiVarRec>;
-  ActiveReplacements: TArray<TReplacementPair>;
+  CustomFullForms:          TArray<TReplacementPair>;
+  CustomPreReplacements:    TArray<TReplacementPair>;
+  CustomPostReplacements:   TArray<TReplacementPair>;
+  AnsiVersion:              string = 'Default';
+  AnsiMappingDir:           string = '';
+  AnsiRegistry:             TList<TAnsiVarRec>;
+  AnsiRegistryMap:          TDictionary<string, TAnsiVarRec>;
+  ActiveReplacements:       TArray<TReplacementPair>;
   KarInclusiveReplacements: TArray<TReplacementPair>;
-  AnsiOverrides: TDictionary<string, string>;
-  VowelRules: TArray<TVowelRule>;
-  ConsonantGroupMap: TDictionary<string, TArray<string>>;
-  AnsiGroupMap: TDictionary<string, TArray<string>>;
-  AnsiGroupRawMap: TDictionary<string, TArray<string>>;
-  RfolaRules: TArray<TRfolaRule>;
-  KarCorrections: TArray<TKarCorrection>;
-  GroupKarCorrections: TArray<TGroupKarCorrection>;
-  ConsonantGroupRawMap: TDictionary<string, TArray<string>>;
-
+  AnsiOverrides:            TDictionary<string, string>;
+  VowelRules:               TArray<TVowelRule>;
+  ConsonantGroupMap:        TDictionary<string, TArray<string>>;
+  AnsiGroupMap:             TDictionary<string, TArray<string>>;
+  AnsiGroupRawMap:          TDictionary<string, TArray<string>>;
+  RfolaRules:               TArray<TRfolaRule>;
+  KarCorrections:           TArray<TKarCorrection>;
+  GroupKarCorrections:      TArray<TGroupKarCorrection>;
+  ConsonantGroupRawMap:     TDictionary<string, TArray<string>>;
 
 procedure ResetAnsiToDefaults;
 procedure LoadAnsiMapping(const Path: string; ErrorLog: TStringList = nil);
@@ -167,7 +165,7 @@ uses
 
 { Bijoy2000 Font Map Constants }
 var
-   { Numbers }
+  { Numbers }
   A_0: string = #$30;
   A_1: string = #$31;
   A_2: string = #$32;
@@ -180,208 +178,208 @@ var
   A_9: string = #$39;
 
   { Vowels and Kars }
-  A_A: Char       = #$41;
-  A_AA: string    = #$41#$76;
-  A_AAKar: Char   = #$76;
-  A_I: Char       = #$42;
-  A_IKar: Char    = #$77;
-  A_II: Char      = #$43;
-  A_IIKar: Char   = #$78;
-  A_U: Char       = #$44;
-  A_UKar2: Char   = #$79;
-  A_UKar1: Char   = #$7A;
-  A_UKar3: Char   = #$2013;
-  A_UKar4: Char   = #$201C;
-  A_UU: Char      = #$45;
-  A_UUKar2: Char  = #$7E;
-  A_UUKar1: Char  = #$201A;
-  A_UUKar3: Char  = #$192;
-  A_RRI: Char     = #$46;
-  A_RRIKar1: Char = #$201E;
-  A_RRIKar2: Char = #$2026;
-  A_E: Char       = #$47;
-  A_EKar1: Char   = #$2020;
-  A_EKar2: Char   = #$2021;
-  A_OI: Char      = #$48;
-  A_OIKar1: Char  = #$2C6;
-  A_OIKar2: Char  = #$2030;
-  A_O: Char       = #$49;
-  A_OU: Char      = #$4A;
-  A_OUKar: Char   = #$160;
+  A_A:       Char   = #$41;
+  A_AA:      string = #$41#$76;
+  A_AAKar:   Char   = #$76;
+  A_I:       Char   = #$42;
+  A_IKar:    Char   = #$77;
+  A_II:      Char   = #$43;
+  A_IIKar:   Char   = #$78;
+  A_U:       Char   = #$44;
+  A_UKar2:   Char   = #$79;
+  A_UKar1:   Char   = #$7A;
+  A_UKar3:   Char   = #$2013;
+  A_UKar4:   Char   = #$201C;
+  A_UU:      Char   = #$45;
+  A_UUKar2:  Char   = #$7E;
+  A_UUKar1:  Char   = #$201A;
+  A_UUKar3:  Char   = #$192;
+  A_RRI:     Char   = #$46;
+  A_RRIKar1: Char   = #$201E;
+  A_RRIKar2: Char   = #$2026;
+  A_E:       Char   = #$47;
+  A_EKar1:   Char   = #$2020;
+  A_EKar2:   Char   = #$2021;
+  A_OI:      Char   = #$48;
+  A_OIKar1:  Char   = #$2C6;
+  A_OIKar2:  Char   = #$2030;
+  A_O:       Char   = #$49;
+  A_OU:      Char   = #$4A;
+  A_OUKar:   Char   = #$160;
 
-   { Symbols }
-  A_Taka: string             = #$24;
-  A_Dari: string             = #$7C;
-  A_DoubleDanda: string      = #$5C;
-  A_Hasanta: string          = #$26;
+  { Symbols }
+  A_Taka:             string = #$24;
+  A_Dari:             string = #$7C;
+  A_DoubleDanda:      string = #$5C;
+  A_Hasanta:          string = #$26;
   A_StartDoubleQuote: string = #$D2;
-  A_EndDoubleQuote: string   = #$D3;
+  A_EndDoubleQuote:   string = #$D3;
 
   A_StartSingleQuote: string = #$D4;
-  A_EndSingleQuote: string   = #$D5;
+  A_EndSingleQuote:   string = #$D5;
 
-   { Consonants }
-  A_K: string        = #$4B;
-  A_Kh: string       = #$4C;
-  A_G: string        = #$4D;
-  A_Gh: string       = #$4E;
-  A_NGA: string      = #$4F;
-  A_C: string        = #$50;
-  A_Ch: string       = #$51;
-  A_J: string        = #$52;
-  A_Jh: string       = #$53;
-  A_NYA: string      = #$54;
-  A_Tt: string       = #$55;
-  A_Tth: string      = #$56;
-  A_Dd: string       = #$57;
-  A_Ddh: string      = #$58;
-  A_Nn: string       = #$59;
-  A_T: string        = #$5A;
-  A_Th: string       = #$5F;
-  A_D: string        = #$60;
-  A_Dh: string       = #$61;
-  A_N: string        = #$62;
-  A_P: string        = #$63;
-  A_Ph: string       = #$64;
-  A_B: string        = #$65;
-  A_Bh: string       = #$66;
-  A_M: string        = #$67;
-  A_Z: string        = #$68;
-  A_R: string        = #$69;
-  A_L: string        = #$6A;
-  A_Sh: string       = #$6B;
-  A_SS: string       = #$6C;
-  A_S: string        = #$6D;
-  A_H: string        = #$6E;
-  A_RR: string       = #$6F;
-  A_RRH: string      = #$70;
-  A_Y: string        = #$71;
+  { Consonants }
+  A_K:        string = #$4B;
+  A_Kh:       string = #$4C;
+  A_G:        string = #$4D;
+  A_Gh:       string = #$4E;
+  A_NGA:      string = #$4F;
+  A_C:        string = #$50;
+  A_Ch:       string = #$51;
+  A_J:        string = #$52;
+  A_Jh:       string = #$53;
+  A_NYA:      string = #$54;
+  A_Tt:       string = #$55;
+  A_Tth:      string = #$56;
+  A_Dd:       string = #$57;
+  A_Ddh:      string = #$58;
+  A_Nn:       string = #$59;
+  A_T:        string = #$5A;
+  A_Th:       string = #$5F;
+  A_D:        string = #$60;
+  A_Dh:       string = #$61;
+  A_N:        string = #$62;
+  A_P:        string = #$63;
+  A_Ph:       string = #$64;
+  A_B:        string = #$65;
+  A_Bh:       string = #$66;
+  A_M:        string = #$67;
+  A_Z:        string = #$68;
+  A_R:        string = #$69;
+  A_L:        string = #$6A;
+  A_Sh:       string = #$6B;
+  A_SS:       string = #$6C;
+  A_S:        string = #$6D;
+  A_H:        string = #$6E;
+  A_RR:       string = #$6F;
+  A_RRH:      string = #$70;
+  A_Y:        string = #$71;
   A_Khandata: string = #$72;
-  A_Anushar: string  = #$73;
+  A_Anushar:  string = #$73;
   A_Bisharga: string = #$74;
-  A_Chandra: string  = #$75;
+  A_Chandra:  string = #$75;
 
   { Full Forms }
-  A_K_K: string      = #$B0;
-  A_K_Tt: string     = #$B1;
-  A_K_Ss_M: string   = #$B2;
-  A_K_T: string      = #$B3;
-  A_K_M: string      = #$B4;
-  A_K_R: string      = #$B5;
-  A_K_Ss: string     = #$B6;
-  A_K_S: string      = #$B7;
-  A_G_Ukar: string   = #$B8;
-  A_G_G: string      = #$B9;
-  A_G_D: string      = #$BA;
-  A_G_Dh: string     = #$BB;
-  A_NGA_K: string    = #$BC;
-  A_NGA_G: string    = #$BD;
-  A_J_J: string      = #$BE;
-  A_J_Jh: string     = #$C0;
-  A_J_NYA: string    = #$C1;
-  A_NYA_C: string    = #$C2;
-  A_NYA_CH: string   = #$C3;
-  A_NYA_J: string    = #$C4;
-  A_NYA_Jh: string   = #$C5;
-  A_Tt_Tt: string    = #$C6;
-  A_Dd_Dd: string    = #$C7;
-  A_Nn_Tt: string    = #$C8;
-  A_Nn_Tth: string   = #$C9;
-  A_NN_Dd: string    = #$CA;
-  A_T_T: string      = #$CB;
-  A_T_Th: string     = #$CC;
-  A_T_M: string      = #$CD;
-  A_T_R: string      = #$CE;
-  A_D_D: string      = #$CF;
-  A_D_Dh: string     = #$D7;
-  A_D_B: string      = #$D8;
-  A_D_M: string      = #$D9;
-  A_N_Tth: string    = #$DA;
-  A_N_Dd: string     = #$DB;
-  A_N_Dh: string     = #$DC;
-  A_N_S: string      = #$DD;
-  A_P_Tt: string     = #$DE;
-  A_P_T: string      = #$DF;
-  A_P_P: string      = #$E0;
-  A_P_S: string      = #$E1;
-  A_B_J: string      = #$E2;
-  A_B_D: string      = #$E3;
-  A_B_Dh: string     = #$E4;
-  A_Bh_R: string     = #$E5;
-  A_M_N: string      = #$E6;
-  A_M_Ph: string     = #$E7;
-  A_L_K: string      = #$E9;
-  A_L_G: string      = #$EA;
-  A_L_Tt: string     = #$EB;
-  A_L_Dd: string     = #$EC;
-  A_L_P: string      = #$ED;
-  A_L_Ph: string     = #$EE;
-  A_Sh_UKar: string  = #$EF;
-  A_Sh_C: string     = #$F0;
-  A_Sh_Ch: string    = #$F1;
-  A_Ss_Nn: string    = #$F2;
-  A_Ss_Tt: string    = #$F3;
-  A_Ss_Tth: string   = #$F4;
-  A_Ss_Ph: string    = #$F5;
-  A_S_Kh: string     = #$F6;
-  A_S_Tt: string     = #$F7;
-  A_S_N: string      = #$F8;
-  A_S_Ph: string     = #$F9;
-  A_H_UKar: string   = #$FB;
+  A_K_K:      string = #$B0;
+  A_K_Tt:     string = #$B1;
+  A_K_Ss_M:   string = #$B2;
+  A_K_T:      string = #$B3;
+  A_K_M:      string = #$B4;
+  A_K_R:      string = #$B5;
+  A_K_Ss:     string = #$B6;
+  A_K_S:      string = #$B7;
+  A_G_Ukar:   string = #$B8;
+  A_G_G:      string = #$B9;
+  A_G_D:      string = #$BA;
+  A_G_Dh:     string = #$BB;
+  A_NGA_K:    string = #$BC;
+  A_NGA_G:    string = #$BD;
+  A_J_J:      string = #$BE;
+  A_J_Jh:     string = #$C0;
+  A_J_NYA:    string = #$C1;
+  A_NYA_C:    string = #$C2;
+  A_NYA_CH:   string = #$C3;
+  A_NYA_J:    string = #$C4;
+  A_NYA_Jh:   string = #$C5;
+  A_Tt_Tt:    string = #$C6;
+  A_Dd_Dd:    string = #$C7;
+  A_Nn_Tt:    string = #$C8;
+  A_Nn_Tth:   string = #$C9;
+  A_NN_Dd:    string = #$CA;
+  A_T_T:      string = #$CB;
+  A_T_Th:     string = #$CC;
+  A_T_M:      string = #$CD;
+  A_T_R:      string = #$CE;
+  A_D_D:      string = #$CF;
+  A_D_Dh:     string = #$D7;
+  A_D_B:      string = #$D8;
+  A_D_M:      string = #$D9;
+  A_N_Tth:    string = #$DA;
+  A_N_Dd:     string = #$DB;
+  A_N_Dh:     string = #$DC;
+  A_N_S:      string = #$DD;
+  A_P_Tt:     string = #$DE;
+  A_P_T:      string = #$DF;
+  A_P_P:      string = #$E0;
+  A_P_S:      string = #$E1;
+  A_B_J:      string = #$E2;
+  A_B_D:      string = #$E3;
+  A_B_Dh:     string = #$E4;
+  A_Bh_R:     string = #$E5;
+  A_M_N:      string = #$E6;
+  A_M_Ph:     string = #$E7;
+  A_L_K:      string = #$E9;
+  A_L_G:      string = #$EA;
+  A_L_Tt:     string = #$EB;
+  A_L_Dd:     string = #$EC;
+  A_L_P:      string = #$ED;
+  A_L_Ph:     string = #$EE;
+  A_Sh_UKar:  string = #$EF;
+  A_Sh_C:     string = #$F0;
+  A_Sh_Ch:    string = #$F1;
+  A_Ss_Nn:    string = #$F2;
+  A_Ss_Tt:    string = #$F3;
+  A_Ss_Tth:   string = #$F4;
+  A_Ss_Ph:    string = #$F5;
+  A_S_Kh:     string = #$F6;
+  A_S_Tt:     string = #$F7;
+  A_S_N:      string = #$F8;
+  A_S_Ph:     string = #$F9;
+  A_H_UKar:   string = #$FB;
   A_H_RRIKar: string = #$FC;
-  A_H_N: string      = #$FD;
-  A_H_M: string      = #$FE;
-  A_Rr_G: string     = #$FF;
+  A_H_N:      string = #$FD;
+  A_H_M:      string = #$FE;
+  A_Rr_G:     string = #$FF;
 
   { First Half forms }
-  A_Reph: Char   = #$A9;
-  A_M_1H: Char   = #$A4;
-  A_Ss_1H: Char  = #$AE;
+  A_Reph:   Char = #$A9;
+  A_M_1H:   Char = #$A4;
+  A_Ss_1H:  Char = #$AE;
   A_S_1H_1: Char = #$AF;
   A_N_1H_1: Char = #$161;
   A_S_1H_2: Char = #$2C9; // -----------Not used
   A_D_1H_1: Char = #$2DC;
-  A_C_1H: Char   = #$201D;
+  A_C_1H:   Char = #$201D;
   A_NGA_1H: Char = #$2022;
   A_N_1H_2: Char = #$203A;
   A_D_1H_2: Char = #$2122;
 
   { Second Half forms }
-  A_B_2H_1: Char    = #$5E; //
-  A_B_2H_2: Char    = #$A1; //
-  A_BH_2H: Char     = #$A2; //
-  A_BH_R_2H: Char   = #$A3; //
-  A_M_2H_1: Char    = #$A5; //
-  A_B_2H_3: Char    = #$A6; //
-  A_M_2H_2: Char    = #$A7; //
-  A_ZFola: Char     = #$A8; //
-  A_RFola_1: Char   = #$AA; //
-  A_RFola_2: Char   = #$AB; //
-  A_L_2H_1: Char    = #$AC; //
-  A_L_2H_2: Char    = #$AD; // <--- Not used
-  A_T_R_2H: Char    = #$BF; //
-  A_RFola_3: Char   = #$D6; //
-  A_Nn_2H_1: Char   = #$E8;
-  A_K_R_2H: Char    = #$152; //
-  A_Nn_2H_2: Char   = #$153;
-  A_B_2H_4: Char    = #$178;  //
-  A_T_2H: Char      = #$2014; //
+  A_B_2H_1:    Char = #$5E; //
+  A_B_2H_2:    Char = #$A1; //
+  A_BH_2H:     Char = #$A2; //
+  A_BH_R_2H:   Char = #$A3; //
+  A_M_2H_1:    Char = #$A5; //
+  A_B_2H_3:    Char = #$A6; //
+  A_M_2H_2:    Char = #$A7; //
+  A_ZFola:     Char = #$A8; //
+  A_RFola_1:   Char = #$AA; //
+  A_RFola_2:   Char = #$AB; //
+  A_L_2H_1:    Char = #$AC; //
+  A_L_2H_2:    Char = #$AD; // <--- Not used
+  A_T_R_2H:    Char = #$BF; //
+  A_RFola_3:   Char = #$D6; //
+  A_Nn_2H_1:   Char = #$E8;
+  A_K_R_2H:    Char = #$152; //
+  A_Nn_2H_2:   Char = #$153;
+  A_B_2H_4:    Char = #$178;  //
+  A_T_2H:      Char = #$2014; //
   A_T_UKar_2H: Char = #$2018; //
-  A_Th_2H: Char     = #$2019; //
-  A_K_2H: Char      = #$2039; //
-  A_L_2H_3: Char    = #$2212; //
+  A_Th_2H:     Char = #$2019; //
+  A_K_2H:      Char = #$2039; //
+  A_L_2H_3:    Char = #$2212; //
 
-
-{ ============================================================================= }
-{ Registry Initialization }
-{ ============================================================================= }
+  { ============================================================================= }
+  { Registry Initialization }
+  { ============================================================================= }
 
 function CountOccurrences(const SubStr, S: string): Integer;
 var
   PosIdx: Integer;
 begin
   Result := 0;
-  if (SubStr = '') or (S = '') then Exit;
+  if (SubStr = '') or (S = '') then
+    Exit;
   PosIdx := Pos(SubStr, S);
   while PosIdx > 0 do
   begin
@@ -396,8 +394,8 @@ end;
 function ResolveContextChar(const Text: string; KarPos: Integer): string;
 var
   PrecedingChar: string;
-  ContextEnd: Integer;
-  IsZfola: Boolean;
+  ContextEnd:    Integer;
+  IsZfola:       Boolean;
 begin
   if KarPos - 1 < 1 then
     Exit('');
@@ -417,8 +415,7 @@ end;
 
 procedure InitializeAnsiRegistry;
 
-  procedure RegVar(const AName, ACategory: string; AVarType: TAnsiVarType;
-    APtr: Pointer; const ADefaultVal, ABengali: string);
+  procedure RegVar(const AName, ACategory: string; AVarType: TAnsiVarType; APtr: Pointer; const ADefaultVal, ABengali: string);
   var
     Rec: TAnsiVarRec;
   begin
@@ -740,13 +737,10 @@ begin
     I := Pos(b_n + b_Hasanta, fConvertedText);
     if I <= 0 then
       break;
-    if ((I + 2 <= Length(fConvertedText)) and 
-        ((fConvertedText[I + 2] = b_t) or (fConvertedText[I + 2] = b_Th) or 
-         (fConvertedText[I + 2] = b_L) or (fConvertedText[I + 2] = b_b) or 
-         (fConvertedText[I + 2] = A_T_R_2H) or (fConvertedText[I + 2] = A_T_UKar_2H))) then
+    if ((I + 2 <= Length(fConvertedText)) and ((fConvertedText[I + 2] = b_t) or (fConvertedText[I + 2] = b_Th) or (fConvertedText[I + 2] = b_L) or
+          (fConvertedText[I + 2] = b_b) or (fConvertedText[I + 2] = A_T_R_2H) or (fConvertedText[I + 2] = A_T_UKar_2H))) then
       fConvertedText[I] := A_N_1H_1
-    else if (I + 2 <= Length(fConvertedText)) and 
-            ((fConvertedText[I + 2] = b_m) or (fConvertedText[I + 2] = b_n)) then
+    else if (I + 2 <= Length(fConvertedText)) and ((fConvertedText[I + 2] = b_m) or (fConvertedText[I + 2] = b_n)) then
       fConvertedText[I] := A_N[1]
     else
       fConvertedText[I] := A_N_1H_2;
@@ -806,19 +800,18 @@ end;
 procedure TUnicodeToBijoy2000.FinalTouch;
 var
   Len: Integer;
-  I: Integer;
-  C: Char;
-  SB: TStringBuilder; // TStringBuilder declared
+  I:   Integer;
+  C:   Char;
+  SB:  TStringBuilder; // TStringBuilder declared
 begin
   fConvertedText := ReplaceStr(fConvertedText, string(b_Hasanta) + string(zwnj), string(A_Hasanta));
-  
+
   Len := Length(fConvertedText);
   if Len > 0 then
   begin
     if string(b_Hasanta) <> '' then
     begin
-      if (Len >= 2) and (fConvertedText[Len] = string(b_Hasanta)[1])
-         and (fConvertedText[Len - 1] = string(b_Hasanta)[1]) then
+      if (Len >= 2) and (fConvertedText[Len] = string(b_Hasanta)[1]) and (fConvertedText[Len - 1] = string(b_Hasanta)[1]) then
       begin
         fConvertedText[Len] := A_Hasanta[1];
         fConvertedText[Len - 1] := A_Hasanta[1];
@@ -827,7 +820,7 @@ begin
         fConvertedText[Len] := A_Hasanta[1];
     end;
   end;
-  
+
   fConvertedText := ReplaceStr(fConvertedText, string(b_Hasanta), '');
   fConvertedText := ReplaceStr(fConvertedText, string(zwj), '');
   fConvertedText := ReplaceStr(fConvertedText, string(zwnj), '');
@@ -843,7 +836,7 @@ begin
   fConvertedText := ReplaceStr(fConvertedText, string(A_ZFola) + string(A_UUKar1), string(A_UUKar1) + string(A_ZFola));
   fConvertedText := ReplaceStr(fConvertedText, string(A_ZFola) + string(A_UUKar2), string(A_UUKar2) + string(A_ZFola));
   fConvertedText := ReplaceStr(fConvertedText, string(A_ZFola) + string(A_UUKar3), string(A_UUKar3) + string(A_ZFola));
-  
+
   // Swap Z-Fola (A_ZFola) and all types of Rfola
   fConvertedText := ReplaceStr(fConvertedText, string(A_RFola_1) + string(A_UKar1), string(A_UKar1) + string(A_RFola_1));
   fConvertedText := ReplaceStr(fConvertedText, string(A_RFola_1) + string(A_UUKar1), string(A_UUKar1) + string(A_RFola_1));
@@ -865,19 +858,19 @@ begin
 
   // Dynamic Post-processing Corrections (JSON-driven)
   if Length(KarCorrections) > 0 then
-    for I := 0 to High(KarCorrections) do
-      fConvertedText := ReplaceStr(fConvertedText,
-        KarCorrections[I].CharStr + KarCorrections[I].FromKar,
-        KarCorrections[I].CharStr + KarCorrections[I].ToKar);
-  
+    for I := 0 to high(KarCorrections) do
+      fConvertedText := ReplaceStr(fConvertedText, KarCorrections[I].CharStr + KarCorrections[I].FromKar, KarCorrections[I].CharStr + KarCorrections[I].ToKar);
+
   // --- STRICT SANITIZATION FOR ANSI OUTPUT (Optimized with TStringBuilder) ---
-  SB := TStringBuilder.Create; 
+  SB := TStringBuilder.Create;
   try
     for I := 1 to Length(fConvertedText) do
     begin
       C := fConvertedText[I];
-      if (Ord(C) >= $0980) and (Ord(C) <= $09FF) then Continue;
-      if ((Ord(C) >= $200B) and (Ord(C) <= $200F)) or (Ord(C) = $FEFF) then Continue;
+      if (Ord(C) >= $0980) and (Ord(C) <= $09FF) then
+        Continue;
+      if ((Ord(C) >= $200B) and (Ord(C) <= $200F)) or (Ord(C) = $FEFF) then
+        Continue;
       SB.Append(C); // Added directly to buffer, no copy
     end;
     fConvertedText := SB.ToString;
@@ -905,17 +898,13 @@ begin
   Result := False;
   if (wC = b_kh) or (wC = b_g) or (wC = b_gh) or (wC = b_Nn) or (wC = b_Th) or (wC = b_d) or (wC = b_dh) or (wC = b_n) or (wC = b_p) or (wC = b_b) or
     (wC = b_m) or (wC = b_z) or (wC = b_r) or (wC = b_L) or (wC = b_sh) or (wC = b_ss) or (wC = b_s) or (wC = b_h) or (wC = b_y) or
-    // Also support ANSI conjunct characters that end with baseline-right consonants
-    (wC = string(A_K_Ss_M)) or (wC = string(A_K_M)) or (wC = string(A_K_Ss)) or (wC = string(A_K_S)) or
-    (wC = string(A_G_G)) or (wC = string(A_G_D)) or (wC = string(A_G_Dh)) or (wC = string(A_NGA_G)) or
-    (wC = string(A_T_Th)) or (wC = string(A_T_M)) or
-    (wC = string(A_D_D)) or (wC = string(A_D_Dh)) or (wC = string(A_D_B)) or (wC = string(A_D_M)) or
-    (wC = string(A_N_Tth)) or (wC = string(A_N_Dh)) or (wC = string(A_N_S)) or
-    (wC = string(A_P_P)) or (wC = string(A_P_S)) or
-    (wC = string(A_B_D)) or (wC = string(A_B_Dh)) or (wC = string(A_Bh_R)) or (wC = string(A_M_N)) or
-    (wC = string(A_L_G)) or (wC = string(A_L_P)) or
-    (wC = string(A_Ss_Nn)) or (wC = string(A_S_Kh)) or (wC = string(A_S_N)) or
-    (wC = string(A_H_N)) or (wC = string(A_H_M)) or (wC = string(A_Rr_G)) then
+  // Also support ANSI conjunct characters that end with baseline-right consonants
+    (wC = string(A_K_Ss_M)) or (wC = string(A_K_M)) or (wC = string(A_K_Ss)) or (wC = string(A_K_S)) or (wC = string(A_G_G)) or (wC = string(A_G_D)) or
+    (wC = string(A_G_Dh)) or (wC = string(A_NGA_G)) or (wC = string(A_T_Th)) or (wC = string(A_T_M)) or (wC = string(A_D_D)) or (wC = string(A_D_Dh)) or
+    (wC = string(A_D_B)) or (wC = string(A_D_M)) or (wC = string(A_N_Tth)) or (wC = string(A_N_Dh)) or (wC = string(A_N_S)) or (wC = string(A_P_P)) or
+    (wC = string(A_P_S)) or (wC = string(A_B_D)) or (wC = string(A_B_Dh)) or (wC = string(A_Bh_R)) or (wC = string(A_M_N)) or (wC = string(A_L_G)) or
+    (wC = string(A_L_P)) or (wC = string(A_Ss_Nn)) or (wC = string(A_S_Kh)) or (wC = string(A_S_N)) or (wC = string(A_H_N)) or (wC = string(A_H_M)) or
+    (wC = string(A_Rr_G)) then
     Result := True;
 
 end;
@@ -924,9 +913,7 @@ end;
 
 function TUnicodeToBijoy2000.IsVowel(C: Char): Boolean;
 begin
-  Result := (C = b_A) or (C = b_AA) or (C = b_I) or (C = b_II) or 
-            (C = b_U) or (C = b_UU) or (C = b_RRI) or (C = b_E) or 
-            (C = b_OI) or (C = b_O) or (C = b_OU);
+  Result := (C = b_A) or (C = b_AA) or (C = b_I) or (C = b_II) or (C = b_U) or (C = b_UU) or (C = b_RRI) or (C = b_E) or (C = b_OI) or (C = b_O) or (C = b_OU);
 end;
 
 { =============================================================================== }
@@ -963,12 +950,12 @@ end;
 
 function TUnicodeToBijoy2000.Convert(const UniText: string): string;
 var
-  I: Integer;
+  I:                  Integer;
   HasTrailingHasanta: Boolean;
-  Rule: TVowelRule;
-  ConsonantPart: string;
-  MapToggleBack: Boolean;
-  MatchedCluster: string;
+  Rule:               TVowelRule;
+  ConsonantPart:      string;
+  MapToggleBack:      Boolean;
+  MatchedCluster:     string;
 begin
   if UniText = '' then
   begin
@@ -976,7 +963,7 @@ begin
       fToggleStates.Clear;
     fLastUniText := '';
     Result := '';
-    exit;
+    Exit;
   end;
 
   if (Pos(' ', UniText) > 0) then
@@ -1000,17 +987,14 @@ begin
     if fLastUniText <> '' then
     begin
       ConsonantPart := UniText;
-      if (Length(fLastUniText) = Length(ConsonantPart) + Length(Rule.KarChar)) and
-         (Copy(fLastUniText, 1, Length(ConsonantPart)) = ConsonantPart) and
-         (Copy(fLastUniText, Length(ConsonantPart) + 1, Length(Rule.KarChar)) = Rule.KarChar) then
+      if (Length(fLastUniText) = Length(ConsonantPart) + Length(Rule.KarChar)) and (Copy(fLastUniText, 1, Length(ConsonantPart)) = ConsonantPart) and
+        (Copy(fLastUniText, Length(ConsonantPart) + 1, Length(Rule.KarChar)) = Rule.KarChar) then
       begin
         FindMappingToggle(Rule, ConsonantPart, MapToggleBack, MatchedCluster);
         if MapToggleBack then
         begin
-          SetToggleState(MatchedCluster, Rule.KarChar,
-            CountOccurrences(Rule.KarChar, fLastUniText),
-            not GetToggleState(MatchedCluster, Rule.KarChar,
-              CountOccurrences(Rule.KarChar, fLastUniText)));
+          SetToggleState(MatchedCluster, Rule.KarChar, CountOccurrences(Rule.KarChar, fLastUniText),
+            not GetToggleState(MatchedCluster, Rule.KarChar, CountOccurrences(Rule.KarChar, fLastUniText)));
         end;
       end;
     end;
@@ -1045,13 +1029,12 @@ begin
 
   // 7. Apply Glyphs, Halfs, and Consonants
   ConvertRFola_ZFola_Hasanta;
-  
+
   { ==========================================================
     (Flicker-Free Half Form Protection)
     ========================================================== }
   HasTrailingHasanta := False;
-  if (Length(fConvertedText) > 0) and 
-     (fConvertedText[Length(fConvertedText)] = b_Hasanta) then
+  if (Length(fConvertedText) > 0) and (fConvertedText[Length(fConvertedText)] = b_Hasanta) then
   begin
     HasTrailingHasanta := True;
     Delete(fConvertedText, Length(fConvertedText), 1);
@@ -1080,10 +1063,11 @@ end;
 function CharInGroup(const Ch: string; const GroupName: string): Boolean;
 var
   Arr: TArray<string>;
-  S: string;
+  S:   string;
 begin
   Result := False;
-  if GroupName = '' then Exit;
+  if GroupName = '' then
+    Exit;
   if GroupName = 'default' then
     Exit(True);
   if ConsonantGroupMap <> nil then
@@ -1104,11 +1088,11 @@ end;
 
 procedure TUnicodeToBijoy2000.ConvertRFola_ZFola_Hasanta;
 var
-  I: Integer;
-  PrevC: string;
+  I:          Integer;
+  PrevC:      string;
   IsHalfForm: Boolean;
-  Rule: TRfolaRule;
-  Matched: Boolean;
+  Rule:       TRfolaRule;
+  Matched:    Boolean;
 begin
   // Convert Z-Fola
   fConvertedText := ReplaceStr(fConvertedText, b_Hasanta + b_z, A_ZFola);
@@ -1138,7 +1122,7 @@ begin
             begin
               fConvertedText := WideStuffString(fConvertedText, I, Rule.ContextReplaceLen, Rule.ContextValue);
               Matched := True;
-              Break;
+              break;
             end;
           end;
         end;
@@ -1148,7 +1132,8 @@ begin
           if Rule.ReplaceLen > 2 then
           begin
             // Dynamic replace length (3, 4, 5, etc.)
-            var StartPos := I - (Rule.ReplaceLen - 2);
+            var
+            StartPos := I - (Rule.ReplaceLen - 2);
             if StartPos >= 1 then
             begin
               if IsHalfForm and (Rule.HalfValue <> '') then
@@ -1163,7 +1148,7 @@ begin
             fConvertedText := WideStuffString(fConvertedText, I, 2, Rule.Value);
           end;
           Matched := True;
-          Break;
+          break;
         end;
       end;
     end;
@@ -1260,14 +1245,16 @@ begin
   I := Length(fConvertedText);
   wSTmp := '';
   fKar := #0;
-  
+
   repeat
-    if I < 1 then break;
+    if I < 1 then
+      break;
     wCTmp := fConvertedText[I];
-    
+
     if MoveAbleKar(wCTmp) then
     begin
-      if fKar <> #0 then wSTmp := fKar + wSTmp;
+      if fKar <> #0 then
+        wSTmp := fKar + wSTmp;
       fKar := wCTmp;
     end
     else
@@ -1316,7 +1303,8 @@ begin
     I := I - 1;
   until I < 1;
 
-  if fKar <> #0 then wSTmp := fKar + wSTmp;
+  if fKar <> #0 then
+    wSTmp := fKar + wSTmp;
 
   fConvertedText := wSTmp;
 end;
@@ -1325,25 +1313,25 @@ end;
 
 procedure TUnicodeToBijoy2000.ReArrangeReph;
 var
-  I: Integer;
-  wCTmp: Char;
-  wSTmp: string;
+  I:           Integer;
+  wCTmp:       Char;
+  wSTmp:       string;
   RephPending: Boolean;
 
   function MoveAbleReph: Boolean;
   begin
     Result := False;
-    if I + 1 >= Length(fConvertedText) then exit;
-    
-// To avoid reph: if the character right before 'ra' is a hasanta (b_Hasanta)
-// then it is not a reph, but rather a ra-phala of the previous letter (e.g., mrya, krya)
+    if I + 1 >= Length(fConvertedText) then
+      Exit;
+
+    // To avoid reph: if the character right before 'ra' is a hasanta (b_Hasanta)
+    // then it is not a reph, but rather a ra-phala of the previous letter (e.g., mrya, krya)
     if (I > 1) and (fConvertedText[I - 1] = b_Hasanta) then
       Exit;
 
     if (fConvertedText[I] = b_r) and (fConvertedText[I + 1] = b_Hasanta) then
     begin
-      if (I + 2 <= Length(fConvertedText)) and 
-         ((fConvertedText[I + 2] = ' ') or (fConvertedText[I + 2] = #13)) then
+      if (I + 2 <= Length(fConvertedText)) and ((fConvertedText[I + 2] = ' ') or (fConvertedText[I + 2] = #13)) then
         Result := False
       else
         Result := True;
@@ -1351,7 +1339,8 @@ var
   end;
 
 begin
-  if Length(fConvertedText) < 3 then exit;
+  if Length(fConvertedText) < 3 then
+    Exit;
   I := 1;
   wSTmp := '';
   RephPending := False;
@@ -1362,20 +1351,20 @@ begin
 
     if MoveAbleReph then
     begin
-       RephPending := True;
-       I := I + 2;
-       continue;
+      RephPending := True;
+      I := I + 2;
+      Continue;
     end;
 
     wSTmp := wSTmp + wCTmp;
 
     if RephPending then
     begin
-      if IsVowel(wCTmp) then 
+      if IsVowel(wCTmp) then
       begin
         // Keep moving
       end
-      else if (I + 1 <= Length(fConvertedText)) and (fConvertedText[I+1] = b_Hasanta) then
+      else if (I + 1 <= Length(fConvertedText)) and (fConvertedText[I + 1] = b_Hasanta) then
       begin
       end
       else if (wCTmp <> b_Hasanta) and (wCTmp <> zwj) and (wCTmp <> zwnj) then
@@ -1386,8 +1375,9 @@ begin
     end;
     Inc(I);
   end;
-  
-  if RephPending then wSTmp := wSTmp + A_Reph;
+
+  if RephPending then
+    wSTmp := wSTmp + A_Reph;
   fConvertedText := wSTmp;
 end;
 
@@ -1397,9 +1387,9 @@ function GetAnsiVarValue(const Name: string): string;
 var
   Rec: TAnsiVarRec;
 begin
-  if (AnsiOverrides <> nil) and AnsiOverrides.TryGetValue(Name, Result) then
+  if (AnsiOverrides <> nil) and AnsiOverrides.TryGetValue(name, Result) then
     Exit;
-  if (AnsiRegistryMap <> nil) and AnsiRegistryMap.TryGetValue(Name, Rec) then
+  if (AnsiRegistryMap <> nil) and AnsiRegistryMap.TryGetValue(name, Rec) then
   begin
     if Rec.VarType = avChar then
       Result := string(PChar(Rec.Ptr)^)
@@ -1412,7 +1402,7 @@ end;
 
 function ProcessHexAndUnicode(const S: string): string;
 var
-  SB: TStringBuilder;
+  SB:      TStringBuilder;
   I, Code: Integer;
 begin
   SB := TStringBuilder.Create;
@@ -1424,12 +1414,12 @@ begin
       begin
         Code := 0;
         I := I + 2;
-        while (I <= Length(S)) and (CharInSet(S[I], ['0'..'9', 'A'..'F', 'a'..'f'])) do
+        while (I <= Length(S)) and (CharInSet(S[I], ['0' .. '9', 'A' .. 'F', 'a' .. 'f'])) do
         begin
           Code := Code * 16;
-          if CharInSet(S[I], ['0'..'9']) then
+          if CharInSet(S[I], ['0' .. '9']) then
             Code := Code + Ord(S[I]) - Ord('0')
-          else if CharInSet(S[I], ['A'..'F']) then
+          else if CharInSet(S[I], ['A' .. 'F']) then
             Code := Code + Ord(S[I]) - Ord('A') + 10
           else
             Code := Code + Ord(S[I]) - Ord('a') + 10;
@@ -1451,10 +1441,10 @@ end;
 
 function ResolveValue(const S: string): string;
 var
-  I, J: Integer;
+  I, J:    Integer;
   VarName: string;
-  VarVal: string;
-  Rec: TAnsiVarRec;
+  VarVal:  string;
+  Rec:     TAnsiVarRec;
 begin
   Result := ProcessHexAndUnicode(S);
   I := 1;
@@ -1487,17 +1477,17 @@ function HasHasantaBefore(const Text: string; Pos: Integer): Boolean; forward;
 // Returns the length of the longest group entry that matches ending at
 // CharIndex, or 0 if no entry matches.  Groups are compared as atomic
 // literal blocks (block-based matching — never character-by-character).
-function MatchGroupLength(const FullText: string; CharIndex: Integer;
-  const GroupName: string): Integer;
+function MatchGroupLength(const FullText: string; CharIndex: Integer; const GroupName: string): Integer;
 var
-  Arr: TArray<string>;
-  S: string;
-  SLen: Integer;
+  Arr:        TArray<string>;
+  S:          string;
+  SLen:       Integer;
   CompareStr: string;
   MatchStart: Integer;
 begin
   Result := 0;
-  if (CharIndex < 1) or (CharIndex > Length(FullText)) then Exit;
+  if (CharIndex < 1) or (CharIndex > Length(FullText)) then
+    Exit;
 
   if AnsiGroupMap <> nil then
   begin
@@ -1539,22 +1529,22 @@ end;
 
 procedure TUnicodeToBijoy2000.ApplyRuleForKar(const KarChar: string; const Phase: string = '');
 var
-  I: Integer;
-  Rule: TVowelRule;
-  UseAlt: Boolean;
-  Found: Boolean;
-  Resolved: string;
-  SearchChar: string;
+  I:               Integer;
+  Rule:            TVowelRule;
+  UseAlt:          Boolean;
+  Found:           Boolean;
+  Resolved:        string;
+  SearchChar:      string;
   OccurrenceIndex: Integer;
-  ClusterInfo: TClusterMatchInfo;
-  LastPos: Integer; // <--- new variable
+  ClusterInfo:     TClusterMatchInfo;
+  LastPos:         Integer; // <--- new variable
 begin
   Found := False;
   for Rule in VowelRules do
     if Rule.KarChar = KarChar then
     begin
       Found := True;
-      Break;
+      break;
     end;
 
   if not Found then
@@ -1570,9 +1560,9 @@ begin
 
   repeat
     // PosEx is used to start searching from after the previous position
-    I := PosEx(SearchChar, fConvertedText, LastPos); 
+    I := PosEx(SearchChar, fConvertedText, LastPos);
     if I <= 0 then
-      Break;
+      break;
 
     Inc(OccurrenceIndex);
 
@@ -1582,9 +1572,7 @@ begin
 
       if ClusterInfo.BestMatchLen > 0 then
       begin
-        if (Phase <> '') and
-           (ClusterInfo.BestMapping.ProcessPhase <> '') and
-           (ClusterInfo.BestMapping.ProcessPhase <> Phase) then
+        if (Phase <> '') and (ClusterInfo.BestMapping.ProcessPhase <> '') and (ClusterInfo.BestMapping.ProcessPhase <> Phase) then
         begin
           Resolved := ResolveValue(Rule.DefaultVal);
         end
@@ -1613,7 +1601,7 @@ begin
     end;
 
     // Very important: next search must start from after the current position
-    LastPos := I + Length(Resolved); 
+    LastPos := I + Length(Resolved);
   until I <= 0;
 end;
 
@@ -1626,7 +1614,7 @@ begin
     Exit;
 
   I := Pos - 1; // Start checking for hasanta from the cell just before Pos (ra)
-  
+
   // Skip ZWJ / ZWNJ characters if present
   while (I >= 1) and ((Text[I] = zwj) or (Text[I] = zwnj)) do
     Dec(I);
@@ -1636,12 +1624,11 @@ begin
     Result := True;
 end;
 
-function TUnicodeToBijoy2000.FindBestClusterMatch(const Text: string;
-  KarPos: Integer; const Rule: TVowelRule): TClusterMatchInfo;
+function TUnicodeToBijoy2000.FindBestClusterMatch(const Text: string; KarPos: Integer; const Rule: TVowelRule): TClusterMatchInfo;
 var
   PrecedingChar: string;
-  Mapping: TVowelRuleMapping;
-  MatchLen: Integer;
+  Mapping:       TVowelRuleMapping;
+  MatchLen:      Integer;
   GroupMatchLen: Integer;
 begin
   Result.MatchedCluster := '';
@@ -1661,8 +1648,7 @@ begin
   // Resolve Z-fola context
   PrecedingChar := Text[KarPos - 1];
   Result.ContextEnd := KarPos - 1;
-  Result.IsZfola := (PrecedingChar = b_z) and (KarPos - 2 >= 1) and
-                     (Text[KarPos - 2] = b_Hasanta);
+  Result.IsZfola := (PrecedingChar = b_z) and (KarPos - 2 >= 1) and (Text[KarPos - 2] = b_Hasanta);
 
   if Result.IsZfola then
   begin
@@ -1685,8 +1671,7 @@ begin
     MatchLen := 0;
 
     // 1. Direct single-character match (skip if preceded by Hasanta = half-form conjunct)
-    if (PrecedingChar <> '') and (PrecedingChar = Mapping.Consonants) and
-       not HasHasantaBefore(Text, KarPos - 1) then
+    if (PrecedingChar <> '') and (PrecedingChar = Mapping.Consonants) and not HasHasantaBefore(Text, KarPos - 1) then
     begin
       if Mapping.MatchMode = 1 then
         MatchLen := 1
@@ -1714,26 +1699,27 @@ begin
   end;
 
   if Result.BestMatchLen > 0 then
-    Result.MatchedCluster := Copy(Text, Result.ContextEnd - Result.BestMatchLen + 1,
-                                  Result.BestMatchLen);
+    Result.MatchedCluster := Copy(Text, Result.ContextEnd - Result.BestMatchLen + 1, Result.BestMatchLen);
 end;
 
 procedure TUnicodeToBijoy2000.ApplyKarInclusiveFullForms;
 var
-  I, PosIdx: Integer;
-  K, V: string;
+  I, PosIdx:  Integer;
+  K, V:       string;
   MatchStart: Integer;
 begin
   for I := 0 to Length(KarInclusiveReplacements) - 1 do
   begin
     K := KarInclusiveReplacements[I].Key;
     V := KarInclusiveReplacements[I].Value;
-    if (K = '') or (V = '') then Continue;
+    if (K = '') or (V = '') then
+      Continue;
 
     PosIdx := 1;
     repeat
       PosIdx := PosEx(K, fConvertedText, PosIdx);
-      if PosIdx <= 0 then Break;
+      if PosIdx <= 0 then
+        break;
 
       // Checking if there's a hasanta immediately before the character (e.g., 'gu' inside 'nggu')
       MatchStart := PosIdx;
@@ -1830,16 +1816,15 @@ begin
       end;
 end;
 
-function TUnicodeToBijoy2000.FindMappingToggle(const Rule: TVowelRule;
-  const ConsonantPart: string; out MappingToggleOnBackspace: Boolean;
+function TUnicodeToBijoy2000.FindMappingToggle(const Rule: TVowelRule; const ConsonantPart: string; out MappingToggleOnBackspace: Boolean;
   out MatchedCluster: string): Boolean;
 var
-  Mapping: TVowelRuleMapping;
-  BestMapping: TVowelRuleMapping;
+  Mapping:                               TVowelRuleMapping;
+  BestMapping:                           TVowelRuleMapping;
   BestMatchLen, MatchLen, GroupMatchLen: Integer;
-  LastC: string;
-  ActualConsonantPart: string;
-  Len: Integer;
+  LastC:                                 string;
+  ActualConsonantPart:                   string;
+  Len:                                   Integer;
 begin
   MappingToggleOnBackspace := Rule.ToggleOnBackspace;
   Result := False;
@@ -1852,9 +1837,7 @@ begin
   Len := Length(ActualConsonantPart);
 
   // Strip Z-fola suffix if present
-  if (Len >= 2) and
-     (Copy(ActualConsonantPart, Len, 1) = b_z) and
-     (Copy(ActualConsonantPart, Len - 1, 1) = b_Hasanta) then
+  if (Len >= 2) and (Copy(ActualConsonantPart, Len, 1) = b_z) and (Copy(ActualConsonantPart, Len - 1, 1) = b_Hasanta) then
   begin
     ActualConsonantPart := Copy(ActualConsonantPart, 1, Len - 2);
     Len := Length(ActualConsonantPart);
@@ -1877,8 +1860,7 @@ begin
     MatchLen := 0;
 
     // 1. Direct character match (skip if preceded by Hasanta = half-form conjunct)
-    if (LastC = Mapping.Consonants) and
-       not HasHasantaBefore(ActualConsonantPart, Len) then
+    if (LastC = Mapping.Consonants) and not HasHasantaBefore(ActualConsonantPart, Len) then
     begin
       if Mapping.MatchMode = 1 then
         MatchLen := 1
@@ -1934,19 +1916,27 @@ begin
   for C in S do
   begin
     case C of
-      '\': Result := Result + '\\';
-      '"': Result := Result + '\"';
-      '/': Result := Result + '\/';
-      #$08: Result := Result + '\b';
-      #$09: Result := Result + '\t';
-      #$0A: Result := Result + '\n';
-      #$0C: Result := Result + '\f';
-      #$0D: Result := Result + '\r';
-    else
-      if Ord(C) < 32 then
-        Result := Result + '\u' + IntToHex(Ord(C), 4)
+      '\':
+        Result := Result + '\\';
+      '"':
+        Result := Result + '\"';
+      '/':
+        Result := Result + '\/';
+      #$08:
+        Result := Result + '\b';
+      #$09:
+        Result := Result + '\t';
+      #$0A:
+        Result := Result + '\n';
+      #$0C:
+        Result := Result + '\f';
+      #$0D:
+        Result := Result + '\r';
       else
-        Result := Result + C;
+        if Ord(C) < 32 then
+          Result := Result + '\u' + IntToHex(Ord(C), 4)
+        else
+          Result := Result + C;
     end;
   end;
 end;
@@ -1961,9 +1951,9 @@ begin
   I := 1;
   while I <= Length(S) do
   begin
-    if (I < Length(S)) and (S[I] = '#') and (S[I+1] = '$') then
+    if (I < Length(S)) and (S[I] = '#') and (S[I + 1] = '$') then
     begin
-      if (I + 2 > Length(S)) or not (CharInSet(S[I+2], ['0'..'9', 'A'..'F', 'a'..'f'])) then
+      if (I + 2 > Length(S)) or not(CharInSet(S[I + 2], ['0' .. '9', 'A' .. 'F', 'a' .. 'f'])) then
       begin
         Result := False;
         Exit;
@@ -1991,18 +1981,25 @@ begin
   Result := '';
   for C in S do
     case C of
-      '"': Result := Result + '\"';
-      '\': Result := Result + '\\';
-      #8: Result := Result + '\b';
-      #9: Result := Result + '\t';
-      #10: Result := Result + '\n';
-      #12: Result := Result + '\f';
-      #13: Result := Result + '\r';
-    else
-      if Ord(C) < 32 then
-        Result := Result + '\u' + IntToHex(Ord(C), 4)
+      '"':
+        Result := Result + '\"';
+      '\':
+        Result := Result + '\\';
+      #8:
+        Result := Result + '\b';
+      #9:
+        Result := Result + '\t';
+      #10:
+        Result := Result + '\n';
+      #12:
+        Result := Result + '\f';
+      #13:
+        Result := Result + '\r';
       else
-        Result := Result + C;
+        if Ord(C) < 32 then
+          Result := Result + '\u' + IntToHex(Ord(C), 4)
+        else
+          Result := Result + C;
     end;
 end;
 
@@ -2029,7 +2026,8 @@ end;
 // Lightweight JSON utilities (replaces System.JSON to reduce ~1MB RTL)
 procedure JSkipWS(const S: string; var P: Integer);
 begin
-  while (P <= Length(S)) and (S[P] <= ' ') do Inc(P);
+  while (P <= Length(S)) and (S[P] <= ' ') do
+    Inc(P);
 end;
 
 function JReadString(const S: string; var P: Integer): string;
@@ -2038,31 +2036,47 @@ var
 begin
   Result := '';
   JSkipWS(S, P);
-  if (P > Length(S)) or (S[P] <> '"') then Exit;
+  if (P > Length(S)) or (S[P] <> '"') then
+    Exit;
   Inc(P);
   SB := TStringBuilder.Create;
   try
     while P <= Length(S) do
     begin
-      if S[P] = '"' then begin Inc(P); Result := SB.ToString; Exit; end;
+      if S[P] = '"' then
+      begin
+        Inc(P);
+        Result := SB.ToString;
+        Exit;
+      end;
       if S[P] = '\' then
       begin
         Inc(P);
-        if P > Length(S) then Exit;
+        if P > Length(S) then
+          Exit;
         case S[P] of
-          '"': SB.Append('"');
-          '\': SB.Append('\');
-          '/': SB.Append('/');
-          'n': SB.Append(#10);
-          'r': SB.Append(#13);
-          't': SB.Append(#9);
-          'u': begin
-                 if P + 4 <= Length(S) then
-                   SB.Append(Char(StrToIntDef('$' + Copy(S, P+1, 4), Ord('?'))))
-                 else SB.Append('?');
-                 Inc(P, 4);
-               end;
-        else SB.Append(S[P]);
+          '"':
+            SB.Append('"');
+          '\':
+            SB.Append('\');
+          '/':
+            SB.Append('/');
+          'n':
+            SB.Append(#10);
+          'r':
+            SB.Append(#13);
+          't':
+            SB.Append(#9);
+          'u':
+            begin
+              if P + 4 <= Length(S) then
+                SB.Append(Char(StrToIntDef('$' + Copy(S, P + 1, 4), Ord('?'))))
+              else
+                SB.Append('?');
+              Inc(P, 4);
+            end;
+          else
+            SB.Append(S[P]);
         end;
         Inc(P);
       end
@@ -2081,19 +2095,26 @@ end;
 function JReadInt(const S: string; var P: Integer; Default: Integer): Integer;
 var
   Start: Integer;
-  Neg: Boolean;
+  Neg:   Boolean;
 begin
-  Result := Default;
+  Result := default;
   JSkipWS(S, P);
-  if (P > Length(S)) then Exit;
+  if (P > Length(S)) then
+    Exit;
   Neg := False;
-  if S[P] = '-' then begin Neg := True; Inc(P); end;
-  if (P > Length(S)) or not CharInSet(S[P], ['0'..'9']) then Exit;
-  Start := P;
-  while (P <= Length(S)) and CharInSet(S[P], ['0'..'9']) do
+  if S[P] = '-' then
+  begin
+    Neg := True;
     Inc(P);
-  Result := StrToIntDef(Copy(S, Start, P - Start), Default);
-  if Neg then Result := -Result;
+  end;
+  if (P > Length(S)) or not CharInSet(S[P], ['0' .. '9']) then
+    Exit;
+  Start := P;
+  while (P <= Length(S)) and CharInSet(S[P], ['0' .. '9']) do
+    Inc(P);
+  Result := StrToIntDef(Copy(S, Start, P - Start), default);
+  if Neg then
+    Result := -Result;
 end;
 
 procedure JSkipValue(const S: string; var P: Integer);
@@ -2101,32 +2122,47 @@ var
   Depth: Integer;
 begin
   JSkipWS(S, P);
-  if P > Length(S) then Exit;
+  if P > Length(S) then
+    Exit;
   case S[P] of
-    '{','[': begin
-               Depth := 1; Inc(P);
-               while (P <= Length(S)) and (Depth > 0) do
-               begin
-                 if S[P] = '"' then
-                begin
-                    Inc(P);
-                    while P <= Length(S) do
-                      if S[P] = '\' then
-                      begin
-                        Inc(P);
-                        if P <= Length(S) then Inc(P);
-                      end
-                      else if S[P] = '"' then begin Inc(P); Break; end
-                      else Inc(P);
-                  end
-                  else if CharInSet(S[P], ['{', '[']) then Inc(Depth)
-                  else if CharInSet(S[P], ['}', ']']) then Dec(Depth);
-                 if Depth > 0 then Inc(P);
-               end;
-               if P <= Length(S) then Inc(P);
-             end;
-    '"': JReadString(S, P);
-    else Inc(P);
+    '{', '[':
+      begin
+        Depth := 1;
+        Inc(P);
+        while (P <= Length(S)) and (Depth > 0) do
+        begin
+          if S[P] = '"' then
+          begin
+            Inc(P);
+            while P <= Length(S) do
+              if S[P] = '\' then
+              begin
+                Inc(P);
+                if P <= Length(S) then
+                  Inc(P);
+              end
+              else if S[P] = '"' then
+              begin
+                Inc(P);
+                break;
+              end
+              else
+                Inc(P);
+          end
+          else if CharInSet(S[P], ['{', '[']) then
+            Inc(Depth)
+          else if CharInSet(S[P], ['}', ']']) then
+            Dec(Depth);
+          if Depth > 0 then
+            Inc(P);
+        end;
+        if P <= Length(S) then
+          Inc(P);
+      end;
+    '"':
+      JReadString(S, P);
+    else
+      Inc(P);
   end;
 end;
 
@@ -2134,7 +2170,7 @@ end;
 
 function JSONPrettyPrint(const JSON: string): string;
 var
-  SB: TStringBuilder;
+  SB:       TStringBuilder;
   P, Depth: Integer;
   C, NextC: Char;
   InString: Boolean;
@@ -2147,7 +2183,8 @@ var
   end;
 
 begin
-  if JSON = '' then Exit('');
+  if JSON = '' then
+    Exit('');
   SB := TStringBuilder.Create;
   try
     Depth := 0;
@@ -2179,13 +2216,14 @@ begin
             SB.Append(C);
 
             NextC := #0;
-            var LookAhead := P + 1;
+            var
+            LookAhead := P + 1;
             while LookAhead <= Length(JSON) do
             begin
               if JSON[LookAhead] > ' ' then
               begin
                 NextC := JSON[LookAhead];
-                Break;
+                break;
               end;
               Inc(LookAhead);
             end;
@@ -2193,7 +2231,8 @@ begin
             if ((C = '{') and (NextC = '}')) or ((C = '[') and (NextC = ']')) then
             begin
               Inc(P);
-              while (P <= Length(JSON)) and (JSON[P] <= ' ') do Inc(P);
+              while (P <= Length(JSON)) and (JSON[P] <= ' ') do
+                Inc(P);
               if (P <= Length(JSON)) and ((JSON[P] = '}') or (JSON[P] = ']')) then
               begin
                 SB.Append(JSON[P]);
@@ -2229,10 +2268,10 @@ begin
             Inc(P);
           end;
 
-      else
-        if C > ' ' then
-          SB.Append(C);
-        Inc(P);
+        else
+          if C > ' ' then
+            SB.Append(C);
+          Inc(P);
       end;
     end;
     Result := SB.ToString;
@@ -2263,11 +2302,11 @@ end;
 
 procedure PrepareActiveReplacements;
 var
-  I: Integer;
-  UniqueMap: TDictionary<string, string>;
-  Rec: TAnsiVarRec;
-  Key: string;
-  Val: string;
+  I:             Integer;
+  UniqueMap:     TDictionary<string, string>;
+  Rec:           TAnsiVarRec;
+  Key:           string;
+  Val:           string;
   ExcludedNames: TDictionary<string, Boolean>;
 begin
   EnsureAnsiRegistry;
@@ -2293,8 +2332,7 @@ begin
       end
       else if Rec.Category = 'Consonants' then
       begin
-        if (Rec.Name <> 'A_Khandata') and (Rec.Name <> 'A_Anushar') and
-           (Rec.Name <> 'A_Bisharga') and (Rec.Name <> 'A_Chandra') then
+        if (Rec.Name <> 'A_Khandata') and (Rec.Name <> 'A_Anushar') and (Rec.Name <> 'A_Bisharga') and (Rec.Name <> 'A_Chandra') then
           Continue;
       end
       else if Rec.Category = 'FullForms' then
@@ -2333,25 +2371,23 @@ begin
     for Key in UniqueMap.Keys do
     begin
       Val := UniqueMap.Items[Key];
-      if (Key.EndsWith(string(b_Ukar))) or
-         (Key.EndsWith(string(b_UUKar))) or
-         (Key.EndsWith(string(b_Rrikar))) then
+      if (Key.EndsWith(string(b_Ukar))) or (Key.EndsWith(string(b_UUKar))) or (Key.EndsWith(string(b_Rrikar))) then
       begin
         SetLength(KarInclusiveReplacements, Length(KarInclusiveReplacements) + 1);
-        KarInclusiveReplacements[High(KarInclusiveReplacements)].Key := Key;
-        KarInclusiveReplacements[High(KarInclusiveReplacements)].Value := Val;
+        KarInclusiveReplacements[high(KarInclusiveReplacements)].Key := Key;
+        KarInclusiveReplacements[high(KarInclusiveReplacements)].Value := Val;
       end
       else
       begin
         SetLength(ActiveReplacements, Length(ActiveReplacements) + 1);
-        ActiveReplacements[High(ActiveReplacements)].Key := Key;
-        ActiveReplacements[High(ActiveReplacements)].Value := Val;
+        ActiveReplacements[high(ActiveReplacements)].Key := Key;
+        ActiveReplacements[high(ActiveReplacements)].Value := Val;
       end;
     end;
 
     // 4. Sort by key length descending (Longest Match First)
     TArray.Sort<TReplacementPair>(ActiveReplacements, TComparer<TReplacementPair>.Construct(
-      function(const L, R: TReplacementPair): Integer
+          function(const L, R: TReplacementPair): Integer
       begin
         Result := R.Key.Length - L.Key.Length;
         if Result = 0 then
@@ -2362,14 +2398,12 @@ begin
           else if not L.Key.EndsWith(string(b_r)) and R.Key.EndsWith(string(b_r)) then
             Result := -1;
         end;
-      end
-    ));
+      end));
     TArray.Sort<TReplacementPair>(KarInclusiveReplacements, TComparer<TReplacementPair>.Construct(
       function(const L, R: TReplacementPair): Integer
       begin
         Result := R.Key.Length - L.Key.Length;
-      end
-    ));
+      end));
   finally
     UniqueMap.Free;
     ExcludedNames.Free;
@@ -2380,7 +2414,7 @@ end;
 
 procedure ResetAnsiToDefaults;
 var
-  Rec: TAnsiVarRec;
+  Rec:      TAnsiVarRec;
   Resolved: string;
 begin
   EnsureAnsiRegistry;
@@ -2395,19 +2429,32 @@ begin
   end;
 
   AnsiOverrides.Clear;
-  Finalize(CustomFullForms); CustomFullForms := nil;
-  Finalize(CustomPreReplacements); CustomPreReplacements := nil;
-  Finalize(CustomPostReplacements); CustomPostReplacements := nil;
-  Finalize(ActiveReplacements); ActiveReplacements := nil;
-  Finalize(KarInclusiveReplacements); KarInclusiveReplacements := nil;
-  Finalize(VowelRules); VowelRules := nil;
-  Finalize(RfolaRules); RfolaRules := nil;
-  Finalize(KarCorrections); KarCorrections := nil;
-  Finalize(GroupKarCorrections); GroupKarCorrections := nil;
-  if AnsiGroupMap <> nil then AnsiGroupMap.Clear;
-  if AnsiGroupRawMap <> nil then AnsiGroupRawMap.Clear;
-  if ConsonantGroupMap <> nil then ConsonantGroupMap.Clear;
-  if ConsonantGroupRawMap <> nil then ConsonantGroupRawMap.Clear;
+  Finalize(CustomFullForms);
+  CustomFullForms := nil;
+  Finalize(CustomPreReplacements);
+  CustomPreReplacements := nil;
+  Finalize(CustomPostReplacements);
+  CustomPostReplacements := nil;
+  Finalize(ActiveReplacements);
+  ActiveReplacements := nil;
+  Finalize(KarInclusiveReplacements);
+  KarInclusiveReplacements := nil;
+  Finalize(VowelRules);
+  VowelRules := nil;
+  Finalize(RfolaRules);
+  RfolaRules := nil;
+  Finalize(KarCorrections);
+  KarCorrections := nil;
+  Finalize(GroupKarCorrections);
+  GroupKarCorrections := nil;
+  if AnsiGroupMap <> nil then
+    AnsiGroupMap.Clear;
+  if AnsiGroupRawMap <> nil then
+    AnsiGroupRawMap.Clear;
+  if ConsonantGroupMap <> nil then
+    ConsonantGroupMap.Clear;
+  if ConsonantGroupRawMap <> nil then
+    ConsonantGroupRawMap.Clear;
   PrepareActiveReplacements;
 end;
 
@@ -2418,28 +2465,52 @@ procedure LoadAnsiMapping(const Path: string; ErrorLog: TStringList = nil);
   function ParseSection(const S: string; var Pos: Integer): TArray<TReplacementPair>;
   var
     Items: TList<TReplacementPair>;
-    Pair: TReplacementPair;
+    Pair:  TReplacementPair;
     Field: string;
   begin
     Items := TList<TReplacementPair>.Create;
     try
       JSkipWS(S, Pos);
-      if (Pos <= Length(S)) and (S[Pos] = '[') then Inc(Pos) else Exit;
+      if (Pos <= Length(S)) and (S[Pos] = '[') then
+        Inc(Pos)
+      else
+        Exit;
       while Pos <= Length(S) do
       begin
         JSkipWS(S, Pos);
-        if (Pos > Length(S)) or (S[Pos] = ']') then begin Inc(Pos); Break; end;
-        if S[Pos] = ',' then begin Inc(Pos); Continue; end;
+        if (Pos > Length(S)) or (S[Pos] = ']') then
+        begin
+          Inc(Pos);
+          break;
+        end;
+        if S[Pos] = ',' then
+        begin
+          Inc(Pos);
+          Continue;
+        end;
         if S[Pos] = '{' then
         begin
-          Inc(Pos); Pair.Key := ''; Pair.Value := ''; Pair.Comment := '';
+          Inc(Pos);
+          Pair.Key := '';
+          Pair.Value := '';
+          Pair.Comment := '';
           while Pos <= Length(S) do
           begin
             JSkipWS(S, Pos);
-            if (Pos > Length(S)) or (S[Pos] = '}') then begin Inc(Pos); Break; end;
-            if S[Pos] = ',' then begin Inc(Pos); Continue; end;
+            if (Pos > Length(S)) or (S[Pos] = '}') then
+            begin
+              Inc(Pos);
+              break;
+            end;
+            if S[Pos] = ',' then
+            begin
+              Inc(Pos);
+              Continue;
+            end;
             Field := JReadString(S, Pos);
-            JSkipWS(S, Pos); if S[Pos] = ':' then Inc(Pos);
+            JSkipWS(S, Pos);
+            if S[Pos] = ':' then
+              Inc(Pos);
             if Field = 'Key' then
               Pair.Key := ResolveValue(JReadString(S, Pos))
             else if Field = 'Value' then
@@ -2462,18 +2533,18 @@ procedure LoadAnsiMapping(const Path: string; ErrorLog: TStringList = nil);
   end;
 
 var
-  JSON: string;
-  P: Integer;
+  JSON:                                                                       string;
+  P:                                                                          Integer;
   Key, ConstName, ConstValue, UnicodeKeyValue, CatName, FieldName, ToggleVal: string;
-  Rec: TAnsiVarRec;
-  Lines: TStringList;
-  Items: TList<string>;
-  RawItems: TList<string>;
-  RawStr: string;
-  GCorrGroup, GCorrFrom, GCorrTo: string;
-  GroupMembers: TArray<string>;
-  GCorrMember: string;
-  GCorrPair: TReplacementPair;
+  Rec:                                                                        TAnsiVarRec;
+  Lines:                                                                      TStringList;
+  Items:                                                                      TList<string>;
+  RawItems:                                                                   TList<string>;
+  RawStr:                                                                     string;
+  GCorrGroup, GCorrFrom, GCorrTo:                                             string;
+  GroupMembers:                                                               TArray<string>;
+  GCorrMember:                                                                string;
+  GCorrPair:                                                                  TReplacementPair;
 begin
   ResetAnsiToDefaults;
 
@@ -2505,51 +2576,96 @@ begin
 
   P := 1;
   JSkipWS(JSON, P);
-  if (P > Length(JSON)) or (JSON[P] <> '{') then Exit;
+  if (P > Length(JSON)) or (JSON[P] <> '{') then
+    Exit;
   Inc(P);
 
   while P <= Length(JSON) do
   begin
     JSkipWS(JSON, P);
-    if (P > Length(JSON)) or (JSON[P] = '}') then Break;
-    if JSON[P] = ',' then begin Inc(P); Continue; end;
+    if (P > Length(JSON)) or (JSON[P] = '}') then
+      break;
+    if JSON[P] = ',' then
+    begin
+      Inc(P);
+      Continue;
+    end;
 
     Key := JReadString(JSON, P);
     JSkipWS(JSON, P);
-    if (P <= Length(JSON)) and (JSON[P] = ':') then Inc(P);
+    if (P <= Length(JSON)) and (JSON[P] = ':') then
+      Inc(P);
     JSkipWS(JSON, P);
 
     if Key = 'Constants' then
     begin
       // Constants: { "Cat": { "Name": { "Value": "...", ... } } }
-      if (P <= Length(JSON)) and (JSON[P] = '{') then Inc(P) else Continue;
+      if (P <= Length(JSON)) and (JSON[P] = '{') then
+        Inc(P)
+      else
+        Continue;
       while P <= Length(JSON) do
       begin
         JSkipWS(JSON, P);
-        if (P > Length(JSON)) or (JSON[P] = '}') then begin Inc(P); Break; end;
-        if JSON[P] = ',' then begin Inc(P); Continue; end;
+        if (P > Length(JSON)) or (JSON[P] = '}') then
+        begin
+          Inc(P);
+          break;
+        end;
+        if JSON[P] = ',' then
+        begin
+          Inc(P);
+          Continue;
+        end;
         CatName := JReadString(JSON, P); // skip category name
-        JSkipWS(JSON, P); if JSON[P] = ':' then Inc(P);
         JSkipWS(JSON, P);
-        if (P <= Length(JSON)) and (JSON[P] = '{') then Inc(P) else Continue;
+        if JSON[P] = ':' then
+          Inc(P);
+        JSkipWS(JSON, P);
+        if (P <= Length(JSON)) and (JSON[P] = '{') then
+          Inc(P)
+        else
+          Continue;
         while P <= Length(JSON) do
         begin
           JSkipWS(JSON, P);
-          if (P > Length(JSON)) or (JSON[P] = '}') then begin Inc(P); Break; end;
-          if JSON[P] = ',' then begin Inc(P); Continue; end;
+          if (P > Length(JSON)) or (JSON[P] = '}') then
+          begin
+            Inc(P);
+            break;
+          end;
+          if JSON[P] = ',' then
+          begin
+            Inc(P);
+            Continue;
+          end;
           ConstName := JReadString(JSON, P);
-          JSkipWS(JSON, P); if JSON[P] = ':' then Inc(P);
+          JSkipWS(JSON, P);
+          if JSON[P] = ':' then
+            Inc(P);
           JSkipWS(JSON, P);
           if (P <= Length(JSON)) and (JSON[P] = '{') then
           begin
-            Inc(P); ConstValue := ''; UnicodeKeyValue := '';
+            Inc(P);
+            ConstValue := '';
+            UnicodeKeyValue := '';
             while P <= Length(JSON) do
             begin
               JSkipWS(JSON, P);
-              if (P > Length(JSON)) or (JSON[P] = '}') then begin Inc(P); Break; end;
-              if JSON[P] = ',' then begin Inc(P); Continue; end;
+              if (P > Length(JSON)) or (JSON[P] = '}') then
+              begin
+                Inc(P);
+                break;
+              end;
+              if JSON[P] = ',' then
+              begin
+                Inc(P);
+                Continue;
+              end;
               FieldName := JReadString(JSON, P);
-              JSkipWS(JSON, P); if JSON[P] = ':' then Inc(P);
+              JSkipWS(JSON, P);
+              if JSON[P] = ':' then
+                Inc(P);
               if FieldName = 'Value' then
                 ConstValue := JReadString(JSON, P)
               else if FieldName = 'UnicodeKey' then
@@ -2566,7 +2682,8 @@ begin
                 begin
                   if Length(ConstValue) = 1 then
                     PChar(Rec.Ptr)^ := ConstValue[1]
-                  else begin
+                  else
+                  begin
                     EnsureAnsiOverrides;
                     AnsiOverrides.AddOrSetValue(ConstName, ConstValue);
                   end;
@@ -2584,31 +2701,57 @@ begin
               end;
             end;
           end
-          else JSkipValue(JSON, P);
+          else
+            JSkipValue(JSON, P);
         end;
       end;
     end
     else if Key = 'VowelsAndKars' then
     begin
-      if (P <= Length(JSON)) and (JSON[P] = '{') then Inc(P) else Continue;
+      if (P <= Length(JSON)) and (JSON[P] = '{') then
+        Inc(P)
+      else
+        Continue;
       while P <= Length(JSON) do
       begin
         JSkipWS(JSON, P);
-        if (P > Length(JSON)) or (JSON[P] = '}') then begin Inc(P); Break; end;
-        if JSON[P] = ',' then begin Inc(P); Continue; end;
+        if (P > Length(JSON)) or (JSON[P] = '}') then
+        begin
+          Inc(P);
+          break;
+        end;
+        if JSON[P] = ',' then
+        begin
+          Inc(P);
+          Continue;
+        end;
         ConstName := JReadString(JSON, P);
-        JSkipWS(JSON, P); if JSON[P] = ':' then Inc(P);
+        JSkipWS(JSON, P);
+        if JSON[P] = ':' then
+          Inc(P);
         JSkipWS(JSON, P);
         if (P <= Length(JSON)) and (JSON[P] = '{') then
         begin
-          Inc(P); ConstValue := ''; UnicodeKeyValue := '';
+          Inc(P);
+          ConstValue := '';
+          UnicodeKeyValue := '';
           while P <= Length(JSON) do
           begin
             JSkipWS(JSON, P);
-            if (P > Length(JSON)) or (JSON[P] = '}') then begin Inc(P); Break; end;
-            if JSON[P] = ',' then begin Inc(P); Continue; end;
+            if (P > Length(JSON)) or (JSON[P] = '}') then
+            begin
+              Inc(P);
+              break;
+            end;
+            if JSON[P] = ',' then
+            begin
+              Inc(P);
+              Continue;
+            end;
             FieldName := JReadString(JSON, P);
-            JSkipWS(JSON, P); if JSON[P] = ':' then Inc(P);
+            JSkipWS(JSON, P);
+            if JSON[P] = ':' then
+              Inc(P);
             if FieldName = 'Value' then
               ConstValue := JReadString(JSON, P)
             else if FieldName = 'UnicodeKey' then
@@ -2625,7 +2768,8 @@ begin
               begin
                 if Length(ConstValue) = 1 then
                   PChar(Rec.Ptr)^ := ConstValue[1]
-                else begin
+                else
+                begin
                   EnsureAnsiOverrides;
                   AnsiOverrides.AddOrSetValue(ConstName, ConstValue);
                 end;
@@ -2643,30 +2787,56 @@ begin
             end;
           end;
         end
-        else JSkipValue(JSON, P);
+        else
+          JSkipValue(JSON, P);
       end;
     end
     else if Key = 'Symbols' then
     begin
-      if (P <= Length(JSON)) and (JSON[P] = '{') then Inc(P) else Continue;
+      if (P <= Length(JSON)) and (JSON[P] = '{') then
+        Inc(P)
+      else
+        Continue;
       while P <= Length(JSON) do
       begin
         JSkipWS(JSON, P);
-        if (P > Length(JSON)) or (JSON[P] = '}') then begin Inc(P); Break; end;
-        if JSON[P] = ',' then begin Inc(P); Continue; end;
+        if (P > Length(JSON)) or (JSON[P] = '}') then
+        begin
+          Inc(P);
+          break;
+        end;
+        if JSON[P] = ',' then
+        begin
+          Inc(P);
+          Continue;
+        end;
         ConstName := JReadString(JSON, P);
-        JSkipWS(JSON, P); if JSON[P] = ':' then Inc(P);
+        JSkipWS(JSON, P);
+        if JSON[P] = ':' then
+          Inc(P);
         JSkipWS(JSON, P);
         if (P <= Length(JSON)) and (JSON[P] = '{') then
         begin
-          Inc(P); ConstValue := ''; UnicodeKeyValue := '';
+          Inc(P);
+          ConstValue := '';
+          UnicodeKeyValue := '';
           while P <= Length(JSON) do
           begin
             JSkipWS(JSON, P);
-            if (P > Length(JSON)) or (JSON[P] = '}') then begin Inc(P); Break; end;
-            if JSON[P] = ',' then begin Inc(P); Continue; end;
+            if (P > Length(JSON)) or (JSON[P] = '}') then
+            begin
+              Inc(P);
+              break;
+            end;
+            if JSON[P] = ',' then
+            begin
+              Inc(P);
+              Continue;
+            end;
             FieldName := JReadString(JSON, P);
-            JSkipWS(JSON, P); if JSON[P] = ':' then Inc(P);
+            JSkipWS(JSON, P);
+            if JSON[P] = ':' then
+              Inc(P);
             if FieldName = 'Value' then
               ConstValue := JReadString(JSON, P)
             else if FieldName = 'UnicodeKey' then
@@ -2683,7 +2853,8 @@ begin
               begin
                 if Length(ConstValue) = 1 then
                   PChar(Rec.Ptr)^ := ConstValue[1]
-                else begin
+                else
+                begin
                   EnsureAnsiOverrides;
                   AnsiOverrides.AddOrSetValue(ConstName, ConstValue);
                 end;
@@ -2701,30 +2872,56 @@ begin
             end;
           end;
         end
-        else JSkipValue(JSON, P);
+        else
+          JSkipValue(JSON, P);
       end;
     end
     else if Key = 'Consonants' then
     begin
-      if (P <= Length(JSON)) and (JSON[P] = '{') then Inc(P) else Continue;
+      if (P <= Length(JSON)) and (JSON[P] = '{') then
+        Inc(P)
+      else
+        Continue;
       while P <= Length(JSON) do
       begin
         JSkipWS(JSON, P);
-        if (P > Length(JSON)) or (JSON[P] = '}') then begin Inc(P); Break; end;
-        if JSON[P] = ',' then begin Inc(P); Continue; end;
+        if (P > Length(JSON)) or (JSON[P] = '}') then
+        begin
+          Inc(P);
+          break;
+        end;
+        if JSON[P] = ',' then
+        begin
+          Inc(P);
+          Continue;
+        end;
         ConstName := JReadString(JSON, P);
-        JSkipWS(JSON, P); if JSON[P] = ':' then Inc(P);
+        JSkipWS(JSON, P);
+        if JSON[P] = ':' then
+          Inc(P);
         JSkipWS(JSON, P);
         if (P <= Length(JSON)) and (JSON[P] = '{') then
         begin
-          Inc(P); ConstValue := ''; UnicodeKeyValue := '';
+          Inc(P);
+          ConstValue := '';
+          UnicodeKeyValue := '';
           while P <= Length(JSON) do
           begin
             JSkipWS(JSON, P);
-            if (P > Length(JSON)) or (JSON[P] = '}') then begin Inc(P); Break; end;
-            if JSON[P] = ',' then begin Inc(P); Continue; end;
+            if (P > Length(JSON)) or (JSON[P] = '}') then
+            begin
+              Inc(P);
+              break;
+            end;
+            if JSON[P] = ',' then
+            begin
+              Inc(P);
+              Continue;
+            end;
             FieldName := JReadString(JSON, P);
-            JSkipWS(JSON, P); if JSON[P] = ':' then Inc(P);
+            JSkipWS(JSON, P);
+            if JSON[P] = ':' then
+              Inc(P);
             if FieldName = 'Value' then
               ConstValue := JReadString(JSON, P)
             else if FieldName = 'UnicodeKey' then
@@ -2741,7 +2938,8 @@ begin
               begin
                 if Length(ConstValue) = 1 then
                   PChar(Rec.Ptr)^ := ConstValue[1]
-                else begin
+                else
+                begin
                   EnsureAnsiOverrides;
                   AnsiOverrides.AddOrSetValue(ConstName, ConstValue);
                 end;
@@ -2759,30 +2957,56 @@ begin
             end;
           end;
         end
-        else JSkipValue(JSON, P);
+        else
+          JSkipValue(JSON, P);
       end;
     end
     else if Key = 'FullForms' then
     begin
-      if (P <= Length(JSON)) and (JSON[P] = '{') then Inc(P) else Continue;
+      if (P <= Length(JSON)) and (JSON[P] = '{') then
+        Inc(P)
+      else
+        Continue;
       while P <= Length(JSON) do
       begin
         JSkipWS(JSON, P);
-        if (P > Length(JSON)) or (JSON[P] = '}') then begin Inc(P); Break; end;
-        if JSON[P] = ',' then begin Inc(P); Continue; end;
+        if (P > Length(JSON)) or (JSON[P] = '}') then
+        begin
+          Inc(P);
+          break;
+        end;
+        if JSON[P] = ',' then
+        begin
+          Inc(P);
+          Continue;
+        end;
         ConstName := JReadString(JSON, P);
-        JSkipWS(JSON, P); if JSON[P] = ':' then Inc(P);
+        JSkipWS(JSON, P);
+        if JSON[P] = ':' then
+          Inc(P);
         JSkipWS(JSON, P);
         if (P <= Length(JSON)) and (JSON[P] = '{') then
         begin
-          Inc(P); ConstValue := ''; UnicodeKeyValue := '';
+          Inc(P);
+          ConstValue := '';
+          UnicodeKeyValue := '';
           while P <= Length(JSON) do
           begin
             JSkipWS(JSON, P);
-            if (P > Length(JSON)) or (JSON[P] = '}') then begin Inc(P); Break; end;
-            if JSON[P] = ',' then begin Inc(P); Continue; end;
+            if (P > Length(JSON)) or (JSON[P] = '}') then
+            begin
+              Inc(P);
+              break;
+            end;
+            if JSON[P] = ',' then
+            begin
+              Inc(P);
+              Continue;
+            end;
             FieldName := JReadString(JSON, P);
-            JSkipWS(JSON, P); if JSON[P] = ':' then Inc(P);
+            JSkipWS(JSON, P);
+            if JSON[P] = ':' then
+              Inc(P);
             if FieldName = 'Value' then
               ConstValue := JReadString(JSON, P)
             else if FieldName = 'UnicodeKey' then
@@ -2799,7 +3023,8 @@ begin
               begin
                 if Length(ConstValue) = 1 then
                   PChar(Rec.Ptr)^ := ConstValue[1]
-                else begin
+                else
+                begin
                   EnsureAnsiOverrides;
                   AnsiOverrides.AddOrSetValue(ConstName, ConstValue);
                 end;
@@ -2817,7 +3042,8 @@ begin
             end;
           end;
         end
-        else JSkipValue(JSON, P);
+        else
+          JSkipValue(JSON, P);
       end;
     end
     else if Key = 'FullFormReplacements' then
@@ -2829,21 +3055,34 @@ begin
     else if Key = 'VowelRules' then
     begin
       SetLength(VowelRules, 0);
-      if (P <= Length(JSON)) and (JSON[P] = '{') then Inc(P) else Continue;
+      if (P <= Length(JSON)) and (JSON[P] = '{') then
+        Inc(P)
+      else
+        Continue;
       while P <= Length(JSON) do
       begin
         JSkipWS(JSON, P);
-        if (P > Length(JSON)) or (JSON[P] = '}') then begin Inc(P); Break; end;
-        if JSON[P] = ',' then begin Inc(P); Continue; end;
+        if (P > Length(JSON)) or (JSON[P] = '}') then
+        begin
+          Inc(P);
+          break;
+        end;
+        if JSON[P] = ',' then
+        begin
+          Inc(P);
+          Continue;
+        end;
         // Read KarChar key
         Key := JReadString(JSON, P);
-        JSkipWS(JSON, P); if JSON[P] = ':' then Inc(P);
+        JSkipWS(JSON, P);
+        if JSON[P] = ':' then
+          Inc(P);
         JSkipWS(JSON, P);
         if (P <= Length(JSON)) and (JSON[P] = '{') then
         begin
           Inc(P);
           SetLength(VowelRules, Length(VowelRules) + 1);
-          with VowelRules[High(VowelRules)] do
+          with VowelRules[high(VowelRules)] do
           begin
             KarChar := ProcessHexAndUnicode(Key);
             DefaultVal := '';
@@ -2853,10 +3092,20 @@ begin
             while P <= Length(JSON) do
             begin
               JSkipWS(JSON, P);
-              if (P > Length(JSON)) or (JSON[P] = '}') then begin Inc(P); Break; end;
-              if JSON[P] = ',' then begin Inc(P); Continue; end;
+              if (P > Length(JSON)) or (JSON[P] = '}') then
+              begin
+                Inc(P);
+                break;
+              end;
+              if JSON[P] = ',' then
+              begin
+                Inc(P);
+                Continue;
+              end;
               FieldName := JReadString(JSON, P);
-              JSkipWS(JSON, P); if JSON[P] = ':' then Inc(P);
+              JSkipWS(JSON, P);
+              if JSON[P] = ':' then
+                Inc(P);
               JSkipWS(JSON, P);
               if FieldName = 'default' then
                 DefaultVal := JReadString(JSON, P)
@@ -2869,17 +3118,26 @@ begin
               end
               else if FieldName = 'mappings' then
               begin
-                if (P <= Length(JSON)) and (JSON[P] = '[') then Inc(P);
+                if (P <= Length(JSON)) and (JSON[P] = '[') then
+                  Inc(P);
                 while P <= Length(JSON) do
                 begin
                   JSkipWS(JSON, P);
-                  if (P > Length(JSON)) or (JSON[P] = ']') then begin Inc(P); Break; end;
-                  if JSON[P] = ',' then begin Inc(P); Continue; end;
+                  if (P > Length(JSON)) or (JSON[P] = ']') then
+                  begin
+                    Inc(P);
+                    break;
+                  end;
+                  if JSON[P] = ',' then
+                  begin
+                    Inc(P);
+                    Continue;
+                  end;
                   if JSON[P] = '{' then
                   begin
                     Inc(P);
                     SetLength(Mappings, Length(Mappings) + 1);
-                    with Mappings[High(Mappings)] do
+                    with Mappings[high(Mappings)] do
                     begin
                       Consonants := '';
                       Value := '';
@@ -2890,10 +3148,20 @@ begin
                       while P <= Length(JSON) do
                       begin
                         JSkipWS(JSON, P);
-                        if (P > Length(JSON)) or (JSON[P] = '}') then begin Inc(P); Break; end;
-                        if JSON[P] = ',' then begin Inc(P); Continue; end;
+                        if (P > Length(JSON)) or (JSON[P] = '}') then
+                        begin
+                          Inc(P);
+                          break;
+                        end;
+                        if JSON[P] = ',' then
+                        begin
+                          Inc(P);
+                          Continue;
+                        end;
                         FieldName := JReadString(JSON, P);
-                        JSkipWS(JSON, P); if JSON[P] = ':' then Inc(P);
+                        JSkipWS(JSON, P);
+                        if JSON[P] = ':' then
+                          Inc(P);
                         JSkipWS(JSON, P);
                         if FieldName = 'consonants' then
                           Consonants := JReadString(JSON, P)
@@ -2938,17 +3206,28 @@ begin
     else if Key = 'RfolaRules' then
     begin
       SetLength(RfolaRules, 0);
-      if (P <= Length(JSON)) and (JSON[P] = '[') then Inc(P) else Continue;
+      if (P <= Length(JSON)) and (JSON[P] = '[') then
+        Inc(P)
+      else
+        Continue;
       while P <= Length(JSON) do
       begin
         JSkipWS(JSON, P);
-        if (P > Length(JSON)) or (JSON[P] = ']') then begin Inc(P); Break; end;
-        if JSON[P] = ',' then begin Inc(P); Continue; end;
+        if (P > Length(JSON)) or (JSON[P] = ']') then
+        begin
+          Inc(P);
+          break;
+        end;
+        if JSON[P] = ',' then
+        begin
+          Inc(P);
+          Continue;
+        end;
         if JSON[P] = '{' then
         begin
           Inc(P);
           SetLength(RfolaRules, Length(RfolaRules) + 1);
-          with RfolaRules[High(RfolaRules)] do
+          with RfolaRules[high(RfolaRules)] do
           begin
             Consonants := '';
             Value := '';
@@ -2964,10 +3243,20 @@ begin
             while P <= Length(JSON) do
             begin
               JSkipWS(JSON, P);
-              if (P > Length(JSON)) or (JSON[P] = '}') then begin Inc(P); Break; end;
-              if JSON[P] = ',' then begin Inc(P); Continue; end;
+              if (P > Length(JSON)) or (JSON[P] = '}') then
+              begin
+                Inc(P);
+                break;
+              end;
+              if JSON[P] = ',' then
+              begin
+                Inc(P);
+                Continue;
+              end;
               FieldName := JReadString(JSON, P);
-              JSkipWS(JSON, P); if JSON[P] = ':' then Inc(P);
+              JSkipWS(JSON, P);
+              if JSON[P] = ':' then
+                Inc(P);
               JSkipWS(JSON, P);
               if FieldName = 'consonants' then
                 Consonants := JReadString(JSON, P)
@@ -3012,17 +3301,28 @@ begin
     else if Key = 'KarCorrections' then
     begin
       SetLength(KarCorrections, 0);
-      if (P <= Length(JSON)) and (JSON[P] = '[') then Inc(P) else Continue;
+      if (P <= Length(JSON)) and (JSON[P] = '[') then
+        Inc(P)
+      else
+        Continue;
       while P <= Length(JSON) do
       begin
         JSkipWS(JSON, P);
-        if (P > Length(JSON)) or (JSON[P] = ']') then begin Inc(P); Break; end;
-        if JSON[P] = ',' then begin Inc(P); Continue; end;
+        if (P > Length(JSON)) or (JSON[P] = ']') then
+        begin
+          Inc(P);
+          break;
+        end;
+        if JSON[P] = ',' then
+        begin
+          Inc(P);
+          Continue;
+        end;
         if JSON[P] = '{' then
         begin
           Inc(P);
           SetLength(KarCorrections, Length(KarCorrections) + 1);
-          with KarCorrections[High(KarCorrections)] do
+          with KarCorrections[high(KarCorrections)] do
           begin
             RawCharStr := '';
             CharStr := '';
@@ -3034,10 +3334,20 @@ begin
             while P <= Length(JSON) do
             begin
               JSkipWS(JSON, P);
-              if (P > Length(JSON)) or (JSON[P] = '}') then begin Inc(P); Break; end;
-              if JSON[P] = ',' then begin Inc(P); Continue; end;
+              if (P > Length(JSON)) or (JSON[P] = '}') then
+              begin
+                Inc(P);
+                break;
+              end;
+              if JSON[P] = ',' then
+              begin
+                Inc(P);
+                Continue;
+              end;
               FieldName := JReadString(JSON, P);
-              JSkipWS(JSON, P); if JSON[P] = ':' then Inc(P);
+              JSkipWS(JSON, P);
+              if JSON[P] = ':' then
+                Inc(P);
               JSkipWS(JSON, P);
               if FieldName = 'char' then
                 RawCharStr := JReadString(JSON, P)
@@ -3059,25 +3369,48 @@ begin
           JSkipValue(JSON, P);
       end;
     end
-else if Key = 'GroupKarCorrections' then
+    else if Key = 'GroupKarCorrections' then
     begin
-      if (P <= Length(JSON)) and (JSON[P] = '[') then Inc(P) else Continue;
+      if (P <= Length(JSON)) and (JSON[P] = '[') then
+        Inc(P)
+      else
+        Continue;
       while P <= Length(JSON) do
       begin
         JSkipWS(JSON, P);
-        if (P > Length(JSON)) or (JSON[P] = ']') then begin Inc(P); Break; end;
-        if JSON[P] = ',' then begin Inc(P); Continue; end;
+        if (P > Length(JSON)) or (JSON[P] = ']') then
+        begin
+          Inc(P);
+          break;
+        end;
+        if JSON[P] = ',' then
+        begin
+          Inc(P);
+          Continue;
+        end;
         if JSON[P] = '{' then
         begin
           Inc(P);
-          GCorrGroup := ''; GCorrFrom := ''; GCorrTo := '';
+          GCorrGroup := '';
+          GCorrFrom := '';
+          GCorrTo := '';
           while P <= Length(JSON) do
           begin
             JSkipWS(JSON, P);
-            if (P > Length(JSON)) or (JSON[P] = '}') then begin Inc(P); Break; end;
-            if JSON[P] = ',' then begin Inc(P); Continue; end;
+            if (P > Length(JSON)) or (JSON[P] = '}') then
+            begin
+              Inc(P);
+              break;
+            end;
+            if JSON[P] = ',' then
+            begin
+              Inc(P);
+              Continue;
+            end;
             FieldName := JReadString(JSON, P);
-            JSkipWS(JSON, P); if JSON[P] = ':' then Inc(P);
+            JSkipWS(JSON, P);
+            if JSON[P] = ':' then
+              Inc(P);
             JSkipWS(JSON, P);
             if FieldName = 'group' then
               GCorrGroup := JReadString(JSON, P)
@@ -3088,8 +3421,7 @@ else if Key = 'GroupKarCorrections' then
             else
               JSkipValue(JSON, P);
           end;
-          if (GCorrGroup <> '') and (GCorrFrom <> '') and (GCorrTo <> '') and
-             (AnsiGroupMap <> nil) then
+          if (GCorrGroup <> '') and (GCorrFrom <> '') and (GCorrTo <> '') and (AnsiGroupMap <> nil) then
           begin
             if AnsiGroupMap.TryGetValue(GCorrGroup, GroupMembers) then
             begin
@@ -3101,7 +3433,7 @@ else if Key = 'GroupKarCorrections' then
                 if (GCorrPair.Key <> '') and (GCorrPair.Key <> GCorrPair.Value) then
                 begin
                   SetLength(CustomPostReplacements, Length(CustomPostReplacements) + 1);
-                  CustomPostReplacements[High(CustomPostReplacements)] := GCorrPair;
+                  CustomPostReplacements[high(CustomPostReplacements)] := GCorrPair;
                 end;
 
                 // 2. Swapped sequence (Kar + RFola) - to match the swap in FinalTouch
@@ -3110,15 +3442,15 @@ else if Key = 'GroupKarCorrections' then
                 if (GCorrPair.Key <> '') and (GCorrPair.Key <> GCorrPair.Value) then
                 begin
                   SetLength(CustomPostReplacements, Length(CustomPostReplacements) + 1);
-                  CustomPostReplacements[High(CustomPostReplacements)] := GCorrPair;
+                  CustomPostReplacements[high(CustomPostReplacements)] := GCorrPair;
                 end;
               end;
             end;
           end;
           SetLength(GroupKarCorrections, Length(GroupKarCorrections) + 1);
-          GroupKarCorrections[High(GroupKarCorrections)].Group := GCorrGroup;
-          GroupKarCorrections[High(GroupKarCorrections)].From := GCorrFrom;
-          GroupKarCorrections[High(GroupKarCorrections)].To_ := GCorrTo;
+          GroupKarCorrections[high(GroupKarCorrections)].Group := GCorrGroup;
+          GroupKarCorrections[high(GroupKarCorrections)].From := GCorrFrom;
+          GroupKarCorrections[high(GroupKarCorrections)].To_ := GCorrTo;
         end
         else
           JSkipValue(JSON, P);
@@ -3127,21 +3459,34 @@ else if Key = 'GroupKarCorrections' then
     else if Key = 'RaPhalaGroups' then
     begin
       if AnsiGroupMap = nil then
-        AnsiGroupMap := TDictionary<string, TArray<string>>.Create
+        AnsiGroupMap := TDictionary < string, TArray < string >>.Create
       else
         AnsiGroupMap.Clear;
       if AnsiGroupRawMap = nil then
-        AnsiGroupRawMap := TDictionary<string, TArray<string>>.Create
+        AnsiGroupRawMap := TDictionary < string, TArray < string >>.Create
       else
         AnsiGroupRawMap.Clear;
-      if (P <= Length(JSON)) and (JSON[P] = '{') then Inc(P) else Continue;
+      if (P <= Length(JSON)) and (JSON[P] = '{') then
+        Inc(P)
+      else
+        Continue;
       while P <= Length(JSON) do
       begin
         JSkipWS(JSON, P);
-        if (P > Length(JSON)) or (JSON[P] = '}') then begin Inc(P); Break; end;
-        if JSON[P] = ',' then begin Inc(P); Continue; end;
+        if (P > Length(JSON)) or (JSON[P] = '}') then
+        begin
+          Inc(P);
+          break;
+        end;
+        if JSON[P] = ',' then
+        begin
+          Inc(P);
+          Continue;
+        end;
         Key := JReadString(JSON, P);
-        JSkipWS(JSON, P); if JSON[P] = ':' then Inc(P);
+        JSkipWS(JSON, P);
+        if JSON[P] = ':' then
+          Inc(P);
         JSkipWS(JSON, P);
         if (P <= Length(JSON)) and (JSON[P] = '[') then
         begin
@@ -3152,8 +3497,16 @@ else if Key = 'GroupKarCorrections' then
             while P <= Length(JSON) do
             begin
               JSkipWS(JSON, P);
-              if (P > Length(JSON)) or (JSON[P] = ']') then begin Inc(P); Break; end;
-              if JSON[P] = ',' then begin Inc(P); Continue; end;
+              if (P > Length(JSON)) or (JSON[P] = ']') then
+              begin
+                Inc(P);
+                break;
+              end;
+              if JSON[P] = ',' then
+              begin
+                Inc(P);
+                Continue;
+              end;
               RawStr := JReadString(JSON, P);
               Items.Add(ResolveValue(RawStr));
               RawItems.Add(RawStr);
@@ -3173,21 +3526,34 @@ else if Key = 'GroupKarCorrections' then
     else if Key = 'ConsonantGroups' then
     begin
       if ConsonantGroupMap = nil then
-        ConsonantGroupMap := TDictionary<string, TArray<string>>.Create
+        ConsonantGroupMap := TDictionary < string, TArray < string >>.Create
       else
         ConsonantGroupMap.Clear;
       if ConsonantGroupRawMap = nil then
-        ConsonantGroupRawMap := TDictionary<string, TArray<string>>.Create
+        ConsonantGroupRawMap := TDictionary < string, TArray < string >>.Create
       else
         ConsonantGroupRawMap.Clear;
-      if (P <= Length(JSON)) and (JSON[P] = '{') then Inc(P) else Continue;
+      if (P <= Length(JSON)) and (JSON[P] = '{') then
+        Inc(P)
+      else
+        Continue;
       while P <= Length(JSON) do
       begin
         JSkipWS(JSON, P);
-        if (P > Length(JSON)) or (JSON[P] = '}') then begin Inc(P); Break; end;
-        if JSON[P] = ',' then begin Inc(P); Continue; end;
+        if (P > Length(JSON)) or (JSON[P] = '}') then
+        begin
+          Inc(P);
+          break;
+        end;
+        if JSON[P] = ',' then
+        begin
+          Inc(P);
+          Continue;
+        end;
         Key := JReadString(JSON, P);
-        JSkipWS(JSON, P); if JSON[P] = ':' then Inc(P);
+        JSkipWS(JSON, P);
+        if JSON[P] = ':' then
+          Inc(P);
         JSkipWS(JSON, P);
         if (P <= Length(JSON)) and (JSON[P] = '[') then
         begin
@@ -3198,8 +3564,16 @@ else if Key = 'GroupKarCorrections' then
             while P <= Length(JSON) do
             begin
               JSkipWS(JSON, P);
-              if (P > Length(JSON)) or (JSON[P] = ']') then begin Inc(P); Break; end;
-              if JSON[P] = ',' then begin Inc(P); Continue; end;
+              if (P > Length(JSON)) or (JSON[P] = ']') then
+              begin
+                Inc(P);
+                break;
+              end;
+              if JSON[P] = ',' then
+              begin
+                Inc(P);
+                Continue;
+              end;
               RawStr := JReadString(JSON, P);
               Items.Add(ResolveValue(RawStr));
               RawItems.Add(RawStr);
@@ -3223,15 +3597,21 @@ else if Key = 'GroupKarCorrections' then
   if Length(CustomFullForms) > 0 then
     TArray.Sort<TReplacementPair>(CustomFullForms, TComparer<TReplacementPair>.Construct(
       function(const L, R: TReplacementPair): Integer
-      begin Result := R.Key.Length - L.Key.Length; end));
+      begin
+        Result := R.Key.Length - L.Key.Length;
+      end));
   if Length(CustomPreReplacements) > 0 then
     TArray.Sort<TReplacementPair>(CustomPreReplacements, TComparer<TReplacementPair>.Construct(
       function(const L, R: TReplacementPair): Integer
-      begin Result := R.Key.Length - L.Key.Length; end));
+      begin
+        Result := R.Key.Length - L.Key.Length;
+      end));
   if Length(CustomPostReplacements) > 0 then
     TArray.Sort<TReplacementPair>(CustomPostReplacements, TComparer<TReplacementPair>.Construct(
       function(const L, R: TReplacementPair): Integer
-      begin Result := R.Key.Length - L.Key.Length; end));
+      begin
+        Result := R.Key.Length - L.Key.Length;
+      end));
 
   PrepareActiveReplacements;
   JSON := '';
@@ -3266,14 +3646,15 @@ end;
 function MakeJSONArrOfReplPairs(const Pairs: array of TReplacementPair): string;
 var
   SB: TStringBuilder;
-  I: Integer;
+  I:  Integer;
 begin
   SB := TStringBuilder.Create;
   try
     SB.Append('[');
-    for I := 0 to High(Pairs) do
+    for I := 0 to high(Pairs) do
     begin
-      if I > 0 then SB.Append(',');
+      if I > 0 then
+        SB.Append(',');
       SB.Append('{');
       SB.Append('"Key":"').Append(SmartEscape(Pairs[I].Key)).Append('",');
       SB.Append('"Value":"').Append(SmartEscape(Pairs[I].Value)).Append('",');
@@ -3294,9 +3675,10 @@ var
   I: Integer;
 begin
   Result := True;
-  if S = '' then Exit(False);
+  if S = '' then
+    Exit(False);
   for I := 1 to Length(S) do
-    if not CharInSet(S[I], ['a'..'z', 'A'..'Z', '0'..'9', '_']) then
+    if not CharInSet(S[I], ['a' .. 'z', 'A' .. 'Z', '0' .. '9', '_']) then
       Exit(False);
 end;
 
@@ -3317,16 +3699,16 @@ end;
 
 procedure ExportAnsiMapping(const Path: string);
 var
-  Lines: TStringList;
-  SB: TStringBuilder;
-  CatSB: TStringBuilder;
-  CategoryOrder: TList<string>;
-  CatEntries: TDictionary<string, TStringBuilder>;
-  I, J, K: Integer;
-  Val: string;
-  Rec, MapRec: TAnsiVarRec;
+  Lines:               TStringList;
+  SB:                  TStringBuilder;
+  CatSB:               TStringBuilder;
+  CategoryOrder:       TList<string>;
+  CatEntries:          TDictionary<string, TStringBuilder>;
+  I, J, K:             Integer;
+  Val:                 string;
+  Rec, MapRec:         TAnsiVarRec;
   CatName, KarCharHex: string;
-  Arr: TArray<string>;
+  Arr:                 TArray<string>;
 begin
   EnsureAnsiRegistry;
   EnsureAnsiOverrides;
@@ -3368,7 +3750,8 @@ begin
       SB.Append('"Constants":{');
       for I := 0 to CategoryOrder.Count - 1 do
       begin
-        if I > 0 then SB.Append(',');
+        if I > 0 then
+          SB.Append(',');
         CatName := CategoryOrder[I];
         CatSB := CatEntries[CatName];
         SB.Append('"').Append(CatName).Append('":{');
@@ -3387,18 +3770,20 @@ begin
       if Length(VowelRules) > 0 then
       begin
         SB.Append(',"VowelRules":{');
-        for I := 0 to High(VowelRules) do
+        for I := 0 to high(VowelRules) do
         begin
-          if I > 0 then SB.Append(',');
+          if I > 0 then
+            SB.Append(',');
           KarCharHex := SmartEscape(VowelRules[I].KarChar);
           SB.Append('"').Append(KarCharHex).Append('":{');
           SB.Append('"default":"').Append(VowelRules[I].DefaultVal).Append('"');
           if VowelRules[I].Toggle <> 'none' then
             SB.Append(',"toggle":"').Append(VowelRules[I].Toggle).Append('"');
           SB.Append(',"mappings":[');
-          for J := 0 to High(VowelRules[I].Mappings) do
+          for J := 0 to high(VowelRules[I].Mappings) do
           begin
-            if J > 0 then SB.Append(',');
+            if J > 0 then
+              SB.Append(',');
             SB.Append('{');
             SB.Append('"consonants":"').Append(ValueToHexOrName(VowelRules[I].Mappings[J].Consonants)).Append('"');
             SB.Append(',"value":"').Append(VowelRules[I].Mappings[J].Value).Append('"');
@@ -3423,12 +3808,14 @@ begin
         K := 0;
         for CatName in AnsiGroupRawMap.Keys do
         begin
-          if K > 0 then SB.Append(',');
+          if K > 0 then
+            SB.Append(',');
           SB.Append('"').Append(CatName).Append('":[');
           Arr := AnsiGroupRawMap[CatName];
-          for J := 0 to High(Arr) do
+          for J := 0 to high(Arr) do
           begin
-            if J > 0 then SB.Append(',');
+            if J > 0 then
+              SB.Append(',');
             SB.Append('"').Append(Arr[J]).Append('"');
           end;
           SB.Append(']');
@@ -3442,12 +3829,14 @@ begin
         K := 0;
         for CatName in AnsiGroupMap.Keys do
         begin
-          if K > 0 then SB.Append(',');
+          if K > 0 then
+            SB.Append(',');
           SB.Append('"').Append(CatName).Append('":[');
           Arr := AnsiGroupMap[CatName];
-          for J := 0 to High(Arr) do
+          for J := 0 to high(Arr) do
           begin
-            if J > 0 then SB.Append(',');
+            if J > 0 then
+              SB.Append(',');
             SB.Append('"').Append(ValueToHexOrName(Arr[J])).Append('"');
           end;
           SB.Append(']');
@@ -3459,7 +3848,8 @@ begin
       SB.Append(',"GroupKarCorrections":[');
       for I := 0 to Length(GroupKarCorrections) - 1 do
       begin
-        if I > 0 then SB.Append(',');
+        if I > 0 then
+          SB.Append(',');
         SB.Append('{');
         SB.Append('"group":"').Append(GroupKarCorrections[I].Group).Append('",');
         SB.Append('"from":"').Append(JSONEscape(GroupKarCorrections[I].From)).Append('",');
@@ -3474,12 +3864,14 @@ begin
         K := 0;
         for CatName in ConsonantGroupRawMap.Keys do
         begin
-          if K > 0 then SB.Append(',');
+          if K > 0 then
+            SB.Append(',');
           SB.Append('"').Append(CatName).Append('":[');
           Arr := ConsonantGroupRawMap[CatName];
-          for J := 0 to High(Arr) do
+          for J := 0 to high(Arr) do
           begin
-            if J > 0 then SB.Append(',');
+            if J > 0 then
+              SB.Append(',');
             SB.Append('"').Append(Arr[J]).Append('"');
           end;
           SB.Append(']');
@@ -3493,12 +3885,14 @@ begin
         K := 0;
         for CatName in ConsonantGroupMap.Keys do
         begin
-          if K > 0 then SB.Append(',');
+          if K > 0 then
+            SB.Append(',');
           SB.Append('"').Append(CatName).Append('":[');
           Arr := ConsonantGroupMap[CatName];
-          for J := 0 to High(Arr) do
+          for J := 0 to high(Arr) do
           begin
-            if J > 0 then SB.Append(',');
+            if J > 0 then
+              SB.Append(',');
             SB.Append('"').Append(ValueToHexOrName(Arr[J])).Append('"');
           end;
           SB.Append(']');
@@ -3510,9 +3904,10 @@ begin
       if Length(RfolaRules) > 0 then
       begin
         SB.Append(',"RfolaRules":[');
-        for I := 0 to High(RfolaRules) do
+        for I := 0 to high(RfolaRules) do
         begin
-          if I > 0 then SB.Append(',');
+          if I > 0 then
+            SB.Append(',');
           SB.Append('{');
           SB.Append('"consonants":"').Append(ValueToHexOrName(RfolaRules[I].Consonants)).Append('",');
           if RfolaRules[I].RawValue <> '' then
@@ -3549,9 +3944,10 @@ begin
       if Length(KarCorrections) > 0 then
       begin
         SB.Append(',"KarCorrections":[');
-        for I := 0 to High(KarCorrections) do
+        for I := 0 to high(KarCorrections) do
         begin
-          if I > 0 then SB.Append(',');
+          if I > 0 then
+            SB.Append(',');
           SB.Append('{');
           if KarCorrections[I].RawCharStr <> '' then
             SB.Append('"char":"').Append(JSONEscape(KarCorrections[I].RawCharStr)).Append('",')
@@ -3593,14 +3989,13 @@ end;
 
 function ValidateAnsiMappingFile(const Path: string; out ErrorMessage: string): Boolean;
 const
-  REPL_SECTIONS: array[0..2] of string = (
-    'FullFormReplacements', 'PreReplacements', 'PostReplacements');
+  REPL_SECTIONS: array [0 .. 2] of string = ('FullFormReplacements', 'PreReplacements', 'PostReplacements');
 var
-  JSON: string;
-  Lines: TStringList;
-  P: Integer;
-  Key: string;
-  ArrIdx: Integer;
+  JSON:         string;
+  Lines:        TStringList;
+  P:            Integer;
+  Key:          string;
+  ArrIdx:       Integer;
   SectionCount: Integer;
 begin
   Result := False;
@@ -3643,12 +4038,18 @@ begin
   while P <= Length(JSON) do
   begin
     JSkipWS(JSON, P);
-    if (P > Length(JSON)) or (JSON[P] = '}') then Break;
-    if JSON[P] = ',' then begin Inc(P); Continue; end;
+    if (P > Length(JSON)) or (JSON[P] = '}') then
+      break;
+    if JSON[P] = ',' then
+    begin
+      Inc(P);
+      Continue;
+    end;
 
     Key := JReadString(JSON, P);
     JSkipWS(JSON, P);
-    if (P <= Length(JSON)) and (JSON[P] = ':') then Inc(P);
+    if (P <= Length(JSON)) and (JSON[P] = ':') then
+      Inc(P);
     JSkipWS(JSON, P);
 
     if Key = 'Constants' then
@@ -3676,8 +4077,13 @@ begin
       while P <= Length(JSON) do
       begin
         JSkipWS(JSON, P);
-        if (P > Length(JSON)) or (JSON[P] = ']') then Break;
-        if JSON[P] = ',' then begin Inc(P); Continue; end;
+        if (P > Length(JSON)) or (JSON[P] = ']') then
+          break;
+        if JSON[P] = ',' then
+        begin
+          Inc(P);
+          Continue;
+        end;
         if JSON[P] = '{' then
         begin
           Inc(P);
@@ -3685,10 +4091,17 @@ begin
           while P <= Length(JSON) do
           begin
             JSkipWS(JSON, P);
-            if (P > Length(JSON)) or (JSON[P] = '}') then Break;
-            if JSON[P] = ',' then begin Inc(P); Continue; end;
+            if (P > Length(JSON)) or (JSON[P] = '}') then
+              break;
+            if JSON[P] = ',' then
+            begin
+              Inc(P);
+              Continue;
+            end;
             Key := JReadString(JSON, P);
-            JSkipWS(JSON, P); if JSON[P] = ':' then Inc(P);
+            JSkipWS(JSON, P);
+            if JSON[P] = ':' then
+              Inc(P);
             JSkipValue(JSON, P);
           end;
           // Actually validate Key/Value exist - basic check
@@ -3764,16 +4177,18 @@ begin
 end;
 
 initialization
-  EnsureAnsiRegistry;
-  EnsureAnsiOverrides;
+
+EnsureAnsiRegistry;
+EnsureAnsiOverrides;
 
 finalization
-  AnsiRegistry.Free;
-  AnsiRegistryMap.Free;
-  AnsiOverrides.Free;
-  AnsiGroupMap.Free;
-  AnsiGroupRawMap.Free;
-  ConsonantGroupMap.Free;
-  ConsonantGroupRawMap.Free;
+
+AnsiRegistry.Free;
+AnsiRegistryMap.Free;
+AnsiOverrides.Free;
+AnsiGroupMap.Free;
+AnsiGroupRawMap.Free;
+ConsonantGroupMap.Free;
+ConsonantGroupRawMap.Free;
 
 end.

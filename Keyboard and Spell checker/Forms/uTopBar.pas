@@ -209,7 +209,7 @@ type
       OrigBMP_ButtonModeB:      TBitmap;
       OrigBMP_ButtonModeB_Over: TBitmap;
       OrigBMP_ButtonModeB_Down: TBitmap;
-      AnsiTextApplied: Boolean;
+      AnsiTextApplied:          Boolean;
 
       BMP_ButtonLayoutDown:      TBitmap;
       BMP_ButtonLayoutDown_Over: TBitmap;
@@ -279,9 +279,8 @@ var
   NewRect: TRect;
 begin
   NewRect := message.ScaledRect^;
-// Reposition window without resizing
-  SetWindowPos(Handle, 0, NewRect.Left, NewRect.Top, Width, Height,
-    SWP_NOZORDER or SWP_NOACTIVATE or SWP_NOSIZE);
+  // Reposition window without resizing
+  SetWindowPos(Handle, 0, NewRect.Left, NewRect.Top, Width, Height, SWP_NOZORDER or SWP_NOACTIVATE or SWP_NOSIZE);
 end;
 
 { =============================================================================== }
@@ -642,17 +641,17 @@ end;
 
 procedure TTopBar.DrawAnsiTextOnBitmap(BMP: TBitmap);
 var
-  Text: string;
-  X, Y: Integer;
+  Text:          string;
+  X, Y:          Integer;
   R_Src, R_Dest: TRect;
 begin
-  R_Src := Rect(5, 0, 6, BMP.Height); 
-  R_Dest := Rect(6, 0, BMP.Width - 6, BMP.Height); 
+  R_Src := Rect(5, 0, 6, BMP.Height);
+  R_Dest := Rect(6, 0, BMP.Width - 6, BMP.Height);
   BMP.Canvas.CopyRect(R_Dest, BMP.Canvas, R_Src);
   Text := 'ANSI';
-  BMP.Canvas.Font.Name := 'Segoe UI'; 
+  BMP.Canvas.Font.Name := 'Segoe UI';
   BMP.Canvas.Font.Height := -10;
-  //BMP.Canvas.Font.Style := [fsBold];
+  // BMP.Canvas.Font.Style := [fsBold];
   BMP.Canvas.Brush.Style := bsClear;
   X := (BMP.Width - BMP.Canvas.TextWidth(Text)) div 2;
   Y := ((BMP.Height - BMP.Canvas.TextHeight(Text)) div 2) + 2;
@@ -669,7 +668,7 @@ var
 begin
   IsAnsi := (ButtonMode_State = State2) and (OutputIsBijoy = 'YES');
   if IsAnsi = AnsiTextApplied then
-    Exit;
+    exit;
   if IsAnsi then
   begin
     if OrigBMP_ButtonModeB = nil then

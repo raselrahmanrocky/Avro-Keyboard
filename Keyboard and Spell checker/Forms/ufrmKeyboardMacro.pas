@@ -1,33 +1,32 @@
 {$INCLUDE ../ProjectDefines.inc}
+unit ufrmKeyboardMacro;
 
-Unit ufrmKeyboardMacro;
+interface
 
-Interface
+uses
+  Windows,
+  Messages,
+  SysUtils,
+  Variants,
+  Classes,
+  Graphics,
+  Controls,
+  Forms,
+  Dialogs;
 
-Uses
-     Windows,
-     Messages,
-     SysUtils,
-     Variants,
-     Classes,
-     Graphics,
-     Controls,
-     Forms,
-     Dialogs;
+type
+  TfrmKeyboardMacro = class(TForm)
+    private
+      { Private declarations }
+    public
+      { Public declarations }
+  end;
 
-Type
-     TfrmKeyboardMacro = Class(TForm)
-     Private
-          { Private declarations }
-     Public
-          { Public declarations }
-     End;
+var
+  frmKeyboardMacro: TfrmKeyboardMacro;
 
-Var
-     frmKeyboardMacro         : TfrmKeyboardMacro;
-
-Implementation
+implementation
 
 {$R *.dfm}
 
-End.
+end.

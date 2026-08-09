@@ -20,17 +20,17 @@ unit clsBijoy2000ToUnicode;
   glyphs (Ansi V3 renders আ as 'xy' and ক as '„þ') and JSON-driven overrides.
 
   Reverse pipeline (mirror of the forward Convert):
-    1. Undo the JSON "PostReplacements" (the forward pass applies them last).
-    2. Undo the FinalTouch glyph swaps (reph/z-fola/r-fola with u-kars).
-    3. One combined glyph -> Unicode sweep: quotes (highest priority), half
-       forms, second-half forms, folas, full forms, consonants, vowels,
-       symbols and digits.  Kars and the reph glyph are left untouched.
-    4. Move the reph glyph to the start of its preceding cluster, expand it
-       to র্ (the forward pass places reph AFTER the cluster it marks).
-    5. Move pre-base kars (ে/ৈ/ি) back after their conjunct-chain clusters,
-       recognising both the raw ANSI glyphs and the already-unicode forms.
-    6. Map the remaining kar glyphs to Unicode kars.
-    7. Rejoin ো (ে+া) and ৌ (ে+ৗ) which the forward pass splits.
+  1. Undo the JSON "PostReplacements" (the forward pass applies them last).
+  2. Undo the FinalTouch glyph swaps (reph/z-fola/r-fola with u-kars).
+  3. One combined glyph -> Unicode sweep: quotes (highest priority), half
+  forms, second-half forms, folas, full forms, consonants, vowels,
+  symbols and digits.  Kars and the reph glyph are left untouched.
+  4. Move the reph glyph to the start of its preceding cluster, expand it
+  to র্ (the forward pass places reph AFTER the cluster it marks).
+  5. Move pre-base kars (ে/ৈ/ি) back after their conjunct-chain clusters,
+  recognising both the raw ANSI glyphs and the already-unicode forms.
+  6. Map the remaining kar glyphs to Unicode kars.
+  7. Rejoin ো (ে+া) and ৌ (ে+ৗ) which the forward pass splits.
 
   The conversion is inherently lossy for ZWNJ/ZWJ and some half-form detail,
   exactly like Bijoy text itself.
@@ -44,32 +44,32 @@ uses
 
 type
   TBijoy2000ToUnicode = class
-  private
-    // glyph sequence -> glyph sequence (undo PostReplacements, last-first)
-    FPostInverse: TArray<TReplacementPair>;
-    // glyph sequence -> glyph sequence (undo FinalTouch swaps)
-    FSwapBacks: TArray<TReplacementPair>;
-    // combined glyph -> Unicode sweep table, sorted longest-glyph first
-    FMain: TArray<TReplacementPair>;
-    // pre-base kar glyphs (ে/ৈ/ি), sorted longest first
-    FPreBaseKars: TArray<TReplacementPair>;
-    // all other kar glyphs (া/ী/ু/ূ/ৃ/ৗ), for cluster detection
-    FOtherKars: TArray<TReplacementPair>;
-    // kar glyph -> Unicode kar, sorted longest first
-    FKarMap: TArray<TReplacementPair>;
+    private
+      // glyph sequence -> glyph sequence (undo PostReplacements, last-first)
+      FPostInverse: TArray<TReplacementPair>;
+      // glyph sequence -> glyph sequence (undo FinalTouch swaps)
+      FSwapBacks: TArray<TReplacementPair>;
+      // combined glyph -> Unicode sweep table, sorted longest-glyph first
+      FMain: TArray<TReplacementPair>;
+      // pre-base kar glyphs (ে/ৈ/ি), sorted longest first
+      FPreBaseKars: TArray<TReplacementPair>;
+      // all other kar glyphs (া/ী/ু/ূ/ৃ/ৗ), for cluster detection
+      FOtherKars: TArray<TReplacementPair>;
+      // kar glyph -> Unicode kar, sorted longest first
+      FKarMap: TArray<TReplacementPair>;
 
-    procedure BuildTables;
-    function VarGlyph(const AName: string): string;
-    function CleanKey(const S: string): string;
-    function HasNonHalfFormOwner(const Glyph: string): Boolean;
-    function IsPreBaseKarAt(const Text: string; P: Integer; out GLen: Integer): Boolean;
-    function IsConsonantChar(const C: Char): Boolean;
-    function IsClusterMember(const Text: string; P: Integer; IsFirst: Boolean): Boolean;
-    function GetPrecedingClusterStart(const Text: string; P: Integer): Integer;
-    procedure ReorderReph(var Text: string);
-    procedure ReorderPreBaseKars(var Text: string);
-  public
-    function Convert(const AnsiText: string): string;
+      procedure BuildTables;
+      function VarGlyph(const AName: string): string;
+      function CleanKey(const S: string): string;
+      function HasNonHalfFormOwner(const Glyph: string): Boolean;
+      function IsPreBaseKarAt(const Text: string; P: Integer; out GLen: Integer): Boolean;
+      function IsConsonantChar(const C: Char): Boolean;
+      function IsClusterMember(const Text: string; P: Integer; IsFirst: Boolean): Boolean;
+      function GetPrecedingClusterStart(const Text: string; P: Integer): Integer;
+      procedure ReorderReph(var Text: string);
+      procedure ReorderPreBaseKars(var Text: string);
+    public
+      function Convert(const AnsiText: string): string;
   end;
 
 implementation
@@ -109,11 +109,14 @@ var
 begin
   Result := S;
   Idx := Pos(' ', Result);
-  if Idx > 0 then Result := Copy(Result, 1, Idx - 1);
+  if Idx > 0 then
+    Result := Copy(Result, 1, Idx - 1);
   Idx := Pos('(', Result);
-  if Idx > 0 then Result := Copy(Result, 1, Idx - 1);
+  if Idx > 0 then
+    Result := Copy(Result, 1, Idx - 1);
   Idx := Pos('-', Result);
-  if Idx > 0 then Result := Copy(Result, 1, Idx - 1);
+  if Idx > 0 then
+    Result := Copy(Result, 1, Idx - 1);
   Result := Trim(Result);
 end;
 
@@ -134,13 +137,8 @@ begin
   if AnsiRegistryMap = nil then
     Exit;
   for R in AnsiRegistryMap.Values do
-    if (R.Name <> 'A_StartSingleQuote') and
-       (R.Name <> 'A_EndSingleQuote') and
-       (R.Name <> 'A_StartDoubleQuote') and
-       (R.Name <> 'A_EndDoubleQuote') and
-       (R.Category <> 'FirstHalfForms') and
-       (R.Category <> 'SecondHalfForms') and
-       (VarGlyph(R.Name) = Glyph) then
+    if (R.Name <> 'A_StartSingleQuote') and (R.Name <> 'A_EndSingleQuote') and (R.Name <> 'A_StartDoubleQuote') and (R.Name <> 'A_EndDoubleQuote') and
+      (R.Category <> 'FirstHalfForms') and (R.Category <> 'SecondHalfForms') and (VarGlyph(R.Name) = Glyph) then
     begin
       Result := True;
       Exit;
@@ -151,10 +149,10 @@ end;
 
 procedure TBijoy2000ToUnicode.BuildTables;
 var
-  Dict: TDictionary<string, string>;
-  Rec: TAnsiVarRec;
+  Dict:       TDictionary<string, string>;
+  Rec:        TAnsiVarRec;
   Glyph, Uni: string;
-  I: Integer;
+  I:          Integer;
 
   // Adds only when the glyph is not yet claimed (first claim wins).
   procedure Add(const AKey, AValue: string);
@@ -163,7 +161,7 @@ var
       Dict.Add(AKey, AValue);
   end;
 
-  // Appends a glyph-sequence -> glyph-sequence swap (skips empty sides).
+// Appends a glyph-sequence -> glyph-sequence swap (skips empty sides).
   procedure AddSwap(const AKey, AValue: string);
   var
     N: Integer;
@@ -223,13 +221,12 @@ begin
     // the longer contextual key below wins first and A_M_2H_2 claims the
     // bare #$BF.  Both sides of the key must be non-empty (see above).
     if (VarGlyph('A_Hasanta') <> '') and (VarGlyph('A_T_R_2H') <> '') then
-      Add(VarGlyph('A_Hasanta') + VarGlyph('A_T_R_2H'),
-          b_Hasanta + b_t + b_Hasanta + b_R);               // ্ + ত্ + র
+      Add(VarGlyph('A_Hasanta') + VarGlyph('A_T_R_2H'), b_Hasanta + b_t + b_Hasanta + b_R); // ্ + ত্ + র
     Add(VarGlyph('A_M_2H_1'), b_Hasanta + b_M);
     Add(VarGlyph('A_M_2H_2'), b_Hasanta + b_M);
-    Add(VarGlyph('A_T_R_2H'), b_t + b_Hasanta + b_R);     // ত্র ২য় খন্ড
-    Add(VarGlyph('A_K_R_2H'), b_K + b_Hasanta + b_R);     // ক্র ২য় খন্ড
-    Add(VarGlyph('A_BH_R_2H'), b_Bh + b_Hasanta + b_R);   // ভ্র ২য় খন্ড
+    Add(VarGlyph('A_T_R_2H'), b_t + b_Hasanta + b_R);   // ত্র ২য় খন্ড
+    Add(VarGlyph('A_K_R_2H'), b_K + b_Hasanta + b_R);   // ক্র ২য় খন্ড
+    Add(VarGlyph('A_BH_R_2H'), b_Bh + b_Hasanta + b_R); // ভ্র ২য় খন্ড
 
     Add(VarGlyph('A_B_2H_1'), b_Hasanta + b_B);
     Add(VarGlyph('A_B_2H_2'), b_Hasanta + b_B);
@@ -287,9 +284,9 @@ begin
     // own re-ordering pass in Convert, and in BanglaPedia it shares a glyph
     // with A_Th_2H, so expanding it blindly would corrupt ্+থ conjuncts.)
     Add(VarGlyph('A_ZFola'), b_Hasanta + b_z);
-    Add(VarGlyph('A_RFola_1'), b_Hasanta + b_r);
-    Add(VarGlyph('A_RFola_2'), b_Hasanta + b_r);
-    Add(VarGlyph('A_RFola_3'), b_Hasanta + b_r);
+    Add(VarGlyph('A_RFola_1'), b_Hasanta + b_R);
+    Add(VarGlyph('A_RFola_2'), b_Hasanta + b_R);
+    Add(VarGlyph('A_RFola_3'), b_Hasanta + b_R);
 
     // ------------------------------------------------------------------
     // Registry-driven glyph -> Unicode table.  Kars and the 1H/2H forms
@@ -303,9 +300,7 @@ begin
         if (Rec.Category = 'FirstHalfForms') or (Rec.Category = 'SecondHalfForms') then
           Continue;
         // Vowel-sign kars are mapped after the reordering pass.
-        if (Rec.Category = 'VowelsAndKars') and
-           (Length(Rec.Name) >= 3) and
-           SameText(Copy(Rec.Name, Length(Rec.Name) - 2, 3), 'Kar') then
+        if (Rec.Category = 'VowelsAndKars') and (Length(Rec.Name) >= 3) and SameText(Copy(Rec.Name, Length(Rec.Name) - 2, 3), 'Kar') then
           Continue;
 
         Glyph := VarGlyph(Rec.Name);
@@ -314,8 +309,7 @@ begin
 
         // The four quote vars are handled first (they win any glyph clash
         // with half-form conjuncts); skip them here.
-        if (Rec.Name = 'A_StartSingleQuote') or (Rec.Name = 'A_EndSingleQuote') or
-           (Rec.Name = 'A_StartDoubleQuote') or (Rec.Name = 'A_EndDoubleQuote') then
+        if (Rec.Name = 'A_StartSingleQuote') or (Rec.Name = 'A_EndSingleQuote') or (Rec.Name = 'A_StartDoubleQuote') or (Rec.Name = 'A_EndDoubleQuote') then
           Continue;
         Uni := CleanKey(Rec.BengaliChar);
         if Uni = '' then
@@ -324,14 +318,14 @@ begin
       end;
 
     // JSON-driven custom full forms (extra conjuncts).
-    for I := 0 to High(CustomFullForms) do
+    for I := 0 to high(CustomFullForms) do
       Add(CustomFullForms[I].Value, CustomFullForms[I].Key);
 
     // Invert the PreReplacements as a gap-fill: glyphs that have no other
     // meaning (e.g. Ansi V3's '!' -> ম্ন glyph, '*' -> A_B_2H glyph) come
     // back to the character the user actually typed.  Glyphs that DO have a
     // real conjunct meaning keep that meaning.
-    for I := 0 to High(CustomPreReplacements) do
+    for I := 0 to high(CustomPreReplacements) do
       Add(CustomPreReplacements[I].Value, CustomPreReplacements[I].Key);
 
     // Flatten + sort the sweep table longest-glyph-first so that multi-char
@@ -346,7 +340,7 @@ begin
       Inc(I);
     end;
     TArray.Sort<TReplacementPair>(FMain, TComparer<TReplacementPair>.Construct(
-      function(const L, R: TReplacementPair): Integer
+          function(const L, R: TReplacementPair): Integer
       begin
         Result := R.Key.Length - L.Key.Length;
       end));
@@ -408,9 +402,9 @@ begin
 
     // Combined kar map (pre-base + others), longest first.
     SetLength(FKarMap, Length(FPreBaseKars) + Length(FOtherKars));
-    for I := 0 to High(FPreBaseKars) do
+    for I := 0 to high(FPreBaseKars) do
       FKarMap[I] := FPreBaseKars[I];
-    for I := 0 to High(FOtherKars) do
+    for I := 0 to high(FOtherKars) do
       FKarMap[Length(FPreBaseKars) + I] := FOtherKars[I];
     TArray.Sort<TReplacementPair>(FKarMap, TComparer<TReplacementPair>.Construct(
       function(const L, R: TReplacementPair): Integer
@@ -429,51 +423,33 @@ begin
     // [UKar2][Reph] meaning the original [Reph][UKar1].  This is inherently
     // lossy: forward also produces [UKar2][Reph] from [Reph][UKar2], which
     // cannot be told apart afterwards.
-    AddSwap(VarGlyph('A_UKar2') + VarGlyph('A_Reph'),
-            VarGlyph('A_Reph') + VarGlyph('A_UKar1'));
-    AddSwap(VarGlyph('A_UKar3') + VarGlyph('A_Reph'),
-            VarGlyph('A_Reph') + VarGlyph('A_UKar3'));
-    AddSwap(VarGlyph('A_UKar4') + VarGlyph('A_Reph'),
-            VarGlyph('A_Reph') + VarGlyph('A_UKar4'));
-    AddSwap(VarGlyph('A_UUKar1') + VarGlyph('A_Reph'),
-            VarGlyph('A_Reph') + VarGlyph('A_UUKar1'));
-    AddSwap(VarGlyph('A_UUKar2') + VarGlyph('A_Reph'),
-            VarGlyph('A_Reph') + VarGlyph('A_UUKar2'));
-    AddSwap(VarGlyph('A_UUKar3') + VarGlyph('A_Reph'),
-            VarGlyph('A_Reph') + VarGlyph('A_UUKar3'));
+    AddSwap(VarGlyph('A_UKar2') + VarGlyph('A_Reph'), VarGlyph('A_Reph') + VarGlyph('A_UKar1'));
+    AddSwap(VarGlyph('A_UKar3') + VarGlyph('A_Reph'), VarGlyph('A_Reph') + VarGlyph('A_UKar3'));
+    AddSwap(VarGlyph('A_UKar4') + VarGlyph('A_Reph'), VarGlyph('A_Reph') + VarGlyph('A_UKar4'));
+    AddSwap(VarGlyph('A_UUKar1') + VarGlyph('A_Reph'), VarGlyph('A_Reph') + VarGlyph('A_UUKar1'));
+    AddSwap(VarGlyph('A_UUKar2') + VarGlyph('A_Reph'), VarGlyph('A_Reph') + VarGlyph('A_UUKar2'));
+    AddSwap(VarGlyph('A_UUKar3') + VarGlyph('A_Reph'), VarGlyph('A_Reph') + VarGlyph('A_UUKar3'));
 
-    AddSwap(VarGlyph('A_UKar1') + VarGlyph('A_RFola_1'),
-            VarGlyph('A_RFola_1') + VarGlyph('A_UKar1'));
-    AddSwap(VarGlyph('A_UUKar1') + VarGlyph('A_RFola_1'),
-            VarGlyph('A_RFola_1') + VarGlyph('A_UUKar1'));
-    AddSwap(VarGlyph('A_UKar1') + VarGlyph('A_RFola_2'),
-            VarGlyph('A_RFola_2') + VarGlyph('A_UKar1'));
-    AddSwap(VarGlyph('A_UUKar1') + VarGlyph('A_RFola_2'),
-            VarGlyph('A_RFola_2') + VarGlyph('A_UUKar1'));
+    AddSwap(VarGlyph('A_UKar1') + VarGlyph('A_RFola_1'), VarGlyph('A_RFola_1') + VarGlyph('A_UKar1'));
+    AddSwap(VarGlyph('A_UUKar1') + VarGlyph('A_RFola_1'), VarGlyph('A_RFola_1') + VarGlyph('A_UUKar1'));
+    AddSwap(VarGlyph('A_UKar1') + VarGlyph('A_RFola_2'), VarGlyph('A_RFola_2') + VarGlyph('A_UKar1'));
+    AddSwap(VarGlyph('A_UUKar1') + VarGlyph('A_RFola_2'), VarGlyph('A_RFola_2') + VarGlyph('A_UUKar1'));
 
-    AddSwap(VarGlyph('A_UKar1') + VarGlyph('A_ZFola'),
-            VarGlyph('A_ZFola') + VarGlyph('A_UKar1'));
-    AddSwap(VarGlyph('A_UKar2') + VarGlyph('A_ZFola'),
-            VarGlyph('A_ZFola') + VarGlyph('A_UKar2'));
-    AddSwap(VarGlyph('A_UKar3') + VarGlyph('A_ZFola'),
-            VarGlyph('A_ZFola') + VarGlyph('A_UKar3'));
-    AddSwap(VarGlyph('A_UKar4') + VarGlyph('A_ZFola'),
-            VarGlyph('A_ZFola') + VarGlyph('A_UKar4'));
-    AddSwap(VarGlyph('A_UUKar1') + VarGlyph('A_ZFola'),
-            VarGlyph('A_ZFola') + VarGlyph('A_UUKar1'));
-    AddSwap(VarGlyph('A_UUKar2') + VarGlyph('A_ZFola'),
-            VarGlyph('A_ZFola') + VarGlyph('A_UUKar2'));
-    AddSwap(VarGlyph('A_UUKar3') + VarGlyph('A_ZFola'),
-            VarGlyph('A_ZFola') + VarGlyph('A_UUKar3'));
+    AddSwap(VarGlyph('A_UKar1') + VarGlyph('A_ZFola'), VarGlyph('A_ZFola') + VarGlyph('A_UKar1'));
+    AddSwap(VarGlyph('A_UKar2') + VarGlyph('A_ZFola'), VarGlyph('A_ZFola') + VarGlyph('A_UKar2'));
+    AddSwap(VarGlyph('A_UKar3') + VarGlyph('A_ZFola'), VarGlyph('A_ZFola') + VarGlyph('A_UKar3'));
+    AddSwap(VarGlyph('A_UKar4') + VarGlyph('A_ZFola'), VarGlyph('A_ZFola') + VarGlyph('A_UKar4'));
+    AddSwap(VarGlyph('A_UUKar1') + VarGlyph('A_ZFola'), VarGlyph('A_ZFola') + VarGlyph('A_UUKar1'));
+    AddSwap(VarGlyph('A_UUKar2') + VarGlyph('A_ZFola'), VarGlyph('A_ZFola') + VarGlyph('A_UUKar2'));
+    AddSwap(VarGlyph('A_UUKar3') + VarGlyph('A_ZFola'), VarGlyph('A_ZFola') + VarGlyph('A_UUKar3'));
 
-    AddSwap(VarGlyph('A_Reph') + VarGlyph('A_ZFola'),
-            VarGlyph('A_ZFola') + VarGlyph('A_Reph'));
+    AddSwap(VarGlyph('A_Reph') + VarGlyph('A_ZFola'), VarGlyph('A_ZFola') + VarGlyph('A_Reph'));
 
     // ------------------------------------------------------------------
     // PostReplacement inversions (undo, last applied first).
     // ------------------------------------------------------------------
     SetLength(FPostInverse, Length(CustomPostReplacements));
-    for I := 0 to High(CustomPostReplacements) do
+    for I := 0 to high(CustomPostReplacements) do
     begin
       FPostInverse[I].Key := CustomPostReplacements[I].Value;
       FPostInverse[I].Value := CustomPostReplacements[I].Key;
@@ -485,8 +461,7 @@ end;
 
 { ============================================================================= }
 
-function TBijoy2000ToUnicode.IsPreBaseKarAt(const Text: string; P: Integer;
-  out GLen: Integer): Boolean;
+function TBijoy2000ToUnicode.IsPreBaseKarAt(const Text: string; P: Integer; out GLen: Integer): Boolean;
 var
   I: Integer;
 begin
@@ -504,9 +479,8 @@ begin
       Exit;
     end;
   end;
-  for I := 0 to High(FPreBaseKars) do
-    if (Length(FPreBaseKars[I].Key) <= Length(Text) - P + 1) and
-       (Copy(Text, P, Length(FPreBaseKars[I].Key)) = FPreBaseKars[I].Key) then
+  for I := 0 to high(FPreBaseKars) do
+    if (Length(FPreBaseKars[I].Key) <= Length(Text) - P + 1) and (Copy(Text, P, Length(FPreBaseKars[I].Key)) = FPreBaseKars[I].Key) then
     begin
       Result := True;
       GLen := Length(FPreBaseKars[I].Key);
@@ -520,9 +494,7 @@ var
   O: Integer;
 begin
   O := Ord(C);
-  Result := (O = $09CE) or
-            ((O >= $0995) and (O <= $09B9)) or
-            (O = $09DC) or (O = $09DD) or (O = $09DF);
+  Result := (O = $09CE) or ((O >= $0995) and (O <= $09B9)) or (O = $09DC) or (O = $09DD) or (O = $09DF);
 end;
 
 // Cluster membership for the kar re-ordering pass.  A cluster is a conjunct
@@ -532,8 +504,7 @@ end;
 // e.g. in ি+দ্+ব+ত the ি belongs to দ্ব only, and ত starts a new syllable
 // (দ্বিতীয়, not দ্বতিীয়).  Folas (্য/্র/্ব/্ম/্ল) are already ্+consonant
 // after the sweep, so the same rule covers them.
-function TBijoy2000ToUnicode.IsClusterMember(const Text: string; P: Integer;
-  IsFirst: Boolean): Boolean;
+function TBijoy2000ToUnicode.IsClusterMember(const Text: string; P: Integer; IsFirst: Boolean): Boolean;
 begin
   if IsFirst then
     Result := IsConsonantChar(Text[P])
@@ -546,16 +517,13 @@ end;
 // Scans backwards from P (a consonant) across the conjunct chain
 // [consonant (্ consonant)*] that ends at P, returning the index of its
 // first character (0 when P is not a consonant).
-function TBijoy2000ToUnicode.GetPrecedingClusterStart(const Text: string;
-  P: Integer): Integer;
+function TBijoy2000ToUnicode.GetPrecedingClusterStart(const Text: string; P: Integer): Integer;
 begin
   Result := 0;
   if (P < 1) or (P > Length(Text)) or not IsConsonantChar(Text[P]) then
     Exit;
   Result := P;
-  while (Result - 2 >= 1) and
-        (Text[Result - 1] = b_Hasanta) and
-        IsConsonantChar(Text[Result - 2]) do
+  while (Result - 2 >= 1) and (Text[Result - 1] = b_Hasanta) and IsConsonantChar(Text[Result - 2]) do
     Result := Result - 2;
 end;
 
@@ -567,9 +535,9 @@ end;
 // পূর্ববঙ্গ (not পূবর্বঙ্গ).
 procedure TBijoy2000ToUnicode.ReorderReph(var Text: string);
 var
-  RephGlyph: string;
+  RephGlyph:    string;
   ClusterStart: Integer;
-  I: Integer;
+  I:            Integer;
 begin
   RephGlyph := VarGlyph('A_Reph');
   if RephGlyph = '' then
@@ -577,16 +545,12 @@ begin
   I := 1;
   while I <= Length(Text) do
   begin
-    if (I + Length(RephGlyph) - 1 <= Length(Text)) and
-       (Copy(Text, I, Length(RephGlyph)) = RephGlyph) then
+    if (I + Length(RephGlyph) - 1 <= Length(Text)) and (Copy(Text, I, Length(RephGlyph)) = RephGlyph) then
     begin
       ClusterStart := GetPrecedingClusterStart(Text, I - 1);
       if ClusterStart > 0 then
       begin
-        Text := Copy(Text, 1, ClusterStart - 1) +
-                RephGlyph +
-                Copy(Text, ClusterStart, I - ClusterStart) +
-                Copy(Text, I + Length(RephGlyph), MaxInt);
+        Text := Copy(Text, 1, ClusterStart - 1) + RephGlyph + Copy(Text, ClusterStart, I - ClusterStart) + Copy(Text, I + Length(RephGlyph), MaxInt);
         I := ClusterStart + Length(RephGlyph);
       end
       else
@@ -596,7 +560,7 @@ begin
       Inc(I);
   end;
   // Expand every remaining reph glyph to র্ (র + হসন্ত).
-  Text := ReplaceStr(Text, RephGlyph, b_r + b_Hasanta);
+  Text := ReplaceStr(Text, RephGlyph, b_R + b_Hasanta);
 end;
 
 // Reverse of ReArrangeKars: pre-base kars (ে/ৈ/ি) were hoisted in front of
@@ -614,7 +578,7 @@ end;
 procedure TBijoy2000ToUnicode.ReorderPreBaseKars(var Text: string);
 var
   I, J, GLen: Integer;
-  IsFirst: Boolean;
+  IsFirst:    Boolean;
 begin
   I := 1;
   while I <= Length(Text) do
@@ -631,10 +595,7 @@ begin
       if J > I + GLen then
       begin
         // Move the kar (Text[I..I+GLen-1]) to just after the cluster.
-        Text := Copy(Text, 1, I - 1) +
-                Copy(Text, I + GLen, J - I - GLen) +
-                Copy(Text, I, GLen) +
-                Copy(Text, J, MaxInt);
+        Text := Copy(Text, 1, I - 1) + Copy(Text, I + GLen, J - I - GLen) + Copy(Text, I, GLen) + Copy(Text, J, MaxInt);
         I := J; // continue right after the moved kar
       end
       else
@@ -650,7 +611,7 @@ end;
 function TBijoy2000ToUnicode.Convert(const AnsiText: string): string;
 var
   Text: string;
-  I: Integer;
+  I:    Integer;
 begin
   if AnsiText = '' then
     Exit('');
@@ -661,16 +622,16 @@ begin
   Text := AnsiText;
 
   // 1. Undo the JSON PostReplacements (forward applies them last).
-  for I := High(FPostInverse) downto 0 do
+  for I := high(FPostInverse) downto 0 do
     Text := ReplaceStr(Text, FPostInverse[I].Key, FPostInverse[I].Value);
 
   // 2. Undo the FinalTouch glyph swaps.
-  for I := 0 to High(FSwapBacks) do
+  for I := 0 to high(FSwapBacks) do
     Text := ReplaceStr(Text, FSwapBacks[I].Key, FSwapBacks[I].Value);
 
   // 3. Combined glyph -> Unicode sweep (longest glyph first).  Kars and the
-  //    reph glyph survive this pass on purpose.
-  for I := 0 to High(FMain) do
+  // reph glyph survive this pass on purpose.
+  for I := 0 to high(FMain) do
     Text := ReplaceStr(Text, FMain[I].Key, FMain[I].Value);
 
   // 4. Move the reph glyph to the start of its cluster, then expand to র্.
@@ -680,7 +641,7 @@ begin
   ReorderPreBaseKars(Text);
 
   // 6. Remaining kar glyphs -> Unicode kars.
-  for I := 0 to High(FKarMap) do
+  for I := 0 to high(FKarMap) do
     Text := ReplaceStr(Text, FKarMap[I].Key, FKarMap[I].Value);
 
   // 7. Rejoin the split ো and ৌ.

@@ -9,7 +9,7 @@
         <AppType>Application</AppType>
         <FrameworkType>VCL</FrameworkType>
         <ProjectVersion>20.1</ProjectVersion>
-        <Platform Condition="'$(Platform)'==''">Win32</Platform>
+        <Platform Condition="'$(Platform)'==''">Win64</Platform>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Config)'=='Base' or '$(Base)'!=''">
         <Base>true</Base>
@@ -105,8 +105,6 @@
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_1_Win32)'!=''">
         <AppDPIAwarenessMode>PerMonitorV2</AppDPIAwarenessMode>
-        <VerInfo_Build>1</VerInfo_Build>
-        <VerInfo_Keys>CompanyName=;FileDescription=Unicode_to_Bijoy;FileVersion=1.0.0.1;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductName=Unicode_to_Bijoy;ProductVersion=1.0.0.0;Comments=;ProgramID=com.embarcadero.Unicode_to_Bijoy</VerInfo_Keys>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_1_Win64)'!=''">
         <AppDPIAwarenessMode>PerMonitorV2</AppDPIAwarenessMode>
@@ -124,12 +122,10 @@
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_2_Win32)'!=''">
         <AppDPIAwarenessMode>PerMonitorV2</AppDPIAwarenessMode>
-        <VerInfo_Build>1</VerInfo_Build>
-        <VerInfo_Keys>CompanyName=;FileDescription=Unicode_to_Bijoy;FileVersion=1.0.0.1;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductName=Unicode_to_Bijoy;ProductVersion=1.0.0.0;Comments=;ProgramID=com.embarcadero.Unicode_to_Bijoy</VerInfo_Keys>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_2_Win64)'!=''">
-        <VerInfo_Build>8</VerInfo_Build>
-        <VerInfo_Keys>CompanyName=;FileDescription=Unicode_to_Bijoy;FileVersion=1.0.0.8;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProgramID=com.embarcadero.Unicode_to_Bijoy;ProductName=Unicode_to_Bijoy;ProductVersion=1.0.0.0;Comments=</VerInfo_Keys>
+        <VerInfo_Build>7</VerInfo_Build>
+        <VerInfo_Keys>CompanyName=;FileDescription=$(MSBuildProjectName);FileVersion=1.0.0.7;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProgramID=com.embarcadero.$(MSBuildProjectName);ProductName=$(MSBuildProjectName);ProductVersion=1.0.0.0;Comments=</VerInfo_Keys>
         <VerInfo_MinorVer>0</VerInfo_MinorVer>
         <Icon_MainIcon>..\assets\icons\Converter.ico</Icon_MainIcon>
     </PropertyGroup>
@@ -140,9 +136,7 @@
         <DCCReference Include="Unit1.pas">
             <Form>Form1</Form>
         </DCCReference>
-        <DCCReference Include="uRoundedPanel.pas"/>
         <DCCReference Include="clsUnicodeToBijoy2000.pas"/>
-        <DCCReference Include="clsBijoy2000ToUnicode.pas"/>
         <DCCReference Include="..\Keyboard and Spell checker\Units\BanglaChars.pas"/>
         <DCCReference Include="..\Keyboard and Spell checker\Units\uFileFolderHandling.pas"/>
         <DCCReference Include="..\Keyboard and Spell checker\Units\WindowsDarkMode.pas"/>

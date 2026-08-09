@@ -11,8 +11,18 @@ unit ufrmAnsiVersionPicker;
 interface
 
 uses
-  Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms,
-  Dialogs, StdCtrls, Generics.Collections, System.Types, uRegistrySettings,
+  Windows,
+  Messages,
+  SysUtils,
+  Classes,
+  Graphics,
+  Controls,
+  Forms,
+  Dialogs,
+  StdCtrls,
+  Generics.Collections,
+  System.Types,
+  uRegistrySettings,
   clsUnicodeToBijoy2000;
 
 const
@@ -25,27 +35,25 @@ type
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
     procedure ListBoxKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
     procedure ListBoxClick(Sender: TObject);
-    procedure ListBoxDrawItem(Control: TWinControl; Index: Integer;
-      Rect: TRect; State: TOwnerDrawState);
-    procedure ListBoxMouseMove(Sender: TObject; Shift: TShiftState;
-      X, Y: Integer);
+    procedure ListBoxDrawItem(Control: TWinControl; Index: Integer; Rect: TRect; State: TOwnerDrawState);
+    procedure ListBoxMouseMove(Sender: TObject; Shift: TShiftState; X, Y: Integer);
     procedure ListBoxMouseLeave(Sender: TObject);
-  private
-    FHoverIndex: Integer;
-    FPrevFocusedWindow: HWND;
-    FPrevForegroundWindow: HWND;
-    function GetSelectedVersion: string;
-    procedure AutoSizeForm;
-    procedure WMNCActivate(var Msg: TWMNCActivate); message WM_NCACTIVATE;
-    procedure WMFocusPicker(var Msg: TMessage); message WM_FOCUS_PICKER;
-    procedure WMTimer(var Msg: TMessage); message WM_TIMER;
-  public
-    procedure Setup;
-    procedure PopulateVersions;
-    procedure PositionFormNearCursor;
-  protected
-    procedure CreateParams(var Params: TCreateParams); override;
-    destructor Destroy; override;
+    private
+      FHoverIndex:           Integer;
+      FPrevFocusedWindow:    HWND;
+      FPrevForegroundWindow: HWND;
+      function GetSelectedVersion: string;
+      procedure AutoSizeForm;
+      procedure WMNCActivate(var Msg: TWMNCActivate); message WM_NCACTIVATE;
+      procedure WMFocusPicker(var Msg: TMessage); message WM_FOCUS_PICKER;
+      procedure WMTimer(var Msg: TMessage); message WM_TIMER;
+    public
+      procedure Setup;
+      procedure PopulateVersions;
+      procedure PositionFormNearCursor;
+    protected
+      procedure CreateParams(var Params: TCreateParams); override;
+      destructor Destroy; override;
   end;
 
 procedure ShowAnsiVersionPicker;
@@ -60,29 +68,30 @@ uses
   ufrmAnsiToast;
 
 // Force a window to the foreground using AttachThreadInput — the most reliable way
-procedure ForceForegroundWindow(hWnd: HWND);
+procedure ForceForegroundWindow(HWND: HWND);
 var
   ForeThread, ThisThread: DWORD;
 begin
-  if not IsWindow(hWnd) then Exit;
+  if not IsWindow(HWND) then
+    Exit;
   ForeThread := GetWindowThreadProcessId(GetForegroundWindow, nil);
   ThisThread := GetCurrentThreadId;
   if ForeThread <> ThisThread then
   begin
     AttachThreadInput(ForeThread, ThisThread, True);
     try
-      SetForegroundWindow(hWnd);
-      BringWindowToTop(hWnd);
-      Windows.SetFocus(hWnd);
+      SetForegroundWindow(HWND);
+      BringWindowToTop(HWND);
+      Windows.SetFocus(HWND);
     finally
       AttachThreadInput(ForeThread, ThisThread, False);
     end;
   end
   else
   begin
-    SetForegroundWindow(hWnd);
-    BringWindowToTop(hWnd);
-    Windows.SetFocus(hWnd);
+    SetForegroundWindow(HWND);
+    BringWindowToTop(HWND);
+    Windows.SetFocus(HWND);
   end;
 end;
 
@@ -183,8 +192,7 @@ begin
   end;
 end;
 
-procedure TfrmAnsiVersionPicker.FormClose(Sender: TObject;
-  var Action: TCloseAction);
+procedure TfrmAnsiVersionPicker.FormClose(Sender: TObject; var Action: TCloseAction);
 begin
   KillTimer(Handle, 1);
   Action := caFree;
@@ -203,7 +211,7 @@ procedure TfrmAnsiVersionPicker.PopulateVersions;
 var
   SearchRec: TSearchRec;
   FileTitle: string;
-  I: Integer;
+  I:         Integer;
 begin
   AvroMainForm1.CleanupDuplicateMappings;
   ListBox.Items.BeginUpdate;
@@ -236,14 +244,16 @@ end;
 procedure TfrmAnsiVersionPicker.AutoSizeForm;
 var
   I, W, MaxW: Integer;
-  TempStr: string;
+  TempStr:    string;
 begin
   MaxW := 0;
   Canvas.Font := ListBox.Font;
   for I := 0 to ListBox.Items.Count - 1 do
   begin
-    if I < 9 then TempStr := IntToStr(I + 1) + '. ' + ListBox.Items[I]
-    else TempStr := ListBox.Items[I];
+    if I < 9 then
+      TempStr := IntToStr(I + 1) + '. ' + ListBox.Items[I]
+    else
+      TempStr := ListBox.Items[I];
     W := Canvas.TextWidth(TempStr);
     if W > MaxW then
       MaxW := W;
@@ -256,7 +266,7 @@ end;
 procedure TfrmAnsiVersionPicker.PositionFormNearCursor;
 var
   CursorPos: TPoint;
-  Monitor: TMonitor;
+  Monitor:   TMonitor;
 begin
   GetCursorPos(CursorPos);
   Monitor := Screen.MonitorFromPoint(CursorPos);
@@ -280,21 +290,20 @@ begin
     Result := ListBox.Items[ListBox.ItemIndex];
 end;
 
-procedure TfrmAnsiVersionPicker.ListBoxDrawItem(Control: TWinControl;
-  Index: Integer; Rect: TRect; State: TOwnerDrawState);
+procedure TfrmAnsiVersionPicker.ListBoxDrawItem(Control: TWinControl; Index: Integer; Rect: TRect; State: TOwnerDrawState);
 var
   IsActive, IsHovered: Boolean;
-  GutterRect: TRect;
-  DisplayText: string;
+  GutterRect:          TRect;
+  DisplayText:         string;
 begin
-  if (Index < 0) or (Index >= ListBox.Items.Count) then
+  if (index < 0) or (index >= ListBox.Items.Count) then
   begin
     ListBox.Canvas.Brush.Color := RGB(242, 242, 242);
     ListBox.Canvas.FillRect(Rect);
     Exit;
   end;
-  IsActive := (AnsiVersion = ListBox.Items[Index]);
-  IsHovered := (Index = FHoverIndex) or (odSelected in State);
+  IsActive := (AnsiVersion = ListBox.Items[index]);
+  IsHovered := (index = FHoverIndex) or (odSelected in State);
 
   // 1. Base background (Always light gray)
   ListBox.Canvas.Brush.Color := RGB(242, 242, 242);
@@ -321,8 +330,8 @@ begin
     // Draw the icon (Checkmark or Dot)
     ListBox.Canvas.Font.Color := RGB(51, 51, 51); // Dark gray icon color
     ListBox.Canvas.Font.Style := [fsBold];
-      DrawText(ListBox.Canvas.Handle, #$2713, -1, GutterRect, DT_CENTER or DT_VCENTER or DT_SINGLELINE);
-    
+    DrawText(ListBox.Canvas.Handle, #$2713, -1, GutterRect, DT_CENTER or DT_VCENTER or DT_SINGLELINE);
+
     // Reset font style for the main text
     ListBox.Canvas.Font.Style := [];
   end;
@@ -330,18 +339,17 @@ begin
   // 5. Draw the main item text (Transparent background, offset from gutter)
   ListBox.Canvas.Brush.Style := bsClear;
   ListBox.Canvas.Font.Color := RGB(0, 0, 0);
-  if Index < 9 then
-    DisplayText := IntToStr(Index + 1) + '. ' + ListBox.Items[Index]
+  if index < 9 then
+    DisplayText := IntToStr(index + 1) + '. ' + ListBox.Items[index]
   else
-    DisplayText := ListBox.Items[Index];
+    DisplayText := ListBox.Items[index];
   ListBox.Canvas.TextOut(Rect.Left + 35, Rect.Top + 3, DisplayText);
-  
+
   // Reset brush style to solid for next draw cycle
   ListBox.Canvas.Brush.Style := bsSolid;
 end;
 
-procedure TfrmAnsiVersionPicker.ListBoxMouseMove(Sender: TObject;
-  Shift: TShiftState; X, Y: Integer);
+procedure TfrmAnsiVersionPicker.ListBoxMouseMove(Sender: TObject; Shift: TShiftState; X, Y: Integer);
 var
   Idx: Integer;
 begin
@@ -363,17 +371,15 @@ procedure TfrmAnsiVersionPicker.ListBoxClick(Sender: TObject);
 var
   SelectedVersion, ErrorMsg: string;
 begin
-  if not Assigned(CurrentPicker) then Exit;
+  if not Assigned(CurrentPicker) then
+    Exit;
   SelectedVersion := GetSelectedVersion;
-  if SelectedVersion = '' then Exit;
+  if SelectedVersion = '' then
+    Exit;
   if not TrySetAnsiVersion(SelectedVersion, ErrorMsg) then
   begin
-    Application.MessageBox(
-      PChar('Could not load the selected ANSI mapping.' + sLineBreak +
-            'Error: ' + ErrorMsg),
-      'ANSI Mapping Error',
-      MB_ICONWARNING or MB_OK
-    );
+    Application.MessageBox(PChar('Could not load the selected ANSI mapping.' + sLineBreak + 'Error: ' + ErrorMsg), 'ANSI Mapping Error',
+      MB_ICONWARNING or MB_OK);
     Exit;
   end;
   AnsiVersion := SelectedVersion;
@@ -389,8 +395,7 @@ begin
   OptimizeMemoryUsage;
 end;
 
-procedure TfrmAnsiVersionPicker.ListBoxKeyDown(Sender: TObject;
-  var Key: Word; Shift: TShiftState);
+procedure TfrmAnsiVersionPicker.ListBoxKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
 var
   TargetIdx: Integer;
 begin
@@ -399,10 +404,12 @@ begin
   case Key of
     VK_ESCAPE:
       begin
-        if Assigned(CurrentPicker) then Close;
+        if Assigned(CurrentPicker) then
+          Close;
       end;
     VK_RETURN:
-      if ListBox.ItemIndex >= 0 then ListBoxClick(nil);
+      if ListBox.ItemIndex >= 0 then
+        ListBoxClick(nil);
     VK_UP:
       begin
         if ListBox.ItemIndex <= 0 then
@@ -419,9 +426,9 @@ begin
           ListBox.ItemIndex := ListBox.ItemIndex + 1;
         Key := 0;
       end;
-    Ord('1')..Ord('9'):
+    Ord('1') .. Ord('9'):
       TargetIdx := Key - Ord('1');
-    VK_NUMPAD1..VK_NUMPAD9:
+    VK_NUMPAD1 .. VK_NUMPAD9:
       TargetIdx := Key - VK_NUMPAD1;
   end;
 
