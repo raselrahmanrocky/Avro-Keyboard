@@ -694,14 +694,18 @@ var
       EmitByte(Ord(S[K]));
   end;
 
-// Append converted text bytes to ConvBuf. ASCII goes out literally;
-// anything above $7F is written back as a \uNNNN escape so the exact code
-// point survives the load (a literal byte would be re-interpreted through
-// \ansicpg).
+// Append converted text bytes to ConvBuf. ASCII goes out literally; bytes
+// above $7F (Bijoy conjuncts in the ANSI font) go out as \'hh hex escapes,
+// which RTF treats exactly like the literal byte: RichEdit maps it through
+// the ANSI codepage (\ansicpg) and the 8-bit font renders its own glyph.
+// A \uNNNN escape must NOT be used here - it would store NNNN as a plain
+// Unicode code point, bypassing the codepage mapping, so a Bijoy byte like
+// $8C would be stored as U+008C (a control character) and the conjunct
+// would never render.
   procedure EmitConverted(const S: string);
   var
     K, V, F: Integer;
-    NumStr:  string;
+    HexStr:  string;
   begin
     for K := 1 to Length(S) do
     begin
@@ -713,18 +717,11 @@ var
       end
       else
       begin
-        if V > 32767 then
-          V := V - 65536; // RTF wants a signed 16-bit value
-        NumStr := '\u' + IntToStr(V);
-        for F := 1 to Length(NumStr) do
+        HexStr := '\''' + LowerCase(IntToHex(V, 2));
+        for F := 1 to Length(HexStr) do
         begin
           SetLength(ConvBuf, Length(ConvBuf) + 1);
-          ConvBuf[Length(ConvBuf) - 1] := Ord(NumStr[F]);
-        end;
-        for F := 1 to UC do
-        begin
-          SetLength(ConvBuf, Length(ConvBuf) + 1);
-          ConvBuf[Length(ConvBuf) - 1] := Ord('?'); // \ucN fallback chars
+          ConvBuf[Length(ConvBuf) - 1] := Ord(HexStr[F]);
         end;
       end;
     end;
@@ -1047,8 +1044,9 @@ end;
 
 procedure TForm1.Button1Click(Sender: TObject);
 var
-  ActiveFont:    string;
-  MS, OutStream: TMemoryStream;
+  Src, OutText, EOL, Segment: string;
+  P, Q, TotalLen:             Integer;
+  ActiveFont:                 string;
 begin
   MEMO1.Enabled := False;
   MEMO2.Enabled := False;
@@ -1060,43 +1058,48 @@ begin
   MEMO2.Clear;
   Application.ProcessMessages;
   try
-    // Convert through RTF instead of plain text so tables, cell borders and
-    // other formatting pasted into MEMO1 survive the Unicode-to-Bijoy pass:
-    // only the text runs (\uNNNN escapes and literal runs) are converted,
-    // every RTF structure word (\trowd, \cell, \row, ...) is kept intact.
-    MS := TMemoryStream.Create;
-    OutStream := TMemoryStream.Create;
-    try
-      MEMO1.Lines.SaveToStream(MS); // SF_RTF - full document, not plain text
-      MS.Position := 0;
-      ConvertRtfUnicodeToBijoy(MS, OutStream, FUniToBijoy);
-      OutStream.Position := 0;
-      MEMO2.Lines.LoadFromStream(OutStream);
-    finally
-      OutStream.Free;
-      MS.Free;
-    end;
-    Progress.Position := 100;
-    Application.ProcessMessages;
+    Src := MEMO1.Text;
+    TotalLen := Length(Src);
+    OutText := '';
+    P := 1;
+    while P <= TotalLen do
+    begin
+      Q := P;
+      while (Q <= TotalLen) and not CharInSet(Src[Q], [#13, #10]) do
+        Inc(Q);
 
+      Segment := Copy(Src, P, Q - P);
+      OutText := OutText + FUniToBijoy.Convert(Segment);
+
+      if Q <= TotalLen then
+      begin
+        EOL := Src[Q];
+        Inc(Q);
+        if (EOL = #13) and (Q <= TotalLen) and (Src[Q] = #10) then
+        begin
+          EOL := EOL + #10;
+          Inc(Q);
+        end;
+        OutText := OutText + EOL;
+      end;
+
+      P := Q;
+      Progress.Position := (P * 100) div (TotalLen + 1);
+      Application.ProcessMessages;
+    end;
+
+    // কনভার্ট হওয়া ANSI টেক্সট বসানো
+    MEMO2.Text := OutText;
+
+    // সিলেক্টেড ফন্ট ও ক্যারেক্টার সেট অ্যাপ্লাই করা
     ActiveFont := cbFontPicker.ActiveFont;
     if ActiveFont = '' then
       ActiveFont := cbFontPicker.Text;
     if ActiveFont = '' then
       ActiveFont := MEMO2.Font.Name;
 
-    MEMO2.DefAttributes.Name := ActiveFont;
-    MEMO2.DefAttributes.Size := 18;
-    MEMO2.DefAttributes.Charset := MEMO2.Font.Charset;
+    ApplyFontToMemo2(ActiveFont);
 
-    // Apply the picked ANSI font to every text run (including table cells).
-    MEMO2.SelectAll;
-    MEMO2.SelAttributes.Name := ActiveFont;
-    MEMO2.SelAttributes.Size := 18;
-    MEMO2.SelAttributes.Charset := MEMO2.Font.Charset;
-    MEMO2.SelLength := 0;
-
-    MakeTextJustified(MEMO2);
   finally
     Progress.Visible := False;
     MEMO1.Enabled := True;
@@ -2072,12 +2075,15 @@ end;
 procedure TForm1.ApplyFontToMemo2(const FontName: string);
 begin
   MEMO2.Font.Name := FontName;
+  MEMO2.Font.Charset := ANSI_CHARSET; 
+
   MEMO2.DefAttributes.Name := FontName;
+  MEMO2.DefAttributes.Charset := ANSI_CHARSET;
 
   MEMO2.SelectAll;
   MEMO2.SelAttributes.Name := FontName;
   MEMO2.SelAttributes.Size := 18;
-  MEMO2.SelAttributes.Charset := MEMO2.Font.Charset;
+  MEMO2.SelAttributes.Charset := ANSI_CHARSET;
   MEMO2.SelLength := 0;
 
   MakeTextJustified(MEMO2);
