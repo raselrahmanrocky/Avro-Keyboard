@@ -1,10 +1,10 @@
 ﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
     <PropertyGroup>
         <ProjectGuid>{68DE998D-54F2-44E3-B56D-54A16FB3C6CF}</ProjectGuid>
-        <MainSource>Unicode_to_Bijoy.dpr</MainSource>
+        <MainSource>Avro Text Converter.dpr</MainSource>
         <Base>True</Base>
         <Config Condition="'$(Config)'==''">Release</Config>
-        <ProjectName Condition="'$(ProjectName)'==''">Unicode_to_Bijoy</ProjectName>
+        <ProjectName Condition="'$(ProjectName)'==''">Avro Text Converter</ProjectName>
         <TargetedPlatforms>3</TargetedPlatforms>
         <AppType>Application</AppType>
         <FrameworkType>VCL</FrameworkType>
@@ -65,7 +65,7 @@
         <DCC_N>false</DCC_N>
         <DCC_S>false</DCC_S>
         <DCC_ImageBase>00400000</DCC_ImageBase>
-        <SanitizedProjectName>Unicode_to_Bijoy</SanitizedProjectName>
+        <SanitizedProjectName>Avro_Text_Converter</SanitizedProjectName>
         <DCC_Namespace>Vcl;Vcl.Imaging;Vcl.Touch;Vcl.Samples;Vcl.Shell;System;Xml;Data;Datasnap;Web;Soap;Winapi;$(DCC_Namespace)</DCC_Namespace>
         <VerInfo_Locale>1033</VerInfo_Locale>
         <VerInfo_Keys>CompanyName=OmicronLab;FileDescription=Avro Text Converter;FileVersion=1.1.0.0;InternalName=Avro Text Converter;LegalCopyright=© OmicronLab. All rights reserved.;LegalTrademarks=Avro Text Converter;OriginalFilename=Avro Text Converter.exe;ProductName=Avro Text Converter;ProductVersion=1.1.0.0;Comments=Avro Text Converter;CFBundleName=</VerInfo_Keys>
@@ -88,7 +88,7 @@
     </PropertyGroup>
     <PropertyGroup Condition="'$(Base_Win64)'!=''">
         <Manifest_File>$(BDS)\bin\default_app.manifest</Manifest_File>
-        <Icon_MainIcon>Unicode_to_Bijoy_Icon.ico</Icon_MainIcon>
+        <Icon_MainIcon>Avro Text Converter_Icon.ico</Icon_MainIcon>
         <UWP_DelphiLogo44>$(BDS)\bin\Artwork\Windows\UWP\delphi_UwpDefault_44.png</UWP_DelphiLogo44>
         <UWP_DelphiLogo150>$(BDS)\bin\Artwork\Windows\UWP\delphi_UwpDefault_150.png</UWP_DelphiLogo150>
         <DCC_Namespace>System.Win;Data.Win;Datasnap.Win;Web.Win;Soap.Win;Xml.Win;$(DCC_Namespace)</DCC_Namespace>
@@ -158,7 +158,7 @@
         <BorlandProject>
             <Delphi.Personality>
                 <Source>
-                    <Source Name="MainSource">Unicode_to_Bijoy.dpr</Source>
+                    <Source Name="MainSource">Avro Text Converter.dpr</Source>
                 </Source>
                 <Excluded_Packages>
                     <Excluded_Packages Name="$(BDSBIN)\dcloffice2k290.bpl">Microsoft Office 2000 Sample Automation Server Wrapper Components</Excluded_Packages>
@@ -170,9 +170,9 @@
                 <Platform value="Win64">True</Platform>
             </Platforms>
             <Deployment Version="4">
-                <DeployFile LocalName="Unicode_to_Bijoy.exe" Configuration="Debug" Class="ProjectOutput">
+                <DeployFile LocalName="Avro Text Converter.exe" Configuration="Debug" Class="ProjectOutput">
                     <Platform Name="Win64">
-                        <RemoteName>Unicode_to_Bijoy.exe</RemoteName>
+                        <RemoteName>Avro Text Converter.exe</RemoteName>
                         <Overwrite>true</Overwrite>
                     </Platform>
                 </DeployFile>
