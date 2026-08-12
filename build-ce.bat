@@ -30,7 +30,7 @@ call :deletefile "build\Layout Editor.exe"
 call :deletefile build\SkinDesigner.exe
 call :deletefile "build\Skin Designer.exe"
 call :deletefile build\Unicode_to_Bijoy.exe
-call :deletefile "build\Unicode to Bijoy.exe"
+call :deletefile "build\Avro Text Converter.exe"
 call :deletefile build\AvroSpell.dll
 
 echo Clearing compilation output done
@@ -56,7 +56,7 @@ move /y Avro_Keyboard.exe "Avro Keyboard.exe"
 move /y Avro_Spell_Checker.exe "Avro Spell Checker.exe"
 move /y LayoutEditor.exe "Layout Editor.exe"
 move /y SkinDesigner.exe "Skin Designer.exe"
-move /y Unicode_to_Bijoy.exe "Unicode to Bijoy.exe"
+move /y Unicode_to_Bijoy.exe "Avro Text Converter.exe"
 if errorlevel 1 goto failed
 
 cd ..

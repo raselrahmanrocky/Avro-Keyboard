@@ -450,17 +450,32 @@ procedure TForm1.DrawRoundedFrame(APanel: TPanel; AMemo: TRichEdit);
 var
   R:           TRect;
   Bg, BorderC: TColor;
+  PenW:        Integer;
 begin
-  if StyleServices.Enabled then
+  // Focused memo -> highlight border (system focus color, blue in both light
+  // and dark themes); otherwise the default shadow border. Swap BorderC for a
+  // fixed color, e.g. $00FF9933 (light blue), if you want a custom shade.
+  if AMemo.Focused then
   begin
-    Bg := StyleServices.GetSystemColor(clWindow);
-    BorderC := StyleServices.GetSystemColor(clBtnShadow);
+    PenW := 2;
+    if StyleServices.Enabled then
+      BorderC := StyleServices.GetSystemColor(clHighlight)
+    else
+      BorderC := clHighlight;
   end
   else
   begin
-    Bg := clWindow;
-    BorderC := clBtnShadow;
+    PenW := 1;
+    if StyleServices.Enabled then
+      BorderC := StyleServices.GetSystemColor(clBtnShadow)
+    else
+      BorderC := clBtnShadow;
   end;
+
+  if StyleServices.Enabled then
+    Bg := StyleServices.GetSystemColor(clWindow)
+  else
+    Bg := clWindow;
 
   // Prevent black rectangle painting on startup before theme colors resolve
   if (Bg = clBlack) or (Bg = 0) then
@@ -476,19 +491,14 @@ begin
     Pen.Style := psClear;
     RoundRect(R.Left, R.Top, R.Right, R.Bottom, 12, 12);
 
+    // Inset the frame by half the pen width so the outer edge stays put in
+    // both states - the border thickens/recolors without visually jumping.
+    InflateRect(R, -PenW div 2, -PenW div 2);
     Brush.Style := bsClear;
     Pen.Style := psSolid;
+    Pen.Width := PenW;
     Pen.Color := BorderC;
-    Pen.Width := 1;
     RoundRect(R.Left, R.Top, R.Right - 1, R.Bottom - 1, 12, 12);
-
-    if AMemo.Focused then
-    begin
-      InflateRect(R, -2, -2);
-      Pen.Style := psDot;
-      Pen.Color := StyleServices.GetSystemColor(clWindowText);
-      RoundRect(R.Left, R.Top, R.Right - 1, R.Bottom - 1, 8, 8);
-    end;
   end;
 end;
 

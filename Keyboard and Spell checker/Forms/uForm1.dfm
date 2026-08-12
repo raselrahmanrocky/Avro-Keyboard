@@ -1666,7 +1666,7 @@ object AvroMainForm1: TAvroMainForm1
       Caption = '-'
     end
     object UnicodetoBijoytextconverter1: TMenuItem
-      Caption = 'Unicode to Bijoy text converter'
+      Caption = 'Avro Text Converter'
       ImageIndex = 25
       OnClick = UnicodetoBijoytextconverter1Click
     end
@@ -1858,7 +1858,7 @@ object AvroMainForm1: TAvroMainForm1
         Caption = '-'
       end
       object UnicodetoBijoytextconverter2: TMenuItem
-        Caption = 'Unicode to Bijoy text converter'
+        Caption = 'Avro Text Converter'
         ImageIndex = 25
         OnClick = UnicodetoBijoytextconverter1Click
       end

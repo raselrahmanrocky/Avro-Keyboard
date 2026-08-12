@@ -26,7 +26,7 @@ begin
   Application.Initialize;
   Application.MainFormOnTaskbar := True;
   TStyleManager.TrySetStyle('Windows10');
-  Application.Title := 'Avro Unicode to Bijoy Converter';
+  Application.Title := 'Avro Text Converter';
   Application.CreateForm(TForm1, Form1);
   Application.Run;
 
