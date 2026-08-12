@@ -6,7 +6,7 @@
   =============================================================================
 }
 
-{$INCLUDE ../ProjectDefines.inc}
+{$INCLUDE ../../ProjectDefines.inc}
 unit uForm1;
 
 interface
@@ -1992,7 +1992,7 @@ end;
 
 procedure TAvroMainForm1.UnicodetoBijoytextconverter1Click(Sender: TObject);
 begin
-  Execute_Something(ExtractFilePath(Application.ExeName) + 'Unicode to Bijoy.exe');
+  Execute_Something(ExtractFilePath(Application.ExeName) + 'Avro Text Converter.exe');
 end;
 
 procedure TAvroMainForm1.UsefultoolsforBangla1Click(Sender: TObject);

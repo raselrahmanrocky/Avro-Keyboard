@@ -83,7 +83,7 @@ Name: "{group}\Avro Spell Checker"; Filename: "{app}\Avro Spell Checker.exe"
 Name: "{group}\Configuring your system"; Filename: "{app}\Configuring_system.htm"
 Name: "{group}\Layout Editor"; Filename: "{app}\Layout Editor.exe"
 Name: "{group}\Skin Designer"; Filename: "{app}\Skin Designer.exe"
-Name: "{group}\Unicode to Bijoy"; Filename: "{app}\Unicode to Bijoy.exe"
+Name: "{group}\Avro Text Converter"; Filename: "{app}\Avro Text Converter.exe"
 
 ; 3. Desktop shortcut (optional, based on task selection)
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon

@@ -68,7 +68,7 @@
         <SanitizedProjectName>Unicode_to_Bijoy</SanitizedProjectName>
         <DCC_Namespace>Vcl;Vcl.Imaging;Vcl.Touch;Vcl.Samples;Vcl.Shell;System;Xml;Data;Datasnap;Web;Soap;Winapi;$(DCC_Namespace)</DCC_Namespace>
         <VerInfo_Locale>1033</VerInfo_Locale>
-        <VerInfo_Keys>CompanyName=OmicronLab;FileDescription=Avro Unicode to Bijoy Converter;FileVersion=1.1.0.0;InternalName=Avro Unicode to Bijoy Converter;LegalCopyright=© OmicronLab. All rights reserved.;LegalTrademarks=Avro Unicode to Bijoy Converter;OriginalFilename=Unicode to Bijoy.exe;ProductName=Avro Unicode to Bijoy Converter;ProductVersion=1.1.0.0;Comments=Avro Unicode to Bijoy Converter;CFBundleName=</VerInfo_Keys>
+        <VerInfo_Keys>CompanyName=OmicronLab;FileDescription=Avro Text Converter;FileVersion=1.1.0.0;InternalName=Avro Text Converter;LegalCopyright=© OmicronLab. All rights reserved.;LegalTrademarks=Avro Text Converter;OriginalFilename=Avro Text Converter.exe;ProductName=Avro Text Converter;ProductVersion=1.1.0.0;Comments=Avro Text Converter;CFBundleName=</VerInfo_Keys>
         <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
         <VerInfo_MinorVer>1</VerInfo_MinorVer>
         <VerInfo_AutoIncVersion>true</VerInfo_AutoIncVersion>

@@ -1,7 +1,7 @@
 object Form1: TForm1
   Left = 0
   Top = 0
-  Caption = 'Avro Unicode to Bijoy Converter'
+  Caption = 'Avro Text Converter'
   ClientHeight = 398
   ClientWidth = 665
   Color = clBtnFace
@@ -54,7 +54,7 @@ object Form1: TForm1
   OnClose = FormClose
   OnCreate = FormCreate
   OnDestroy = FormDestroy
-  PixelsPerInch = 80
+  PixelsPerInch = 100
   OnResize = FormResize
   TextHeight = 13
   object PanelHeader: TPanel
@@ -82,7 +82,7 @@ object Form1: TForm1
     ParentDoubleBuffered = False
     TabOrder = 1
     object Button1: TButton
-      Left = 20
+      Left = 13
       Top = 3
       Width = 105
       Height = 25
@@ -97,7 +97,7 @@ object Form1: TForm1
       OnClick = Button1Click
     end
     object cbAnsiVersion: TAnsiVersionCombo
-      Left = 131
+      Left = 124
       Top = 3
       Width = 160
       Height = 25
@@ -115,7 +115,7 @@ object Form1: TForm1
       OnCloseUp = cbAnsiVersionCloseUp
     end
     object Button2: TButton
-      Left = 297
+      Left = 290
       Top = 3
       Width = 105
       Height = 25
@@ -130,7 +130,7 @@ object Form1: TForm1
       OnClick = Button2Click
     end
     object cbFontPicker: TFontPickerCombo
-      Left = 408
+      Left = 401
       Top = 3
       Width = 200
       Height = 25
