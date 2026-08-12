@@ -61,6 +61,7 @@ type
       procedure BuildTables;
       function VarGlyph(const AName: string): string;
       function CleanKey(const S: string): string;
+      function IsSingleAsciiPunct(const S: string): Boolean;
       function HasNonHalfFormOwner(const Glyph: string): Boolean;
       function IsPreBaseKarAt(const Text: string; P: Integer; out GLen: Integer): Boolean;
       function IsConsonantChar(const C: Char): Boolean;
@@ -118,6 +119,24 @@ begin
   if Idx > 0 then
     Result := Copy(Result, 1, Idx - 1);
   Result := Trim(Result);
+end;
+
+// True for the single ASCII bracket/hyphen characters.  A custom full-form
+// glyph that is a bracket or a hyphen (Ansi V3: ণ্ণ = ']', ঙ্ম = '-') is
+// indistinguishable from the literal punctuation the forward pass passes
+// through - brackets frame citations/numbers ([৫]) and hyphens join year
+// ranges (১৯৪৭-১৯৪৮) in prose, so those keep their literal meaning.
+// Quotation marks and letters keep their conjunct claim (ক্ষ্ম = '"'),
+// since the conjunct is the common meaning there.
+function TBijoy2000ToUnicode.IsSingleAsciiPunct(const S: string): Boolean;
+begin
+  Result := False;
+  if Length(S) <> 1 then
+    Exit;
+  case S[1] of
+    '[', ']', '{', '}', '(', ')', '<', '>', '-':
+      Result := True;
+  end;
 end;
 
 // True when some registry entry OTHER than the four quote vars and other than
@@ -200,6 +219,44 @@ begin
       Add(b_StartDoubleQuote, b_StartDoubleQuote);
     if not HasNonHalfFormOwner(b_EndDoubleQuote) then
       Add(b_EndDoubleQuote, b_EndDoubleQuote);
+
+    // ------------------------------------------------------------------
+    // Base LETTERS first.  A glyph shared by a letter and a conjunct
+    // half-form keeps its LETTER meaning: several mappings reuse plain
+    // glyphs for both - Ansi V3 maps ত and ্+ত to the same '‡þ' glyph,
+    // ণ to the default ্+থ glyph, and হ to the default ভ্র-২য় খন্ড glyph
+    // (Ansi V3 disables that half-form with an empty Value, which the
+    // loader leaves at its stale default).  If the half-forms claimed those
+    // glyphs first, every ত would come back as ্+ত and every হ as ভ্র -
+    // exactly the corruption reported for Ansi V3.  Conjunct full forms
+    // (FullForms category) are claimed AFTER the half-forms so that a
+    // half-form wins over a full-form clash (SutonnyMJ maps both ত্ম and
+    // ্+ত to the same 'Í' glyph; ্+ত is the common meaning there).  Kars
+    // are handled by their own later passes.
+    if AnsiRegistryMap <> nil then
+      for Rec in AnsiRegistryMap.Values do
+      begin
+        if Rec.BengaliChar = '' then
+          Continue;
+        if (Rec.Category = 'FirstHalfForms') or (Rec.Category = 'SecondHalfForms') or (Rec.Category = 'FullForms') then
+          Continue;
+        // Vowel-sign kars are mapped after the reordering pass.
+        if (Rec.Category = 'VowelsAndKars') and (Length(Rec.Name) >= 3) and SameText(Copy(Rec.Name, Length(Rec.Name) - 2, 3), 'Kar') then
+          Continue;
+
+        Glyph := VarGlyph(Rec.Name);
+        if Glyph = '' then
+          Continue;
+
+        // The four quote vars are handled first (they win any glyph clash
+        // with half-form conjuncts); skip them here.
+        if (Rec.Name = 'A_StartSingleQuote') or (Rec.Name = 'A_EndSingleQuote') or (Rec.Name = 'A_StartDoubleQuote') or (Rec.Name = 'A_EndDoubleQuote') then
+          Continue;
+        Uni := CleanKey(Rec.BengaliChar);
+        if Uni = '' then
+          Continue;
+        Add(Glyph, Uni);
+      end;
 
     // ------------------------------------------------------------------
     // Half-form glyphs.  First-half forms stand for the consonant alone
@@ -288,28 +345,17 @@ begin
     Add(VarGlyph('A_RFola_2'), b_Hasanta + b_R);
     Add(VarGlyph('A_RFola_3'), b_Hasanta + b_R);
 
-    // ------------------------------------------------------------------
-    // Registry-driven glyph -> Unicode table.  Kars and the 1H/2H forms
-    // above are excluded - kars are handled contextually by later passes.
-    // ------------------------------------------------------------------
+    // Registry conjunct full forms (extra glyphs like ত্ম in SutonnyMJ).
+    // Claimed after the half-forms so a half-form clash wins there.
     if AnsiRegistryMap <> nil then
       for Rec in AnsiRegistryMap.Values do
       begin
         if Rec.BengaliChar = '' then
           Continue;
-        if (Rec.Category = 'FirstHalfForms') or (Rec.Category = 'SecondHalfForms') then
+        if Rec.Category <> 'FullForms' then
           Continue;
-        // Vowel-sign kars are mapped after the reordering pass.
-        if (Rec.Category = 'VowelsAndKars') and (Length(Rec.Name) >= 3) and SameText(Copy(Rec.Name, Length(Rec.Name) - 2, 3), 'Kar') then
-          Continue;
-
         Glyph := VarGlyph(Rec.Name);
         if Glyph = '' then
-          Continue;
-
-        // The four quote vars are handled first (they win any glyph clash
-        // with half-form conjuncts); skip them here.
-        if (Rec.Name = 'A_StartSingleQuote') or (Rec.Name = 'A_EndSingleQuote') or (Rec.Name = 'A_StartDoubleQuote') or (Rec.Name = 'A_EndDoubleQuote') then
           Continue;
         Uni := CleanKey(Rec.BengaliChar);
         if Uni = '' then
@@ -317,9 +363,16 @@ begin
         Add(Glyph, Uni);
       end;
 
-    // JSON-driven custom full forms (extra conjuncts).
+    // JSON-driven custom full forms (extra conjuncts).  A key that is a
+    // single printable ASCII punctuation character is skipped: the forward
+    // pass leaves ASCII text untouched, so a literal ']' or '-' in the
+    // source (e.g. Ansi V3 maps ণ্ণ to ']' and ঙ্ম to '-') is
+    // indistinguishable from the conjunct it stands for, and prose keeps
+    // the punctuation.  Multi-char keys (স্ত = 'hßþ') cannot occur in
+    // ordinary ASCII text, so they stay.
     for I := 0 to high(CustomFullForms) do
-      Add(CustomFullForms[I].Value, CustomFullForms[I].Key);
+      if not IsSingleAsciiPunct(CustomFullForms[I].Value) then
+        Add(CustomFullForms[I].Value, CustomFullForms[I].Key);
 
     // Invert the PreReplacements as a gap-fill: glyphs that have no other
     // meaning (e.g. Ansi V3's '!' -> ম্ন glyph, '*' -> A_B_2H glyph) come
