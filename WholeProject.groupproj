@@ -18,7 +18,7 @@
         <Projects Include="Skin Designer\SkinDesigner.dproj">
             <Dependencies/>
         </Projects>
-        <Projects Include="Unicode to ascii converter\Avro Text Converter.dproj">
+        <Projects Include="Unicode to ascii converter\Avro_Text_Converter.dproj">
             <Dependencies/>
         </Projects>
     </ItemGroup>
@@ -75,13 +75,13 @@
         <MSBuild Projects="Skin Designer\SkinDesigner.dproj" Targets="Make"/>
     </Target>
     <Target Name="Avro_Text_Converter">
-        <MSBuild Projects="Unicode to ascii converter\Avro Text Converter.dproj"/>
+        <MSBuild Projects="Unicode to ascii converter\Avro_Text_Converter.dproj"/>
     </Target>
     <Target Name="Avro_Text_Converter:Clean">
-        <MSBuild Projects="Unicode to ascii converter\Avro Text Converter.dproj" Targets="Clean"/>
+        <MSBuild Projects="Unicode to ascii converter\Avro_Text_Converter.dproj" Targets="Clean"/>
     </Target>
     <Target Name="Avro_Text_Converter:Make">
-        <MSBuild Projects="Unicode to ascii converter\Avro Text Converter.dproj" Targets="Make"/>
+        <MSBuild Projects="Unicode to ascii converter\Avro_Text_Converter.dproj" Targets="Make"/>
     </Target>
     <Target Name="Build">
         <CallTarget Targets="Avro_Keyboard;AvroSpell;Avro_Spell_Checker;LayoutEditor;SkinDesigner;Avro_Text_Converter"/>

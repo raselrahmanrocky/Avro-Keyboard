@@ -25,7 +25,7 @@ uses
 begin
   Application.Initialize;
   Application.MainFormOnTaskbar := True;
-  TStyleManager.TrySetStyle('Windows10');
+  TStyleManager.TrySetStyle('Windows10', False); { False = no dialog if style missing }
   Application.Title := 'Avro Text Converter';
   Application.CreateForm(TForm1, Form1);
   Application.Run;

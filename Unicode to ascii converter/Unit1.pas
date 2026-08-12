@@ -139,6 +139,7 @@ type
     SelectAll1: TMenuItem;
     Clear1: TMenuItem;
     procedure FormCreate(Sender: TObject);
+    procedure FormShow(Sender: TObject);
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
     procedure FormResize(Sender: TObject);
     procedure Button1Click(Sender: TObject);
@@ -171,6 +172,7 @@ type
       FPopupTarget:   TRichEdit;
 
       procedure AppEventsMessage(var Msg: TMsg; var Handled: Boolean);
+      procedure WMFocusMemo(var Message: TMessage); message WM_APP + 1;
       function IsMemo1Target(AHwnd: hWnd): Boolean;
       function IsMemo2Target(AHwnd: hWnd): Boolean;
       procedure HandleThemes;
@@ -247,7 +249,7 @@ var
   Glyph: string;
   R:     TRect;
 begin
-  Glyph := #$0995; // ক
+  Glyph := #$0995; // Bengali 'ka' (U+0995)
   C.Font.Name := 'Kalpurush ANSI';
   C.Font.Charset := ANSI_CHARSET;
   C.Font.Size := 10;
@@ -1036,7 +1038,7 @@ end;
 
 procedure TForm1.HandleThemes;
 begin
-  SetAppropriateThemeMode('Windows10 Dark', 'Windows10');
+  SetAppropriateThemeMode('Windows10 Dark', 'Windows10', 'Windows');
   MEMO1.Color := StyleServices.GetSystemColor(clWindow);
   MEMO1.Font.Color := StyleServices.GetSystemColor(clWindowText);
   MEMO2.Color := StyleServices.GetSystemColor(clWindow);
@@ -1057,21 +1059,27 @@ var
   Src, OutText, EOL, Segment: string;
   P, Q, TotalLen:             Integer;
   ActiveFont:                 string;
+  ShowProgress:               Boolean;
 begin
-  MEMO1.Enabled := False;
-  MEMO2.Enabled := False;
-  Button1.Enabled := False;
-  Button2.Enabled := False;
-  cbFontPicker.Enabled := False;
-  Progress.Visible := True;
-  Progress.Position := 0;
-  MEMO2.Clear;
-  Application.ProcessMessages;
+  Src := MEMO1.Text;
+  TotalLen := Length(Src);
+  if TotalLen = 0 then Exit;
+
+  // কেবল বড় টেক্সটের জন্য প্রোগ্রেস বার চালু হবে
+  ShowProgress := TotalLen > 2000;
+  if ShowProgress then
+  begin
+    Progress.Visible := True;
+    Progress.Position := 0;
+  end;
+
+  // Lock MEMO2 screen redraws to prevent flickering
+  SendMessage(MEMO2.Handle, WM_SETREDRAW, 0, 0);
   try
-    Src := MEMO1.Text;
-    TotalLen := Length(Src);
+    MEMO2.Clear;
     OutText := '';
     P := 1;
+
     while P <= TotalLen do
     begin
       Q := P;
@@ -1094,14 +1102,17 @@ begin
       end;
 
       P := Q;
-      Progress.Position := (P * 100) div (TotalLen + 1);
-      Application.ProcessMessages;
+
+      // কেবল বড় ফাইল প্রসেসের সময়ই প্রোগ্রেস আপডেট হবে
+      if ShowProgress then
+      begin
+        Progress.Position := (P * 100) div (TotalLen + 1);
+        Application.ProcessMessages;
+      end;
     end;
 
-    // কনভার্ট হওয়া ANSI টেক্সট বসানো
     MEMO2.Text := OutText;
 
-    // সিলেক্টেড ফন্ট ও ক্যারেক্টার সেট অ্যাপ্লাই করা
     ActiveFont := cbFontPicker.ActiveFont;
     if ActiveFont = '' then
       ActiveFont := cbFontPicker.Text;
@@ -1109,14 +1120,12 @@ begin
       ActiveFont := MEMO2.Font.Name;
 
     ApplyFontToMemo2(ActiveFont);
-
   finally
-    Progress.Visible := False;
-    MEMO1.Enabled := True;
-    MEMO2.Enabled := True;
-    Button1.Enabled := True;
-    Button2.Enabled := True;
-    cbFontPicker.Enabled := True;
+    // Unlock redraws and refresh the memo
+    SendMessage(MEMO2.Handle, WM_SETREDRAW, 1, 0);
+    MEMO2.Invalidate;
+    if ShowProgress then
+      Progress.Visible := False;
   end;
 end;
 
@@ -1124,21 +1133,26 @@ procedure TForm1.Button2Click(Sender: TObject);
 var
   Src, OutText, EOL, Segment: string;
   P, Q, TotalLen:             Integer;
+  ShowProgress:               Boolean;
 begin
-  MEMO1.Enabled := False;
-  MEMO2.Enabled := False;
-  Button1.Enabled := False;
-  Button2.Enabled := False;
-  cbFontPicker.Enabled := False;
-  Progress.Visible := True;
-  Progress.Position := 0;
-  MEMO1.Clear;
-  Application.ProcessMessages;
+  Src := MEMO2.Text;
+  TotalLen := Length(Src);
+  if TotalLen = 0 then Exit;
+
+  ShowProgress := TotalLen > 2000;
+  if ShowProgress then
+  begin
+    Progress.Visible := True;
+    Progress.Position := 0;
+  end;
+
+  // Lock MEMO1 screen redraws
+  SendMessage(MEMO1.Handle, WM_SETREDRAW, 0, 0);
   try
-    Src := MEMO2.Text;
-    TotalLen := Length(Src);
+    MEMO1.Clear;
     OutText := '';
     P := 1;
+
     while P <= TotalLen do
     begin
       Q := P;
@@ -1161,8 +1175,12 @@ begin
       end;
 
       P := Q;
-      Progress.Position := (P * 100) div (TotalLen + 1);
-      Application.ProcessMessages;
+
+      if ShowProgress then
+      begin
+        Progress.Position := (P * 100) div (TotalLen + 1);
+        Application.ProcessMessages;
+      end;
     end;
 
     MEMO1.DefAttributes.Name := MEMO1.Font.Name;
@@ -1179,12 +1197,10 @@ begin
 
     MakeTextJustified(MEMO1);
   finally
-    Progress.Visible := False;
-    MEMO1.Enabled := True;
-    MEMO2.Enabled := True;
-    Button1.Enabled := True;
-    Button2.Enabled := True;
-    cbFontPicker.Enabled := True;
+    SendMessage(MEMO1.Handle, WM_SETREDRAW, 1, 0);
+    MEMO1.Invalidate;
+    if ShowProgress then
+      Progress.Visible := False;
   end;
 end;
 
@@ -1271,6 +1287,16 @@ begin
     SetCursor(LoadCursor(0, IDC_IBEAM));
     Result := 1;
     Exit;
+  end;
+
+  // The native combo selects the whole edit text when the edit gains focus
+  // via keyboard/Tab or programmatically at startup. Clear that selection so
+  // the font name is never left highlighted in blue - unless the user is
+  // actively clicking into the field (the click itself places the caret).
+  if uMsg = WM_SETFOCUS then
+  begin
+    if (GetKeyState(VK_LBUTTON) and $8000) = 0 then
+      SendMessage(hWnd, EM_SETSEL, -1, -1);
   end;
 
   // The native combo box selects all of the edit text (EM_SETSEL 0,-1) after
@@ -2058,7 +2084,7 @@ begin
   if cbFontPicker.IsUpdating then
     Exit;
 
-  // ✅ মাউসে ক্লিক বা Enter চেপে ফন্ট নিশ্চিত (Commit) করা হলেই কেবল ফন্ট অ্যাপ্লাই ও ফোকাস আউট হবে:
+  // ✅ Apply the font and move focus out only after it is confirmed via mouse click or Enter:
   if SameText(cbFontPicker.Text, cbFontPicker.ActiveFont) then
   begin
     ApplyFontToMemo2(cbFontPicker.ActiveFont);
@@ -2084,20 +2110,28 @@ end;
 
 procedure TForm1.ApplyFontToMemo2(const FontName: string);
 begin
-  MEMO2.Font.Name := FontName;
-  MEMO2.Font.Charset := ANSI_CHARSET; 
+  // Change the font while redraws are suspended
+  SendMessage(MEMO2.Handle, WM_SETREDRAW, 0, 0);
+  try
+    MEMO2.Font.Name := FontName;
+    MEMO2.Font.Charset := ANSI_CHARSET; 
 
-  MEMO2.DefAttributes.Name := FontName;
-  MEMO2.DefAttributes.Charset := ANSI_CHARSET;
+    MEMO2.DefAttributes.Name := FontName;
+    MEMO2.DefAttributes.Charset := ANSI_CHARSET;
 
-  MEMO2.SelectAll;
-  MEMO2.SelAttributes.Name := FontName;
-  MEMO2.SelAttributes.Size := 18;
-  MEMO2.SelAttributes.Charset := ANSI_CHARSET;
-  MEMO2.SelLength := 0;
+    MEMO2.SelectAll;
+    MEMO2.SelAttributes.Name := FontName;
+    MEMO2.SelAttributes.Size := 18;
+    MEMO2.SelAttributes.Charset := ANSI_CHARSET;
+    MEMO2.SelLength := 0;
 
-  MakeTextJustified(MEMO2);
-  cbFontPicker.ActiveFont := FontName;
+    MakeTextJustified(MEMO2);
+    cbFontPicker.ActiveFont := FontName;
+  finally
+    // Re-enable redraws and refresh the screen at once
+    SendMessage(MEMO2.Handle, WM_SETREDRAW, 1, 0);
+    MEMO2.Invalidate;
+  end;
 end;
 
 procedure TForm1.cbAnsiVersionDrawItem(Control: TWinControl; Index: Integer; Rect: TRect; State: TOwnerDrawState);
@@ -2308,6 +2342,19 @@ begin
   SendMessage(MEMO1.Handle, EM_SETCUEBANNER, 1, lParam(PChar('Type or paste Unicode Bangla text here...')));
   SendMessage(MEMO2.Handle, EM_SETCUEBANNER, 1, lParam(PChar('Converted ANSI text will appear here...')));
   ActiveControl := MEMO1;
+end;
+
+procedure TForm1.FormShow(Sender: TObject);
+begin
+  // Post (not send) so the input caret lands in MEMO1 only after the window
+  // is fully created and shown - otherwise the native combo box reclaims
+  // focus and highlights its text on launch.
+  PostMessage(Handle, WM_APP + 1, 0, 0);
+end;
+
+procedure TForm1.WMFocusMemo(var Message: TMessage);
+begin
+  MEMO1.SetFocus;
 end;
 
 procedure TForm1.FormResize(Sender: TObject);
