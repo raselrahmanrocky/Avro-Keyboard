@@ -18,7 +18,7 @@
         <Projects Include="Skin Designer\SkinDesigner.dproj">
             <Dependencies/>
         </Projects>
-        <Projects Include="Unicode to ascii converter\Unicode_to_Bijoy.dproj">
+        <Projects Include="Unicode to ascii converter\Avro Text Converter.dproj">
             <Dependencies/>
         </Projects>
     </ItemGroup>
@@ -74,23 +74,23 @@
     <Target Name="SkinDesigner:Make">
         <MSBuild Projects="Skin Designer\SkinDesigner.dproj" Targets="Make"/>
     </Target>
-    <Target Name="Unicode_to_Bijoy">
-        <MSBuild Projects="Unicode to ascii converter\Unicode_to_Bijoy.dproj"/>
+    <Target Name="Avro_Text_Converter">
+        <MSBuild Projects="Unicode to ascii converter\Avro Text Converter.dproj"/>
     </Target>
-    <Target Name="Unicode_to_Bijoy:Clean">
-        <MSBuild Projects="Unicode to ascii converter\Unicode_to_Bijoy.dproj" Targets="Clean"/>
+    <Target Name="Avro_Text_Converter:Clean">
+        <MSBuild Projects="Unicode to ascii converter\Avro Text Converter.dproj" Targets="Clean"/>
     </Target>
-    <Target Name="Unicode_to_Bijoy:Make">
-        <MSBuild Projects="Unicode to ascii converter\Unicode_to_Bijoy.dproj" Targets="Make"/>
+    <Target Name="Avro_Text_Converter:Make">
+        <MSBuild Projects="Unicode to ascii converter\Avro Text Converter.dproj" Targets="Make"/>
     </Target>
     <Target Name="Build">
-        <CallTarget Targets="Avro_Keyboard;AvroSpell;Avro_Spell_Checker;LayoutEditor;SkinDesigner;Unicode_to_Bijoy"/>
+        <CallTarget Targets="Avro_Keyboard;AvroSpell;Avro_Spell_Checker;LayoutEditor;SkinDesigner;Avro_Text_Converter"/>
     </Target>
     <Target Name="Clean">
-        <CallTarget Targets="Avro_Keyboard:Clean;AvroSpell:Clean;Avro_Spell_Checker:Clean;LayoutEditor:Clean;SkinDesigner:Clean;Unicode_to_Bijoy:Clean"/>
+        <CallTarget Targets="Avro_Keyboard:Clean;AvroSpell:Clean;Avro_Spell_Checker:Clean;LayoutEditor:Clean;SkinDesigner:Clean;Avro_Text_Converter:Clean"/>
     </Target>
     <Target Name="Make">
-        <CallTarget Targets="Avro_Keyboard:Make;AvroSpell:Make;Avro_Spell_Checker:Make;LayoutEditor:Make;SkinDesigner:Make;Unicode_to_Bijoy:Make"/>
+        <CallTarget Targets="Avro_Keyboard:Make;AvroSpell:Make;Avro_Spell_Checker:Make;LayoutEditor:Make;SkinDesigner:Make;Avro_Text_Converter:Make"/>
     </Target>
     <Import Project="$(BDS)\Bin\CodeGear.Group.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Group.Targets')"/>
 </Project>

@@ -6,7 +6,7 @@
   =============================================================================
 }
 
-program Unicode_to_Bijoy;
+program Avro_Text_Converter;
 
 uses
   Forms,
