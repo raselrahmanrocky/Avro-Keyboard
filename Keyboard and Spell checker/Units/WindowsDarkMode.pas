@@ -24,7 +24,12 @@ function DarkModeIsEnabled: boolean;
 // For example:
 // SetAppropriateThemeMode('Carbon', 'Windows10');
 //
-procedure SetAppropriateThemeMode(const DarkModeThemeName, LightModeThemeName: string);
+// The optional FallbackStyleName is applied when the preferred style is not
+// available (e.g. the VCL style was not embedded in the executable), so the
+// app degrades gracefully instead of showing a "Style not found" dialog.
+//
+procedure SetAppropriateThemeMode(const DarkModeThemeName, LightModeThemeName: string;
+  const FallbackStyleName: string = '');
 
 // Sets either a Dark Mode or non Dark mode theme based in the "AsDarkMode" boolean
 // For example:
@@ -40,12 +45,28 @@ uses
   {$IFDEF MSWINDOWS}
   Winapi.Windows,      // for the pre-defined registry key constants
   System.Win.Registry, // for the registry read access
+  Vcl.Themes,          // for TStyleManager
   {$ENDIF}
   System.SysUtils;
 
-procedure SetAppropriateThemeMode(const DarkModeThemeName, LightModeThemeName: string);
+procedure SetAppropriateThemeMode(const DarkModeThemeName, LightModeThemeName: string;
+  const FallbackStyleName: string = '');
+{$IFDEF MSWINDOWS}
+var
+  PreferredStyle: string;
+{$ENDIF}
 begin
-  { No-op: native Windows theming active — VCL styles disabled for memory }
+{$IFDEF MSWINDOWS}
+  if DarkModeIsEnabled then
+    PreferredStyle := DarkModeThemeName
+  else
+    PreferredStyle := LightModeThemeName;
+
+  { The second parameter (False) suppresses the "Style not found" message
+    dialog, so a missing style degrades gracefully to the fallback. }
+  if not TStyleManager.TrySetStyle(PreferredStyle, False) and (FallbackStyleName <> '') then
+    TStyleManager.TrySetStyle(FallbackStyleName, False);
+{$ENDIF}
 end;
 
 procedure SetSpecificThemeMode(const AsDarkMode: boolean; const DarkModeThemeName, LightModeThemeName: string);

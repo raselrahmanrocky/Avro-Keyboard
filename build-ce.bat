@@ -29,7 +29,7 @@ call :deletefile build\LayoutEditor.exe
 call :deletefile "build\Layout Editor.exe"
 call :deletefile build\SkinDesigner.exe
 call :deletefile "build\Skin Designer.exe"
-call :deletefile build\Unicode_to_Bijoy.exe
+call :deletefile build\Avro_Text_Converter.exe
 call :deletefile "build\Avro Text Converter.exe"
 call :deletefile build\AvroSpell.dll
 
@@ -42,7 +42,7 @@ call :waitforfile build\AvroSpell.dll
 call :waitforfile build\Avro_Spell_Checker.exe
 call :waitforfile build\LayoutEditor.exe
 call :waitforfile build\SkinDesigner.exe
-call :waitforfile "build\Avro Text Converter.exe"
+call :waitforfile build\Avro_Text_Converter.exe
 
 echo Found all, waiting 2 seconds more...
 timeout /t 2 /nobreak >nul
@@ -56,6 +56,7 @@ move /y Avro_Keyboard.exe "Avro Keyboard.exe"
 move /y Avro_Spell_Checker.exe "Avro Spell Checker.exe"
 move /y LayoutEditor.exe "Layout Editor.exe"
 move /y SkinDesigner.exe "Skin Designer.exe"
+move /y Avro_Text_Converter.exe "Avro Text Converter.exe"
 if errorlevel 1 goto failed
 
 cd ..

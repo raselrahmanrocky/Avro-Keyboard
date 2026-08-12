@@ -56,6 +56,7 @@ object Form1: TForm1
   OnDestroy = FormDestroy
   PixelsPerInch = 100
   OnResize = FormResize
+  OnShow = FormShow
   TextHeight = 13
   object PanelHeader: TPanel
     Left = 0
