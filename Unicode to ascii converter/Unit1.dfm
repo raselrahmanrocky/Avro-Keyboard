@@ -62,14 +62,25 @@ object Form1: TForm1
     Left = 0
     Top = 0
     Width = 665
-    Height = 1
+    Height = 28
     Align = alTop
     BevelOuter = bvNone
     DoubleBuffered = True
     FullRepaint = False
     ParentDoubleBuffered = False
     TabOrder = 0
-
+    object btnSettings: TSpeedButton
+      Left = 632
+      Top = 2
+      Width = 29
+      Height = 24
+      Anchors = [akTop, akRight]
+      Caption = ''
+      Flat = True
+      ShowHint = True
+      Hint = 'Settings'
+      OnClick = btnSettingsClick
+    end
   end
   object PanelButton: TPanel
     Left = 0
@@ -183,7 +194,7 @@ object Form1: TForm1
       Font.Name = 'Siyam Rupali'
       Font.Style = []
       ParentFont = False
-      ScrollBars = ssBoth
+      ScrollBars = ssVertical
       WordWrap = True
       TabOrder = 0
       OnEnter = MemoFocusChanged
@@ -240,7 +251,7 @@ object Form1: TForm1
       Font.Name = 'Kalpurush ANSI'
       Font.Style = []
       ParentFont = False
-      ScrollBars = ssBoth
+      ScrollBars = ssVertical
       WordWrap = True
       TabOrder = 0
       OnEnter = MemoFocusChanged
@@ -299,6 +310,25 @@ object Form1: TForm1
     object Clear1: TMenuItem
       Caption = 'Clear'
       OnClick = MenuClearClick
+    end
+  end
+  object pmSettings: TPopupMenu
+    Left = 664
+    Top = 128
+    object miThemeSystem: TMenuItem
+      Caption = 'System Default'
+      Tag = 0
+      OnClick = MenuThemeClick
+    end
+    object miThemeLight: TMenuItem
+      Caption = 'Light Theme'
+      Tag = 1
+      OnClick = MenuThemeClick
+    end
+    object miThemeDark: TMenuItem
+      Caption = 'Dark Theme'
+      Tag = 2
+      OnClick = MenuThemeClick
     end
   end
 end

@@ -24,6 +24,7 @@ uses
   Menus,
   Clipbrd,
   StdCtrls,
+  Buttons,
   clsUnicodeToBijoy2000,
   clsBijoy2000ToUnicode,
   ComCtrls,
@@ -62,6 +63,9 @@ type
 
   // Original window procedure of the combo's inner EDIT control.
   TFontPickerEditWndProc = function(hWnd: hWnd; uMsg: UINT; wParam: wParam; lParam: lParam): LRESULT stdcall;
+
+  // Theme modes offered by the settings gear menu.
+  TThemeMode = (tmSystem, tmLight, tmDark);
 
   // Editable combo (csDropDown face) whose drop-down list is owner-drawn with
   // the app's amber design language, supporting live type-to-search filtering,
@@ -133,6 +137,11 @@ type
     PanelFooter: TPanel;
     Splitter1: TSplitter;
     PopupMenu1: TPopupMenu;
+    btnSettings: TSpeedButton;
+    pmSettings: TPopupMenu;
+    miThemeSystem: TMenuItem;
+    miThemeLight: TMenuItem;
+    miThemeDark: TMenuItem;
     Cut1: TMenuItem;
     Copy1: TMenuItem;
     Paste1: TMenuItem;
@@ -154,6 +163,8 @@ type
     procedure FormDestroy(Sender: TObject);
     procedure SplitterMoved(Sender: TObject);
     procedure Label_OmicronLabClick(Sender: TObject);
+    procedure btnSettingsClick(Sender: TObject);
+    procedure MenuThemeClick(Sender: TObject);
     procedure AppEventsSettingChange(Sender: TObject; Flag: Integer; const Section: string; var Result: LongInt);
     procedure MemoPanelPaint(Sender: TObject);
     procedure MemoPanelMouseDown(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
@@ -166,10 +177,14 @@ type
     procedure MenuClearClick(Sender: TObject);
     procedure MEMOContextPopup(Sender: TObject; MousePos: TPoint; var Handled: Boolean);
     private
-      FUniToBijoy:    TUnicodeToBijoy2000;
-      FBijoyToUni:    TBijoy2000ToUnicode;
-      FSplitterRatio: Double;
-      FPopupTarget:   TRichEdit;
+      FUniToBijoy:       TUnicodeToBijoy2000;
+      FBijoyToUni:       TBijoy2000ToUnicode;
+      FSplitterRatio:    Double;
+      FPopupTarget:      TRichEdit;
+      FCurrentThemeMode: TThemeMode;
+
+      procedure ApplySelectedTheme(Mode: TThemeMode);
+      function ReadConverterThemeMode: TThemeMode;
 
       procedure AppEventsMessage(var Msg: TMsg; var Handled: Boolean);
       procedure WMFocusMemo(var Message: TMessage); message WM_APP + 1;
@@ -450,16 +465,28 @@ end;
 
 procedure TForm1.DrawRoundedFrame(APanel: TPanel; AMemo: TRichEdit);
 var
-  R:           TRect;
-  Bg, BorderC: TColor;
-  PenW:        Integer;
+  R, FullR:              TRect;
+  Bg, ParentBg, BorderC: TColor;
+  PenW:                  Integer;
+  IsDark:                Boolean;
 begin
-  // Focused memo -> highlight border (system focus color, blue in both light
-  // and dark themes); otherwise the default shadow border. Swap BorderC for a
-  // fixed color, e.g. $00FF9933 (light blue), if you want a custom shade.
+  if StyleServices.Enabled then
+  begin
+    ParentBg := StyleServices.GetSystemColor(clBtnFace);
+    Bg := StyleServices.GetSystemColor(clWindow);
+  end
+  else
+  begin
+    ParentBg := clBtnFace;
+    Bg := AMemo.Color;
+  end;
+
+  // চেক করা হচ্ছে কারেন্ট থিমটি ডার্ক কি না
+  IsDark := (GetRValue(ColorToRGB(ParentBg)) + GetGValue(ColorToRGB(ParentBg)) + GetBValue(ColorToRGB(ParentBg))) < 384;
+
   if AMemo.Focused then
   begin
-    PenW := 2;
+    PenW := 1;
     if StyleServices.Enabled then
       BorderC := StyleServices.GetSystemColor(clHighlight)
     else
@@ -468,33 +495,33 @@ begin
   else
   begin
     PenW := 1;
-    if StyleServices.Enabled then
-      BorderC := StyleServices.GetSystemColor(clBtnShadow)
+    if IsDark then
+      // ডার্ক মোডে ২য় ছবির মতো হালকা সাদাটে-গ্রে বর্ডার আউটলাইন
+      BorderC := RGB(80, 85, 95)
     else
-      BorderC := clBtnShadow;
+      // লাইট মোডে সফট গ্রে বর্ডার
+      BorderC := RGB(200, 200, 200);
   end;
 
-  if StyleServices.Enabled then
-    Bg := StyleServices.GetSystemColor(clWindow)
-  else
-    Bg := clWindow;
-
-  // Prevent black rectangle painting on startup before theme colors resolve
-  if (Bg = clBlack) or (Bg = 0) then
-    Bg := clWhite;
-
-  R := APanel.ClientRect;
+  FullR := APanel.ClientRect;
+  R := FullR;
   InflateRect(R, -4, -4);
 
   with TRoundedPanel(APanel).Surface do
   begin
+    // ১. প্যানেল মার্জিন ব্যাকগ্রাউন্ড ফিল
+    Brush.Color := ParentBg;
+    Brush.Style := bsSolid;
+    Pen.Style := psClear;
+    FillRect(FullR);
+
+    // ২. ইনসেট মেমো ব্যাকগ্রাউন্ড
     Brush.Color := Bg;
     Brush.Style := bsSolid;
     Pen.Style := psClear;
     RoundRect(R.Left, R.Top, R.Right, R.Bottom, 12, 12);
 
-    // Inset the frame by half the pen width so the outer edge stays put in
-    // both states - the border thickens/recolors without visually jumping.
+    // ৩. ডার্ক মোডের জন্য দৃশ্যমান হালকা বর্ডার
     InflateRect(R, -PenW div 2, -PenW div 2);
     Brush.Style := bsClear;
     Pen.Style := psSolid;
@@ -614,7 +641,15 @@ begin
   ParaFormat.wAlignment := PFA_JUSTIFY;
   RE.SelectAll;
   SendMessage(RE.Handle, EM_SETPARAFORMAT, 0, lParam(@ParaFormat));
+  // Force the theme text color over any formatting imported with pasted RTF
+  // (e.g. clBlack), which is otherwise invisible on the dark theme.
+  RE.SelAttributes.Color := StyleServices.GetSystemColor(clWindowText);
   RE.SelLength := 0;
+
+  // EM_SETPARAFORMAT resets the native character tracking/layout, which drops
+  // WordWrap and stretches the text onto a single line. Re-issue wrap-to-window
+  // so the text wraps to the control width again.
+  SendMessage(RE.Handle, EM_SETTARGETDEVICE, 0, 0);
 end;
 
 { Remember the ANSI mapping version / font the user picked so the next launch
@@ -1037,15 +1072,93 @@ begin
 end;
 
 procedure TForm1.HandleThemes;
+var
+  TextColor: TColor;
 begin
-  SetAppropriateThemeMode('Windows10 Dark', 'Windows10', 'Windows');
+  case FCurrentThemeMode of
+    tmSystem:
+      SetAppropriateThemeMode('Windows10 Dark', 'Windows10', 'Windows');
+    tmLight:
+      TStyleManager.TrySetStyle('Windows10', False);
+    tmDark:
+      TStyleManager.TrySetStyle('Windows10 Dark', False);
+  end;
+  TextColor := StyleServices.GetSystemColor(clWindowText);
+
+  // Fix MEMO1 colors and re-apply Word Wrap
   MEMO1.Color := StyleServices.GetSystemColor(clWindow);
-  MEMO1.Font.Color := StyleServices.GetSystemColor(clWindowText);
+  MEMO1.Font.Color := TextColor;
+  // Re-color every existing run (pasted text keeps its imported black color
+  // otherwise, which disappears on the dark theme).
+  MEMO1.SelectAll;
+  MEMO1.SelAttributes.Color := TextColor;
+  MEMO1.SelLength := 0;
+  SendMessage(MEMO1.Handle, EM_SETTARGETDEVICE, 0, 0); // Fixes WordWrap
+
+  // Fix MEMO2 colors and re-apply Word Wrap
   MEMO2.Color := StyleServices.GetSystemColor(clWindow);
-  MEMO2.Font.Color := StyleServices.GetSystemColor(clWindowText);
+  MEMO2.Font.Color := TextColor;
+  MEMO2.SelectAll;
+  MEMO2.SelAttributes.Color := TextColor;
+  MEMO2.SelLength := 0;
+  SendMessage(MEMO2.Handle, EM_SETTARGETDEVICE, 0, 0); // Fixes WordWrap
+
   MEMO1Panel.Invalidate;
   MEMO2Panel.Invalidate;
   cbAnsiVersion.Invalidate;
+end;
+
+{ Applies the selected theme, refreshes the UI colours and persists the
+  choice so the next launch opens with the same mode. }
+procedure TForm1.ApplySelectedTheme(Mode: TThemeMode);
+const
+  ModeNames: array [TThemeMode] of string = ('System', 'Light', 'Dark');
+begin
+  FCurrentThemeMode := Mode;
+  HandleThemes;
+  SaveConverterSetting('ThemeMode', ModeNames[Mode]);
+end;
+
+{ Reads the last selected theme mode from the registry; defaults to System. }
+function TForm1.ReadConverterThemeMode: TThemeMode;
+var
+  Reg: TRegistry;
+  S:   string;
+begin
+  Result := tmSystem;
+  Reg := TRegistry.Create;
+  try
+    Reg.RootKey := HKEY_CURRENT_USER;
+    if Reg.OpenKeyReadOnly('Software\OmicronLab\Avro Keyboard') then
+    begin
+      S := Reg.ReadString('ThemeMode');
+      if SameText(S, 'Light') then
+        Result := tmLight
+      else if SameText(S, 'Dark') then
+        Result := tmDark;
+    end;
+  finally
+    Reg.Free;
+  end;
+end;
+
+{ Shows the theme popup menu under the gear button with the active mode
+  checked. }
+procedure TForm1.btnSettingsClick(Sender: TObject);
+var
+  Pt: TPoint;
+begin
+  miThemeSystem.Checked := (FCurrentThemeMode = tmSystem);
+  miThemeLight.Checked := (FCurrentThemeMode = tmLight);
+  miThemeDark.Checked := (FCurrentThemeMode = tmDark);
+  Pt := btnSettings.ClientToScreen(Point(0, btnSettings.Height));
+  pmSettings.Popup(Pt.X, Pt.Y);
+end;
+
+procedure TForm1.MenuThemeClick(Sender: TObject);
+begin
+  if Sender is TMenuItem then
+    ApplySelectedTheme(TThemeMode(TMenuItem(Sender).Tag));
 end;
 
 procedure TForm1.AppEventsSettingChange(Sender: TObject; Flag: Integer; const Section: string; var Result: LongInt);
@@ -1063,7 +1176,8 @@ var
 begin
   Src := MEMO1.Text;
   TotalLen := Length(Src);
-  if TotalLen = 0 then Exit;
+  if TotalLen = 0 then
+    Exit;
 
   // কেবল বড় টেক্সটের জন্য প্রোগ্রেস বার চালু হবে
   ShowProgress := TotalLen > 2000;
@@ -1137,7 +1251,8 @@ var
 begin
   Src := MEMO2.Text;
   TotalLen := Length(Src);
-  if TotalLen = 0 then Exit;
+  if TotalLen = 0 then
+    Exit;
 
   ShowProgress := TotalLen > 2000;
   if ShowProgress then
@@ -2114,7 +2229,7 @@ begin
   SendMessage(MEMO2.Handle, WM_SETREDRAW, 0, 0);
   try
     MEMO2.Font.Name := FontName;
-    MEMO2.Font.Charset := ANSI_CHARSET; 
+    MEMO2.Font.Charset := ANSI_CHARSET;
 
     MEMO2.DefAttributes.Name := FontName;
     MEMO2.DefAttributes.Charset := ANSI_CHARSET;
@@ -2126,6 +2241,8 @@ begin
     MEMO2.SelLength := 0;
 
     MakeTextJustified(MEMO2);
+    // Explicitly re-apply word wrap to the window width after the font change
+    SendMessage(MEMO2.Handle, EM_SETTARGETDEVICE, 0, 0);
     cbFontPicker.ActiveFont := FontName;
   finally
     // Re-enable redraws and refresh the screen at once
@@ -2266,6 +2383,9 @@ var
   SavedAnsiVersion, SavedFont, ErrMsg: string;
   Idx:                                 Integer;
 begin
+  // Restore the last selected theme before the first paint. In tmSystem the
+  // app follows the Windows dark/light mode (re-evaluated on setting changes).
+  FCurrentThemeMode := ReadConverterThemeMode;
   HandleThemes;
   DoubleBuffered := True;
 
@@ -2342,6 +2462,14 @@ begin
   SendMessage(MEMO1.Handle, EM_SETCUEBANNER, 1, lParam(PChar('Type or paste Unicode Bangla text here...')));
   SendMessage(MEMO2.Handle, EM_SETCUEBANNER, 1, lParam(PChar('Converted ANSI text will appear here...')));
   ActiveControl := MEMO1;
+
+  // Gear glyph and emoji captions are set here (the .dfm file is ANSI-only).
+  btnSettings.Font.Name := 'Segoe UI Symbol';
+  btnSettings.Font.Height := -16;
+  btnSettings.Caption := Char($2699);
+  miThemeSystem.Caption := Char($25D0) + ' System Default'; // ◐ Half circle
+  miThemeLight.Caption := Char($2600) + ' Light Theme';     // ☀ Sun
+  miThemeDark.Caption := Char($263D) + ' Dark Theme';       // ☽ Moon
 end;
 
 procedure TForm1.FormShow(Sender: TObject);
