@@ -132,7 +132,6 @@ type
     Progress: TProgressBar;
     Label_OmicronLab: TLabel;
     AppEvents: TApplicationEvents;
-    PanelHeader: TPanel;
     PanelButton: TPanel;
     PanelFooter: TPanel;
     Splitter1: TSplitter;
@@ -193,6 +192,7 @@ type
       procedure HandleThemes;
       procedure ApplyFontToMemo2(const FontName: string);
       procedure MakeTextJustified(RE: TRichEdit);
+      procedure Splitter1CanResize(Sender: TObject; var NewSize: Integer; var Accept: Boolean);
       procedure PasteToPopupMemo;
       procedure SaveConverterSetting(const Name, Value: string);
       function ReadConverterSettings(out AnsiVer, FontName: string): Boolean;
@@ -219,6 +219,20 @@ uses
   WindowsDarkMode,
   Winapi.RichEdit,
   Themes;
+
+type
+  // Replaces VCL's TRichEditStyleHook so the style engine stops forcing its
+  // own colors (e.g. pure black) into the memos; every message is passed
+  // straight back to the control, which paints the colors we assign.
+  TPassThroughRichEditStyleHook = class(TStyleHook)
+    function HandleMessage(var Message: TMessage): Boolean; override;
+  end;
+
+function TPassThroughRichEditStyleHook.HandleMessage(var Message: TMessage): Boolean;
+begin
+  // Never consume the message - let the control handle it normally.
+  Result := False;
+end;
 
 { =============================================================================== }
 { Small colour helpers shared by the mapping picker }
@@ -470,19 +484,20 @@ var
   PenW:                  Integer;
   IsDark:                Boolean;
 begin
-  if StyleServices.Enabled then
+  IsDark := (GetRValue(ColorToRGB(StyleServices.GetSystemColor(clBtnFace))) +
+             GetGValue(ColorToRGB(StyleServices.GetSystemColor(clBtnFace))) +
+             GetBValue(ColorToRGB(StyleServices.GetSystemColor(clBtnFace)))) < 384;
+
+  if IsDark then
   begin
-    ParentBg := StyleServices.GetSystemColor(clBtnFace);
-    Bg := StyleServices.GetSystemColor(clWindow);
+    ParentBg := RGB(31, 31, 31); // #1f1f1f
+    Bg := RGB(31, 31, 31);       // #1f1f1f
   end
   else
   begin
-    ParentBg := clBtnFace;
+    ParentBg := StyleServices.GetSystemColor(clBtnFace);
     Bg := AMemo.Color;
   end;
-
-  // চেক করা হচ্ছে কারেন্ট থিমটি ডার্ক কি না
-  IsDark := (GetRValue(ColorToRGB(ParentBg)) + GetGValue(ColorToRGB(ParentBg)) + GetBValue(ColorToRGB(ParentBg))) < 384;
 
   if AMemo.Focused then
   begin
@@ -496,10 +511,8 @@ begin
   begin
     PenW := 1;
     if IsDark then
-      // ডার্ক মোডে ২য় ছবির মতো হালকা সাদাটে-গ্রে বর্ডার আউটলাইন
-      BorderC := RGB(80, 85, 95)
+      BorderC := RGB(80, 85, 95) // দৃশ্যমান সফট ডার্ক-গ্রে বর্ডার আউটলাইন
     else
-      // লাইট মোডে সফট গ্রে বর্ডার
       BorderC := RGB(200, 200, 200);
   end;
 
@@ -509,19 +522,19 @@ begin
 
   with TRoundedPanel(APanel).Surface do
   begin
-    // ১. প্যানেল মার্জিন ব্যাকগ্রাউন্ড ফিল
+    // ১. প্যানেল মার্জিন
     Brush.Color := ParentBg;
     Brush.Style := bsSolid;
     Pen.Style := psClear;
     FillRect(FullR);
 
-    // ২. ইনসেট মেমো ব্যাকগ্রাউন্ড
+    // ২. মেমো ব্যাকগ্রাউন্ড
     Brush.Color := Bg;
     Brush.Style := bsSolid;
     Pen.Style := psClear;
     RoundRect(R.Left, R.Top, R.Right, R.Bottom, 12, 12);
 
-    // ৩. ডার্ক মোডের জন্য দৃশ্যমান হালকা বর্ডার
+    // ৩. আউটলাইন বর্ডার
     InflateRect(R, -PenW div 2, -PenW div 2);
     Brush.Style := bsClear;
     Pen.Style := psSolid;
@@ -1073,7 +1086,8 @@ end;
 
 procedure TForm1.HandleThemes;
 var
-  TextColor: TColor;
+  TextColor, DarkBg: TColor;
+  IsDark:            Boolean;
 begin
   case FCurrentThemeMode of
     tmSystem:
@@ -1083,25 +1097,81 @@ begin
     tmDark:
       TStyleManager.TrySetStyle('Windows10 Dark', False);
   end;
+
+  // Detect dark mode by the effective face colour: a dark theme resolves
+  // clBtnFace to a dark grey, a light theme to a light grey. (IsSystemStyle
+  // cannot be used here - it is only True for the native system style, while
+  // this app always activates a custom style such as 'Windows10 Dark'.)
+  IsDark := StyleServices.Enabled and
+    ((GetRValue(ColorToRGB(StyleServices.GetSystemColor(clBtnFace))) +
+      GetGValue(ColorToRGB(StyleServices.GetSystemColor(clBtnFace))) +
+      GetBValue(ColorToRGB(StyleServices.GetSystemColor(clBtnFace)))) < 384);
+
   TextColor := StyleServices.GetSystemColor(clWindowText);
 
-  // Fix MEMO1 colors and re-apply Word Wrap
-  MEMO1.Color := StyleServices.GetSystemColor(clWindow);
+  if IsDark then
+  begin
+    DarkBg := RGB(31, 31, 31); // #1f1f1f
+
+    // মেমোর VCL Style Client override বন্ধ
+    MEMO1.StyleElements := MEMO1.StyleElements - [seClient];
+    MEMO2.StyleElements := MEMO2.StyleElements - [seClient];
+
+    // ফর্ম এবং সব প্যানেলের ব্যাকগ্রাউন্ড কালার #1f1f1f সেট করা
+    Self.Color := DarkBg;
+
+    PanelButton.ParentBackground := False;
+    PanelButton.Color := DarkBg;
+
+    PanelFooter.ParentBackground := False;
+    PanelFooter.Color := DarkBg;
+
+    MEMO1Panel.ParentBackground := False;
+    MEMO1Panel.Color := DarkBg;
+
+    MEMO2Panel.ParentBackground := False;
+    MEMO2Panel.Color := DarkBg;
+
+    MEMO1.Color := DarkBg;
+    MEMO2.Color := DarkBg;
+
+    // দৃশ্যমান গ্রে শেড, যা #1f1f1f ব্যাকগ্রাউন্ডের সাথে কনট্রাস্ট তৈরি করে
+    Splitter1.Color := RGB(60, 60, 65);
+  end
+  else
+  begin
+    MEMO1.StyleElements := [seFont, seClient, seBorder];
+    MEMO2.StyleElements := [seFont, seClient, seBorder];
+
+    Self.Color := StyleServices.GetSystemColor(clBtnFace);
+
+    PanelButton.ParentBackground := True;
+    PanelFooter.ParentBackground := True;
+
+    MEMO1Panel.ParentBackground := True;
+    MEMO2Panel.ParentBackground := True;
+
+    MEMO1.Color := StyleServices.GetSystemColor(clWindow);
+    MEMO2.Color := StyleServices.GetSystemColor(clWindow);
+
+    // লাইট মোডে হালকা গ্রে স্প্লিটার বর্ডার
+    Splitter1.Color := RGB(220, 220, 220);
+  end;
+
+  // RichEdit নেটিভ ব্যাকগ্রাউন্ড ওয়াশ আপডেট
+  SendMessage(MEMO1.Handle, EM_SETBKGNDCOLOR, 0, ColorToRGB(MEMO1.Color));
   MEMO1.Font.Color := TextColor;
-  // Re-color every existing run (pasted text keeps its imported black color
-  // otherwise, which disappears on the dark theme).
   MEMO1.SelectAll;
   MEMO1.SelAttributes.Color := TextColor;
   MEMO1.SelLength := 0;
-  SendMessage(MEMO1.Handle, EM_SETTARGETDEVICE, 0, 0); // Fixes WordWrap
+  SendMessage(MEMO1.Handle, EM_SETTARGETDEVICE, 0, 0);
 
-  // Fix MEMO2 colors and re-apply Word Wrap
-  MEMO2.Color := StyleServices.GetSystemColor(clWindow);
+  SendMessage(MEMO2.Handle, EM_SETBKGNDCOLOR, 0, ColorToRGB(MEMO2.Color));
   MEMO2.Font.Color := TextColor;
   MEMO2.SelectAll;
   MEMO2.SelAttributes.Color := TextColor;
   MEMO2.SelLength := 0;
-  SendMessage(MEMO2.Handle, EM_SETTARGETDEVICE, 0, 0); // Fixes WordWrap
+  SendMessage(MEMO2.Handle, EM_SETTARGETDEVICE, 0, 0);
 
   MEMO1Panel.Invalidate;
   MEMO2Panel.Invalidate;
@@ -2383,19 +2453,33 @@ var
   SavedAnsiVersion, SavedFont, ErrMsg: string;
   Idx:                                 Integer;
 begin
+  // Replace the VCL style hook for TRichEdit with a pass-through hook so the
+  // style engine can no longer paint its own (pure black) background inside
+  // the memos - the pass-through leaves every message to the control itself.
+  TStyleManager.Engine.UnRegisterStyleHook(ComCtrls.TRichEdit, TRichEditStyleHook);
+  TStyleManager.Engine.RegisterStyleHook(ComCtrls.TRichEdit, TPassThroughRichEditStyleHook);
+
   // Restore the last selected theme before the first paint. In tmSystem the
   // app follows the Windows dark/light mode (re-evaluated on setting changes).
   FCurrentThemeMode := ReadConverterThemeMode;
   HandleThemes;
   DoubleBuffered := True;
 
-  PanelHeader.DoubleBuffered := True;
+  // Splitter: টানার সময় ড্যাশড/প্যাটার্ন প্রিভিউ লাইন না দেখিয়ে মসৃণ লাইভ রিসাইজ
+  Splitter1.ResizeStyle := rsUpdate;
+  Splitter1.Height := 5;
+  // সর্বনিম্ন ৮০ পিক্সেল সীমা - VCL নিজেই মাউসকে এর বেশি যেতে দেবে না
+  Splitter1.MinSize := 80;
+  // AutoSnap ডিফল্ট True হলে MinSize-এ পৌঁছালে প্যানেল ০-তে collapse হয় - বন্ধ করছি
+  Splitter1.AutoSnap := False;
+  Splitter1.OnCanResize := Splitter1CanResize;
+
   PanelButton.DoubleBuffered := True;
   PanelFooter.DoubleBuffered := True;
 
   AppEvents.OnMessage := AppEventsMessage;
 
-  FSplitterRatio := MEMO1Panel.Height / (ClientHeight - PanelHeader.Height - PanelButton.Height - PanelFooter.Height - Splitter1.Height);
+  FSplitterRatio := MEMO1Panel.Height / (ClientHeight - PanelButton.Height - PanelFooter.Height - Splitter1.Height);
   FUniToBijoy := TUnicodeToBijoy2000.Create;
   FBijoyToUni := TBijoy2000ToUnicode.Create;
 
@@ -2491,17 +2575,17 @@ var
 begin
   // Dynamically size cbFontPicker with a max width constraint of 280px,
   // so it never stretches too wide in full screen mode, nor overflows
-  // the window when it is small.
+  // the window when it is small. Reserve room for btnSettings on the right.
   if cbFontPicker <> nil then
   begin
-    AvailWidth := ClientWidth - cbFontPicker.Left - 20;
+    AvailWidth := btnSettings.Left - cbFontPicker.Left - 16;
     if AvailWidth > 280 then
       cbFontPicker.Width := 280
     else if AvailWidth > 120 then
       cbFontPicker.Width := AvailWidth;
   end;
 
-  Available := ClientHeight - PanelHeader.Height - PanelButton.Height - PanelFooter.Height - Splitter1.Height;
+  Available := ClientHeight - PanelButton.Height - PanelFooter.Height - Splitter1.Height;
   if Available > 0 then
   begin
     NewHeight := Round(Available * FSplitterRatio);
@@ -2528,24 +2612,28 @@ begin
   end;
 end;
 
+procedure TForm1.Splitter1CanResize(Sender: TObject; var NewSize: Integer; var Accept: Boolean);
+var
+  Available: Integer;
+begin
+  // লাইভ ড্র্যাগ চলাকালেই দুই প্যানেলকে ৮০..(Available-৮০) সীমায় লক করুন -
+  // এতে SplitterMoved-এ আর ম্যানুয়ালি Height রি-সেট করতে হয় না (ব্লিংকিং এড়ায়)
+  Available := ClientHeight - PanelButton.Height - PanelFooter.Height - Splitter1.Height;
+  if NewSize < 80 then
+    NewSize := 80
+  else if Available - NewSize < 80 then
+    NewSize := Available - 80;
+end;
+
 procedure TForm1.SplitterMoved(Sender: TObject);
 var
   Available: Integer;
 begin
-  Available := ClientHeight - PanelHeader.Height - PanelButton.Height - PanelFooter.Height - Splitter1.Height;
+  Available := ClientHeight - PanelButton.Height - PanelFooter.Height - Splitter1.Height;
   if Available > 0 then
   begin
+    // কেবল নতুন রেশিও সংরক্ষণ করুন - Height সরাসরি বদলানোর দরকার নেই
     FSplitterRatio := MEMO1Panel.Height / Available;
-    if MEMO1Panel.Height < 80 then
-    begin
-      MEMO1Panel.Height := 80;
-      FSplitterRatio := MEMO1Panel.Height / Available;
-    end;
-    if Available - MEMO1Panel.Height - Splitter1.Height < 80 then
-    begin
-      MEMO1Panel.Height := Available - 80 - Splitter1.Height;
-      FSplitterRatio := MEMO1Panel.Height / Available;
-    end;
   end;
 end;
 

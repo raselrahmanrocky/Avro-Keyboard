@@ -58,33 +58,9 @@ object Form1: TForm1
   OnResize = FormResize
   OnShow = FormShow
   TextHeight = 13
-  object PanelHeader: TPanel
-    Left = 0
-    Top = 0
-    Width = 665
-    Height = 28
-    Align = alTop
-    BevelOuter = bvNone
-    DoubleBuffered = True
-    FullRepaint = False
-    ParentDoubleBuffered = False
-    TabOrder = 0
-    object btnSettings: TSpeedButton
-      Left = 632
-      Top = 2
-      Width = 29
-      Height = 24
-      Anchors = [akTop, akRight]
-      Caption = ''
-      Flat = True
-      ShowHint = True
-      Hint = 'Settings'
-      OnClick = btnSettingsClick
-    end
-  end
   object PanelButton: TPanel
     Left = 0
-    Top = 24
+    Top = 0
     Width = 665
     Height = 32
     Align = alTop
@@ -92,7 +68,7 @@ object Form1: TForm1
     DoubleBuffered = True
     FullRepaint = False
     ParentDoubleBuffered = False
-    TabOrder = 1
+    TabOrder = 0
     object Button1: TButton
       Left = 13
       Top = 3
@@ -156,6 +132,18 @@ object Form1: TForm1
       OnChange = cbFontPickerChange
       OnDropDown = cbFontPickerDropDown
       OnCloseUp = cbFontPickerCloseUp
+    end
+    object btnSettings: TSpeedButton
+      Left = 628
+      Top = 3
+      Width = 29
+      Height = 25
+      Anchors = [akTop, akRight]
+      Caption = ''
+      Flat = True
+      ShowHint = True
+      Hint = 'Settings'
+      OnClick = btnSettingsClick
     end
   end
   object MEMO1Panel: TRoundedPanel
