@@ -33,7 +33,8 @@ uses
   uRoundedPanel,
   Math,
   Registry,
-  StrUtils;
+  StrUtils,
+  System.RegularExpressions;
 
 type
   // Interceptor class to stop TRichEdit flicker during live resize
@@ -676,18 +677,39 @@ begin
   Clear1.Enabled := SelectAll1.Enabled;
 end;
 
-// Copy puts RTF on the clipboard so the active font name (SutonnyMJ etc.)
-// travels with the text - MS Word then uses that font instead of its own
-// default.  Native CopyToClipboard would also embed the current theme's
-// foreground color (white in dark mode -> invisible when pasted into Word's
-// white page), so the selection's color is temporarily forced to clBlack
-// inside a locked-redraw frame before copying and restored instantly - no
-// flicker, no permanent formatting change.
+// Stream-out callback for EM_STREAMOUT (SF_RTF): appends the RTF bytes the
+// rich edit produces into the TBytesStream passed as dwCookie.
+function RtfStreamOutCallback(dwCookie: DWORD_PTR; pbBuff: PByte; cb: Longint; var pcb: Longint): Longint; stdcall;
+begin
+  Result := 0;
+  try
+    pcb := TBytesStream(dwCookie).Write(pbBuff^, cb);
+  except
+    Result := 1; // signal the error back to the rich edit
+    pcb := 0;
+  end;
+end;
+
+// Copy exports the selection as RTF so the active font name (SutonnyMJ etc.)
+// travels with the text into MS Word, but strips the explicit font SIZE
+// (\fsN) and COLOR (\cfN / {\colortbl ...}) control words first - Word then
+// uses its own document font size and Automatic text color instead of the
+// app's 18pt preview size / dark-theme white.  Both the cleaned RTF and a
+// plain CF_UNICODETEXT copy are placed on the clipboard, so any consumer
+// (Word, browsers, editors) gets a usable format.
 procedure TForm1.CopyMemoWithFont(M: TRichEdit);
 var
   SavedStart, SavedLength: Integer;
-  SavedColor:             TColor;
   WasSelected:            Boolean;
+  Stream:                 TBytesStream;
+  EditStream:             TEditStream;
+  RtfBytes:               TBytes;
+  RtfStr, UniText:        string;
+  Enc:                    TEncoding;
+  H:                      HGLOBAL;
+  P:                      Pointer;
+  ByteCount:              Integer;
+  RtfFmt:                 UINT;
 begin
   if M = nil then
     Exit;
@@ -696,28 +718,88 @@ begin
   SavedLength := M.SelLength;
   WasSelected := SavedLength > 0;
 
-  // Lock the screen so the user never sees the color flip.
-  SendMessage(M.Handle, EM_HIDESELECTION, 1, 0);
+  // Lock redraws so an auto "Select All" (when nothing was selected) is
+  // never visible on screen.
   SendMessage(M.Handle, WM_SETREDRAW, 0, 0);
   try
     if not WasSelected then
       M.SelectAll;
 
-    SavedColor := M.SelAttributes.Color;
+    // 1. Stream the selection out as raw RTF bytes.
+    Stream := TBytesStream.Create;
+    try
+      FillChar(EditStream, SizeOf(EditStream), 0);
+      EditStream.dwCookie := DWORD_PTR(Stream);
+      EditStream.pfnCallback := RtfStreamOutCallback;
+      SendMessage(M.Handle, EM_STREAMOUT, SFF_SELECTION or SF_RTF, LPARAM(@EditStream));
+      RtfBytes := Stream.Bytes;
+      SetLength(RtfBytes, Stream.Size);
+    finally
+      Stream.Free;
+    end;
 
-    // 1. Force black so the exported RTF carries no white (dark-theme) color.
-    M.SelAttributes.Color := clBlack;
+    UniText := M.SelText;
 
-    // 2. Copy RTF including the font name.
-    M.CopyToClipboard;
+    // 2. Strip \fsN (size) and \cfN / {\colortbl ...} (color) control words.
+    // The RTF bytes are bridged through ISO-8859-1 so every byte round-trips
+    // losslessly (the stripped patterns are pure ASCII, so they match
+    // identically whatever codepage the RTF header declares).
+    Enc := TEncoding.GetEncoding(28591);
+    RtfStr := Enc.GetString(RtfBytes);
+    RtfStr := TRegEx.Replace(RtfStr, '\\fs\d+\s?', '');
+    RtfStr := TRegEx.Replace(RtfStr, '\\cf\d+\s?', '');
+    RtfStr := TRegEx.Replace(RtfStr, '\{\\colortbl[^}]*\}', '');
+    RtfBytes := Enc.GetBytes(RtfStr);
 
-    // 3. Restore the theme color and the original selection.
-    M.SelAttributes.Color := SavedColor;
+    // 3. Place both formats on the Windows clipboard.
+    RtfFmt := RegisterClipboardFormat('Rich Text Format');
+    if OpenClipboard(Handle) then
+      try
+        EmptyClipboard;
+
+        // CF_UNICODETEXT: the plain Unicode text of the selection.
+        ByteCount := (Length(UniText) + 1) * SizeOf(WideChar);
+        H := GlobalAlloc(GMEM_MOVEABLE or GMEM_ZEROINIT, ByteCount);
+        if H <> 0 then
+        begin
+          P := GlobalLock(H);
+          if P <> nil then
+          begin
+            Move(PWideChar(UniText)^, P^, ByteCount);
+            GlobalUnlock(H);
+            if SetClipboardData(CF_UNICODETEXT, H) = 0 then
+              GlobalFree(H); // clipboard did not take ownership
+          end
+          else
+            GlobalFree(H);
+        end;
+
+        // Rich Text Format: the cleaned RTF (font name kept, size/color gone).
+        ByteCount := Length(RtfBytes) + 1;
+        H := GlobalAlloc(GMEM_MOVEABLE or GMEM_ZEROINIT, ByteCount);
+        if H <> 0 then
+        begin
+          P := GlobalLock(H);
+          if P <> nil then
+          begin
+            if Length(RtfBytes) > 0 then
+              Move(RtfBytes[0], P^, Length(RtfBytes));
+            GlobalUnlock(H);
+            if SetClipboardData(RtfFmt, H) = 0 then
+              GlobalFree(H);
+          end
+          else
+            GlobalFree(H);
+        end;
+      finally
+        CloseClipboard;
+      end;
+
+    // 4. Restore the original selection (still under the redraw lock).
     M.SelStart := SavedStart;
     M.SelLength := SavedLength;
   finally
     SendMessage(M.Handle, WM_SETREDRAW, 1, 0);
-    SendMessage(M.Handle, EM_HIDESELECTION, 0, 0);
     M.Invalidate;
   end;
 end;
