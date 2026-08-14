@@ -42,12 +42,19 @@ type
   end;
 
 type
+  // Fired by Convert at each pipeline stage so a caller can show progress.
+  // Percent is 0..100; Stage is a short ASCII identifier of the current pass.
+  TConverterProgress = procedure(Sender: TObject; Percent: Integer; const Stage: string) of object;
+
+type
   TUnicodeToBijoy2000 = class
     private
       fUniText:       string;
       fConvertedText: string;
       fToggleStates:  TDictionary<string, Boolean>;
       fLastUniText:   string;
+      FOnProgress:    TConverterProgress;
+      procedure ReportProgress(Percent: Integer; const Stage: string);
       procedure ReArrangeKars;
       procedure ReArrangeReph;
       procedure ReplaceFullForms;
@@ -64,7 +71,6 @@ type
 
       // Utility Functions
       function BaseLineRightCharacter(const wC: string): Boolean;
-      function WideStuffString(Source: string; Start, Len: Integer; SubString: string): string;
       function IsVowel(C: Char): Boolean;
       function GetToggleState(const Context, Key: string; OccurrenceIndex: Integer): Boolean;
       procedure SetToggleState(const Context, Key: string; OccurrenceIndex: Integer; Value: Boolean);
@@ -76,6 +82,8 @@ type
     public
       destructor Destroy; override;
       function Convert(const UniText: string): string;
+      // Optional progress callback fired by Convert between pipeline stages.
+      property OnProgress: TConverterProgress read FOnProgress write FOnProgress;
   end;
 
   TReplacementPair = record
@@ -643,7 +651,130 @@ end;
 procedure TUnicodeToBijoy2000.SecondHalfForms;
 var
   I:  Integer;
-  wT: string;
+  wT: Char;
+  SB: TStringBuilder;
+
+  function PickB2H(const wC: Char): Char;
+  begin
+    if (wC = b_s) or (wC = b_ss) or (wC = b_m) or (wC = b_n) or (wC = b_d) or (wC = A_M_1H) or (wC = A_Ss_1H) or (wC = A_S_1H_1) or (wC = A_N_1H_1) or
+        (wC = A_D_1H_2) then
+      Result := A_B_2H_1
+    else if (wC = b_dh) or (wC = b_b) or (wC = b_h) then
+      Result := A_B_2H_4
+    else if (wC = b_sh) or (wC = b_g) or (wC = b_p) then
+      Result := A_B_2H_3
+    else
+      Result := A_B_2H_2;
+  end;
+
+  function PickM2H(const wC: Char): Char;
+  begin
+    if (wC = A_M_1H) or (wC = A_Ss_1H) or (wC = A_C_1H) or (wC = A_S_1H_1) or (wC = A_D_1H_2) or (wC = A_N_1H_1) or (wC = A_N_1H_2) then
+      Result := A_M_2H_2
+    else if wC = A_NGA_1H then
+      Result := A_M[1]
+    else
+      Result := A_M_2H_1;
+  end;
+
+  function PickL2H(const wC: Char): Char;
+  begin
+    if BaseLineRightCharacter(string(wC)) then
+      Result := A_L_2H_3
+    else
+      Result := A_L_2H_1;
+  end;
+
+  // Replace every (hasanta + C) pair in one left-to-right pass, reading the
+  // character before the hasanta from the output built so far (the in-place
+  // version read the same evolved prefix). The old repeat/Pos + WideStuffString
+  // loops restarted the scan from the top and rebuilt the whole string for
+  // every match - O(N^2) on conjunct-heavy text.
+
+  procedure ScanB2H;
+  begin
+    SB := TStringBuilder.Create(Length(fConvertedText) + 8);
+    try
+      I := 1;
+      while I <= Length(fConvertedText) do
+      begin
+        if (fConvertedText[I] = b_Hasanta) and (I < Length(fConvertedText)) and (fConvertedText[I + 1] = b_b) then
+        begin
+          if SB.Length >= 1 then
+            wT := SB.Chars[SB.Length - 1]
+          else
+            wT := #0;
+          SB.Append(PickB2H(wT));
+          Inc(I, 2);
+        end
+        else
+        begin
+          SB.Append(fConvertedText[I]);
+          Inc(I);
+        end;
+      end;
+      fConvertedText := SB.ToString;
+    finally
+      SB.Free;
+    end;
+  end;
+
+  procedure ScanM2H;
+  begin
+    SB := TStringBuilder.Create(Length(fConvertedText) + 8);
+    try
+      I := 1;
+      while I <= Length(fConvertedText) do
+      begin
+        if (fConvertedText[I] = b_Hasanta) and (I < Length(fConvertedText)) and (fConvertedText[I + 1] = b_m) then
+        begin
+          if SB.Length >= 1 then
+            wT := SB.Chars[SB.Length - 1]
+          else
+            wT := #0;
+          SB.Append(PickM2H(wT));
+          Inc(I, 2);
+        end
+        else
+        begin
+          SB.Append(fConvertedText[I]);
+          Inc(I);
+        end;
+      end;
+      fConvertedText := SB.ToString;
+    finally
+      SB.Free;
+    end;
+  end;
+
+  procedure ScanL2H;
+  begin
+    SB := TStringBuilder.Create(Length(fConvertedText) + 8);
+    try
+      I := 1;
+      while I <= Length(fConvertedText) do
+      begin
+        if (fConvertedText[I] = b_Hasanta) and (I < Length(fConvertedText)) and (fConvertedText[I + 1] = b_L) then
+        begin
+          if SB.Length >= 1 then
+            wT := SB.Chars[SB.Length - 1]
+          else
+            wT := #0;
+          SB.Append(PickL2H(wT));
+          Inc(I, 2);
+        end
+        else
+        begin
+          SB.Append(fConvertedText[I]);
+          Inc(I);
+        end;
+      end;
+      fConvertedText := SB.ToString;
+    finally
+      SB.Free;
+    end;
+  end;
+
 begin
   { A_BH_2H }
   fConvertedText := ReplaceStr(fConvertedText, b_Hasanta + b_Bh, A_BH_2H);
@@ -655,48 +786,13 @@ begin
   fConvertedText := ReplaceStr(fConvertedText, b_Hasanta + b_K, A_K_2H);
 
   { A_B_2H_1, A_B_2H_2, A_B_2H_3, A_B_2H_4 }
-  repeat
-    I := Pos(b_Hasanta + b_b, fConvertedText);
-    if I <= 0 then
-      break;
-    wT := MidStr(fConvertedText, I - 1, 1);
-
-    if ((wT = b_s) or (wT = b_ss) or (wT = b_m) or (wT = b_n) or (wT = b_d) or (wT = A_M_1H) or (wT = A_Ss_1H) or (wT = A_S_1H_1) or (wT = A_N_1H_1) or
-        (wT = A_D_1H_2)) then
-      fConvertedText := WideStuffString(fConvertedText, I, 2, A_B_2H_1)
-    else if ((wT = b_dh) or (wT = b_b) or (wT = b_h)) then
-      fConvertedText := WideStuffString(fConvertedText, I, 2, A_B_2H_4)
-    else if ((wT = b_sh) or (wT = b_g) or (wT = b_p)) then
-      fConvertedText := WideStuffString(fConvertedText, I, 2, A_B_2H_3)
-    else
-      fConvertedText := WideStuffString(fConvertedText, I, 2, A_B_2H_2);
-  until I <= 0;
+  ScanB2H;
 
   { A_M_2H_1  and  A_M_2H_2 }
-  repeat
-    I := Pos(b_Hasanta + b_m, fConvertedText);
-    if I <= 0 then
-      break;
-    wT := MidStr(fConvertedText, I - 1, 1);
-    if ((wT = A_M_1H) or (wT = A_Ss_1H) or (wT = A_C_1H) or (wT = A_S_1H_1) or (wT = A_D_1H_2) or (wT = A_N_1H_1) or (wT = A_N_1H_2)) then
-      fConvertedText := WideStuffString(fConvertedText, I, 2, A_M_2H_2)
-    else if wT = A_NGA_1H then
-      fConvertedText := WideStuffString(fConvertedText, I, 2, A_M)
-    else
-      fConvertedText := WideStuffString(fConvertedText, I, 2, A_M_2H_1);
-  until I <= 0;
+  ScanM2H;
 
   { A_L_2H_1  and  A_L_2H_3 }
-  repeat
-    I := Pos(b_Hasanta + b_L, fConvertedText);
-    if I <= 0 then
-      break;
-    wT := MidStr(fConvertedText, I - 1, 1);
-    if BaseLineRightCharacter(wT) then
-      fConvertedText := WideStuffString(fConvertedText, I, 2, A_L_2H_3)
-    else
-      fConvertedText := WideStuffString(fConvertedText, I, 2, A_L_2H_1);
-  until I <= 0;
+  ScanL2H;
 
   { A_Nn_2H_1 }
   fConvertedText := ReplaceStr(fConvertedText, b_Hasanta + b_Nn, A_Nn_2H_1);
@@ -708,7 +804,8 @@ end;
 
 procedure TUnicodeToBijoy2000.FirstHalfForms;
 var
-  I: Integer;
+  I:  Integer;
+  SB: TStringBuilder;
 begin
   { A_M_1H }
   fConvertedText := ReplaceStr(fConvertedText, b_m + b_Hasanta, A_M_1H + b_Hasanta);
@@ -721,30 +818,64 @@ begin
   { A_S_1H_1 }
   fConvertedText := ReplaceStr(fConvertedText, b_s + b_Hasanta, A_S_1H_1 + b_Hasanta);
 
+  // Replace every (d + hasanta) pair in one left-to-right pass. The old
+  // repeat/Pos loops restarted the scan from the top for every match - O(N^2)
+  // on conjunct-heavy text. Replacements are 1->1 so positions never shift;
+  // the look-ahead at I+2 always reads the original character.
   { A_D_1H_1  and  A_D_1H_2 }
-  repeat
-    I := Pos(b_d + b_Hasanta, fConvertedText);
-    if I <= 0 then
-      break;
-    if MidStr(fConvertedText, I + 2, 1) = b_g then
-      fConvertedText[I] := A_D_1H_1
-    else
-      fConvertedText[I] := A_D_1H_2;
-  until I <= 0;
+  SB := TStringBuilder.Create(Length(fConvertedText) + 8);
+  try
+    I := 1;
+    while I <= Length(fConvertedText) do
+    begin
+      if (fConvertedText[I] = b_d) and (I < Length(fConvertedText)) and (fConvertedText[I + 1] = b_Hasanta) then
+      begin
+        if (I + 2 <= Length(fConvertedText)) and (fConvertedText[I + 2] = b_g) then
+          SB.Append(A_D_1H_1)
+        else
+          SB.Append(A_D_1H_2);
+        SB.Append(b_Hasanta);
+        Inc(I, 2);
+      end
+      else
+      begin
+        SB.Append(fConvertedText[I]);
+        Inc(I);
+      end;
+    end;
+    fConvertedText := SB.ToString;
+  finally
+    SB.Free;
+  end;
 
   { Elevate first-half N-forms }
-  repeat
-    I := Pos(b_n + b_Hasanta, fConvertedText);
-    if I <= 0 then
-      break;
-    if ((I + 2 <= Length(fConvertedText)) and ((fConvertedText[I + 2] = b_t) or (fConvertedText[I + 2] = b_Th) or (fConvertedText[I + 2] = b_L) or
-          (fConvertedText[I + 2] = b_b) or (fConvertedText[I + 2] = A_T_R_2H) or (fConvertedText[I + 2] = A_T_UKar_2H))) then
-      fConvertedText[I] := A_N_1H_1
-    else if (I + 2 <= Length(fConvertedText)) and ((fConvertedText[I + 2] = b_m) or (fConvertedText[I + 2] = b_n)) then
-      fConvertedText[I] := A_N[1]
-    else
-      fConvertedText[I] := A_N_1H_2;
-  until I <= 0;
+  SB := TStringBuilder.Create(Length(fConvertedText) + 8);
+  try
+    I := 1;
+    while I <= Length(fConvertedText) do
+    begin
+      if (fConvertedText[I] = b_n) and (I < Length(fConvertedText)) and (fConvertedText[I + 1] = b_Hasanta) then
+      begin
+        if (I + 2 <= Length(fConvertedText)) and ((fConvertedText[I + 2] = b_t) or (fConvertedText[I + 2] = b_Th) or (fConvertedText[I + 2] = b_L) or
+              (fConvertedText[I + 2] = b_b) or (fConvertedText[I + 2] = A_T_R_2H) or (fConvertedText[I + 2] = A_T_UKar_2H)) then
+          SB.Append(A_N_1H_1)
+        else if (I + 2 <= Length(fConvertedText)) and ((fConvertedText[I + 2] = b_m) or (fConvertedText[I + 2] = b_n)) then
+          SB.Append(A_N[1])
+        else
+          SB.Append(A_N_1H_2);
+        SB.Append(b_Hasanta);
+        Inc(I, 2);
+      end
+      else
+      begin
+        SB.Append(fConvertedText[I]);
+        Inc(I);
+      end;
+    end;
+    fConvertedText := SB.ToString;
+  finally
+    SB.Free;
+  end;
 end;
 
 { =============================================================================== }
@@ -948,7 +1079,15 @@ end;
 
 { =============================================================================== }
 
+procedure TUnicodeToBijoy2000.ReportProgress(Percent: Integer; const Stage: string);
+begin
+  if Assigned(FOnProgress) then
+    FOnProgress(Self, Percent, Stage);
+end;
+
 function TUnicodeToBijoy2000.Convert(const UniText: string): string;
+const
+  TotalStages = 21;
 var
   I:                  Integer;
   HasTrailingHasanta: Boolean;
@@ -956,7 +1095,10 @@ var
   ConsonantPart:      string;
   MapToggleBack:      Boolean;
   MatchedCluster:     string;
+  StageNo:            Integer;
 begin
+  StageNo := 0;
+
   if UniText = '' then
   begin
     if fToggleStates <> nil then
@@ -978,6 +1120,8 @@ begin
   // 1. Dynamic pre-placement fixes - runs at the very beginning on raw Unicode input
   for I := 0 to Length(CustomPreReplacements) - 1 do
     fConvertedText := ReplaceStr(fConvertedText, CustomPreReplacements[I].Key, CustomPreReplacements[I].Value);
+  Inc(StageNo);
+  ReportProgress((StageNo * 100) div TotalStages, 'pre-replacements');
 
   for Rule in VowelRules do
   begin
@@ -1001,34 +1145,60 @@ begin
   end;
 
   fLastUniText := UniText;
+  Inc(StageNo);
+  ReportProgress((StageNo * 100) div TotalStages, 'toggle-state');
 
   // 2. Resolve kar-inclusive full forms BEFORE the vowel-rule pass
   ApplyKarInclusiveFullForms;
+  Inc(StageNo);
+  ReportProgress((StageNo * 100) div TotalStages, 'kar-inclusive');
 
   // === Phase A: Pre-phase vowel rule pass (raw Unicode text) ===
   ApplyRuleForKar(b_Ukar, 'pre');
+  Inc(StageNo);
+  ReportProgress((StageNo * 100) div TotalStages, 'u-kar-pre');
   ApplyRuleForKar(b_UUKar, 'pre');
+  Inc(StageNo);
+  ReportProgress((StageNo * 100) div TotalStages, 'uu-kar-pre');
   ApplyRuleForKar(b_Rrikar, 'pre');
+  Inc(StageNo);
+  ReportProgress((StageNo * 100) div TotalStages, 'rri-kar-pre');
 
   // Clean start
   DeNormalize;
+  Inc(StageNo);
+  ReportProgress((StageNo * 100) div TotalStages, 'denormalize');
   ReplaceNumbers;
+  Inc(StageNo);
+  ReportProgress((StageNo * 100) div TotalStages, 'numbers');
 
   // 3. Rearrange Vowels and Reph
   ReArrangeKars;
+  Inc(StageNo);
+  ReportProgress((StageNo * 100) div TotalStages, 'rearrange-kars');
   ReArrangeReph;
+  Inc(StageNo);
+  ReportProgress((StageNo * 100) div TotalStages, 'rearrange-reph');
 
   // 4. Apply the U/UU/RRI main pass
   ApplyVowelKars;
+  Inc(StageNo);
+  ReportProgress((StageNo * 100) div TotalStages, 'vowel-kars');
 
   // 5. Process remaining Conjuncts and Full Forms
   ReplaceFullForms;
+  Inc(StageNo);
+  ReportProgress((StageNo * 100) div TotalStages, 'full-forms');
 
   // 6. Process remaining Vowels
   ReplaceKarsVowels;
+  Inc(StageNo);
+  ReportProgress((StageNo * 100) div TotalStages, 'kar-vowels');
 
   // 7. Apply Glyphs, Halfs, and Consonants
   ConvertRFola_ZFola_Hasanta;
+  Inc(StageNo);
+  ReportProgress((StageNo * 100) div TotalStages, 'rfola-zfola');
 
   { ==========================================================
     (Flicker-Free Half Form Protection)
@@ -1047,13 +1217,27 @@ begin
     fConvertedText := fConvertedText + b_Hasanta;
   end;
   { =========================================================== }
+  Inc(StageNo);
+  ReportProgress((StageNo * 100) div TotalStages, 'first-half-forms');
   SecondHalfForms;
+  Inc(StageNo);
+  ReportProgress((StageNo * 100) div TotalStages, 'second-half-forms');
   Consonants;
+  Inc(StageNo);
+  ReportProgress((StageNo * 100) div TotalStages, 'consonants');
   // === Post-phase vowel rule pass ===
   ApplyRuleForKar(b_Ukar, 'post');
+  Inc(StageNo);
+  ReportProgress((StageNo * 100) div TotalStages, 'u-kar-post');
   ApplyRuleForKar(b_UUKar, 'post');
+  Inc(StageNo);
+  ReportProgress((StageNo * 100) div TotalStages, 'uu-kar-post');
   ApplyRuleForKar(b_Rrikar, 'post');
+  Inc(StageNo);
+  ReportProgress((StageNo * 100) div TotalStages, 'rri-kar-post');
   FinalTouch;
+  Inc(StageNo);
+  ReportProgress((StageNo * 100) div TotalStages, 'final-touch');
 
   Result := fConvertedText;
 end;
@@ -1089,63 +1273,63 @@ end;
 procedure TUnicodeToBijoy2000.ConvertRFola_ZFola_Hasanta;
 var
   I:          Integer;
-  PrevC:      string;
+  PrevC:      Char;
   IsHalfForm: Boolean;
   Rule:       TRfolaRule;
-  Matched:    Boolean;
-begin
-  // Convert Z-Fola
-  fConvertedText := ReplaceStr(fConvertedText, b_Hasanta + b_z, A_ZFola);
-  // Convert Hasanta
-  fConvertedText := ReplaceStr(fConvertedText, b_Hasanta + zwnj, A_Hasanta);
-  // Convert R-Fola
-  repeat
-    I := Pos(b_Hasanta + b_r, fConvertedText);
-    if I <= 0 then
-      break;
+  SB:         TStringBuilder;
+  Val:        string;
+  Take:       Integer;
+  C2, C3:     Char;
 
-    PrevC := MidStr(fConvertedText, I - 1, 1);
-    IsHalfForm := (I - 2 >= 1) and (MidStr(fConvertedText, I - 2, 1) = b_Hasanta);
-
+  // Resolve which glyph replaces this r-fola and how far it reaches back into
+  // the output (0 = only hasanta+ra, 1 = also the consonant before them).
+  // Mirrors the rule/fallback logic of the in-place version exactly.
+  procedure MatchRfola;
+  var
+    Matched:  Boolean;
+    LoopRule: TRfolaRule;
+  begin
     Matched := False;
     if Length(RfolaRules) > 0 then
     begin
-      for Rule in RfolaRules do
+      // The loop variable must be local to this nested routine (Delphi
+      // requires for-loop control variables to be simple locals); Rule is
+      // copied out so the matched rule stays visible to the caller.
+      for LoopRule in RfolaRules do
       begin
+        Rule := LoopRule;
         // Check context group first (e.g., t preceded by K/t)
-        if (Rule.ContextGroup <> '') and CharInGroup(PrevC, Rule.Consonants) then
+        if (Rule.ContextGroup <> '') and CharInGroup(string(PrevC), Rule.Consonants) then
         begin
           // Check if the character before PrevC's Hasanta is in ContextGroup
-          if IsHalfForm and (I - 3 >= 1) then
+          if IsHalfForm and (C3 <> #0) then
           begin
-            if CharInGroup(MidStr(fConvertedText, I - 3, 1), Rule.ContextGroup) then
+            if CharInGroup(string(C3), Rule.ContextGroup) then
             begin
-              fConvertedText := WideStuffString(fConvertedText, I, Rule.ContextReplaceLen, Rule.ContextValue);
+              Val := Rule.ContextValue;
+              Take := 0; // ContextReplaceLen is 2 in the mappings: hasanta + ra
               Matched := True;
               break;
             end;
           end;
         end;
         // Check main consonant group
-        if CharInGroup(PrevC, Rule.Consonants) then
+        if CharInGroup(string(PrevC), Rule.Consonants) then
         begin
           if Rule.ReplaceLen > 2 then
           begin
-            // Dynamic replace length (3, 4, 5, etc.)
-            var
-            StartPos := I - (Rule.ReplaceLen - 2);
-            if StartPos >= 1 then
-            begin
-              if IsHalfForm and (Rule.HalfValue <> '') then
-                fConvertedText := WideStuffString(fConvertedText, StartPos, Rule.ReplaceLen, Rule.HalfValue)
-              else
-                fConvertedText := WideStuffString(fConvertedText, StartPos, Rule.ReplaceLen, Rule.Value);
-            end;
+            // Dynamic replace length (3, 4, 5, etc.) - reaches one char back
+            Take := Rule.ReplaceLen - 2;
+            if IsHalfForm and (Rule.HalfValue <> '') then
+              Val := Rule.HalfValue
+            else
+              Val := Rule.Value;
           end
           else
           begin
             // Default 2-char: replace hasanta + ra
-            fConvertedText := WideStuffString(fConvertedText, I, 2, Rule.Value);
+            Val := Rule.Value;
+            Take := 0;
           end;
           Matched := True;
           break;
@@ -1157,53 +1341,164 @@ begin
     if not Matched then
     begin
       if (PrevC = b_p) or (PrevC = b_g) or (PrevC = b_sh) then
-        fConvertedText := WideStuffString(fConvertedText, I, 2, A_RFola_3)
+      begin
+        Val := A_RFola_3;
+        Take := 0;
+      end
       else if PrevC = b_Bh then
       begin
         if IsHalfForm then
-          fConvertedText := WideStuffString(fConvertedText, I - 1, 3, A_BH_R_2H)
+          Val := A_BH_R_2H
         else
-          fConvertedText := WideStuffString(fConvertedText, I - 1, 3, A_Bh_R);
+          Val := A_Bh_R;
+        Take := 1;
       end
       else if PrevC = b_K then
       begin
         if IsHalfForm then
-          fConvertedText := WideStuffString(fConvertedText, I - 1, 3, A_K_R_2H)
+          Val := A_K_R_2H
         else
-          fConvertedText := WideStuffString(fConvertedText, I - 1, 3, A_K_R);
+          Val := A_K_R;
+        Take := 1;
       end
       else if PrevC = b_t then
       begin
         if IsHalfForm then
         begin
-          if (I - 3 >= 1) and ((MidStr(fConvertedText, I - 3, 1) = b_K) or (MidStr(fConvertedText, I - 3, 1) = b_t)) then
-            fConvertedText := WideStuffString(fConvertedText, I, 2, A_RFola_2)
+          if (C3 <> #0) and ((C3 = b_K) or (C3 = b_t)) then
+          begin
+            Val := A_RFola_2;
+            Take := 0;
+          end
           else
-            fConvertedText := WideStuffString(fConvertedText, I - 1, 3, A_T_R_2H);
+          begin
+            Val := A_T_R_2H;
+            Take := 1;
+          end;
         end
         else
-          fConvertedText := WideStuffString(fConvertedText, I - 1, 3, A_T_R);
+        begin
+          Val := A_T_R;
+          Take := 1;
+        end;
       end
-      else if (PrevC = A_K_T) or (PrevC = A_T_T) or (PrevC = A_P_T) then
-        fConvertedText := WideStuffString(fConvertedText, I, 2, A_RFola_2)
+      else if (PrevC = A_K_T[1]) or (PrevC = A_T_T[1]) or (PrevC = A_P_T[1]) then
+      begin
+        Val := A_RFola_2;
+        Take := 0;
+      end
       else if PrevC = b_ph then
-        fConvertedText := WideStuffString(fConvertedText, I, 2, A_RFola_2)
+      begin
+        Val := A_RFola_2;
+        Take := 0;
+      end
       else
-        fConvertedText := WideStuffString(fConvertedText, I, 2, A_RFola_1);
+      begin
+        Val := A_RFola_1;
+        Take := 0;
+      end;
     end;
+  end;
 
-  until I <= 0;
+begin
+  // Convert Z-Fola
+  fConvertedText := ReplaceStr(fConvertedText, b_Hasanta + b_z, A_ZFola);
+  // Convert Hasanta
+  fConvertedText := ReplaceStr(fConvertedText, b_Hasanta + zwnj, A_Hasanta);
+
+  // Convert R-Fola - single left-to-right pass. The old repeat/Pos +
+  // WideStuffString loop rescanned from the top and rebuilt the whole string
+  // for every r-fola - O(N^2) on conjunct-heavy text. The (hasanta + ra) match
+  // is always found in the input here; the consonant before it (and the
+  // 3-char reach-back) is read from the output built so far, exactly like the
+  // in-place version's evolved prefix.
+  SB := TStringBuilder.Create(Length(fConvertedText) + 16);
+  try
+    I := 1;
+    while I <= Length(fConvertedText) do
+    begin
+      if (fConvertedText[I] = b_Hasanta) and (I < Length(fConvertedText)) and (fConvertedText[I + 1] = b_r) then
+      begin
+        if SB.Length >= 1 then
+          PrevC := SB.Chars[SB.Length - 1]
+        else
+          PrevC := #0;
+        if SB.Length >= 2 then
+          C2 := SB.Chars[SB.Length - 2]
+        else
+          C2 := #0;
+        if SB.Length >= 3 then
+          C3 := SB.Chars[SB.Length - 3]
+        else
+          C3 := #0;
+        IsHalfForm := (C2 = b_Hasanta);
+
+        MatchRfola;
+
+        if Take > SB.Length then
+          Take := SB.Length;
+        SB.Length := SB.Length - Take;
+        SB.Append(Val);
+        Inc(I, 2);
+      end
+      else
+      begin
+        SB.Append(fConvertedText[I]);
+        Inc(I);
+      end;
+    end;
+    fConvertedText := SB.ToString;
+  finally
+    SB.Free;
+  end;
 end;
 
 { =============================================================================== }
 
 procedure TUnicodeToBijoy2000.DeNormalize;
+var
+  SB:         TStringBuilder;
+  I, J, RunLen: Integer;
 begin
   fConvertedText := ReplaceStr(fConvertedText, b_z + b_Nukta, b_y);
   fConvertedText := ReplaceStr(fConvertedText, b_dd + b_Nukta, b_rr);
   fConvertedText := ReplaceStr(fConvertedText, b_ddh + b_Nukta, b_rrh);
-  while Pos(b_Hasanta + b_Hasanta + b_Hasanta, fConvertedText) > 0 do
-    fConvertedText := ReplaceStr(fConvertedText, b_Hasanta + b_Hasanta + b_Hasanta, b_Hasanta + b_Hasanta);
+
+  // The old while Pos(HHH) + ReplaceStr loop rescanned the whole string for
+  // every long hasanta run - O(N^2) on pathological input. Collapse every run
+  // of 3+ hasantas to a pair in a single pass (a pair is a valid joiner and
+  // must be preserved).
+  SB := TStringBuilder.Create(Length(fConvertedText) + 8);
+  try
+    I := 1;
+    while I <= Length(fConvertedText) do
+    begin
+      if fConvertedText[I] = b_Hasanta then
+      begin
+        J := I;
+        while (J <= Length(fConvertedText)) and (fConvertedText[J] = b_Hasanta) do
+          Inc(J);
+        RunLen := J - I;
+        if RunLen > 2 then
+          RunLen := 2;
+        while RunLen > 0 do
+        begin
+          SB.Append(b_Hasanta);
+          Dec(RunLen);
+        end;
+        I := J;
+      end
+      else
+      begin
+        SB.Append(fConvertedText[I]);
+        Inc(I);
+      end;
+    end;
+    fConvertedText := SB.ToString;
+  finally
+    SB.Free;
+  end;
+
   fConvertedText := ReplaceStr(fConvertedText, b_Hasanta + b_z + b_Hasanta + b_r, b_Hasanta + b_r + b_Hasanta + b_z);
 end;
 
@@ -1227,9 +1522,10 @@ end;
 
 procedure TUnicodeToBijoy2000.ReArrangeKars;
 var
-  I:           Integer;
-  fKar, wCTmp: Char;
-  wSTmp:       string;
+  I, OutIdx: Integer;
+  wCTmp, fKar: Char;
+  Len: Integer;
+  TempList: TList<Char>;
 
   function MoveAbleKar(const wKar: Char): Boolean;
   begin
@@ -1241,72 +1537,83 @@ begin
   fConvertedText := ReplaceStr(fConvertedText, b_OKar, b_Ekar + b_AAKar);
   fConvertedText := ReplaceStr(fConvertedText, b_OUKar, b_Ekar + b_LengthMark);
 
-  // Bring IKar,EKar and OIkar to beginning of consonant/conjuncts
-  I := Length(fConvertedText);
-  wSTmp := '';
-  fKar := #0;
+  Len := Length(fConvertedText);
+  if Len = 0 then
+    Exit;
 
-  repeat
-    if I < 1 then
-      break;
-    wCTmp := fConvertedText[I];
+  // The old code prepended characters to a string inside the loop
+  // (wSTmp := wCTmp + wSTmp), re-allocating and copying the whole string on
+  // every character - O(N^2), the main cause of the freeze on large texts.
+  // Instead we append to a pre-allocated list while scanning backwards, then
+  // write the result back in a single O(N) pass.
+  TempList := TList<Char>.Create;
+  try
+    TempList.Capacity := Len + (Len div 4);
+    fKar := #0;
+    I := Len;
 
-    if MoveAbleKar(wCTmp) then
+    while I >= 1 do
     begin
-      if fKar <> #0 then
-        wSTmp := fKar + wSTmp;
-      fKar := wCTmp;
-    end
-    else
-    begin
-      if fKar = #0 then
-      begin // No Kar is pending
-        wSTmp := wCTmp + wSTmp;
+      wCTmp := fConvertedText[I];
+
+      if MoveAbleKar(wCTmp) then
+      begin
+        if fKar <> #0 then
+          TempList.Add(fKar);
+        fKar := wCTmp;
       end
       else
       begin
-        if (IsPureConsonent(wCTmp) = False) and (wCTmp <> b_Hasanta) and (wCTmp <> zwj) and (wCTmp <> zwnj) then
-        begin
-          if fKar <> #0 then
-          begin
-            wSTmp := wCTmp + fKar + wSTmp;
-            fKar := #0;
-          end
-          else
-            wSTmp := wCTmp + wSTmp;
+        if fKar = #0 then
+        begin // No Kar is pending
+          TempList.Add(wCTmp);
         end
         else
         begin
-          if (wCTmp = b_Hasanta) or (wCTmp = zwj) or (wCTmp = zwnj) then
+          if (IsPureConsonent(wCTmp) = False) and (wCTmp <> b_Hasanta) and (wCTmp <> zwj) and (wCTmp <> zwnj) then
           begin
-            wSTmp := wCTmp + wSTmp;
+            TempList.Add(fKar);
+            fKar := #0;
+            TempList.Add(wCTmp);
           end
-          else if IsPureConsonent(wCTmp) then
+          else
           begin
-            if (I > 1) and ((fConvertedText[I - 1] = b_Hasanta) or (fConvertedText[I - 1] = zwj) or (fConvertedText[I - 1] = zwnj)) then
-              wSTmp := wCTmp + wSTmp
-            else
+            if (wCTmp = b_Hasanta) or (wCTmp = zwj) or (wCTmp = zwnj) then
             begin
-              if fKar <> #0 then
-              begin
-                wSTmp := fKar + wCTmp + wSTmp;
-                // Place pending kar at begining
-                fKar := #0;
-              end
+              TempList.Add(wCTmp);
+            end
+            else if IsPureConsonent(wCTmp) then
+            begin
+              if (I > 1) and ((fConvertedText[I - 1] = b_Hasanta) or (fConvertedText[I - 1] = zwj) or (fConvertedText[I - 1] = zwnj)) then
+                TempList.Add(wCTmp)
               else
-                wSTmp := wCTmp + wSTmp;
+              begin
+                TempList.Add(wCTmp);
+                TempList.Add(fKar);
+                // Place pending kar at beginning
+                fKar := #0;
+              end;
             end;
           end;
         end;
       end;
+      Dec(I);
     end;
-    I := I - 1;
-  until I < 1;
 
-  if fKar <> #0 then
-    wSTmp := fKar + wSTmp;
+    if fKar <> #0 then
+      TempList.Add(fKar);
 
-  fConvertedText := wSTmp;
+    // TempList holds the output in reverse order - copy it back front-to-back.
+    SetLength(fConvertedText, TempList.Count);
+    OutIdx := 1;
+    for I := TempList.Count - 1 downto 0 do
+    begin
+      fConvertedText[OutIdx] := TempList[I];
+      Inc(OutIdx);
+    end;
+  finally
+    TempList.Free;
+  end;
 end;
 
 { =============================================================================== }
@@ -1315,13 +1622,14 @@ procedure TUnicodeToBijoy2000.ReArrangeReph;
 var
   I:           Integer;
   wCTmp:       Char;
-  wSTmp:       string;
+  Len:         Integer;
+  SB:          TStringBuilder;
   RephPending: Boolean;
 
   function MoveAbleReph: Boolean;
   begin
     Result := False;
-    if I + 1 >= Length(fConvertedText) then
+    if I + 1 >= Len then
       Exit;
 
     // To avoid reph: if the character right before 'ra' is a hasanta (b_Hasanta)
@@ -1331,7 +1639,7 @@ var
 
     if (fConvertedText[I] = b_r) and (fConvertedText[I + 1] = b_Hasanta) then
     begin
-      if (I + 2 <= Length(fConvertedText)) and ((fConvertedText[I + 2] = ' ') or (fConvertedText[I + 2] = #13)) then
+      if (I + 2 <= Len) and ((fConvertedText[I + 2] = ' ') or (fConvertedText[I + 2] = #13)) then
         Result := False
       else
         Result := True;
@@ -1339,46 +1647,54 @@ var
   end;
 
 begin
-  if Length(fConvertedText) < 3 then
+  Len := Length(fConvertedText);
+  if Len < 3 then
     Exit;
-  I := 1;
-  wSTmp := '';
-  RephPending := False;
 
-  while I <= Length(fConvertedText) do
-  begin
-    wCTmp := fConvertedText[I];
+  // The old code appended to a string inside the loop (wSTmp := wSTmp + wCTmp),
+  // re-allocating on every character - O(N^2). TStringBuilder appends in place.
+  SB := TStringBuilder.Create(Len + 64);
+  try
+    I := 1;
+    RephPending := False;
 
-    if MoveAbleReph then
+    while I <= Len do
     begin
-      RephPending := True;
-      I := I + 2;
-      Continue;
-    end;
+      wCTmp := fConvertedText[I];
 
-    wSTmp := wSTmp + wCTmp;
+      if MoveAbleReph then
+      begin
+        RephPending := True;
+        I := I + 2;
+        Continue;
+      end;
+
+      SB.Append(wCTmp);
+
+      if RephPending then
+      begin
+        if IsVowel(wCTmp) then
+        begin
+          // Keep moving
+        end
+        else if (I + 1 <= Len) and (fConvertedText[I + 1] = b_Hasanta) then
+        begin
+        end
+        else if (wCTmp <> b_Hasanta) and (wCTmp <> zwj) and (wCTmp <> zwnj) then
+        begin
+          SB.Append(A_Reph);
+          RephPending := False;
+        end;
+      end;
+      Inc(I);
+    end;
 
     if RephPending then
-    begin
-      if IsVowel(wCTmp) then
-      begin
-        // Keep moving
-      end
-      else if (I + 1 <= Length(fConvertedText)) and (fConvertedText[I + 1] = b_Hasanta) then
-      begin
-      end
-      else if (wCTmp <> b_Hasanta) and (wCTmp <> zwj) and (wCTmp <> zwnj) then
-      begin
-        wSTmp := wSTmp + A_Reph;
-        RephPending := False;
-      end;
-    end;
-    Inc(I);
+      SB.Append(A_Reph);
+    fConvertedText := SB.ToString;
+  finally
+    SB.Free;
   end;
-
-  if RephPending then
-    wSTmp := wSTmp + A_Reph;
-  fConvertedText := wSTmp;
 end;
 
 { =============================================================================== }
@@ -1528,8 +1844,11 @@ begin
 end;
 
 procedure TUnicodeToBijoy2000.ApplyRuleForKar(const KarChar: string; const Phase: string = '');
+const
+  // Maximum look-back depth needed by the cluster match (longest group entry
+  // plus the hasanta walk). Far larger than any real conjunct.
+  LookBackWindow = 64;
 var
-  I:               Integer;
   Rule:            TVowelRule;
   UseAlt:          Boolean;
   Found:           Boolean;
@@ -1537,7 +1856,9 @@ var
   SearchChar:      string;
   OccurrenceIndex: Integer;
   ClusterInfo:     TClusterMatchInfo;
-  LastPos:         Integer; // <--- new variable
+  SB:              TStringBuilder;
+  I, LW:           Integer;
+  Win:             string;
 begin
   Found := False;
   for Rule in VowelRules do
@@ -1555,54 +1876,68 @@ begin
   else
     SearchChar := KarChar;
 
-  OccurrenceIndex := 0;
-  LastPos := 1; // <--- starting position from 1
-
-  repeat
-    // PosEx is used to start searching from after the previous position
-    I := PosEx(SearchChar, fConvertedText, LastPos);
-    if I <= 0 then
-      break;
-
-    Inc(OccurrenceIndex);
-
-    if I - 1 >= 1 then
+  // The old code rebuilt the whole string for every kar occurrence
+  // (WideStuffString inside the loop) - O(N^2) on texts full of u/uu/rri.
+  // Build the output once, left to right. The cluster match must see the
+  // evolving string exactly as the in-place version would, so it is given a
+  // window = the last LookBackWindow chars of the output built so far (the
+  // evolved prefix) with the kar sitting right after the window.
+  SB := TStringBuilder.Create(Length(fConvertedText) + 16);
+  try
+    OccurrenceIndex := 0;
+    I := 1;
+    while I <= Length(fConvertedText) do
     begin
-      ClusterInfo := FindBestClusterMatch(fConvertedText, I, Rule);
-
-      if ClusterInfo.BestMatchLen > 0 then
+      if fConvertedText[I] = SearchChar[1] then
       begin
-        if (Phase <> '') and (ClusterInfo.BestMapping.ProcessPhase <> '') and (ClusterInfo.BestMapping.ProcessPhase <> Phase) then
+        Inc(OccurrenceIndex);
+
+        if SB.Length >= 1 then
         begin
-          Resolved := ResolveValue(Rule.DefaultVal);
+          LW := SB.Length;
+          if LW > LookBackWindow then
+            LW := LookBackWindow;
+          Win := SB.ToString(SB.Length - LW, LW);
+          ClusterInfo := FindBestClusterMatch(Win, LW + 1, Rule);
+
+          if ClusterInfo.BestMatchLen > 0 then
+          begin
+            if (Phase <> '') and (ClusterInfo.BestMapping.ProcessPhase <> '') and (ClusterInfo.BestMapping.ProcessPhase <> Phase) then
+            begin
+              Resolved := ResolveValue(Rule.DefaultVal);
+            end
+            else
+            begin
+              if ClusterInfo.BestMapping.ToggleOnBackspace then
+                UseAlt := GetToggleState(ClusterInfo.MatchedCluster, KarChar, OccurrenceIndex)
+              else
+                UseAlt := False;
+
+              if UseAlt and (ClusterInfo.BestMapping.Alt <> '') then
+                Resolved := ResolveValue(ClusterInfo.BestMapping.Alt)
+              else
+                Resolved := ResolveValue(ClusterInfo.BestMapping.Value);
+            end;
+          end
+          else
+            Resolved := ResolveValue(Rule.DefaultVal);
         end
         else
-        begin
-          if ClusterInfo.BestMapping.ToggleOnBackspace then
-            UseAlt := GetToggleState(ClusterInfo.MatchedCluster, KarChar, OccurrenceIndex)
-          else
-            UseAlt := False;
+          Resolved := ResolveValue(Rule.DefaultVal);
 
-          if UseAlt and (ClusterInfo.BestMapping.Alt <> '') then
-            Resolved := ResolveValue(ClusterInfo.BestMapping.Alt)
-          else
-            Resolved := ResolveValue(ClusterInfo.BestMapping.Value);
-        end;
+        SB.Append(Resolved);
+        Inc(I);
       end
       else
-        Resolved := ResolveValue(Rule.DefaultVal);
-
-      fConvertedText := WideStuffString(fConvertedText, I, 1, Resolved);
-    end
-    else
-    begin
-      Resolved := ResolveValue(Rule.DefaultVal);
-      fConvertedText := WideStuffString(fConvertedText, I, 1, Resolved);
+      begin
+        SB.Append(fConvertedText[I]);
+        Inc(I);
+      end;
     end;
-
-    // Very important: next search must start from after the current position
-    LastPos := I + Length(Resolved);
-  until I <= 0;
+    fConvertedText := SB.ToString;
+  finally
+    SB.Free;
+  end;
 end;
 
 function HasHasantaBefore(const Text: string; Pos: Integer): Boolean;
@@ -1703,10 +2038,20 @@ begin
 end;
 
 procedure TUnicodeToBijoy2000.ApplyKarInclusiveFullForms;
+const
+  // HasHasantaBefore only walks back over ZWJ/ZWNJ characters; this bound
+  // keeps the check O(1) while covering every realistic run.
+  LookBackWindow = 64;
 var
-  I, PosIdx:  Integer;
-  K, V:       string;
-  MatchStart: Integer;
+  I, J, P:   Integer;
+  K, V:      string;
+  SB:        TStringBuilder;
+  KLen:      Integer;
+  StartPos:  Integer;
+  ResumePos: Integer; // 1-based output position where the next occurrence may start
+  HPos:      Integer;
+  Match:     Boolean;
+  HasH:      Boolean;
 begin
   for I := 0 to Length(KarInclusiveReplacements) - 1 do
   begin
@@ -1715,25 +2060,59 @@ begin
     if (K = '') or (V = '') then
       Continue;
 
-    PosIdx := 1;
-    repeat
-      PosIdx := PosEx(K, fConvertedText, PosIdx);
-      if PosIdx <= 0 then
-        break;
+    KLen := Length(K);
 
-      // Checking if there's a hasanta immediately before the character (e.g., 'gu' inside 'nggu')
-      MatchStart := PosIdx;
-      if HasHasantaBefore(fConvertedText, MatchStart) then
+    // The old code rescanned with PosEx and rebuilt the whole string with
+    // WideStuffString for every occurrence - O(N^2) on texts full of the
+    // pattern. Scan once: append each character, and whenever the output tail
+    // forms K (starting at/after the resume position), apply the same
+    // hasanta-before rule as the in-place version.
+    SB := TStringBuilder.Create(Length(fConvertedText) + 8);
+    try
+      ResumePos := 1;
+      for J := 1 to Length(fConvertedText) do
       begin
-        // If hasanta exists, it's part of a conjunct, so cannot be split as a standalone 'gu'
-        Inc(PosIdx, Length(K));
-      end
-      else
-      begin
-        fConvertedText := WideStuffString(fConvertedText, PosIdx, Length(K), V);
-        Inc(PosIdx, Length(V));
+        SB.Append(fConvertedText[J]);
+
+        if SB.Length < KLen then
+          Continue;
+        StartPos := SB.Length - KLen + 1;
+        if StartPos < ResumePos then
+          Continue;
+
+        Match := True;
+        for P := 0 to KLen - 1 do
+          if SB.Chars[StartPos - 1 + P] <> K[P + 1] then
+          begin
+            Match := False;
+            Break;
+          end;
+        if not Match then
+          Continue;
+
+        // Hasanta immediately before the match? (e.g., 'gu' inside 'nggu')
+        HPos := StartPos - 1;
+        while (HPos >= 1) and (StartPos - HPos <= LookBackWindow) and
+              ((SB.Chars[HPos - 1] = zwj) or (SB.Chars[HPos - 1] = zwnj)) do
+          Dec(HPos);
+        HasH := (HPos >= 1) and (SB.Chars[HPos - 1] = b_Hasanta);
+
+        if HasH then
+        begin
+          // Part of a conjunct - keep it; continue searching right after it.
+          ResumePos := StartPos + KLen;
+        end
+        else
+        begin
+          SB.Length := StartPos - 1;
+          SB.Append(V);
+          ResumePos := SB.Length + 1;
+        end;
       end;
-    until False;
+      fConvertedText := SB.ToString;
+    finally
+      SB.Free;
+    end;
   end;
 end;
 
@@ -1754,31 +2133,63 @@ end;
 
 procedure TUnicodeToBijoy2000.ReplaceKarsVowels;
 var
-  I: Integer;
+  I:  Integer;
+  SB: TStringBuilder;
 begin
-  // Convert Ekar
-  repeat
-    I := Pos(b_Ekar, fConvertedText);
-    if I <= 0 then
-      break;
-    if ((I = 1) or (MidStr(fConvertedText, I - 1, 1) = ' ') or (MidStr(fConvertedText, I - 1, 1) = #13) or (MidStr(fConvertedText, I - 1, 1) = #10) or
-        (MidStr(fConvertedText, I - 1, 1) = #9)) then
-      fConvertedText[I] := A_EKar1
-    else
-      fConvertedText := WideStuffString(fConvertedText, I, 1, GetAnsiVarValue('A_EKar2'));
-  until I <= 0;
+  // Convert Ekar - single left-to-right pass. The old repeat/Pos loop
+  // restarted the scan and rebuilt the string for every e-kar - O(N^2) on
+  // kar-heavy text. Replacements are 1->1 so positions never shift; the
+  // predecessor check reads the output tail (the same evolved prefix).
+  SB := TStringBuilder.Create(Length(fConvertedText) + 8);
+  try
+    I := 1;
+    while I <= Length(fConvertedText) do
+    begin
+      if fConvertedText[I] = b_Ekar then
+      begin
+        if (SB.Length = 0) or (SB.Chars[SB.Length - 1] = ' ') or (SB.Chars[SB.Length - 1] = #13) or (SB.Chars[SB.Length - 1] = #10) or
+            (SB.Chars[SB.Length - 1] = #9) then
+          SB.Append(A_EKar1)
+        else
+          SB.Append(GetAnsiVarValue('A_EKar2'));
+        Inc(I);
+      end
+      else
+      begin
+        SB.Append(fConvertedText[I]);
+        Inc(I);
+      end;
+    end;
+    fConvertedText := SB.ToString;
+  finally
+    SB.Free;
+  end;
 
   // Convert OIKar
-  repeat
-    I := Pos(b_OIKar, fConvertedText);
-    if I <= 0 then
-      break;
-    if ((I = 1) or (MidStr(fConvertedText, I - 1, 1) = ' ') or (MidStr(fConvertedText, I - 1, 1) = #13) or (MidStr(fConvertedText, I - 1, 1) = #10) or
-        (MidStr(fConvertedText, I - 1, 1) = #9)) then
-      fConvertedText[I] := A_OIKar1
-    else
-      fConvertedText := WideStuffString(fConvertedText, I, 1, GetAnsiVarValue('A_OIKar2'));
-  until I <= 0;
+  SB := TStringBuilder.Create(Length(fConvertedText) + 8);
+  try
+    I := 1;
+    while I <= Length(fConvertedText) do
+    begin
+      if fConvertedText[I] = b_OIKar then
+      begin
+        if (SB.Length = 0) or (SB.Chars[SB.Length - 1] = ' ') or (SB.Chars[SB.Length - 1] = #13) or (SB.Chars[SB.Length - 1] = #10) or
+            (SB.Chars[SB.Length - 1] = #9) then
+          SB.Append(A_OIKar1)
+        else
+          SB.Append(GetAnsiVarValue('A_OIKar2'));
+        Inc(I);
+      end
+      else
+      begin
+        SB.Append(fConvertedText[I]);
+        Inc(I);
+      end;
+    end;
+    fConvertedText := SB.ToString;
+  finally
+    SB.Free;
+  end;
 
   // Convert rest of the Kars
   fConvertedText := ReplaceStr(fConvertedText, b_AAKar, A_AAKar);
@@ -1896,15 +2307,6 @@ begin
 end;
 
 { =============================================================================== }
-
-function TUnicodeToBijoy2000.WideStuffString(Source: string; Start, Len: Integer; SubString: string): string;
-var
-  FirstPart, LastPart: string;
-begin
-  FirstPart := LeftStr(Source, Start - 1);
-  LastPart := MidStr(Source, Start + Len, Length(Source));
-  Result := FirstPart + SubString + LastPart;
-end;
 
 { =============================================================================== }
 
