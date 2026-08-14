@@ -87,7 +87,7 @@ object Form1: TForm1
       TabOrder = 0
       OnClick = Button1Click
     end
-    object cbAnsiVersion: TAnsiVersionCombo
+    object cbAnsiVersion: TComboBox
       Left = 119
       Top = 3
       Width = 160
@@ -123,7 +123,7 @@ object Form1: TForm1
       TabOrder = 2
       OnClick = Button2Click
     end
-    object cbFontPicker: TFontPickerCombo
+    object cbFontPicker: TComboBox
       Left = 396
       Top = 3
       Width = 200
@@ -152,7 +152,7 @@ object Form1: TForm1
       OnClick = btnSettingsClick
     end
   end
-  object MEMO1Panel: TRoundedPanel
+  object MEMO1Panel: TPanel
     Left = 8
     Top = 56
     Width = 649
@@ -168,7 +168,6 @@ object Form1: TForm1
     FullRepaint = True
     ParentDoubleBuffered = False
     TabOrder = 2
-    OnDraw = MemoPanelPaint
     OnMouseDown = MemoPanelMouseDown
     object MEMO1: TRichEdit
       Left = 10
@@ -210,7 +209,7 @@ object Form1: TForm1
     Margins.Bottom = 0
     OnMoved = SplitterMoved
   end
-  object MEMO2Panel: TRoundedPanel
+  object MEMO2Panel: TPanel
     Left = 8
     Top = 191
     Width = 649
@@ -226,7 +225,6 @@ object Form1: TForm1
     FullRepaint = True
     ParentDoubleBuffered = False
     TabOrder = 3
-    OnDraw = MemoPanelPaint
     OnMouseDown = MemoPanelMouseDown
     object MEMO2: TRichEdit
       Left = 10
