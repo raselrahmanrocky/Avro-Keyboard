@@ -20,7 +20,12 @@ uses
   Windows;
 
 type
-  TRoundedPanel = class(TPanel)
+  // Interceptor class for TPanel (same name as the VCL base class, so the
+  // .dfm only needs the standard "TPanel" class name the IDE knows).  The
+  // form designer instantiates the plain VCL TPanel; at runtime this
+  // interceptor is used instead and provides the rounded-frame drawing
+  // (OnDraw) and flicker-free resize behaviour.
+  TPanel = class(ExtCtrls.TPanel)
     private
       FOnDraw: TNotifyEvent;
       procedure WMEraseBkgnd(var Message: TWMEraseBkgnd); message WM_ERASEBKGND;
@@ -37,7 +42,7 @@ implementation
 
 { =============================================================================== }
 
-procedure TRoundedPanel.CreateParams(var Params: TCreateParams);
+procedure TPanel.CreateParams(var Params: TCreateParams);
 begin
   inherited CreateParams(Params);
   // Panel must not over-paint its children (RichEdit) during live resize
@@ -46,7 +51,7 @@ end;
 
 { =============================================================================== }
 
-procedure TRoundedPanel.WMEraseBkgnd(var Message: TWMEraseBkgnd);
+procedure TPanel.WMEraseBkgnd(var Message: TWMEraseBkgnd);
 begin
   // Prevent background erasing to stop flicker during resize
   message.Result := 1;
@@ -54,7 +59,7 @@ end;
 
 { =============================================================================== }
 
-procedure TRoundedPanel.Paint;
+procedure TPanel.Paint;
 begin
   inherited Paint;
   if Assigned(FOnDraw) then
@@ -63,13 +68,9 @@ end;
 
 { =============================================================================== }
 
-function TRoundedPanel.Surface: TCanvas;
+function TPanel.Surface: TCanvas;
 begin
   Result := Canvas;
 end;
-
-initialization
-
-Classes.RegisterClass(TRoundedPanel);
 
 end.

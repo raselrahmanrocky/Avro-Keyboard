@@ -47,36 +47,22 @@ type
       procedure CreateParams(var Params: TCreateParams); override;
   end;
 
-  // Fully custom-painted drop-down used to pick the ANSI mapping version.
-  TAnsiVersionCombo = class(StdCtrls.TComboBox)
+  // Interceptor class for TComboBox (same name as the VCL base class, so the
+  // .dfm only needs the standard "TComboBox" class name the IDE knows).  It
+  // merges the two custom combos of this form:
+  //   * ANSI version combo (Style = csOwnerDrawFixed) - fully custom-painted
+  //     face (amber design language) and owner-drawn drop-down list.
+  //   * Font picker (Style = csDropDown) - searchable font picker with live
+  //     type-to-search filtering, click-to-open and keyboard navigation.
+  // FFontPickerMode is set by the form in FormCreate to select the behaviour.
+  TComboBox = class(StdCtrls.TComboBox)
     private
-      FHovered: Boolean;
-      FPressed: Boolean;
-      FActive:  Boolean; // drop-down list is open
-      procedure CMMouseEnter(var Message: TMessage); message CM_MOUSEENTER;
-      procedure CMMouseLeave(var Message: TMessage); message CM_MOUSELEAVE;
-      procedure WMLButtonDown(var Message: TWMLButtonDown); message WM_LBUTTONDOWN;
-      procedure WMLButtonUp(var Message: TWMLButtonUp); message WM_LBUTTONUP;
-      procedure WMSetFocus(var Message: TWMSetFocus); message WM_SETFOCUS;
-      procedure WMKillFocus(var Message: TWMKillFocus); message WM_KILLFOCUS;
-      procedure WMPaint(var Message: TWMPaint); message WM_PAINT;
-      procedure WMEraseBkgnd(var Message: TWMEraseBkgnd); message WM_ERASEBKGND;
-      procedure PaintFace(DC: HDC);
-    public
-      procedure SetDropDownActive(const Value: Boolean);
-  end;
-
-  // Original window procedure of the combo's inner EDIT control.
-  TFontPickerEditWndProc = function(hWnd: hWnd; uMsg: UINT; wParam: wParam; lParam: lParam): LRESULT stdcall;
-
-  // Theme modes offered by the settings gear menu.
-  TThemeMode = (tmSystem, tmLight, tmDark);
-
-  // Editable combo (csDropDown face) whose drop-down list is owner-drawn with
-  // the app's amber design language, supporting live type-to-search filtering,
-  // click-to-open, and keyboard navigation (Up/Down/Enter/Escape).
-  TFontPickerCombo = class(StdCtrls.TComboBox)
-    private
+      // Shared face state
+      FHovered:      Boolean;
+      FPressed:      Boolean;
+      FActive:       Boolean; // ANSI version combo: drop-down list is open
+      FFontPickerMode: Boolean; // this instance is the searchable font picker
+      // Font-picker state
       FFullFontList: TStringList; // Master list of every installed font
       FActiveFont:   string;      // Last committed font
       FSearchText:   string;      // Search text kept while navigating
@@ -87,14 +73,16 @@ type
       FEditHandle:   hWnd;        // Inner EDIT control (keyboard/mouse focus target)
       FDefEditProc:  Pointer;     // Original window proc of the inner EDIT
       FClickWasOpen: Boolean;     // Drop-down was open at WM_LBUTTONDOWN
-      FHovered:      Boolean;
       procedure ApplyEditCentering; // ES_LEFT + vertical centering of the edit text
       procedure CMMouseEnter(var Message: TMessage); message CM_MOUSEENTER;
       procedure CMMouseLeave(var Message: TMessage); message CM_MOUSELEAVE;
+      procedure WMLButtonDown(var Message: TWMLButtonDown); message WM_LBUTTONDOWN;
+      procedure WMLButtonUp(var Message: TWMLButtonUp); message WM_LBUTTONUP;
       procedure WMSetFocus(var Message: TWMSetFocus); message WM_SETFOCUS;
       procedure WMKillFocus(var Message: TWMKillFocus); message WM_KILLFOCUS;
       procedure WMPaint(var Message: TWMPaint); message WM_PAINT;
       procedure WMEraseBkgnd(var Message: TWMEraseBkgnd); message WM_ERASEBKGND;
+      procedure PaintFace(DC: HDC);
       procedure PaintBorder(DC: HDC);
       procedure DrawDropDownItem(DC: HDC; Index: Integer; Rect: TRect; State: TOwnerDrawState);
       function ListHandle: hWnd;
@@ -110,6 +98,7 @@ type
     public
       constructor Create(AOwner: TComponent); override;
       destructor Destroy; override;
+      procedure SetDropDownActive(const Value: Boolean);
       procedure LoadFonts;
       function FindFontIndex(const AName: string): Integer;
       procedure SetActiveFont(const AName: string);
@@ -122,18 +111,25 @@ type
       function FontExists(const AName: string): Boolean;
       property ActiveFont: string read FActiveFont write FActiveFont;
       property IsUpdating: Boolean read FUpdating;
+      property FontPickerMode: Boolean read FFontPickerMode write FFontPickerMode;
   end;
+
+  // Original window procedure of the combo's inner EDIT control.
+  TFontPickerEditWndProc = function(hWnd: hWnd; uMsg: UINT; wParam: wParam; lParam: lParam): LRESULT stdcall;
+
+  // Theme modes offered by the settings gear menu.
+  TThemeMode = (tmSystem, tmLight, tmDark);
 
   TForm1 = class(TForm)
     MEMO1: TRichEdit;
     MEMO2: TRichEdit;
-    MEMO1Panel: TRoundedPanel;
-    MEMO2Panel: TRoundedPanel;
+    MEMO1Panel: TPanel;
+    MEMO2Panel: TPanel;
     Button1: TButton;
     Button2: TButton;
     LabelAnsi: TLabel;
-    cbAnsiVersion: TAnsiVersionCombo;
-    cbFontPicker: TFontPickerCombo;
+    cbAnsiVersion: TComboBox;
+    cbFontPicker: TComboBox;
     Progress: TProgressBar;
     Label_OmicronLab: TLabel;
     AppEvents: TApplicationEvents;
@@ -199,7 +195,7 @@ type
       function ReadConverterThemeMode: TThemeMode;
       procedure StartConversion(UnicodeToAnsi: Boolean);
       procedure CompleteConversion(UnicodeToAnsi: Boolean; const OutText, ErrMsg: string);
-      procedure LoadMemoText(RE: TRichEdit; const Text, FontName: string; FontSize: Integer; Charset: Byte);
+      procedure LoadMemoText(RE: TRichEdit; const Text, FontName: string; FontSize: Integer; Charset: Byte; RestoreCaret: Integer = -1);
 
       procedure AppEventsMessage(var Msg: TMsg; var Handled: Boolean);
       procedure WMFocusMemo(var Message: TMessage); message WM_APP + 1;
@@ -208,6 +204,12 @@ type
       procedure HandleThemes;
       procedure ApplyFontToMemo2(const FontName: string);
       procedure MakeTextJustified(RE: TRichEdit);
+      // Applies PFA_JUSTIFY to a range (ASelEnd = -1 means to end of text).
+      procedure SetMemoJustify(RE: TRichEdit; ASelStart, ASelEnd: Integer);
+      // Re-asserts margins + EM_SETTARGETDEVICE so wrapping tracks the width.
+      procedure RefreshMemoWrap(RE: TRichEdit);
+      // Applies a colour to every character in one SCF_ALL pass (theme switch).
+      procedure ApplyMemoTextColor(RE: TRichEdit; AColor: TColor);
       procedure Splitter1CanResize(Sender: TObject; var NewSize: Integer; var Accept: Boolean);
       procedure PasteToPopupMemo(Target: TRichEdit = nil);
       procedure SaveConverterSetting(const Name, Value: string);
@@ -334,55 +336,70 @@ begin
 end;
 
 { =============================================================================== }
-{ TAnsiVersionCombo }
+{ TComboBox: ANSI version combo face painting }
 { =============================================================================== }
 
-procedure TAnsiVersionCombo.CMMouseEnter(var Message: TMessage);
+procedure TComboBox.CMMouseEnter(var Message: TMessage);
 begin
   FHovered := True;
   Invalidate;
   inherited;
 end;
 
-procedure TAnsiVersionCombo.CMMouseLeave(var Message: TMessage);
+procedure TComboBox.CMMouseLeave(var Message: TMessage);
 begin
   FHovered := False;
   Invalidate;
   inherited;
 end;
 
-procedure TAnsiVersionCombo.WMLButtonDown(var Message: TWMLButtonDown);
+procedure TComboBox.WMLButtonDown(var Message: TWMLButtonDown);
 begin
   FPressed := True;
   Invalidate;
   inherited;
 end;
 
-procedure TAnsiVersionCombo.WMLButtonUp(var Message: TWMLButtonUp);
+procedure TComboBox.WMLButtonUp(var Message: TWMLButtonUp);
 begin
   FPressed := False;
   Invalidate;
   inherited;
 end;
 
-procedure TAnsiVersionCombo.WMSetFocus(var Message: TWMSetFocus);
+procedure TComboBox.WMSetFocus(var Message: TWMSetFocus);
 begin
   Invalidate;
   inherited;
 end;
 
-procedure TAnsiVersionCombo.WMKillFocus(var Message: TWMKillFocus);
+procedure TComboBox.WMKillFocus(var Message: TWMKillFocus);
 begin
   Invalidate;
   inherited;
+  // Font picker only: restore the active font when the user leaves the
+  // search box half-typed or empty.
+  if FFontPickerMode and ((Text = '') or not FontExists(Text)) then
+  begin
+    FUpdating := True;
+    try
+      Text := FActiveFont;
+
+      // ফোকাস সরার সময় যেন সিলেক্ট না হয়:
+      SelStart := Length(FActiveFont);
+      SelLength := 0;
+    finally
+      FUpdating := False;
+    end;
+  end;
 end;
 
-procedure TAnsiVersionCombo.WMEraseBkgnd(var Message: TWMEraseBkgnd);
+procedure TComboBox.WMEraseBkgnd(var Message: TWMEraseBkgnd);
 begin
   message.Result := 1;
 end;
 
-procedure TAnsiVersionCombo.SetDropDownActive(const Value: Boolean);
+procedure TComboBox.SetDropDownActive(const Value: Boolean);
 begin
   FActive := Value;
   if not Value then
@@ -390,37 +407,7 @@ begin
   Invalidate;
 end;
 
-procedure TAnsiVersionCombo.WMPaint(var Message: TWMPaint);
-var
-  DC, MemDC: HDC;
-  PS:        TPaintStruct;
-  Bmp, Old:  HBITMAP;
-begin
-  if message.DC <> 0 then
-  begin
-    PaintFace(message.DC);
-    Exit;
-  end;
-
-  DC := BeginPaint(Handle, PS);
-  try
-    MemDC := CreateCompatibleDC(DC);
-    Bmp := CreateCompatibleBitmap(DC, Width, Height);
-    Old := SelectObject(MemDC, Bmp);
-    try
-      PaintFace(MemDC);
-      BitBlt(DC, 0, 0, Width, Height, MemDC, 0, 0, SRCCOPY);
-    finally
-      SelectObject(MemDC, Old);
-      DeleteObject(Bmp);
-      DeleteDC(MemDC);
-    end;
-  finally
-    EndPaint(Handle, PS);
-  end;
-end;
-
-procedure TAnsiVersionCombo.PaintFace(DC: HDC);
+procedure TComboBox.PaintFace(DC: HDC);
 var
   C:                                    TCanvas;
   R, TextR, GlyphR:                     TRect;
@@ -571,7 +558,7 @@ begin
   R := FullR;
   InflateRect(R, -4, -4);
 
-  with TRoundedPanel(APanel).Surface do
+  with TPanel(APanel).Surface do
   begin
     // ১. প্যানেল মার্জিন
     Brush.Color := ParentBg;
@@ -886,10 +873,60 @@ begin
   CopyMemoWithFont(PopupMemo);
 end;
 
+{ Applies PFA_JUSTIFY to the given range only - the single place paragraph
+  alignment is set, so LoadMemoText, MakeTextJustified and the paste path all
+  agree.  ASelEnd = -1 extends the selection to the end of the document. }
+procedure TForm1.SetMemoJustify(RE: TRichEdit; ASelStart, ASelEnd: Integer);
+var
+  ParaFormat: PARAFORMAT2;
+begin
+  if not RE.HandleAllocated then
+    Exit;
+  FillChar(ParaFormat, SizeOf(ParaFormat), 0);
+  ParaFormat.cbSize := SizeOf(ParaFormat);
+  ParaFormat.dwMask := PFM_ALIGNMENT;
+  ParaFormat.wAlignment := PFA_JUSTIFY;
+
+  SendMessage(RE.Handle, EM_SETSEL, WPARAM(ASelStart), WPARAM(ASelEnd));
+  SendMessage(RE.Handle, EM_SETPARAFORMAT, 0, LPARAM(@ParaFormat));
+end;
+
+{ Re-asserts the word-wrap boundary: EM_SETMARGINS keeps the format rectangle
+  inset constant (6 px each side, matching FormCreate) and EM_SETTARGETDEVICE
+  with a nil DC makes the control re-wrap to its current client width - this
+  tracks the vertical scrollbar exactly.  Call after any resize or content
+  change that alters the available width; otherwise the wrap boundary stays at
+  an old/narrower width and text wraps early, leaving an uneven gap on the
+  right edge. }
+procedure TForm1.RefreshMemoWrap(RE: TRichEdit);
+begin
+  if not RE.HandleAllocated then
+    Exit;
+  SendMessage(RE.Handle, EM_SETMARGINS, EC_LEFTMARGIN or EC_RIGHTMARGIN, MakeLParam(6, 6));
+  SendMessage(RE.Handle, EM_SETTARGETDEVICE, 0, 0);
+end;
+
+{ Applies the given colour to every character of the document with a single
+  EM_SETCHARFORMAT SCF_ALL pass - no SelectAll/SelAttributes round-trips, so
+  a live theme switch stays instant even on very large documents. }
+procedure TForm1.ApplyMemoTextColor(RE: TRichEdit; AColor: TColor);
+var
+  CF: TCharFormat2;
+begin
+  if not RE.HandleAllocated then
+    Exit;
+  FillChar(CF, SizeOf(CF), 0);
+  CF.cbSize := SizeOf(CF);
+  CF.dwMask := CFM_COLOR;
+  CF.crTextColor := ColorToRGB(AColor);
+  SendMessage(RE.Handle, EM_SETCHARFORMAT, SCF_ALL, LPARAM(@CF));
+end;
+
 procedure TForm1.PasteToPopupMemo(Target: TRichEdit = nil);
 var
-  M:        TRichEdit;
-  ClipText: string;
+  M:                   TRichEdit;
+  ClipText:            string;
+  InsertAt, InsertEnd: Integer;
 begin
   // An explicit Target (Ctrl+V resolves it from the keyboard focus) is used
   // as-is; a nil Target resolves via PopupMemo, which prefers the memo the
@@ -912,6 +949,10 @@ begin
 
     SendMessage(M.Handle, WM_SETREDRAW, 0, 0);
     try
+      // Where the insertion starts (caret, or the start of the selection it
+      // replaces) - the pasted range is justified without touching the rest.
+      InsertAt := M.SelStart;
+
       // ১. কার্সার পজিশনে বর্তমান ফন্ট সাইজ ও সঠিক কালার নিশ্চিত করা
       M.SelAttributes.Name := M.Font.Name;
       M.SelAttributes.Size := M.Font.Size;
@@ -921,7 +962,14 @@ begin
       // ২. wParam = 1 দিয়ে টেক্সট ইনসার্ট করা (wParam = 1 দিলে এটি Undo/Redo করা যায়)
       SendMessage(M.Handle, EM_REPLACESEL, 1, lParam(PChar(ClipText)));
 
-      SendMessage(M.Handle, EM_SETTARGETDEVICE, 0, 0);
+      // After EM_REPLACESEL the caret sits at the end of the inserted text:
+      // justify exactly that range (same PFA_JUSTIFY as the rest of the memo)
+      // and re-assert the wrap boundary to the current client width.
+      InsertEnd := M.SelStart;
+      SetMemoJustify(M, InsertAt, InsertEnd);
+      M.SelStart := InsertEnd;
+      M.SelLength := 0;
+      RefreshMemoWrap(M);
     finally
       SendMessage(M.Handle, WM_SETREDRAW, 1, 0);
       M.Invalidate;
@@ -949,7 +997,6 @@ end;
 
 procedure TForm1.MakeTextJustified(RE: TRichEdit);
 var
-  ParaFormat:              PARAFORMAT2;
   TextColor:               TColor;
   CF:                      TCharFormat2;
   SavedStart, SavedLength: Integer;
@@ -961,15 +1008,9 @@ begin
     SavedStart := RE.SelStart;
     SavedLength := RE.SelLength;
 
-    FillChar(ParaFormat, SizeOf(ParaFormat), 0);
-    ParaFormat.cbSize := SizeOf(ParaFormat);
-    ParaFormat.dwMask := PFM_ALIGNMENT;
-    ParaFormat.wAlignment := PFA_JUSTIFY;
-
-    // Paragraph alignment needs a selection - EM_SETSEL(0, -1) selects the
-    // whole document without the VCL SelectAll overhead; restored below.
-    SendMessage(RE.Handle, EM_SETSEL, 0, -1);
-    SendMessage(RE.Handle, EM_SETPARAFORMAT, 0, lParam(@ParaFormat));
+    // Whole-document justification via the shared routine - EM_SETSEL(0, -1)
+    // selects everything without the VCL SelectAll overhead; restored below.
+    SetMemoJustify(RE, 0, -1);
 
     TextColor := StyleServices.GetSystemColor(clWindowText);
 
@@ -991,7 +1032,7 @@ begin
     RE.SelStart := SavedStart;
     RE.SelLength := SavedLength;
 
-    SendMessage(RE.Handle, EM_SETTARGETDEVICE, 0, 0);
+    RefreshMemoWrap(RE);
   finally
     // ২. রিড্র চালু ও সিলেকশন আনহাইড করা
     SendMessage(RE.Handle, WM_SETREDRAW, 1, 0);
@@ -1422,8 +1463,8 @@ end;
 
 procedure TForm1.HandleThemes;
 var
-  TextColor, DarkBg: TColor;
-  IsDark:            Boolean;
+  TextColor, FaceColor, WindowColor, DarkBg: TColor;
+  IsDark:                                    Boolean;
 begin
   case FCurrentThemeMode of
     tmSystem:
@@ -1442,7 +1483,11 @@ begin
     ((GetRValue(ColorToRGB(StyleServices.GetSystemColor(clBtnFace))) + GetGValue(ColorToRGB(StyleServices.GetSystemColor(clBtnFace))) +
         GetBValue(ColorToRGB(StyleServices.GetSystemColor(clBtnFace)))) < 384);
 
+  // Resolve the theme palette once - every control below uses these values,
+  // so the whole form switches colours in one consistent pass.
   TextColor := StyleServices.GetSystemColor(clWindowText);
+  FaceColor := StyleServices.GetSystemColor(clBtnFace);
+  WindowColor := StyleServices.GetSystemColor(clWindow);
 
   if IsDark then
   begin
@@ -1478,16 +1523,26 @@ begin
     MEMO1.StyleElements := [seFont, seClient, seBorder];
     MEMO2.StyleElements := [seFont, seClient, seBorder];
 
-    Self.Color := StyleServices.GetSystemColor(clBtnFace);
+    Self.Color := FaceColor;
 
+    // Explicitly reset the Color each panel was given in dark mode.
+    // ParentBackground := True alone is not enough here: the rounded-panel
+    // interceptor swallows WM_ERASEBKGND and the buffered paint can keep
+    // the stale #1f1f1f colour otherwise.
     PanelButton.ParentBackground := True;
+    PanelButton.Color := FaceColor;
+
     PanelFooter.ParentBackground := True;
+    PanelFooter.Color := FaceColor;
 
     MEMO1Panel.ParentBackground := True;
-    MEMO2Panel.ParentBackground := True;
+    MEMO1Panel.Color := FaceColor;
 
-    MEMO1.Color := StyleServices.GetSystemColor(clWindow);
-    MEMO2.Color := StyleServices.GetSystemColor(clWindow);
+    MEMO2Panel.ParentBackground := True;
+    MEMO2Panel.Color := FaceColor;
+
+    MEMO1.Color := WindowColor;
+    MEMO2.Color := WindowColor;
 
     // লাইট মোডে হালকা গ্রে স্প্লিটার বর্ডার
     Splitter1.Color := RGB(220, 220, 220);
@@ -1495,22 +1550,32 @@ begin
 
   // RichEdit নেটিভ ব্যাকগ্রাউন্ড ওয়াশ আপডেট
   SendMessage(MEMO1.Handle, EM_SETBKGNDCOLOR, 0, ColorToRGB(MEMO1.Color));
-  MEMO1.Font.Color := TextColor;
-  MEMO1.SelectAll;
-  MEMO1.SelAttributes.Color := TextColor;
-  MEMO1.SelLength := 0;
-  SendMessage(MEMO1.Handle, EM_SETTARGETDEVICE, 0, 0);
-
   SendMessage(MEMO2.Handle, EM_SETBKGNDCOLOR, 0, ColorToRGB(MEMO2.Color));
+
+  // Control font and the default for newly typed text follow the theme too.
+  MEMO1.Font.Color := TextColor;
   MEMO2.Font.Color := TextColor;
-  MEMO2.SelectAll;
-  MEMO2.SelAttributes.Color := TextColor;
-  MEMO2.SelLength := 0;
-  SendMessage(MEMO2.Handle, EM_SETTARGETDEVICE, 0, 0);
+  MEMO1.DefAttributes.Color := TextColor;
+  MEMO2.DefAttributes.Color := TextColor;
+
+  // Whole-document text colour in one SCF_ALL pass per memo - no
+  // SelectAll/SelAttributes round-trips, so the switch stays instant.
+  ApplyMemoTextColor(MEMO1, TextColor);
+  ApplyMemoTextColor(MEMO2, TextColor);
+
+  // Re-assert the wrap boundary (target device + margins) to the current
+  // client width after the style change.
+  RefreshMemoWrap(MEMO1);
+  RefreshMemoWrap(MEMO2);
 
   MEMO1Panel.Invalidate;
   MEMO2Panel.Invalidate;
   cbAnsiVersion.Invalidate;
+
+  // Force every child to repaint now so no stale buffered background (e.g.
+  // the dark #1f1f1f) survives the switch - RDW_ERASE re-sends
+  // WM_ERASEBKGND to the whole window hierarchy.
+  RedrawWindow(Handle, nil, 0, RDW_INVALIDATE or RDW_ALLCHILDREN or RDW_UPDATENOW or RDW_ERASE);
 end;
 
 { Applies the selected theme, refreshes the UI colours and persists the
@@ -1611,11 +1676,12 @@ end;
 // streamed text inherits font/size/color and justification automatically;
 // one EM_STREAMIN (SF_UNICODE) then replaces the whole document in a single
 // pass (~5x faster than Text :=, and no post-load formatting passes at all).
-procedure TForm1.LoadMemoText(RE: TRichEdit; const Text, FontName: string; FontSize: Integer; Charset: Byte);
+procedure TForm1.LoadMemoText(RE: TRichEdit; const Text, FontName: string; FontSize: Integer; Charset: Byte; RestoreCaret: Integer = -1);
 var
-  Stream: TStringStream;
-  ES:     TEditStream;
-  PF:     PARAFORMAT2;
+  Stream:   TStringStream;
+  ES:       TEditStream;
+  PF:       PARAFORMAT2;
+  CaretPos: Integer;
 begin
   // Select everything - EM_STREAMIN replaces the current selection, so this
   // swaps the whole document in one pass (no separate Clear).
@@ -1645,12 +1711,32 @@ begin
   finally
     Stream.Free;
   end;
+
+  // Make justification explicit on the streamed document (idempotent - the
+  // default set above is what new text inherits) and refresh the wrap
+  // boundary so the text re-wraps edge-to-edge at the current client width.
+  SetMemoJustify(RE, 0, -1);
+  RefreshMemoWrap(RE);
+
+  // Restore the caret to its pre-conversion position, clamped to the new
+  // document length (the converted text may be shorter than what was there
+  // before) so EM_SETSEL can never point past the buffer.  EM_SETSEL(x, x)
+  // also clears any selection, so no blue highlight survives the conversion,
+  // and EM_SCROLLCARET keeps the caret visible.  Runs inside the caller's
+  // WM_SETREDRAW-off window, so there is no flicker.
+  if RestoreCaret >= 0 then
+  begin
+    CaretPos := Math.Min(RestoreCaret, Length(Text));
+    SendMessage(RE.Handle, EM_SETSEL, CaretPos, CaretPos);
+    SendMessage(RE.Handle, EM_SCROLLCARET, 0, 0);
+  end;
 end;
 
 procedure TForm1.CompleteConversion(UnicodeToAnsi: Boolean; const OutText, ErrMsg: string);
 var
   Target:     TRichEdit;
   ActiveFont: string;
+  SavedCaret: Integer;
 begin
   Progress.Visible := False;
   LblFooter.Visible := True;
@@ -1674,9 +1760,13 @@ begin
     if ActiveFont = '' then
       ActiveFont := Target.Font.Name;
 
+    // Remember where the caret is in the output memo before the whole
+    // document is replaced, so it can be restored after the conversion.
+    SavedCaret := Target.SelStart;
+
     SendMessage(Target.Handle, WM_SETREDRAW, 0, 0);
     try
-      LoadMemoText(Target, OutText, ActiveFont, Target.Font.Size, ANSI_CHARSET);
+      LoadMemoText(Target, OutText, ActiveFont, Target.Font.Size, ANSI_CHARSET, SavedCaret);
       cbFontPicker.ActiveFont := ActiveFont;
     finally
       SendMessage(Target.Handle, WM_SETREDRAW, 1, 0);
@@ -1686,9 +1776,13 @@ begin
   else
   begin
     Target := MEMO1;
+    // Remember where the caret is in the output memo before the whole
+    // document is replaced, so it can be restored after the conversion.
+    SavedCaret := Target.SelStart;
+
     SendMessage(Target.Handle, WM_SETREDRAW, 0, 0);
     try
-      LoadMemoText(Target, OutText, Target.Font.Name, Target.Font.Size, Target.Font.Charset);
+      LoadMemoText(Target, OutText, Target.Font.Name, Target.Font.Size, Target.Font.Charset, SavedCaret);
     finally
       SendMessage(Target.Handle, WM_SETREDRAW, 1, 0);
       Target.Invalidate;
@@ -1844,14 +1938,14 @@ begin
 end;
 
 { =============================================================================== }
-{ TFontPickerCombo: editable, owner-drawn, type-to-search font picker }
+{ TComboBox: editable, owner-drawn, type-to-search font picker }
 { =============================================================================== }
 
 function FontPickerEditProc(hWnd: hWnd; uMsg: UINT; wParam: wParam; lParam: lParam): LRESULT stdcall;
 var
-  Combo: TFontPickerCombo;
+  Combo: TComboBox;
 begin
-  Combo := TFontPickerCombo(GetProp(hWnd, 'AvroFontPicker'));
+  Combo := TComboBox(GetProp(hWnd, 'AvroFontPicker'));
   if Combo = nil then
   begin
     Result := DefWindowProc(hWnd, uMsg, wParam, lParam);
@@ -1923,7 +2017,7 @@ begin
   end;
 end;
 
-function TFontPickerCombo.HandleEditKey(uMsg: UINT; wParam: wParam; lParam: lParam): Boolean;
+function TComboBox.HandleEditKey(uMsg: UINT; wParam: wParam; lParam: lParam): Boolean;
 var
   Key: Word;
 begin
@@ -1961,7 +2055,7 @@ begin
   end;
 end;
 
-constructor TFontPickerCombo.Create(AOwner: TComponent);
+constructor TComboBox.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
   FFullFontList := TStringList.Create;
@@ -1973,23 +2067,30 @@ begin
   AutoDropDown := False;
 end;
 
-destructor TFontPickerCombo.Destroy;
+destructor TComboBox.Destroy;
 begin
   FFullFontList.Free;
   inherited Destroy;
 end;
 
-procedure TFontPickerCombo.CreateParams(var Params: TCreateParams);
+procedure TComboBox.CreateParams(var Params: TCreateParams);
 begin
   inherited CreateParams(Params);
-  Params.Style := Params.Style or CBS_OWNERDRAWFIXED;
+  // The font picker is a csDropDown combo in the .dfm but owner-drawn at
+  // runtime; the ANSI version combo is already csOwnerDrawFixed from the .dfm.
+  if FFontPickerMode then
+    Params.Style := Params.Style or CBS_OWNERDRAWFIXED;
 end;
 
-procedure TFontPickerCombo.CreateWnd;
+procedure TComboBox.CreateWnd;
 var
   Info: TComboBoxInfo;
 begin
   inherited CreateWnd;
+  // Sub-classing the inner edit is only meaningful for the searchable font
+  // picker; the ANSI version combo paints its own face and has no edit text.
+  if not FFontPickerMode then
+    Exit;
   SendMessage(Handle, CB_SETITEMHEIGHT, 0, ItemHeight);
 
   FillChar(Info, SizeOf(Info), 0);
@@ -2005,7 +2106,7 @@ begin
   ApplyEditCentering;
 end;
 
-procedure TFontPickerCombo.ApplyEditCentering;
+procedure TComboBox.ApplyEditCentering;
 var
   DC:                   HDC;
   TM:                   TTextMetric;
@@ -2072,9 +2173,9 @@ begin
   SetWindowPos(FEditHandle, 0, WR.Left - ClientOrigin.X, NewTop, WR.Right - WR.Left, NewH, SWP_NOZORDER or SWP_NOACTIVATE);
 end;
 
-procedure TFontPickerCombo.DestroyWnd;
+procedure TComboBox.DestroyWnd;
 begin
-  if (FEditHandle <> 0) and Assigned(FDefEditProc) then
+  if FFontPickerMode and (FEditHandle <> 0) and Assigned(FDefEditProc) then
   begin
     SetWindowLongPtr(FEditHandle, GWLP_WNDPROC, LONG_PTR(FDefEditProc));
     RemoveProp(FEditHandle, 'AvroFontPicker');
@@ -2084,60 +2185,12 @@ begin
   inherited DestroyWnd;
 end;
 
-procedure TFontPickerCombo.CMMouseEnter(var Message: TMessage);
-begin
-  FHovered := True;
-  Invalidate;
-  inherited;
-end;
-
-procedure TFontPickerCombo.CMMouseLeave(var Message: TMessage);
-begin
-  FHovered := False;
-  Invalidate;
-  inherited;
-end;
-
-procedure TFontPickerCombo.WMSetFocus(var Message: TWMSetFocus);
-begin
-  // Focus alone (startup, Tab) must never auto-open the drop-down.
-  // The list opens only on an explicit click (edit sub-class) or when
-  // the user actively types a character (FilterList).
-  Invalidate;
-  inherited;
-end;
-
-procedure TFontPickerCombo.WMKillFocus(var Message: TWMKillFocus);
-begin
-  Invalidate;
-  inherited;
-  // Restore active font if left half-typed or empty
-  if (Text = '') or not FontExists(Text) then
-  begin
-    FUpdating := True;
-    try
-      Text := FActiveFont;
-
-      // ✅ ফোকাস সরার সময় যেন সিলেক্ট না হয়:
-      SelStart := Length(FActiveFont);
-      SelLength := 0;
-    finally
-      FUpdating := False;
-    end;
-  end;
-end;
-
-procedure TFontPickerCombo.WMEraseBkgnd(var Message: TWMEraseBkgnd);
-begin
-  message.Result := 1;
-end;
-
-function TFontPickerCombo.HasInputFocus: Boolean;
+function TComboBox.HasInputFocus: Boolean;
 begin
   Result := (GetFocus = Handle) or IsChild(Handle, GetFocus);
 end;
 
-procedure TFontPickerCombo.PaintBorder(DC: HDC);
+procedure TComboBox.PaintBorder(DC: HDC);
 var
   C:           TCanvas;
   R:           TRect;
@@ -2169,7 +2222,7 @@ begin
   end;
 end;
 
-procedure TFontPickerCombo.WMPaint(var Message: TWMPaint);
+procedure TComboBox.WMPaint(var Message: TWMPaint);
 var
   DC, MemDC: HDC;
   PS:        TPaintStruct;
@@ -2177,7 +2230,10 @@ var
 begin
   if message.DC <> 0 then
   begin
-    PaintBorder(message.DC);
+    if FFontPickerMode then
+      PaintBorder(message.DC)
+    else
+      PaintFace(message.DC);
     Exit;
   end;
 
@@ -2187,7 +2243,10 @@ begin
     Bmp := CreateCompatibleBitmap(DC, Width, Height);
     Old := SelectObject(MemDC, Bmp);
     try
-      PaintBorder(MemDC);
+      if FFontPickerMode then
+        PaintBorder(MemDC)
+      else
+        PaintFace(MemDC);
       BitBlt(DC, 0, 0, Width, Height, MemDC, 0, 0, SRCCOPY);
     finally
       SelectObject(MemDC, Old);
@@ -2199,7 +2258,7 @@ begin
   end;
 end;
 
-procedure TFontPickerCombo.DrawDropDownItem(DC: HDC; Index: Integer; Rect: TRect; State: TOwnerDrawState);
+procedure TComboBox.DrawDropDownItem(DC: HDC; Index: Integer; Rect: TRect; State: TOwnerDrawState);
 var
   C:                 TCanvas;
   Text:              string;
@@ -2243,7 +2302,7 @@ begin
   end;
 end;
 
-function TFontPickerCombo.ListHandle: hWnd;
+function TComboBox.ListHandle: hWnd;
 var
   Info: TComboBoxInfo;
 begin
@@ -2254,7 +2313,7 @@ begin
     Result := Info.hwndList;
 end;
 
-procedure TFontPickerCombo.UpdateListCursor;
+procedure TComboBox.UpdateListCursor;
 var
   LH: hWnd;
 begin
@@ -2269,7 +2328,7 @@ begin
     SendMessage(LH, LB_SETCURSEL, FCursorIndex, 0);
 end;
 
-procedure TFontPickerCombo.MoveCursor(Delta: Integer);
+procedure TComboBox.MoveCursor(Delta: Integer);
 var
   SaveText:               string;
   OldSelStart, OldSelLen: Integer;
@@ -2302,7 +2361,7 @@ begin
   Invalidate;
 end;
 
-function TFontPickerCombo.FindFontIndex(const AName: string): Integer;
+function TComboBox.FindFontIndex(const AName: string): Integer;
 begin
   for Result := 0 to FFullFontList.Count - 1 do
     if SameText(FFullFontList[Result], AName) then
@@ -2310,7 +2369,7 @@ begin
   Result := -1;
 end;
 
-procedure TFontPickerCombo.LoadFonts;
+procedure TComboBox.LoadFonts;
 begin
   FFullFontList.Assign(Screen.Fonts);
   FUpdating := True;
@@ -2321,7 +2380,7 @@ begin
   end;
 end;
 
-procedure TFontPickerCombo.SetActiveFont(const AName: string);
+procedure TComboBox.SetActiveFont(const AName: string);
 begin
   FActiveFont := AName;
   FUpdating := True;
@@ -2336,7 +2395,7 @@ begin
   end;
 end;
 
-procedure TFontPickerCombo.HandleDropDown;
+procedure TComboBox.HandleDropDown;
 var
   WasUpdating: Boolean;
 begin
@@ -2357,7 +2416,7 @@ begin
   end;
 end;
 
-procedure TFontPickerCombo.FilterList(const AText: string);
+procedure TComboBox.FilterList(const AText: string);
 var
   I, OldSelStart, OldSelLen: Integer;
   MatchingFonts:             TStringList;
@@ -2444,7 +2503,7 @@ begin
   end;
 end;
 
-procedure TFontPickerCombo.RestoreFullList;
+procedure TComboBox.RestoreFullList;
 var
   SaveText: string;
   Idx:      Integer;
@@ -2474,7 +2533,7 @@ begin
   end;
 end;
 
-procedure TFontPickerCombo.CommitCursor(ACloseDropDown: Boolean);
+procedure TComboBox.CommitCursor(ACloseDropDown: Boolean);
 var
   LH:       hWnd;
   N:        Integer;
@@ -2537,7 +2596,7 @@ begin
   Invalidate;
 end;
 
-procedure TFontPickerCombo.CancelFilter;
+procedure TComboBox.CancelFilter;
 begin
   FUpdating := True;
   try
@@ -2556,7 +2615,7 @@ begin
   Invalidate;
 end;
 
-function TFontPickerCombo.FilterAndGetExact: string;
+function TComboBox.FilterAndGetExact: string;
 var
   Idx: Integer;
 begin
@@ -2569,83 +2628,92 @@ begin
     Result := FFullFontList[Idx];
 end;
 
-function TFontPickerCombo.FontExists(const AName: string): Boolean;
+function TComboBox.FontExists(const AName: string): Boolean;
 begin
   Result := (AName <> '') and (FFullFontList.IndexOf(AName) >= 0);
 end;
 
-procedure TFontPickerCombo.WndProc(var Message: TMessage);
+procedure TComboBox.WndProc(var Message: TMessage);
 var
   Idx: Integer;
 begin
-  case message.Msg of
-    // Keep the standard arrow cursor visible over the combo face and its
-    // dropped-down list - same reason as in FontPickerEditProc: the system
-    // may not refresh the cursor while the list holds mouse capture.
-    WM_SETCURSOR:
-      begin
-        SetCursor(LoadCursor(0, IDC_ARROW));
-        message.Result := 1;
-        Exit;
-      end;
-    WM_KEYDOWN:
-      begin
-        if HandleEditKey(message.Msg, message.wParam, message.lParam) then
+  // The font picker's custom handling (search filtering, keyboard navigation,
+  // commit-on-click, owner-drawn list) must not affect the ANSI version combo,
+  // which relies on the native combo behaviour and its own OnDrawItem event.
+  if FFontPickerMode then
+  begin
+    case message.Msg of
+      // Keep the standard arrow cursor visible over the combo face and its
+      // dropped-down list - same reason as in FontPickerEditProc: the system
+      // may not refresh the cursor while the list holds mouse capture.
+      WM_SETCURSOR:
         begin
-          message.Result := 0;
+          SetCursor(LoadCursor(0, IDC_ARROW));
+          message.Result := 1;
           Exit;
         end;
-      end;
-    CN_COMMAND:
-      begin
-        case TWMCommand(message).NotifyCode of
-          CBN_SELCHANGE:
-            begin
-              message.Result := 0;
-              Exit;
-            end;
-          CBN_SELENDOK:
-            begin
-              // Single mouse click or Enter key commits immediately
-              if not FUpdating then
-                CommitCursor(True);
-              message.Result := 0;
-              Exit;
-            end;
-          CBN_SELENDCANCEL:
-            begin
-              if (not FUpdating) and not FCommitting then
-              begin
-                if (Text = '') or (Text <> FActiveFont) then
-                begin
-                  FUpdating := True;
-                  try
-                    Text := FActiveFont;
-                    Idx := Items.IndexOf(FActiveFont);
-                    if Idx >= 0 then
-                      ItemIndex := Idx;
-                    SelStart := Length(FActiveFont);
-                    SelLength := 0;
-                  finally
-                    FUpdating := False;
-                  end;
-                  FSearchText := '';
-                  Invalidate;
-                end;
-              end;
-              message.Result := 0;
-              Exit;
-            end;
+      WM_KEYDOWN:
+        begin
+          if HandleEditKey(message.Msg, message.wParam, message.lParam) then
+          begin
+            message.Result := 0;
+            Exit;
+          end;
         end;
-      end;
-    CN_DRAWITEM:
-      begin
-        with PDrawItemStruct(message.lParam)^ do
-          if Integer(itemID) >= 0 then
-            DrawDropDownItem(HDC, Integer(itemID), rcItem, TOwnerDrawState(LoWord(itemState)));
-        message.Result := 1;
-        Exit;
-      end;
+      CN_COMMAND:
+        begin
+          case TWMCommand(message).NotifyCode of
+            CBN_SELCHANGE:
+              begin
+                message.Result := 0;
+                Exit;
+              end;
+            CBN_SELENDOK:
+              begin
+                // Single mouse click or Enter key commits immediately
+                if not FUpdating then
+                  CommitCursor(True);
+                message.Result := 0;
+                Exit;
+              end;
+            CBN_SELENDCANCEL:
+              begin
+                if (not FUpdating) and not FCommitting then
+                begin
+                  if (Text = '') or (Text <> FActiveFont) then
+                  begin
+                    FUpdating := True;
+                    try
+                      Text := FActiveFont;
+                      Idx := Items.IndexOf(FActiveFont);
+                      if Idx >= 0 then
+                        ItemIndex := Idx;
+                      SelStart := Length(FActiveFont);
+                      SelLength := 0;
+                    finally
+                      FUpdating := False;
+                    end;
+                    FSearchText := '';
+                    Invalidate;
+                  end;
+                end;
+                message.Result := 0;
+                Exit;
+              end;
+          end;
+        end;
+      CN_DRAWITEM:
+        begin
+          with PDrawItemStruct(message.lParam)^ do
+            if Integer(itemID) >= 0 then
+              DrawDropDownItem(HDC, Integer(itemID), rcItem, TOwnerDrawState(LoWord(itemState)));
+          message.Result := 1;
+          Exit;
+        end;
+    end;
+  end;
+
+  case message.Msg of
     WM_LBUTTONDOWN:
       Invalidate;
     WM_LBUTTONDBLCLK:
@@ -2964,7 +3032,7 @@ end;
 
 procedure TForm1.FormDestroy(Sender: TObject);
 begin
-  // The font list is owned by cbFontPicker (TFontPickerCombo)
+  // The font list is owned by cbFontPicker (the TComboBox font picker)
 end;
 
 procedure TForm1.FormCreate(Sender: TObject);
@@ -2997,6 +3065,17 @@ begin
   PanelFooter.DoubleBuffered := True;
 
   AppEvents.OnMessage := AppEventsMessage;
+
+  // The merged combo interceptor needs to know which instance is the
+  // searchable font picker and which is the ANSI mapping version picker.
+  cbFontPicker.FontPickerMode := True;
+  cbAnsiVersion.FontPickerMode := False;
+
+  // The rounded panels draw their frames through OnDraw.  The .dfm uses the
+  // standard TPanel class name (so the IDE can open it), which has no OnDraw
+  // property, so the event is wired up here instead of in the .dfm.
+  MEMO1Panel.OnDraw := MemoPanelPaint;
+  MEMO2Panel.OnDraw := MemoPanelPaint;
 
   FSplitterRatio := 0.48;
   FUniToBijoy := TUnicodeToBijoy2000.Create;
@@ -3146,6 +3225,13 @@ begin
       end;
     end;
   end;
+
+  // Re-wrap both memos to the new client width - without this the RichEdit
+  // target-device boundary stays at the old (narrower) width and text wraps
+  // early, leaving an uneven gap on the right edge.  Handles may not exist
+  // yet while the form is still being constructed; RefreshMemoWrap checks.
+  RefreshMemoWrap(MEMO1);
+  RefreshMemoWrap(MEMO2);
 end;
 
 procedure TForm1.Splitter1CanResize(Sender: TObject; var NewSize: Integer; var Accept: Boolean);
