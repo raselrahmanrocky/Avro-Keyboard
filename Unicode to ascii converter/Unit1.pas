@@ -203,6 +203,7 @@ type
       function PopupMemo: TRichEdit;
       function MemoAtPoint(const Pt: TPoint): TRichEdit;
       procedure SetMemoFontSize(RE: TRichEdit; Size: Integer);
+      procedure CopyMemoWithFont(M: TRichEdit);
       procedure UpdateFooterTip;
       function CanPasteToMemo: Boolean;
       procedure PopulateAnsiVersionsCombo;
@@ -675,16 +676,68 @@ begin
   Clear1.Enabled := SelectAll1.Enabled;
 end;
 
-procedure TForm1.MenuCutClick(Sender: TObject);
+// Copy puts RTF on the clipboard so the active font name (SutonnyMJ etc.)
+// travels with the text - MS Word then uses that font instead of its own
+// default.  Native CopyToClipboard would also embed the current theme's
+// foreground color (white in dark mode -> invisible when pasted into Word's
+// white page), so the selection's color is temporarily forced to clBlack
+// inside a locked-redraw frame before copying and restored instantly - no
+// flicker, no permanent formatting change.
+procedure TForm1.CopyMemoWithFont(M: TRichEdit);
+var
+  SavedStart, SavedLength: Integer;
+  SavedColor:             TColor;
+  WasSelected:            Boolean;
 begin
-  if PopupMemo <> nil then
-    PopupMemo.CutToClipboard;
+  if M = nil then
+    Exit;
+
+  SavedStart := M.SelStart;
+  SavedLength := M.SelLength;
+  WasSelected := SavedLength > 0;
+
+  // Lock the screen so the user never sees the color flip.
+  SendMessage(M.Handle, EM_HIDESELECTION, 1, 0);
+  SendMessage(M.Handle, WM_SETREDRAW, 0, 0);
+  try
+    if not WasSelected then
+      M.SelectAll;
+
+    SavedColor := M.SelAttributes.Color;
+
+    // 1. Force black so the exported RTF carries no white (dark-theme) color.
+    M.SelAttributes.Color := clBlack;
+
+    // 2. Copy RTF including the font name.
+    M.CopyToClipboard;
+
+    // 3. Restore the theme color and the original selection.
+    M.SelAttributes.Color := SavedColor;
+    M.SelStart := SavedStart;
+    M.SelLength := SavedLength;
+  finally
+    SendMessage(M.Handle, WM_SETREDRAW, 1, 0);
+    SendMessage(M.Handle, EM_HIDESELECTION, 0, 0);
+    M.Invalidate;
+  end;
+end;
+
+procedure TForm1.MenuCutClick(Sender: TObject);
+var
+  M: TRichEdit;
+begin
+  M := PopupMemo;
+  if (M <> nil) and (M.SelLength > 0) then
+  begin
+    CopyMemoWithFont(M);
+    // Undoable deletion of the selection (wParam = 1 enables undo/redo).
+    SendMessage(M.Handle, EM_REPLACESEL, 1, lParam(PChar('')));
+  end;
 end;
 
 procedure TForm1.MenuCopyClick(Sender: TObject);
 begin
-  if PopupMemo <> nil then
-    PopupMemo.CopyToClipboard;
+  CopyMemoWithFont(PopupMemo);
 end;
 
 procedure TForm1.PasteToPopupMemo;
@@ -2471,6 +2524,28 @@ begin
         VK_NUMPAD0, Ord('0'):
           begin
             SetMemoFontSize(RE, 18); // reset to the default 18pt
+            Handled := True;
+            Exit;
+          end;
+
+        // Ctrl + C / Ctrl + X: copy/cut as clean plain text (no RTF with
+        // theme colors - same reason as MenuCopyClick/MenuCutClick above).
+        // Ctrl + C / Ctrl + X: copy/cut keeps the font name via RTF but
+        // temporarily forces black color (see CopyMemoWithFont).
+        Ord('C'):
+          begin
+            CopyMemoWithFont(RE);
+            Handled := True;
+            Exit;
+          end;
+        Ord('X'):
+          begin
+            if RE.SelLength > 0 then
+            begin
+              CopyMemoWithFont(RE);
+              // Undoable deletion of the selection.
+              SendMessage(RE.Handle, EM_REPLACESEL, 1, lParam(PChar('')));
+            end;
             Handled := True;
             Exit;
           end;
