@@ -45,6 +45,8 @@ uses
 type
   TBijoy2000ToUnicode = class
     private
+      FOnProgress: TConverterProgress;
+
       // glyph sequence -> glyph sequence (undo PostReplacements, last-first)
       FPostInverse: TArray<TReplacementPair>;
       // glyph sequence -> glyph sequence (undo FinalTouch swaps)
@@ -63,6 +65,15 @@ type
       // changes so the next Convert rebuilds exactly once.
       FTablesBuilt: Boolean;
 
+      // Fast longest-match lookup tables for the single-pass sweeps (see
+      // SweepReplace): every glyph key in a dictionary plus the longest key
+      // length to try at each position.  Built alongside FMain/FKarMap.
+      FMainLookup: TDictionary<string, string>;
+      FMainMaxLen: Integer;
+      FKarLookup:  TDictionary<string, string>;
+      FKarMaxLen:  Integer;
+
+      procedure ReportProgress(Percent: Integer; const Stage: string);
       procedure BuildTables;
       function VarGlyph(const AName: string): string;
       function CleanKey(const S: string): string;
@@ -76,10 +87,13 @@ type
       procedure ReorderReph(var Text: string);
       procedure ReorderPreBaseKars(var Text: string);
     public
+      destructor Destroy; override;
       function Convert(const AnsiText: string): string;
       // Call after the ANSI mapping changes (JSON re-loaded / defaults
       // restored) so the cached lookup tables are rebuilt on the next call.
       procedure InvalidateTables;
+      // Optional progress callback fired by Convert between pipeline stages.
+      property OnProgress: TConverterProgress read FOnProgress write FOnProgress;
   end;
 
 implementation
@@ -447,6 +461,19 @@ begin
         Result := R.Key.Length - L.Key.Length;
       end));
 
+    // Fast lookup for the single-pass sweep (SweepReplace): every key plus
+    // the longest key length to try at each position.  Rebuilt (not reused)
+    // when the mapping changes and BuildTables runs again.
+    FreeAndNil(FMainLookup);
+    FMainLookup := TDictionary<string, string>.Create;
+    FMainMaxLen := 0;
+    for I := 0 to high(FMain) do
+    begin
+      FMainLookup.Add(FMain[I].Key, FMain[I].Value);
+      if Length(FMain[I].Key) > FMainMaxLen then
+        FMainMaxLen := Length(FMain[I].Key);
+    end;
+
     // ------------------------------------------------------------------
     // Kar tables.
     // ------------------------------------------------------------------
@@ -513,6 +540,17 @@ begin
       begin
         Result := R.Key.Length - L.Key.Length;
       end));
+
+    // Fast lookup for the single-pass kar sweep (SweepReplace).
+    FreeAndNil(FKarLookup);
+    FKarLookup := TDictionary<string, string>.Create;
+    FKarMaxLen := 0;
+    for I := 0 to high(FKarMap) do
+    begin
+      FKarLookup.Add(FKarMap[I].Key, FKarMap[I].Value);
+      if Length(FKarMap[I].Key) > FKarMaxLen then
+        FKarMaxLen := Length(FKarMap[I].Key);
+    end;
 
     // ------------------------------------------------------------------
     // FinalTouch swap inversions (glyph sequence -> glyph sequence).
@@ -689,42 +727,134 @@ procedure TBijoy2000ToUnicode.ReorderPreBaseKars(var Text: string);
 var
   I, J, GLen: Integer;
   IsFirst:    Boolean;
+  SB:         TStringBuilder;
 begin
-  I := 1;
-  while I <= Length(Text) do
-  begin
-    if IsPreBaseKarAt(Text, I, GLen) then
+  if Text = '' then
+    Exit;
+
+  // The old code rebuilt the whole string (four Copy concatenations) for
+  // every pre-base kar it moved - O(N^2) on kar-heavy Bengali text.  Build
+  // the output once in a single left-to-right pass: when a kar is followed
+  // by a conjunct chain, emit the chain first and the kar right after it
+  // (exactly the move the in-place version performed), then keep scanning
+  // the original input from after the cluster - the suffix the in-place
+  // version scanned next is byte-identical to the original input there.
+  SB := TStringBuilder.Create(Length(Text) + 16);
+  try
+    I := 1;
+    while I <= Length(Text) do
     begin
-      J := I + GLen;
-      IsFirst := True;
-      while (J <= Length(Text)) and IsClusterMember(Text, J, IsFirst) do
+      if IsPreBaseKarAt(Text, I, GLen) then
       begin
-        Inc(J);
-        IsFirst := False;
-      end;
-      if J > I + GLen then
-      begin
-        // Move the kar (Text[I..I+GLen-1]) to just after the cluster.
-        Text := Copy(Text, 1, I - 1) + Copy(Text, I + GLen, J - I - GLen) + Copy(Text, I, GLen) + Copy(Text, J, MaxInt);
-        I := J; // continue right after the moved kar
+        J := I + GLen;
+        IsFirst := True;
+        while (J <= Length(Text)) and IsClusterMember(Text, J, IsFirst) do
+        begin
+          Inc(J);
+          IsFirst := False;
+        end;
+        if J > I + GLen then
+        begin
+          // Cluster [I+GLen .. J-1] first, then the kar moved after it.
+          SB.Append(Copy(Text, I + GLen, J - I - GLen));
+          SB.Append(Copy(Text, I, GLen));
+          I := J; // continue right after the moved kar
+        end
+        else
+        begin
+          SB.Append(Copy(Text, I, GLen));
+          Inc(I, GLen);
+        end;
       end
       else
-        Inc(I, GLen);
-    end
-    else
-      Inc(I);
+      begin
+        SB.Append(Text[I]);
+        Inc(I);
+      end;
+    end;
+    Text := SB.ToString;
+  finally
+    SB.Free;
   end;
 end;
 
 { ============================================================================= }
 
-function TBijoy2000ToUnicode.Convert(const AnsiText: string): string;
+// Single-pass equivalent of "run one full ReplaceStr pass per table entry,
+// longest key first": at each position take the LONGEST key that matches and
+// emit its value, otherwise copy the character.  This is exactly what the
+// old sequential sweep produced - a longer key always ran before a shorter
+// one, and every replacement value here is a Unicode-range string that can
+// never match another (ANSI-range) glyph key, so no value is ever re-scanned.
+// Cost: O(N * longest-key-length) instead of O(N * entry count) with a full
+// string rebuild per entry.
+function SweepReplace(const S: string; const Lookup: TDictionary<string, string>; MaxLen: Integer): string;
 var
-  Text: string;
-  I:    Integer;
+  SB: TStringBuilder;
+  N, I, L: Integer;
+  V:  string;
+begin
+  if (S = '') or (Lookup = nil) or (Lookup.Count = 0) then
+    Exit(S);
+  SB := TStringBuilder.Create(Length(S) + 16);
+  try
+    N := Length(S);
+    I := 1;
+    while I <= N do
+    begin
+      L := MaxLen;
+      if L > N - I + 1 then
+        L := N - I + 1;
+      V := '';
+      while L >= 1 do
+      begin
+        if Lookup.TryGetValue(Copy(S, I, L), V) then
+          Break;
+        Dec(L);
+      end;
+      if L >= 1 then
+      begin
+        SB.Append(V);
+        Inc(I, L);
+      end
+      else
+      begin
+        SB.Append(S[I]);
+        Inc(I);
+      end;
+    end;
+    Result := SB.ToString;
+  finally
+    SB.Free;
+  end;
+end;
+
+procedure TBijoy2000ToUnicode.ReportProgress(Percent: Integer; const Stage: string);
+begin
+  if Assigned(FOnProgress) then
+    FOnProgress(Self, Percent, Stage);
+end;
+
+destructor TBijoy2000ToUnicode.Destroy;
+begin
+  FMainLookup.Free;
+  FKarLookup.Free;
+  inherited Destroy;
+end;
+
+function TBijoy2000ToUnicode.Convert(const AnsiText: string): string;
+const
+  TotalStages = 8;
+var
+  Text:    string;
+  I:       Integer;
+  StageNo: Integer;
+  SB:      TStringBuilder;
 begin
   if AnsiText = '' then
     Exit('');
+
+  StageNo := 0;
 
   // Tables depend on the currently selected ANSI mapping.  They are built
   // once and cached (InvalidateTables marks them stale when the mapping
@@ -737,15 +867,22 @@ begin
   // 1. Undo the JSON PostReplacements (forward applies them last).
   for I := high(FPostInverse) downto 0 do
     Text := ReplaceStr(Text, FPostInverse[I].Key, FPostInverse[I].Value);
+  Inc(StageNo);
+  ReportProgress((StageNo * 100) div TotalStages, 'post-inverse');
 
   // 2. Undo the FinalTouch glyph swaps.
   for I := 0 to high(FSwapBacks) do
     Text := ReplaceStr(Text, FSwapBacks[I].Key, FSwapBacks[I].Value);
+  Inc(StageNo);
+  ReportProgress((StageNo * 100) div TotalStages, 'swap-backs');
 
   // 3. Combined glyph -> Unicode sweep (longest glyph first).  Kars and the
-  // reph glyph survive this pass on purpose.
-  for I := 0 to high(FMain) do
-    Text := ReplaceStr(Text, FMain[I].Key, FMain[I].Value);
+  // reph glyph survive this pass on purpose.  Single pass: the old code ran
+  // one full ReplaceStr scan + rebuild per table entry (hundreds of passes),
+  // which dominated the conversion time on large texts.
+  Text := SweepReplace(Text, FMainLookup, FMainMaxLen);
+  Inc(StageNo);
+  ReportProgress((StageNo * 100) div TotalStages, 'main-sweep');
 
   // 3.5 A conjunct written as [first-half][second-half] - exactly what the
   // forward pass emits (¯ + ‹ for স্ক) - decodes to consonant+্ from the
@@ -754,26 +891,54 @@ begin
   // pass only ever produces a doubled হসন্ত from a doubled হসন্ত input
   // (DeNormalize just reduces runs), which real Bijoy text does not
   // contain, so collapsing runs back to a single ্ is safe and restores
-  // the joining form.
-  repeat
-    I := Pos(b_Hasanta + b_Hasanta, Text);
-    if I > 0 then
-      Delete(Text, I, 1);
-  until I <= 0;
+  // the joining form.  One left-to-right pass collapsing every run of 2+
+  // hasantas to a single hasanta - the old repeat Pos + Delete loop was
+  // O(N^2) on dense runs (k hasantas collapse to 1 either way).
+  SB := TStringBuilder.Create(Length(Text) + 8);
+  try
+    I := 1;
+    while I <= Length(Text) do
+    begin
+      if Text[I] = b_Hasanta then
+      begin
+        SB.Append(b_Hasanta);
+        while (I <= Length(Text)) and (Text[I] = b_Hasanta) do
+          Inc(I);
+      end
+      else
+      begin
+        SB.Append(Text[I]);
+        Inc(I);
+      end;
+    end;
+    Text := SB.ToString;
+  finally
+    SB.Free;
+  end;
+  Inc(StageNo);
+  ReportProgress((StageNo * 100) div TotalStages, 'hasanta-collapse');
 
   // 4. Move the reph glyph to the start of its cluster, then expand to র্.
   ReorderReph(Text);
+  Inc(StageNo);
+  ReportProgress((StageNo * 100) div TotalStages, 'reorder-reph');
 
   // 5. Put ে/ৈ/ি back after their conjunct-chain clusters.
   ReorderPreBaseKars(Text);
+  Inc(StageNo);
+  ReportProgress((StageNo * 100) div TotalStages, 'reorder-prebase');
 
-  // 6. Remaining kar glyphs -> Unicode kars.
-  for I := 0 to high(FKarMap) do
-    Text := ReplaceStr(Text, FKarMap[I].Key, FKarMap[I].Value);
+  // 6. Remaining kar glyphs -> Unicode kars.  Single pass (same reasoning
+  // as the main sweep; values are Unicode-range so never re-matched).
+  Text := SweepReplace(Text, FKarLookup, FKarMaxLen);
+  Inc(StageNo);
+  ReportProgress((StageNo * 100) div TotalStages, 'kar-map');
 
   // 7. Rejoin the split ো and ৌ.
   Text := ReplaceStr(Text, b_Ekar + b_AAKar, b_Okar);
   Text := ReplaceStr(Text, b_Ekar + b_LengthMark, b_OUkar);
+  Inc(StageNo);
+  ReportProgress((StageNo * 100) div TotalStages, 'rejoin');
 
   Result := Text;
 end;

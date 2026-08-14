@@ -41,6 +41,10 @@ type
   TRichEdit = class(ComCtrls.TRichEdit)
     private
       procedure WMEraseBkgnd(var Message: TWMEraseBkgnd); message WM_ERASEBKGND;
+    protected
+      // Use the Msftedit.dll control (RichEdit 3.0) instead of Riched20.dll
+      // (RichEdit 2.0) so the native EM_SETZOOM/EM_GETZOOM messages work.
+      procedure CreateParams(var Params: TCreateParams); override;
   end;
 
   // Fully custom-painted drop-down used to pick the ANSI mapping version.
@@ -184,9 +188,18 @@ type
       FSplitterRatio:    Double;
       FPopupTarget:      TRichEdit;
       FCurrentThemeMode: TThemeMode;
+      // Non-nil while a background conversion (TConversionWorker) is running.
+      // The worker nils it via Synchronize once its work has been applied.
+      FConvThread:       TThread;
+      // Guards FormClose against re-entry while it waits for a running
+      // conversion to finish (a second WM_CLOSE during the wait loop).
+      FClosing:          Boolean;
 
       procedure ApplySelectedTheme(Mode: TThemeMode);
       function ReadConverterThemeMode: TThemeMode;
+      procedure StartConversion(UnicodeToAnsi: Boolean);
+      procedure CompleteConversion(UnicodeToAnsi: Boolean; const OutText, ErrMsg: string);
+      procedure LoadMemoText(RE: TRichEdit; const Text, FontName: string; FontSize: Integer; Charset: Byte);
 
       procedure AppEventsMessage(var Msg: TMsg; var Handled: Boolean);
       procedure WMFocusMemo(var Message: TMessage); message WM_APP + 1;
@@ -196,14 +209,15 @@ type
       procedure ApplyFontToMemo2(const FontName: string);
       procedure MakeTextJustified(RE: TRichEdit);
       procedure Splitter1CanResize(Sender: TObject; var NewSize: Integer; var Accept: Boolean);
-      procedure PasteToPopupMemo;
+      procedure PasteToPopupMemo(Target: TRichEdit = nil);
       procedure SaveConverterSetting(const Name, Value: string);
       function ReadConverterSettings(out AnsiVer, FontName: string): Boolean;
       procedure ConvertRtfUnicodeToBijoy(Src, Dst: TStream; Conv: TUnicodeToBijoy2000);
       procedure DrawRoundedFrame(APanel: TPanel; AMemo: TRichEdit);
       function PopupMemo: TRichEdit;
       function MemoAtPoint(const Pt: TPoint): TRichEdit;
-      procedure SetMemoFontSize(RE: TRichEdit; Size: Integer);
+      function CurrentMemoZoomPercent(RE: TRichEdit): Integer;
+      procedure SetMemoZoom(RE: TRichEdit; TargetPercent: Integer);
       procedure CopyMemoWithFont(M: TRichEdit);
       procedure UpdateFooterTip;
       function CanPasteToMemo: Boolean;
@@ -228,6 +242,29 @@ uses
   Themes;
 
 type
+  // Runs the Unicode<->ANSI conversion on a worker thread so the UI stays
+  // responsive on very large texts.  Progress is pushed back through the
+  // converters' OnProgress callback and applied to the Progress bar via
+  // Synchronize; the final Synchronize applies the result to the memo and
+  // lets the thread free itself (FreeOnTerminate).
+  TConversionWorker = class(TThread)
+    private
+      FOwner:         TForm1;
+      FUnicodeToAnsi: Boolean;
+      FSrc:           string;
+      FResult:        string;
+      FError:         string;
+      FPercent:       Integer;
+      FStage:         string;
+      procedure WorkerProgress(Sender: TObject; Percent: Integer; const Stage: string);
+      procedure SyncProgress;
+      procedure SyncFinished;
+    protected
+      procedure Execute; override;
+    public
+      constructor Create(AOwner: TForm1; UnicodeToAnsi: Boolean; const Src: string);
+  end;
+
   // Replaces VCL's TRichEditStyleHook so the style engine stops forcing its
   // own colors (e.g. pure black) into the memos; every message is passed
   // straight back to the control, which paints the colors we assign.
@@ -478,6 +515,14 @@ begin
   message.Result := 1;
 end;
 
+procedure TRichEdit.CreateParams(var Params: TCreateParams);
+begin
+  inherited CreateParams(Params);
+  // RICHEDIT50W (Msftedit.dll) implements RichEdit 3.0, which is required for
+  // the instant EM_SETZOOM zoom used by Ctrl + mouse wheel.
+  CreateSubClass(Params, 'RICHEDIT50W');
+end;
+
 procedure TForm1.CreateParams(var Params: TCreateParams);
 begin
   inherited CreateParams(Params);
@@ -597,33 +642,39 @@ end;
 // Applies the size to the base font, the default attributes (newly typed
 // text) and the selected text, then restores the caret/selection.  Clamped
 // to 10pt..72pt.
-procedure TForm1.SetMemoFontSize(RE: TRichEdit; Size: Integer);
+// Returns the memo's current zoom as a percentage (defaults to 100% when the
+// control reports no zoom).  EM_SETZOOM stores the zoom as a numerator/
+// denominator fraction; SetMemoZoom always writes a denominator of 100, so
+// the numerator read back here is already the percentage.
+function TForm1.CurrentMemoZoomPercent(RE: TRichEdit): Integer;
 var
-  SavedStart, SavedLength: Integer;
+  ZoomNum, ZoomDen: Cardinal;
 begin
-  if Size < 10 then
-    Size := 10;
-  if Size > 72 then
-    Size := 72;
-
-  SendMessage(RE.Handle, WM_SETREDRAW, 0, 0);
-  try
-    SavedStart := RE.SelStart;
-    SavedLength := RE.SelLength;
-
-    RE.Font.Size := Size;
-    RE.DefAttributes.Size := Size;
-
-    RE.SelectAll;
-    RE.SelAttributes.Size := Size;
-    RE.SelLength := 0;
-
-    RE.SelStart := SavedStart;
-    RE.SelLength := SavedLength;
-  finally
-    SendMessage(RE.Handle, WM_SETREDRAW, 1, 0);
-    RE.Invalidate;
+  if SendMessage(RE.Handle, EM_GETZOOM, WPARAM(@ZoomNum), LPARAM(@ZoomDen)) = 0 then
+  begin
+    ZoomNum := 100;
+    ZoomDen := 100;
   end;
+  if ZoomDen = 0 then
+    ZoomDen := 100;
+  Result := Round(ZoomNum * 100 / ZoomDen);
+  if Result < 1 then
+    Result := 100;
+end;
+
+// Applies a display-only zoom (50%..300%) with the RichEdit's native
+// EM_SETZOOM: the control scales its rendering instantly without re-formatting
+// every run or re-shaping complex-script text, so it is equally fast on the
+// Unicode memo (MEMO1) and the ANSI memo (MEMO2) no matter how much text they
+// hold.  The stored font size is untouched, so the converted output keeps the
+// user's chosen size.
+procedure TForm1.SetMemoZoom(RE: TRichEdit; TargetPercent: Integer);
+begin
+  if TargetPercent < 50 then
+    TargetPercent := 50;
+  if TargetPercent > 300 then
+    TargetPercent := 300;
+  SendMessage(RE.Handle, EM_SETZOOM, TargetPercent, 100);
 end;
 
 // Context-sensitive guidance shown in the footer bar, driven by which memo
@@ -684,6 +735,19 @@ begin
   Result := 0;
   try
     pcb := TBytesStream(dwCookie).Write(pbBuff^, cb);
+  except
+    Result := 1; // signal the error back to the rich edit
+    pcb := 0;
+  end;
+end;
+
+// Stream-in callback for EM_STREAMIN (SF_TEXT or SF_UNICODE): feeds the
+// bytes of a TStringStream to the rich edit control.
+function RtfStreamInCallback(dwCookie: DWORD_PTR; pbBuff: PByte; cb: Longint; var pcb: Longint): Longint; stdcall;
+begin
+  Result := 0;
+  try
+    pcb := TStringStream(dwCookie).Read(pbBuff^, cb);
   except
     Result := 1; // signal the error back to the rich edit
     pcb := 0;
@@ -822,12 +886,19 @@ begin
   CopyMemoWithFont(PopupMemo);
 end;
 
-procedure TForm1.PasteToPopupMemo;
+procedure TForm1.PasteToPopupMemo(Target: TRichEdit = nil);
 var
   M:        TRichEdit;
   ClipText: string;
 begin
-  M := PopupMemo;
+  // An explicit Target (Ctrl+V resolves it from the keyboard focus) is used
+  // as-is; a nil Target resolves via PopupMemo, which prefers the memo the
+  // popup was opened on (FPopupTarget) - correct for the context menu, where
+  // the first right-click on an inactive window may not move the focus.
+  if Target <> nil then
+    M := Target
+  else
+    M := PopupMemo;
   if (M <> nil) and CanPasteToMemo then
   begin
     // ক্লিপবোর্ড থেকে প্লেইন ইউনিকোড টেক্সট নেওয়া
@@ -880,6 +951,7 @@ procedure TForm1.MakeTextJustified(RE: TRichEdit);
 var
   ParaFormat:              PARAFORMAT2;
   TextColor:               TColor;
+  CF:                      TCharFormat2;
   SavedStart, SavedLength: Integer;
 begin
   // ১. সিলেকশন হাইলাইট লুকানো এবং স্ক্রিন রিড্র সাময়িক বন্ধ রাখা
@@ -894,15 +966,22 @@ begin
     ParaFormat.dwMask := PFM_ALIGNMENT;
     ParaFormat.wAlignment := PFA_JUSTIFY;
 
-    RE.SelectAll;
+    // Paragraph alignment needs a selection - EM_SETSEL(0, -1) selects the
+    // whole document without the VCL SelectAll overhead; restored below.
+    SendMessage(RE.Handle, EM_SETSEL, 0, -1);
     SendMessage(RE.Handle, EM_SETPARAFORMAT, 0, lParam(@ParaFormat));
 
     TextColor := StyleServices.GetSystemColor(clWindowText);
 
-    // ফন্ট প্রোপার্টিজ সেট করা (হার্ডকোডেড ১৮-এর বদলে বর্তমান সাইজ ধরে রাখা)
-    RE.SelAttributes.Color := TextColor;
-    RE.SelAttributes.Name := RE.Font.Name;
-    RE.SelAttributes.Size := RE.Font.Size;
+    // Font attributes across the whole document in one SCF_ALL pass - no
+    // SelectAll/SelAttributes round-trips (keeps the current size).
+    FillChar(CF, SizeOf(CF), 0);
+    CF.cbSize := SizeOf(CF);
+    CF.dwMask := CFM_COLOR or CFM_FACE or CFM_SIZE;
+    CF.crTextColor := ColorToRGB(TextColor);
+    CF.yHeight := RE.Font.Size * 20;
+    StrPLCopy(@CF.szFaceName[0], RE.Font.Name, LF_FACESIZE - 1);
+    SendMessage(RE.Handle, EM_SETCHARFORMAT, SCF_ALL, LPARAM(@CF));
 
     RE.DefAttributes.Color := TextColor;
     RE.DefAttributes.Name := RE.Font.Name;
@@ -1493,68 +1572,210 @@ begin
     HandleThemes;
 end;
 
-procedure TForm1.Button1Click(Sender: TObject);
+procedure TForm1.StartConversion(UnicodeToAnsi: Boolean);
 var
-  Src, OutText, ActiveFont: string;
+  Src: string;
 begin
-  Src := MEMO1.Text;
+  // One conversion at a time - the worker uses the shared converter
+  // instances (FUniToBijoy / FBijoyToUni), which must not run concurrently.
+  if FConvThread <> nil then
+    Exit;
+
+  if UnicodeToAnsi then
+    Src := MEMO1.Text
+  else
+    Src := MEMO2.Text;
   if Src = '' then
     Exit;
 
-  Screen.Cursor := crHourGlass;
-  SendMessage(MEMO2.Handle, WM_SETREDRAW, 0, 0);
-  try
-    // পুরো টেক্সট এক কলে কনভার্ট - কনভার্টার #13#10 নেটিভলি হ্যান্ডেল করে, তাই
-    // লাইন-বাই-লাইন লুপ, প্রতি লাইনে ProcessMessages এবং O(N^2) স্ট্রিং জোড়া
-    // দেওয়ার দরকার নেই (পুরনো কোড বড় টেক্সটে হ্যাং করত)!।
-    OutText := FUniToBijoy.Convert(Src);
-    MEMO2.Text := OutText;
+  // Keep the UI live: the actual Convert runs on a background thread, so a
+  // huge text no longer freezes the window.  The controls that could race
+  // with the worker (the second convert button, the ANSI-mapping combo that
+  // can InvalidateTables mid-flight) are disabled until it finishes.
+  Button1.Enabled := False;
+  Button2.Enabled := False;
+  cbAnsiVersion.Enabled := False;
+  LblFooter.Visible := False;
+  Progress.Position := 0;
+  Progress.Visible := True;
 
+  FConvThread := TConversionWorker.Create(Self, UnicodeToAnsi, Src);
+  FConvThread.Start;
+end;
+
+// Loads a large converted document into a memo without freezing the UI.
+// The old `Memo.Text :=` + SCF_ALL + paragraph passes forced RichEdit to
+// re-format and re-shape the whole complex-script document on the main
+// thread several times - measured in the tens of seconds on big texts.  Here
+// the character/paragraph defaults are applied BEFORE loading, so the
+// streamed text inherits font/size/color and justification automatically;
+// one EM_STREAMIN (SF_UNICODE) then replaces the whole document in a single
+// pass (~5x faster than Text :=, and no post-load formatting passes at all).
+procedure TForm1.LoadMemoText(RE: TRichEdit; const Text, FontName: string; FontSize: Integer; Charset: Byte);
+var
+  Stream: TStringStream;
+  ES:     TEditStream;
+  PF:     PARAFORMAT2;
+begin
+  // Select everything - EM_STREAMIN replaces the current selection, so this
+  // swaps the whole document in one pass (no separate Clear).
+  SendMessage(RE.Handle, EM_SETSEL, 0, -1);
+
+  RE.Font.Name := FontName;
+  RE.Font.Charset := Charset;
+  RE.Font.Size := FontSize;
+  RE.DefAttributes.Name := FontName;
+  RE.DefAttributes.Size := FontSize;
+  RE.DefAttributes.Charset := Charset;
+  RE.DefAttributes.Color := StyleServices.GetSystemColor(clWindowText);
+
+  // Default paragraph format = justified (the streamed text picks it up).
+  FillChar(PF, SizeOf(PF), 0);
+  PF.cbSize := SizeOf(PF);
+  PF.dwMask := PFM_ALIGNMENT;
+  PF.wAlignment := PFA_JUSTIFY;
+  SendMessage(RE.Handle, EM_SETPARAFORMAT, 0, LPARAM(@PF));
+
+  Stream := TStringStream.Create(Text, TEncoding.Unicode, False);
+  try
+    FillChar(ES, SizeOf(ES), 0);
+    ES.dwCookie := DWORD_PTR(Stream);
+    ES.pfnCallback := @RtfStreamInCallback;
+    SendMessage(RE.Handle, EM_STREAMIN, SF_TEXT or SF_UNICODE, LPARAM(@ES));
+  finally
+    Stream.Free;
+  end;
+end;
+
+procedure TForm1.CompleteConversion(UnicodeToAnsi: Boolean; const OutText, ErrMsg: string);
+var
+  Target:     TRichEdit;
+  ActiveFont: string;
+begin
+  Progress.Visible := False;
+  LblFooter.Visible := True;
+  Button1.Enabled := True;
+  Button2.Enabled := True;
+  cbAnsiVersion.Enabled := True;
+  FConvThread := nil;
+
+  if ErrMsg <> '' then
+  begin
+    MessageDlg('Conversion failed: ' + ErrMsg, mtError, [mbOK], 0);
+    Exit;
+  end;
+
+  if UnicodeToAnsi then
+  begin
+    Target := MEMO2;
     ActiveFont := cbFontPicker.ActiveFont;
     if ActiveFont = '' then
       ActiveFont := cbFontPicker.Text;
     if ActiveFont = '' then
-      ActiveFont := MEMO2.Font.Name;
+      ActiveFont := Target.Font.Name;
 
-    ApplyFontToMemo2(ActiveFont);
-  finally
-    SendMessage(MEMO2.Handle, WM_SETREDRAW, 1, 0);
-    MEMO2.Invalidate;
-    Screen.Cursor := crDefault;
+    SendMessage(Target.Handle, WM_SETREDRAW, 0, 0);
+    try
+      LoadMemoText(Target, OutText, ActiveFont, Target.Font.Size, ANSI_CHARSET);
+      cbFontPicker.ActiveFont := ActiveFont;
+    finally
+      SendMessage(Target.Handle, WM_SETREDRAW, 1, 0);
+      Target.Invalidate;
+    end;
+  end
+  else
+  begin
+    Target := MEMO1;
+    SendMessage(Target.Handle, WM_SETREDRAW, 0, 0);
+    try
+      LoadMemoText(Target, OutText, Target.Font.Name, Target.Font.Size, Target.Font.Charset);
+    finally
+      SendMessage(Target.Handle, WM_SETREDRAW, 1, 0);
+      Target.Invalidate;
+    end;
   end;
 end;
 
-procedure TForm1.Button2Click(Sender: TObject);
-var
-  Src, OutText: string;
+{ ---------------------------------------------------------------------------
+  TConversionWorker
+
+  Runs FUniToBijoy.Convert / FBijoyToUni.Convert on a worker thread.  The
+  converters keep their own per-instance state (fToggleStates etc.) and only
+  touch read-only global mapping tables, so using the form's shared instances
+  from this single worker is safe - the buttons and the ANSI-version combo are
+  disabled while it runs, so no other code path touches them concurrently.
+  --------------------------------------------------------------------------- }
+constructor TConversionWorker.Create(AOwner: TForm1; UnicodeToAnsi: Boolean; const Src: string);
 begin
-  Src := MEMO2.Text;
-  if Src = '' then
-    Exit;
+  inherited Create(True); // suspended - the form starts it explicitly
+  FreeOnTerminate := True;
+  FOwner := AOwner;
+  FUnicodeToAnsi := UnicodeToAnsi;
+  FSrc := Src;
+end;
 
-  Screen.Cursor := crHourGlass;
-  SendMessage(MEMO1.Handle, WM_SETREDRAW, 0, 0);
+procedure TConversionWorker.Execute;
+begin
   try
-    // পুরো টেক্সট এক কলে কনভার্ট (Button1Click-এর মতোই)।
-    OutText := FBijoyToUni.Convert(Src);
-    MEMO1.Text := OutText;
-
-    MEMO1.DefAttributes.Name := MEMO1.Font.Name;
-    MEMO1.DefAttributes.Size := MEMO1.Font.Size;
-    MEMO1.DefAttributes.Charset := MEMO1.Font.Charset;
-
-    MEMO1.SelectAll;
-    MEMO1.SelAttributes.Name := MEMO1.Font.Name;
-    MEMO1.SelAttributes.Size := MEMO1.Font.Size;
-    MEMO1.SelAttributes.Charset := MEMO1.Font.Charset;
-    MEMO1.SelLength := 0;
-
-    MakeTextJustified(MEMO1);
-  finally
-    SendMessage(MEMO1.Handle, WM_SETREDRAW, 1, 0);
-    MEMO1.Invalidate;
-    Screen.Cursor := crDefault;
+    if FUnicodeToAnsi then
+    begin
+      // A real method reference (not an anonymous method) so the assignment
+      // compiles against the converters' TConverterProgress (of object) type.
+      FOwner.FUniToBijoy.OnProgress := WorkerProgress;
+      try
+        FResult := FOwner.FUniToBijoy.Convert(FSrc);
+      finally
+        // Drop the callback so the converter never holds a reference to this
+        // worker after it has been freed (FreeOnTerminate).
+        FOwner.FUniToBijoy.OnProgress := nil;
+      end;
+    end
+    else
+    begin
+      FOwner.FBijoyToUni.OnProgress := WorkerProgress;
+      try
+        FResult := FOwner.FBijoyToUni.Convert(FSrc);
+      finally
+        FOwner.FBijoyToUni.OnProgress := nil;
+      end;
+    end;
+  except
+    on E: Exception do
+      FError := E.Message;
   end;
+
+  Synchronize(SyncFinished);
+end;
+
+procedure TConversionWorker.WorkerProgress(Sender: TObject; Percent: Integer; const Stage: string);
+begin
+  // Fired from the converters' OnProgress while Convert runs on this worker.
+  FPercent := Percent;
+  FStage := Stage;
+  Synchronize(SyncProgress);
+end;
+
+procedure TConversionWorker.SyncProgress;
+begin
+  // Runs on the main thread; the form may be closing, so guard the control.
+  if FOwner.Progress <> nil then
+    FOwner.Progress.Position := FPercent;
+end;
+
+procedure TConversionWorker.SyncFinished;
+begin
+  // Runs on the main thread after the conversion finished (or failed).
+  FOwner.CompleteConversion(FUnicodeToAnsi, FResult, FError);
+end;
+
+procedure TForm1.Button1Click(Sender: TObject);
+begin
+  StartConversion(True);
+end;
+
+procedure TForm1.Button2Click(Sender: TObject);
+begin
+  StartConversion(False);
 end;
 
 procedure TForm1.PopulateAnsiVersionsCombo;
@@ -2467,6 +2688,8 @@ begin
 end;
 
 procedure TForm1.ApplyFontToMemo2(const FontName: string);
+var
+  CF: TCharFormat2;
 begin
   // Change the font while redraws are suspended
   SendMessage(MEMO2.Handle, WM_SETREDRAW, 0, 0);
@@ -2479,11 +2702,16 @@ begin
     MEMO2.DefAttributes.Size := MEMO2.Font.Size;
     MEMO2.DefAttributes.Charset := ANSI_CHARSET;
 
-    MEMO2.SelectAll;
-    MEMO2.SelAttributes.Name := FontName;
-    MEMO2.SelAttributes.Size := MEMO2.Font.Size;
-    MEMO2.SelAttributes.Charset := ANSI_CHARSET;
-    MEMO2.SelLength := 0;
+    // SCF_ALL applies the face/size/charset to the whole document in one pass,
+    // without SelectAll (which re-formats every run and freezes the UI on
+    // large texts) and without touching the selection/caret.
+    FillChar(CF, SizeOf(CF), 0);
+    CF.cbSize := SizeOf(CF);
+    CF.dwMask := CFM_FACE or CFM_SIZE or CFM_CHARSET;
+    CF.bCharSet := ANSI_CHARSET;
+    CF.yHeight := MEMO2.Font.Size * 20;
+    StrPLCopy(@CF.szFaceName[0], FontName, LF_FACESIZE - 1);
+    SendMessage(MEMO2.Handle, EM_SETCHARFORMAT, SCF_ALL, LPARAM(@CF));
 
     MakeTextJustified(MEMO2);
     // Explicitly re-apply word wrap to the window width after the font change
@@ -2566,13 +2794,14 @@ var
   RE:                             TRichEdit;
   IsPickerDropped, IsAnsiDropped: Boolean;
 begin
-  // Ctrl + / Ctrl - / Ctrl 0 change the ACTUAL font size of the memo that
-  // currently has the keyboard focus.  Note: we resolve the target from the
-  // active focus directly (not via PopupMemo) because PopupMemo prefers the
-  // stale FPopupTarget remembered from a right-click, which would keep
-  // resizing MEMO1 after focus has moved to MEMO2.  Works with both the
-  // Number Row and the Number Pad; the message is marked handled so the
-  // +/-/0 character is never typed into the memo.
+  // Ctrl + / Ctrl - / Ctrl 0 zoom the memo that currently has the keyboard
+  // focus, using the same instant EM_SETZOOM as the mouse wheel (display-only
+  // scaling - no per-run re-formatting, no complex-script re-shaping).  Note:
+  // we resolve the target from the active focus directly (not via PopupMemo)
+  // because PopupMemo prefers the stale FPopupTarget remembered from a
+  // right-click, which would keep resizing MEMO1 after focus has moved to
+  // MEMO2.  Works with both the Number Row and the Number Pad; the message is
+  // marked handled so the +/-/0 character is never typed into the memo.
   if (Msg.Message = WM_KEYDOWN) and ((GetKeyState(VK_CONTROL) and $8000) <> 0) then
   begin
     // Directly target the currently focused memo control
@@ -2586,26 +2815,26 @@ begin
     if RE <> nil then
     begin
       case Msg.wParam of
-        // Font size up: Number Pad (+) or Number Row (=/+)
+        // Zoom in 10%: Number Pad (+) or Number Row (=/+)
         VK_ADD, VK_OEM_PLUS:
           begin
-            SetMemoFontSize(RE, RE.Font.Size + 2);
+            SetMemoZoom(RE, CurrentMemoZoomPercent(RE) + 10);
             Handled := True;
             Exit;
           end;
 
-        // Font size down: Number Pad (-) or Number Row (-/_)
+        // Zoom out 10%: Number Pad (-) or Number Row (-/_)
         VK_SUBTRACT, VK_OEM_MINUS:
           begin
-            SetMemoFontSize(RE, RE.Font.Size - 2);
+            SetMemoZoom(RE, CurrentMemoZoomPercent(RE) - 10);
             Handled := True;
             Exit;
           end;
 
-        // Reset to the default 18pt font: Number Pad (0) or Number Row (0)
+        // Reset zoom to 100%: Number Pad (0) or Number Row (0)
         VK_NUMPAD0, Ord('0'):
           begin
-            SetMemoFontSize(RE, 18); // reset to the default 18pt
+            SetMemoZoom(RE, 100);
             Handled := True;
             Exit;
           end;
@@ -2635,22 +2864,40 @@ begin
     end;
   end;
 
-  if (Msg.Message = WM_KEYDOWN) and (Msg.wParam = Ord('V')) and ((GetKeyState(VK_CONTROL) and $8000) <> 0) and (PopupMemo <> nil) and CanPasteToMemo then
+  if (Msg.Message = WM_KEYDOWN) and (Msg.wParam = Ord('V')) and ((GetKeyState(VK_CONTROL) and $8000) <> 0) and CanPasteToMemo then
   begin
-    PasteToPopupMemo;
-    Handled := True;
+    // Ctrl+V pastes into the memo that has the keyboard focus, NOT into
+    // PopupMemo - PopupMemo prefers the stale FPopupTarget remembered from an
+    // earlier right-click and would paste into the other box after the focus
+    // has moved (the same reason the font-size shortcuts resolve the target
+    // from the focus directly).
+    if MEMO2.Focused or (ActiveControl = MEMO2) then
+      RE := MEMO2
+    else if MEMO1.Focused or (ActiveControl = MEMO1) then
+      RE := MEMO1
+    else
+      RE := nil;
+
+    if RE <> nil then
+    begin
+      PasteToPopupMemo(RE);
+      Handled := True;
+    end;
   end
   else if (Msg.Message = WM_MOUSEWHEEL) and ((GetKeyState(VK_CONTROL) and $8000) <> 0) then
   begin
-    // Ctrl + mouse wheel changes the ACTUAL font size of the memo under the
-    // cursor: wheel up +2pt, wheel down -2pt (same as Ctrl + / Ctrl -).
+    // Ctrl + mouse wheel zooms the memo under the cursor with the RichEdit's
+    // native EM_SETZOOM: display-only zoom applied instantly by the control
+    // itself - no SelectAll, no per-run re-formatting, no UI freeze even on
+    // huge documents, and equally fast on the Unicode and ANSI memos.
     RE := MemoAtPoint(Msg.Pt);
     if RE <> nil then
     begin
+      // Wheel up = zoom in (+10%), wheel down = zoom out (-10%)
       if SmallInt(Msg.wParam shr 16) > 0 then
-        SetMemoFontSize(RE, RE.Font.Size + 2)
+        SetMemoZoom(RE, CurrentMemoZoomPercent(RE) + 10)
       else
-        SetMemoFontSize(RE, RE.Font.Size - 2);
+        SetMemoZoom(RE, CurrentMemoZoomPercent(RE) - 10);
       Handled := True; // don't let the wheel also scroll the control
     end;
   end
@@ -2696,8 +2943,21 @@ end;
 
 procedure TForm1.FormClose(Sender: TObject; var Action: TCloseAction);
 begin
-  FUniToBijoy.Free;
-  FBijoyToUni.Free;
+  if not FClosing then
+  begin
+    FClosing := True;
+
+    // Let any in-flight background conversion finish before freeing the
+    // converters it may still be using.  The worker signals completion
+    // through Synchronize, so pumping the queue lets it land; conversion is
+    // fast (linear passes), so this loop is short.  The FClosing guard stops
+    // a second WM_CLOSE delivered during the wait from re-entering.
+    while FConvThread <> nil do
+      Application.ProcessMessages;
+
+    FUniToBijoy.Free;
+    FBijoyToUni.Free;
+  end;
   Action := caFree;
   Form1 := nil;
 end;
