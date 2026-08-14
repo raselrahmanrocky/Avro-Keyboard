@@ -134,6 +134,7 @@ type
     AppEvents: TApplicationEvents;
     PanelButton: TPanel;
     PanelFooter: TPanel;
+    LblFooter: TLabel;
     Splitter1: TSplitter;
     PopupMenu1: TPopupMenu;
     btnSettings: TSpeedButton;
@@ -146,6 +147,7 @@ type
     Paste1: TMenuItem;
     SelectAll1: TMenuItem;
     Clear1: TMenuItem;
+    miZoomHint: TMenuItem;
     procedure FormCreate(Sender: TObject);
     procedure FormShow(Sender: TObject);
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
@@ -199,6 +201,9 @@ type
       procedure ConvertRtfUnicodeToBijoy(Src, Dst: TStream; Conv: TUnicodeToBijoy2000);
       procedure DrawRoundedFrame(APanel: TPanel; AMemo: TRichEdit);
       function PopupMemo: TRichEdit;
+      function MemoAtPoint(const Pt: TPoint): TRichEdit;
+      procedure SetMemoFontSize(RE: TRichEdit; Size: Integer);
+      procedure UpdateFooterTip;
       function CanPasteToMemo: Boolean;
       procedure PopulateAnsiVersionsCombo;
     protected
@@ -484,9 +489,8 @@ var
   PenW:                  Integer;
   IsDark:                Boolean;
 begin
-  IsDark := (GetRValue(ColorToRGB(StyleServices.GetSystemColor(clBtnFace))) +
-             GetGValue(ColorToRGB(StyleServices.GetSystemColor(clBtnFace))) +
-             GetBValue(ColorToRGB(StyleServices.GetSystemColor(clBtnFace)))) < 384;
+  IsDark := (GetRValue(ColorToRGB(StyleServices.GetSystemColor(clBtnFace))) + GetGValue(ColorToRGB(StyleServices.GetSystemColor(clBtnFace))) +
+      GetBValue(ColorToRGB(StyleServices.GetSystemColor(clBtnFace)))) < 384;
 
   if IsDark then
   begin
@@ -566,6 +570,74 @@ begin
     MEMO1Panel.Invalidate
   else if Sender = MEMO2 then
     MEMO2Panel.Invalidate;
+  UpdateFooterTip;
+end;
+
+// The memo under the mouse cursor (or the focused one) - used to decide which
+// box the Ctrl + mouse wheel zoom applies to.
+function TForm1.MemoAtPoint(const Pt: TPoint): TRichEdit;
+var
+  Wnd: hWnd;
+begin
+  Result := nil;
+  Wnd := WindowFromPoint(Pt);
+  if IsMemo1Target(Wnd) then
+    Result := MEMO1
+  else if IsMemo2Target(Wnd) then
+    Result := MEMO2
+  else if MEMO1.Focused then
+    Result := MEMO1
+  else if MEMO2.Focused then
+    Result := MEMO2;
+end;
+
+// Permanently changes the ACTUAL font size of a memo (the text itself).
+// Applies the size to the base font, the default attributes (newly typed
+// text) and the selected text, then restores the caret/selection.  Clamped
+// to 10pt..72pt.
+procedure TForm1.SetMemoFontSize(RE: TRichEdit; Size: Integer);
+var
+  SavedStart, SavedLength: Integer;
+begin
+  if Size < 10 then
+    Size := 10;
+  if Size > 72 then
+    Size := 72;
+
+  SendMessage(RE.Handle, WM_SETREDRAW, 0, 0);
+  try
+    SavedStart := RE.SelStart;
+    SavedLength := RE.SelLength;
+
+    RE.Font.Size := Size;
+    RE.DefAttributes.Size := Size;
+
+    RE.SelectAll;
+    RE.SelAttributes.Size := Size;
+    RE.SelLength := 0;
+
+    RE.SelStart := SavedStart;
+    RE.SelLength := SavedLength;
+  finally
+    SendMessage(RE.Handle, WM_SETREDRAW, 1, 0);
+    RE.Invalidate;
+  end;
+end;
+
+// Context-sensitive guidance shown in the footer bar, driven by which memo
+// currently has the focus.
+procedure TForm1.UpdateFooterTip;
+begin
+  if LblFooter = nil then
+    Exit;
+  if MEMO1.Focused then
+    LblFooter.Caption := 'Unicode input - type or paste Bengali text, then press "Unicode to ANSI". ' +
+      'Right-click for edit options. Ctrl + mouse wheel to zoom.'
+  else if MEMO2.Focused then
+    LblFooter.Caption := 'ANSI preview - pick a font above, or press "ANSI to Unicode" to convert back. ' +
+      'Right-click for edit options. Ctrl + mouse wheel to zoom.'
+  else
+    LblFooter.Caption := 'Right-click a box for edit options. Ctrl + mouse wheel to zoom in/out.';
 end;
 
 function TForm1.PopupMemo: TRichEdit;
@@ -617,13 +689,38 @@ end;
 
 procedure TForm1.PasteToPopupMemo;
 var
-  M: TRichEdit;
+  M:        TRichEdit;
+  ClipText: string;
 begin
   M := PopupMemo;
   if (M <> nil) and CanPasteToMemo then
   begin
-    M.PasteFromClipboard;
-    MakeTextJustified(M);
+    // ক্লিপবোর্ড থেকে প্লেইন ইউনিকোড টেক্সট নেওয়া
+    if Clipboard.HasFormat(CF_UNICODETEXT) or Clipboard.HasFormat(CF_TEXT) then
+      ClipText := Clipboard.AsText
+    else
+      Exit;
+
+    if ClipText = '' then
+      Exit;
+
+    SendMessage(M.Handle, WM_SETREDRAW, 0, 0);
+    try
+      // ১. কার্সার পজিশনে বর্তমান ফন্ট সাইজ ও সঠিক কালার নিশ্চিত করা
+      M.SelAttributes.Name := M.Font.Name;
+      M.SelAttributes.Size := M.Font.Size;
+      M.SelAttributes.Color := StyleServices.GetSystemColor(clWindowText);
+      M.SelAttributes.Charset := M.Font.Charset;
+
+      // ২. wParam = 1 দিয়ে টেক্সট ইনসার্ট করা (wParam = 1 দিলে এটি Undo/Redo করা যায়)
+      SendMessage(M.Handle, EM_REPLACESEL, 1, lParam(PChar(ClipText)));
+
+      SendMessage(M.Handle, EM_SETTARGETDEVICE, 0, 0);
+    finally
+      SendMessage(M.Handle, WM_SETREDRAW, 1, 0);
+      M.Invalidate;
+      SendMessage(M.Handle, EM_SCROLLCARET, 0, 0);
+    end;
   end;
 end;
 
@@ -646,23 +743,48 @@ end;
 
 procedure TForm1.MakeTextJustified(RE: TRichEdit);
 var
-  ParaFormat: PARAFORMAT2;
+  ParaFormat:              PARAFORMAT2;
+  TextColor:               TColor;
+  SavedStart, SavedLength: Integer;
 begin
-  FillChar(ParaFormat, SizeOf(ParaFormat), 0);
-  ParaFormat.cbSize := SizeOf(ParaFormat);
-  ParaFormat.dwMask := PFM_ALIGNMENT;
-  ParaFormat.wAlignment := PFA_JUSTIFY;
-  RE.SelectAll;
-  SendMessage(RE.Handle, EM_SETPARAFORMAT, 0, lParam(@ParaFormat));
-  // Force the theme text color over any formatting imported with pasted RTF
-  // (e.g. clBlack), which is otherwise invisible on the dark theme.
-  RE.SelAttributes.Color := StyleServices.GetSystemColor(clWindowText);
-  RE.SelLength := 0;
+  // ১. সিলেকশন হাইলাইট লুকানো এবং স্ক্রিন রিড্র সাময়িক বন্ধ রাখা
+  SendMessage(RE.Handle, EM_HIDESELECTION, 1, 0);
+  SendMessage(RE.Handle, WM_SETREDRAW, 0, 0);
+  try
+    SavedStart := RE.SelStart;
+    SavedLength := RE.SelLength;
 
-  // EM_SETPARAFORMAT resets the native character tracking/layout, which drops
-  // WordWrap and stretches the text onto a single line. Re-issue wrap-to-window
-  // so the text wraps to the control width again.
-  SendMessage(RE.Handle, EM_SETTARGETDEVICE, 0, 0);
+    FillChar(ParaFormat, SizeOf(ParaFormat), 0);
+    ParaFormat.cbSize := SizeOf(ParaFormat);
+    ParaFormat.dwMask := PFM_ALIGNMENT;
+    ParaFormat.wAlignment := PFA_JUSTIFY;
+
+    RE.SelectAll;
+    SendMessage(RE.Handle, EM_SETPARAFORMAT, 0, lParam(@ParaFormat));
+
+    TextColor := StyleServices.GetSystemColor(clWindowText);
+
+    // ফন্ট প্রোপার্টিজ সেট করা (হার্ডকোডেড ১৮-এর বদলে বর্তমান সাইজ ধরে রাখা)
+    RE.SelAttributes.Color := TextColor;
+    RE.SelAttributes.Name := RE.Font.Name;
+    RE.SelAttributes.Size := RE.Font.Size;
+
+    RE.DefAttributes.Color := TextColor;
+    RE.DefAttributes.Name := RE.Font.Name;
+    RE.DefAttributes.Size := RE.Font.Size;
+
+    // কার্সারকে পেস্ট করা পজিশনে ফিরিয়ে দেওয়া
+    RE.SelStart := SavedStart;
+    RE.SelLength := SavedLength;
+
+    SendMessage(RE.Handle, EM_SETTARGETDEVICE, 0, 0);
+  finally
+    // ২. রিড্র চালু ও সিলেকশন আনহাইড করা
+    SendMessage(RE.Handle, WM_SETREDRAW, 1, 0);
+    SendMessage(RE.Handle, EM_HIDESELECTION, 0, 0);
+    RE.Invalidate;
+    SendMessage(RE.Handle, EM_SCROLLCARET, 0, 0);
+  end;
 end;
 
 { Remember the ANSI mapping version / font the user picked so the next launch
@@ -706,7 +828,7 @@ end;
 { ---------------------------------------------------------------------------
   ConvertRtfUnicodeToBijoy
 
-  Converts the Unicode text inside an RTF stream to Bijoy (ANSI) while leaving
+  Converts the Unicode text inside an RTF stream to (ANSI) while leaving
   every RTF structure word intact - table definitions (\trowd, \cl..., \cellx,
   \cell, \row, \lastcell), fonts, colors, embedded binary (\bin), etc.
 
@@ -1103,9 +1225,8 @@ begin
   // cannot be used here - it is only True for the native system style, while
   // this app always activates a custom style such as 'Windows10 Dark'.)
   IsDark := StyleServices.Enabled and
-    ((GetRValue(ColorToRGB(StyleServices.GetSystemColor(clBtnFace))) +
-      GetGValue(ColorToRGB(StyleServices.GetSystemColor(clBtnFace))) +
-      GetBValue(ColorToRGB(StyleServices.GetSystemColor(clBtnFace)))) < 384);
+    ((GetRValue(ColorToRGB(StyleServices.GetSystemColor(clBtnFace))) + GetGValue(ColorToRGB(StyleServices.GetSystemColor(clBtnFace))) +
+        GetBValue(ColorToRGB(StyleServices.GetSystemColor(clBtnFace)))) < 384);
 
   TextColor := StyleServices.GetSystemColor(clWindowText);
 
@@ -1239,62 +1360,19 @@ end;
 
 procedure TForm1.Button1Click(Sender: TObject);
 var
-  Src, OutText, EOL, Segment: string;
-  P, Q, TotalLen:             Integer;
-  ActiveFont:                 string;
-  ShowProgress:               Boolean;
+  Src, OutText, ActiveFont: string;
 begin
   Src := MEMO1.Text;
-  TotalLen := Length(Src);
-  if TotalLen = 0 then
+  if Src = '' then
     Exit;
 
-  // কেবল বড় টেক্সটের জন্য প্রোগ্রেস বার চালু হবে
-  ShowProgress := TotalLen > 2000;
-  if ShowProgress then
-  begin
-    Progress.Visible := True;
-    Progress.Position := 0;
-  end;
-
-  // Lock MEMO2 screen redraws to prevent flickering
+  Screen.Cursor := crHourGlass;
   SendMessage(MEMO2.Handle, WM_SETREDRAW, 0, 0);
   try
-    MEMO2.Clear;
-    OutText := '';
-    P := 1;
-
-    while P <= TotalLen do
-    begin
-      Q := P;
-      while (Q <= TotalLen) and not CharInSet(Src[Q], [#13, #10]) do
-        Inc(Q);
-
-      Segment := Copy(Src, P, Q - P);
-      OutText := OutText + FUniToBijoy.Convert(Segment);
-
-      if Q <= TotalLen then
-      begin
-        EOL := Src[Q];
-        Inc(Q);
-        if (EOL = #13) and (Q <= TotalLen) and (Src[Q] = #10) then
-        begin
-          EOL := EOL + #10;
-          Inc(Q);
-        end;
-        OutText := OutText + EOL;
-      end;
-
-      P := Q;
-
-      // কেবল বড় ফাইল প্রসেসের সময়ই প্রোগ্রেস আপডেট হবে
-      if ShowProgress then
-      begin
-        Progress.Position := (P * 100) div (TotalLen + 1);
-        Application.ProcessMessages;
-      end;
-    end;
-
+    // পুরো টেক্সট এক কলে কনভার্ট - কনভার্টার #13#10 নেটিভলি হ্যান্ডেল করে, তাই
+    // লাইন-বাই-লাইন লুপ, প্রতি লাইনে ProcessMessages এবং O(N^2) স্ট্রিং জোড়া
+    // দেওয়ার দরকার নেই (পুরনো কোড বড় টেক্সটে হ্যাং করত)!।
+    OutText := FUniToBijoy.Convert(Src);
     MEMO2.Text := OutText;
 
     ActiveFont := cbFontPicker.ActiveFont;
@@ -1305,78 +1383,34 @@ begin
 
     ApplyFontToMemo2(ActiveFont);
   finally
-    // Unlock redraws and refresh the memo
     SendMessage(MEMO2.Handle, WM_SETREDRAW, 1, 0);
     MEMO2.Invalidate;
-    if ShowProgress then
-      Progress.Visible := False;
+    Screen.Cursor := crDefault;
   end;
 end;
 
 procedure TForm1.Button2Click(Sender: TObject);
 var
-  Src, OutText, EOL, Segment: string;
-  P, Q, TotalLen:             Integer;
-  ShowProgress:               Boolean;
+  Src, OutText: string;
 begin
   Src := MEMO2.Text;
-  TotalLen := Length(Src);
-  if TotalLen = 0 then
+  if Src = '' then
     Exit;
 
-  ShowProgress := TotalLen > 2000;
-  if ShowProgress then
-  begin
-    Progress.Visible := True;
-    Progress.Position := 0;
-  end;
-
-  // Lock MEMO1 screen redraws
+  Screen.Cursor := crHourGlass;
   SendMessage(MEMO1.Handle, WM_SETREDRAW, 0, 0);
   try
-    MEMO1.Clear;
-    OutText := '';
-    P := 1;
-
-    while P <= TotalLen do
-    begin
-      Q := P;
-      while (Q <= TotalLen) and not CharInSet(Src[Q], [#13, #10]) do
-        Inc(Q);
-
-      Segment := Copy(Src, P, Q - P);
-      OutText := OutText + FBijoyToUni.Convert(Segment);
-
-      if Q <= TotalLen then
-      begin
-        EOL := Src[Q];
-        Inc(Q);
-        if (EOL = #13) and (Q <= TotalLen) and (Src[Q] = #10) then
-        begin
-          EOL := EOL + #10;
-          Inc(Q);
-        end;
-        OutText := OutText + EOL;
-      end;
-
-      P := Q;
-
-      if ShowProgress then
-      begin
-        Progress.Position := (P * 100) div (TotalLen + 1);
-        Application.ProcessMessages;
-      end;
-    end;
+    // পুরো টেক্সট এক কলে কনভার্ট (Button1Click-এর মতোই)।
+    OutText := FBijoyToUni.Convert(Src);
+    MEMO1.Text := OutText;
 
     MEMO1.DefAttributes.Name := MEMO1.Font.Name;
-    MEMO1.DefAttributes.Size := 18;
+    MEMO1.DefAttributes.Size := MEMO1.Font.Size;
     MEMO1.DefAttributes.Charset := MEMO1.Font.Charset;
-
-    MEMO1.Text := OutText;
 
     MEMO1.SelectAll;
     MEMO1.SelAttributes.Name := MEMO1.Font.Name;
-    MEMO1.SelAttributes.Size := 18;
+    MEMO1.SelAttributes.Size := MEMO1.Font.Size;
     MEMO1.SelAttributes.Charset := MEMO1.Font.Charset;
     MEMO1.SelLength := 0;
 
@@ -1384,8 +1418,7 @@ begin
   finally
     SendMessage(MEMO1.Handle, WM_SETREDRAW, 1, 0);
     MEMO1.Invalidate;
-    if ShowProgress then
-      Progress.Visible := False;
+    Screen.Cursor := crDefault;
   end;
 end;
 
@@ -1436,7 +1469,12 @@ begin
   if not TrySetAnsiVersion(VerName, ErrMsg) then
     MessageDlg('Failed to load ANSI mapping: ' + ErrMsg, mtError, [mbOK], 0)
   else
+  begin
+    // রিভার্স কনভার্টারের লুকআপ টেবিল ক্যাশ করা থাকে; ম্যাপিং বদলেছে, তাই
+    // সেগুলো স্টেল চিহ্নিত করুন - পরের Convert-এ একবারই রিবিল্ড হবে।
+    FBijoyToUni.InvalidateTables;
     SaveConverterSetting('AnsiVersion', VerName);
+  end;
 end;
 
 procedure TForm1.cbAnsiVersionDropDown(Sender: TObject);
@@ -2299,14 +2337,16 @@ begin
   SendMessage(MEMO2.Handle, WM_SETREDRAW, 0, 0);
   try
     MEMO2.Font.Name := FontName;
+    // Only the font FACE changes here - the user's current font size is kept.
     MEMO2.Font.Charset := ANSI_CHARSET;
 
     MEMO2.DefAttributes.Name := FontName;
+    MEMO2.DefAttributes.Size := MEMO2.Font.Size;
     MEMO2.DefAttributes.Charset := ANSI_CHARSET;
 
     MEMO2.SelectAll;
     MEMO2.SelAttributes.Name := FontName;
-    MEMO2.SelAttributes.Size := 18;
+    MEMO2.SelAttributes.Size := MEMO2.Font.Size;
     MEMO2.SelAttributes.Charset := ANSI_CHARSET;
     MEMO2.SelLength := 0;
 
@@ -2388,12 +2428,74 @@ procedure TForm1.AppEventsMessage(var Msg: TMsg; var Handled: Boolean);
 var
   TargetWnd:                      hWnd;
   Pt:                             TPoint;
+  RE:                             TRichEdit;
   IsPickerDropped, IsAnsiDropped: Boolean;
 begin
+  // Ctrl + / Ctrl - / Ctrl 0 change the ACTUAL font size of the memo that
+  // currently has the keyboard focus.  Note: we resolve the target from the
+  // active focus directly (not via PopupMemo) because PopupMemo prefers the
+  // stale FPopupTarget remembered from a right-click, which would keep
+  // resizing MEMO1 after focus has moved to MEMO2.  Works with both the
+  // Number Row and the Number Pad; the message is marked handled so the
+  // +/-/0 character is never typed into the memo.
+  if (Msg.Message = WM_KEYDOWN) and ((GetKeyState(VK_CONTROL) and $8000) <> 0) then
+  begin
+    // Directly target the currently focused memo control
+    if MEMO2.Focused or (ActiveControl = MEMO2) then
+      RE := MEMO2
+    else if MEMO1.Focused or (ActiveControl = MEMO1) then
+      RE := MEMO1
+    else
+      RE := nil;
+
+    if RE <> nil then
+    begin
+      case Msg.wParam of
+        // Font size up: Number Pad (+) or Number Row (=/+)
+        VK_ADD, VK_OEM_PLUS:
+          begin
+            SetMemoFontSize(RE, RE.Font.Size + 2);
+            Handled := True;
+            Exit;
+          end;
+
+        // Font size down: Number Pad (-) or Number Row (-/_)
+        VK_SUBTRACT, VK_OEM_MINUS:
+          begin
+            SetMemoFontSize(RE, RE.Font.Size - 2);
+            Handled := True;
+            Exit;
+          end;
+
+        // Reset to the default 18pt font: Number Pad (0) or Number Row (0)
+        VK_NUMPAD0, Ord('0'):
+          begin
+            SetMemoFontSize(RE, 18); // reset to the default 18pt
+            Handled := True;
+            Exit;
+          end;
+      end;
+    end;
+  end;
+
   if (Msg.Message = WM_KEYDOWN) and (Msg.wParam = Ord('V')) and ((GetKeyState(VK_CONTROL) and $8000) <> 0) and (PopupMemo <> nil) and CanPasteToMemo then
   begin
     PasteToPopupMemo;
     Handled := True;
+  end
+  else if (Msg.Message = WM_MOUSEWHEEL) and ((GetKeyState(VK_CONTROL) and $8000) <> 0) then
+  begin
+    // Ctrl + mouse wheel changes the ACTUAL font size of the memo under the
+    // cursor: wheel up +2pt, wheel down -2pt (same as Ctrl + / Ctrl -).
+    RE := MemoAtPoint(Msg.Pt);
+    if RE <> nil then
+    begin
+      if SmallInt(Msg.wParam shr 16) > 0 then
+        SetMemoFontSize(RE, RE.Font.Size + 2)
+      else
+        SetMemoFontSize(RE, RE.Font.Size - 2);
+      Handled := True; // don't let the wheel also scroll the control
+    end;
   end
   else if (Msg.Message = WM_LBUTTONDOWN) or (Msg.Message = WM_NCLBUTTONDOWN) then
   begin
@@ -2479,7 +2581,7 @@ begin
 
   AppEvents.OnMessage := AppEventsMessage;
 
-  FSplitterRatio := MEMO1Panel.Height / (ClientHeight - PanelButton.Height - PanelFooter.Height - Splitter1.Height);
+  FSplitterRatio := 0.48;
   FUniToBijoy := TUnicodeToBijoy2000.Create;
   FBijoyToUni := TBijoy2000ToUnicode.Create;
 
@@ -2524,12 +2626,21 @@ begin
   MEMO1.Font.Size := 18;
   MEMO2.Font.Size := 18;
 
+  // DefAttributes for new text insertion
   MEMO1.DefAttributes.Name := MEMO1.Font.Name;
-  MEMO1.DefAttributes.Size := MEMO1.Font.Size;
+  MEMO1.DefAttributes.Size := 18;
   MEMO1.DefAttributes.Charset := MEMO1.Font.Charset;
   MEMO2.DefAttributes.Name := MEMO2.Font.Name;
-  MEMO2.DefAttributes.Size := MEMO2.Font.Size;
+  MEMO2.DefAttributes.Size := 18;
   MEMO2.DefAttributes.Charset := MEMO2.Font.Charset;
+
+  // SelAttributes for initial empty cursor caret position
+  MEMO1.SelAttributes.Name := MEMO1.Font.Name;
+  MEMO1.SelAttributes.Size := 18;
+  MEMO1.SelAttributes.Charset := MEMO1.Font.Charset;
+  MEMO2.SelAttributes.Name := MEMO2.Font.Name;
+  MEMO2.SelAttributes.Size := 18;
+  MEMO2.SelAttributes.Charset := MEMO2.Font.Charset;
 
   MakeTextJustified(MEMO1);
   MakeTextJustified(MEMO2);
@@ -2554,6 +2665,14 @@ begin
   miThemeSystem.Caption := Char($25D0) + ' System Default'; // ◐ Half circle
   miThemeLight.Caption := Char($2600) + ' Light Theme';     // ☀ Sun
   miThemeDark.Caption := Char($263D) + ' Dark Theme';       // ☽ Moon
+
+  // Multi-line hints on both memos (the .dfm file is ANSI-only, so the hint
+  // text with its line break is set here at runtime).
+  Self.ShowHint := True;
+  MEMO1.Hint := 'Right-click for Edit options (Cut/Copy/Paste)'#13#10 + 'Ctrl + Mouse Scroll Up/Down to Increase/Decrease Font Size';
+  MEMO2.Hint := MEMO1.Hint;
+
+  UpdateFooterTip;
 end;
 
 procedure TForm1.FormShow(Sender: TObject);

@@ -57,12 +57,18 @@ type
       FOtherKars: TArray<TReplacementPair>;
       // kar glyph -> Unicode kar, sorted longest first
       FKarMap: TArray<TReplacementPair>;
+      // True once BuildTables has populated the arrays for the currently
+      // loaded ANSI mapping.  Convert skips the rebuild (dictionary fills +
+      // sorts) on every call; InvalidateTables resets it when the mapping
+      // changes so the next Convert rebuilds exactly once.
+      FTablesBuilt: Boolean;
 
       procedure BuildTables;
       function VarGlyph(const AName: string): string;
       function CleanKey(const S: string): string;
       function IsSingleAsciiPunct(const S: string): Boolean;
       function HasNonHalfFormOwner(const Glyph: string): Boolean;
+      function HasFirstHalfOwner(const Glyph: string): Boolean;
       function IsPreBaseKarAt(const Text: string; P: Integer; out GLen: Integer): Boolean;
       function IsConsonantChar(const C: Char): Boolean;
       function IsClusterMember(const Text: string; P: Integer; IsFirst: Boolean): Boolean;
@@ -71,6 +77,9 @@ type
       procedure ReorderPreBaseKars(var Text: string);
     public
       function Convert(const AnsiText: string): string;
+      // Call after the ANSI mapping changes (JSON re-loaded / defaults
+      // restored) so the cached lookup tables are rebuilt on the next call.
+      procedure InvalidateTables;
   end;
 
 implementation
@@ -142,12 +151,29 @@ end;
 // True when some registry entry OTHER than the four quote vars and other than
 // the half-form categories (FirstHalfForms / SecondHalfForms) uses Glyph as
 // its glyph.  Used to decide whether a raw Unicode quote codepoint may claim
-// that value: quotes beat half-forms (the user's explicit priority, e.g. a
-// pasted U+2019 must not come back as the default ্+থ conjunct), but never a
-// real letter (Ansi V3 maps ণ to U+2019 - that meaning must survive).  The
-// half-form meanings are preserved anyway: first-half forms always keep a
-// trailing হসন্ত glyph in forward output, and BuildTables claims those pairs
-// contextually (longest key wins over the single quote codepoint).
+// that value: quotes beat SECOND-half forms (the user's explicit priority,
+// e.g. a pasted U+2019 must not come back as the default ্+থ conjunct), but
+// never a real letter (Ansi V3 maps ণ to U+2019 - that meaning must survive)
+// and never a first-half form (A_C_1H owns U+201D in the default mapping -
+// see HasFirstHalfOwner).  The half-form meanings are preserved anyway:
+// first-half forms always keep a trailing হসন্ত glyph in forward output, and
+// BuildTables claims those pairs contextually (longest key wins over the
+// single quote codepoint).
+function TBijoy2000ToUnicode.HasFirstHalfOwner(const Glyph: string): Boolean;
+var
+  R: TAnsiVarRec;
+begin
+  Result := False;
+  if AnsiRegistryMap = nil then
+    Exit;
+  for R in AnsiRegistryMap.Values do
+    if (R.Category = 'FirstHalfForms') and (VarGlyph(R.Name) = Glyph) then
+    begin
+      Result := True;
+      Exit;
+    end;
+end;
+
 function TBijoy2000ToUnicode.HasNonHalfFormOwner(const Glyph: string): Boolean;
 var
   R: TAnsiVarRec;
@@ -207,17 +233,20 @@ begin
     Add(VarGlyph('A_StartDoubleQuote'), b_StartDoubleQuote);
     Add(VarGlyph('A_EndDoubleQuote'), b_EndDoubleQuote);
 
-    // Raw Unicode quote codepoints also win over half-form conjunct glyphs:
-    // in the default mapping A_Th_2H is U+2019, so a pasted ' would come
-    // back as ্+থ.  Quotes only ever beat half-forms - a codepoint that a
-    // real letter owns (Ansi V3: ণ = U+2019) keeps its letter meaning.
-    if not HasNonHalfFormOwner(b_StartSingleQuote) then
+    // Raw Unicode quote codepoints win over SECOND-half-form conjunct
+    // glyphs (in the default mapping A_Th_2H is U+2019, so a pasted '
+    // would come back as ্+থ), but a codepoint owned by a FIRST-half form
+    // keeps its conjunct meaning - in the default/SutonnyMJ mappings the
+    // glyph of A_C_1H IS U+201D, and a bare " there is the half-form of
+    // চ (চ্), not a quote.  Quotes never beat a real letter either
+    // (Ansi V3: ণ = U+2019 keeps its letter meaning).
+    if not HasNonHalfFormOwner(b_StartSingleQuote) and not HasFirstHalfOwner(b_StartSingleQuote) then
       Add(b_StartSingleQuote, b_StartSingleQuote);
-    if not HasNonHalfFormOwner(b_EndSingleQuote) then
+    if not HasNonHalfFormOwner(b_EndSingleQuote) and not HasFirstHalfOwner(b_EndSingleQuote) then
       Add(b_EndSingleQuote, b_EndSingleQuote);
-    if not HasNonHalfFormOwner(b_StartDoubleQuote) then
+    if not HasNonHalfFormOwner(b_StartDoubleQuote) and not HasFirstHalfOwner(b_StartDoubleQuote) then
       Add(b_StartDoubleQuote, b_StartDoubleQuote);
-    if not HasNonHalfFormOwner(b_EndDoubleQuote) then
+    if not HasNonHalfFormOwner(b_EndDoubleQuote) and not HasFirstHalfOwner(b_EndDoubleQuote) then
       Add(b_EndDoubleQuote, b_EndDoubleQuote);
 
     // ------------------------------------------------------------------
@@ -262,6 +291,10 @@ begin
     // Half-form glyphs.  First-half forms stand for the consonant alone
     // (the forward pass keeps its hasanta in the following glyph), while
     // second-half forms bring their own leading hasanta (্+consonant).
+    // A_C_1H is the exception: its default/SutonnyMJ glyph is U+201D, which
+    // real Bijoy text writes as the complete চ্ (the next consonant follows
+    // directly, with no separate হসন্ত glyph), so its bare form expands
+    // with a hasanta below.
     // ------------------------------------------------------------------
     // Special pair: ঙ + ্ + ম is encoded as NGA_1H + plain ম (no hasanta).
     // Guarded: a mapping may blank either glyph (Ansi V3 blanks A_T_R_2H),
@@ -301,10 +334,10 @@ begin
 
     // First-half forms in forward output ALWAYS keep a trailing হসন্ত glyph
     // (FirstHalfForms replaces consonant+্ with [1H]+্, never swallows the
-    // hasanta).  Claim the pair contextually so that - even though the raw
-    // quote codepoints now win over half-forms (see HasNonHalfFormOwner) - a
-    // forward-produced conjunct like ্-চ (default A_C_1H = U+201D = ") still
-    // reverses to চ+্ via the longer key, while a BARE U+201D is a pasted ".
+    // hasanta).  Claim the pair contextually so a forward-produced conjunct
+    // like ্-চ (default A_C_1H = U+201D = ") still reverses to চ্ via the
+    // longer key.  A BARE U+201D is also the half-form there (see
+    // HasFirstHalfOwner), so it expands to চ্ by the single-glyph claim.
     if VarGlyph('A_Hasanta') <> '' then
     begin
       if VarGlyph('A_M_1H') <> '' then
@@ -327,15 +360,31 @@ begin
         Add(VarGlyph('A_D_1H_2') + VarGlyph('A_Hasanta'), b_d + b_Hasanta);
     end;
 
-    Add(VarGlyph('A_M_1H'), b_M);
-    Add(VarGlyph('A_Ss_1H'), b_Ss);
-    Add(VarGlyph('A_C_1H'), b_C);
-    Add(VarGlyph('A_NGA_1H'), b_NGA);
-    Add(VarGlyph('A_S_1H_1'), b_s);
-    Add(VarGlyph('A_N_1H_1'), b_n);
-    Add(VarGlyph('A_N_1H_2'), b_n);
-    Add(VarGlyph('A_D_1H_1'), b_d);
-    Add(VarGlyph('A_D_1H_2'), b_d);
+    // Second-half forms that share their glyph with a quote codepoint
+    // (default/SutonnyMJ: A_Th_2H = U+2019 = closing single quote) lose their
+    // BARE claim to the quote identity above, so a conjunct written as
+    // [1st-half][2nd-half] - exactly what the forward pass emits for স্থ and
+    // ন্থ - must be claimed as an explicit multi-glyph pair.  The 2-char key
+    // always beats the 1-char quote claim in the longest-first sweep, and a
+    // quote never directly follows a half-form glyph in real text, so the
+    // pair is unambiguous.
+    if VarGlyph('A_Th_2H') <> '' then
+    begin
+      if VarGlyph('A_S_1H_1') <> '' then
+        Add(VarGlyph('A_S_1H_1') + VarGlyph('A_Th_2H'), b_s + b_Hasanta + b_Th); // ¯' -> স্থ
+      if VarGlyph('A_N_1H_1') <> '' then
+        Add(VarGlyph('A_N_1H_1') + VarGlyph('A_Th_2H'), b_n + b_Hasanta + b_Th); // š' -> ন্থ
+    end;
+
+    Add(VarGlyph('A_M_1H'), b_M + b_Hasanta);
+    Add(VarGlyph('A_Ss_1H'), b_Ss + b_Hasanta);
+    Add(VarGlyph('A_C_1H'), b_C + b_Hasanta);
+    Add(VarGlyph('A_NGA_1H'), b_NGA + b_Hasanta);
+    Add(VarGlyph('A_S_1H_1'), b_s + b_Hasanta);
+    Add(VarGlyph('A_N_1H_1'), b_n + b_Hasanta);
+    Add(VarGlyph('A_N_1H_2'), b_n + b_Hasanta);
+    Add(VarGlyph('A_D_1H_1'), b_d + b_Hasanta);
+    Add(VarGlyph('A_D_1H_2'), b_d + b_Hasanta);
 
     // Folas.  (The reph glyph is deliberately NOT expanded here: it needs its
     // own re-ordering pass in Convert, and in BanglaPedia it shares a glyph
@@ -507,9 +556,17 @@ begin
       FPostInverse[I].Key := CustomPostReplacements[I].Value;
       FPostInverse[I].Value := CustomPostReplacements[I].Key;
     end;
+
+    // Everything is built and sorted - cache it until the mapping changes.
+    FTablesBuilt := True;
   finally
     Dict.Free;
   end;
+end;
+
+procedure TBijoy2000ToUnicode.InvalidateTables;
+begin
+  FTablesBuilt := False;
 end;
 
 { ============================================================================= }
@@ -669,9 +726,12 @@ begin
   if AnsiText = '' then
     Exit('');
 
-  // Tables depend on the currently selected ANSI mapping, so rebuild them
-  // on every call (cheap - a few hundred entries).
-  BuildTables;
+  // Tables depend on the currently selected ANSI mapping.  They are built
+  // once and cached (InvalidateTables marks them stale when the mapping
+  // changes), so repeated Convert calls no longer rebuild and re-sort
+  // hundreds of dictionary entries on every single invocation.
+  if not FTablesBuilt then
+    BuildTables;
   Text := AnsiText;
 
   // 1. Undo the JSON PostReplacements (forward applies them last).
@@ -686,6 +746,20 @@ begin
   // reph glyph survive this pass on purpose.
   for I := 0 to high(FMain) do
     Text := ReplaceStr(Text, FMain[I].Key, FMain[I].Value);
+
+  // 3.5 A conjunct written as [first-half][second-half] - exactly what the
+  // forward pass emits (¯ + ‹ for স্ক) - decodes to consonant+্ from the
+  // first half and ্+consonant from the second half, yielding a doubled
+  // হসন্ত that breaks the conjunct (স্্‌ক instead of স্‌ক).  The forward
+  // pass only ever produces a doubled হসন্ত from a doubled হসন্ত input
+  // (DeNormalize just reduces runs), which real Bijoy text does not
+  // contain, so collapsing runs back to a single ্ is safe and restores
+  // the joining form.
+  repeat
+    I := Pos(b_Hasanta + b_Hasanta, Text);
+    if I > 0 then
+      Delete(Text, I, 1);
+  until I <= 0;
 
   // 4. Move the reph glyph to the start of its cluster, then expand to র্.
   ReorderReph(Text);

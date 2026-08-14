@@ -2,8 +2,8 @@ object Form1: TForm1
   Left = 0
   Top = 0
   Caption = 'Avro Text Converter'
-  ClientHeight = 398
-  ClientWidth = 665
+  ClientHeight = 600
+  ClientWidth = 900
   Color = clBtnFace
   DoubleBuffered = True
   Font.Charset = DEFAULT_CHARSET
@@ -70,22 +70,25 @@ object Form1: TForm1
     ParentDoubleBuffered = False
     TabOrder = 0
     object Button1: TButton
-      Left = 13
+      Left = 8
       Top = 3
       Width = 105
       Height = 25
       Caption = 'Unicode to ANSI'
+      Default = False
       Font.Charset = DEFAULT_CHARSET
       Font.Color = clWindowText
       Font.Height = -11
       Font.Name = 'Tahoma'
       Font.Style = [fsBold]
       ParentFont = False
+      ShowHint = True
+      Hint = 'Convert the Unicode (Bengali) text above to ANSI (Bijoy)'
       TabOrder = 0
       OnClick = Button1Click
     end
     object cbAnsiVersion: TAnsiVersionCombo
-      Left = 124
+      Left = 119
       Top = 3
       Width = 160
       Height = 25
@@ -103,22 +106,25 @@ object Form1: TForm1
       OnCloseUp = cbAnsiVersionCloseUp
     end
     object Button2: TButton
-      Left = 290
+      Left = 285
       Top = 3
       Width = 105
       Height = 25
       Caption = 'ANSI to Unicode'
+      Default = False
       Font.Charset = DEFAULT_CHARSET
       Font.Color = clWindowText
       Font.Height = -11
       Font.Name = 'Tahoma'
       Font.Style = [fsBold]
       ParentFont = False
+      ShowHint = True
+      Hint = 'Convert the ANSI (Bijoy) text below back to Unicode'
       TabOrder = 2
       OnClick = Button2Click
     end
     object cbFontPicker: TFontPickerCombo
-      Left = 401
+      Left = 396
       Top = 3
       Width = 200
       Height = 25
@@ -134,7 +140,7 @@ object Form1: TForm1
       OnCloseUp = cbFontPickerCloseUp
     end
     object btnSettings: TSpeedButton
-      Left = 628
+      Left = 635
       Top = 3
       Width = 29
       Height = 25
@@ -153,9 +159,9 @@ object Form1: TForm1
     Height = 125
     Align = alTop
     AlignWithMargins = True
-    Margins.Left = 8
+    Margins.Left = 2
     Margins.Top = 0
-    Margins.Right = 8
+    Margins.Right = 2
     Margins.Bottom = 0
     BevelOuter = bvNone
     DoubleBuffered = True
@@ -179,11 +185,12 @@ object Form1: TForm1
       Font.Charset = ANSI_CHARSET
       Font.Color = clWindowText
       Font.Height = -13
-      Font.Name = 'Siyam Rupali'
+      Font.Name = 'Bornomala'
       Font.Style = []
       ParentFont = False
       ScrollBars = ssVertical
       WordWrap = True
+      ShowHint = True
       TabOrder = 0
       OnEnter = MemoFocusChanged
       OnExit = MemoFocusChanged
@@ -197,9 +204,9 @@ object Form1: TForm1
     Cursor = crVSplit
     Align = alTop
     AlignWithMargins = True
-    Margins.Left = 8
+    Margins.Left = 2
     Margins.Top = 0
-    Margins.Right = 8
+    Margins.Right = 2
     Margins.Bottom = 0
     OnMoved = SplitterMoved
   end
@@ -210,9 +217,9 @@ object Form1: TForm1
     Height = 207
     Align = alClient
     AlignWithMargins = True
-    Margins.Left = 8
+    Margins.Left = 2
     Margins.Top = 0
-    Margins.Right = 8
+    Margins.Right = 2
     Margins.Bottom = 0
     BevelOuter = bvNone
     DoubleBuffered = True
@@ -240,6 +247,7 @@ object Form1: TForm1
       Font.Style = []
       ParentFont = False
       ScrollBars = ssVertical
+      ShowHint = True
       WordWrap = True
       TabOrder = 0
       OnEnter = MemoFocusChanged
@@ -257,6 +265,23 @@ object Form1: TForm1
     FullRepaint = False
     ParentDoubleBuffered = False
     TabOrder = 4
+    object LblFooter: TLabel
+      Left = 8
+      Top = 6
+      Width = 649
+      Height = 13
+      Align = alClient
+      Caption = ''
+      Font.Charset = DEFAULT_CHARSET
+      Font.Color = clWindowText
+      Font.Height = -11
+      Font.Name = 'Tahoma'
+      Font.Style = []
+      Margins.Left = 8
+      ParentFont = False
+      Layout = tlCenter
+      Transparent = True
+    end
     object Progress: TProgressBar
       Left = 12
       Top = 6
@@ -272,7 +297,7 @@ object Form1: TForm1
     Left = 720
     Top = 192
   end
-  object PopupMenu1: TPopupMenu
+object PopupMenu1: TPopupMenu
     Left = 664
     Top = 192
     OnPopup = PopupMenu1Popup
