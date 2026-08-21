@@ -1,4 +1,4 @@
-{
+﻿{
   =============================================================================
   This Source Code Form is subject to the terms of the Mozilla Public
   License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -2937,7 +2937,7 @@ procedure LoadAnsiMapping(const Path: string; ErrorLog: TStringList = nil);
 var
   JSON:                                                                       string;
   P:                                                                          Integer;
-  Key, ConstName, ConstValue, UnicodeKeyValue, CatName, FieldName, ToggleVal: string;
+  Key, ConstName, ConstValue, UnicodeKeyValue, CatName, FieldName, ToggleVal, ConstComment: string;
   Rec:                                                                        TAnsiVarRec;
   Lines:                                                                      TStringList;
   Items:                                                                      TList<string>;
@@ -3051,6 +3051,7 @@ begin
             Inc(P);
             ConstValue := '';
             UnicodeKeyValue := '';
+            ConstComment := '';
             while P <= Length(JSON) do
             begin
               JSkipWS(JSON, P);
@@ -3072,6 +3073,8 @@ begin
                 ConstValue := JReadString(JSON, P)
               else if FieldName = 'UnicodeKey' then
                 UnicodeKeyValue := ResolveValue(JReadString(JSON, P))
+              else if FieldName = 'Comment' then
+                ConstComment := JReadString(JSON, P)
               else
                 JSkipValue(JSON, P);
             end;
@@ -3099,6 +3102,14 @@ begin
               if AnsiRegistryMap.TryGetValue(ConstName, Rec) then
               begin
                 Rec.BengaliChar := UnicodeKeyValue;
+                AnsiRegistryMap.AddOrSetValue(ConstName, Rec);
+              end;
+            end;
+            if ConstComment <> '' then
+            begin
+              if AnsiRegistryMap.TryGetValue(ConstName, Rec) then
+              begin
+                Rec.Comment := ConstComment;
                 AnsiRegistryMap.AddOrSetValue(ConstName, Rec);
               end;
             end;
