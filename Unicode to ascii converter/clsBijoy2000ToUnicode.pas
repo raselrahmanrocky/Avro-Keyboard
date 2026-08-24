@@ -345,6 +345,7 @@ begin
     Add(VarGlyph('A_T_2H'), b_Hasanta + b_t);
     Add(VarGlyph('A_Th_2H'), b_Hasanta + b_Th);
     Add(VarGlyph('A_K_2H'), b_Hasanta + b_K);
+    Add(VarGlyph('A_P_2H'), b_Hasanta + b_p);
 
     // First-half forms in forward output ALWAYS keep a trailing হসন্ত glyph
     // (FirstHalfForms replaces consonant+্ with [1H]+্, never swallows the
