@@ -363,6 +363,9 @@ var
   A_ZFola:     Char = #$A8; //
   A_RFola_1:   Char = #$AA; //
   A_RFola_2:   Char = #$AB; //
+  A_RFola_4:   Char = #$C7; // <--- used in ansi v4
+  A_RFola_5:   Char = #$CB; // <--- used in ansi v4
+  A_RFola_6:   Char = #$CC; // <--- used in ansi v4
   A_L_2H_1:    Char = #$AC; //
   A_L_2H_2:    Char = #$AD; // <--- Not used
   A_T_R_2H:    Char = #$BF; //
@@ -376,6 +379,7 @@ var
   A_Th_2H:     Char = #$2019; //
   A_K_2H:      Char = #$2039; //
   A_L_2H_3:    Char = #$2212; //
+  A_P_2H:      Char = #$2219; //
 
   { ============================================================================= }
   { Registry Initialization }
@@ -631,10 +635,13 @@ begin
   RegVar('A_ZFola', 'SecondHalfForms', avChar, @A_ZFola, '#$A8', 'য-ফলা');
   RegVar('A_RFola_1', 'SecondHalfForms', avChar, @A_RFola_1, '#$AA', 'র-ফলা ১');
   RegVar('A_RFola_2', 'SecondHalfForms', avChar, @A_RFola_2, '#$AB', 'র-ফলা ২');
+  RegVar('A_RFola_3', 'SecondHalfForms', avChar, @A_RFola_3, '#$D6', 'র-ফলা ৩');
+  RegVar('A_RFola_4', 'SecondHalfForms', avChar, @A_RFola_4, '#$C7', 'র-ফলা ৪');
+  RegVar('A_RFola_5', 'SecondHalfForms', avChar, @A_RFola_5, '#$CB', 'র-ফলা ৫');
+  RegVar('A_RFola_6', 'SecondHalfForms', avChar, @A_RFola_6, '#$CC', 'র-ফলা ৬');
   RegVar('A_L_2H_1', 'SecondHalfForms', avChar, @A_L_2H_1, '#$AC', 'ল-এর দ্বিতীয় খন্ড ১');
   RegVar('A_L_2H_2', 'SecondHalfForms', avChar, @A_L_2H_2, '#$AD', 'ল-এর দ্বিতীয় খন্ড ২');
   RegVar('A_T_R_2H', 'SecondHalfForms', avChar, @A_T_R_2H, '#$BF', 'ত্র-এর দ্বিতীয় খন্ড');
-  RegVar('A_RFola_3', 'SecondHalfForms', avChar, @A_RFola_3, '#$D6', 'র-ফলা ৩');
   RegVar('A_Nn_2H_1', 'SecondHalfForms', avChar, @A_Nn_2H_1, '#$E8', 'ণ-এর দ্বিতীয় খন্ড ১');
   RegVar('A_K_R_2H', 'SecondHalfForms', avChar, @A_K_R_2H, '#$152', 'ক্র-এর দ্বিতীয় খন্ড');
   RegVar('A_Nn_2H_2', 'SecondHalfForms', avChar, @A_Nn_2H_2, '#$153', 'ণ-এর দ্বিতীয় খন্ড ২');
@@ -644,6 +651,7 @@ begin
   RegVar('A_Th_2H', 'SecondHalfForms', avChar, @A_Th_2H, '#$2019', 'থ-এর দ্বিতীয় খন্ড');
   RegVar('A_K_2H', 'SecondHalfForms', avChar, @A_K_2H, '#$2039', 'ক-এর দ্বিতীয় খন্ড');
   RegVar('A_L_2H_3', 'SecondHalfForms', avChar, @A_L_2H_3, '#$2212', 'ল-এর দ্বিতীয় খন্ড ৩');
+  RegVar('A_P_2H', 'SecondHalfForms', avChar, @A_P_2H, '#$2219', 'প-এর দ্বিতীয় খন্ড');
 end;
 { TUnicodeToBijoy2000 }
 { =============================================================================== }
@@ -657,7 +665,7 @@ var
   function PickB2H(const wC: Char): Char;
   begin
     if (wC = b_s) or (wC = b_ss) or (wC = b_m) or (wC = b_n) or (wC = b_d) or (wC = A_M_1H) or (wC = A_Ss_1H) or (wC = A_S_1H_1) or (wC = A_N_1H_1) or
-        (wC = A_D_1H_2) then
+      (wC = A_D_1H_2) then
       Result := A_B_2H_1
     else if (wC = b_dh) or (wC = b_b) or (wC = b_h) then
       Result := A_B_2H_4
@@ -685,11 +693,11 @@ var
       Result := A_L_2H_1;
   end;
 
-  // Replace every (hasanta + C) pair in one left-to-right pass, reading the
-  // character before the hasanta from the output built so far (the in-place
-  // version read the same evolved prefix). The old repeat/Pos + WideStuffString
-  // loops restarted the scan from the top and rebuilt the whole string for
-  // every match - O(N^2) on conjunct-heavy text.
+// Replace every (hasanta + C) pair in one left-to-right pass, reading the
+// character before the hasanta from the output built so far (the in-place
+// version read the same evolved prefix). The old repeat/Pos + WideStuffString
+// loops restarted the scan from the top and rebuilt the whole string for
+// every match - O(N^2) on conjunct-heavy text.
 
   procedure ScanB2H;
   begin
@@ -784,6 +792,8 @@ begin
   fConvertedText := ReplaceStr(fConvertedText, b_Hasanta + b_Th, A_Th_2H);
   { A_K_2H }
   fConvertedText := ReplaceStr(fConvertedText, b_Hasanta + b_K, A_K_2H);
+  { A_P_2H }
+  fConvertedText := ReplaceStr(fConvertedText, b_Hasanta + b_p, A_P_2H);
 
   { A_B_2H_1, A_B_2H_2, A_B_2H_3, A_B_2H_4 }
   ScanB2H;
@@ -857,7 +867,7 @@ begin
       if (fConvertedText[I] = b_n) and (I < Length(fConvertedText)) and (fConvertedText[I + 1] = b_Hasanta) then
       begin
         if (I + 2 <= Length(fConvertedText)) and ((fConvertedText[I + 2] = b_t) or (fConvertedText[I + 2] = b_Th) or (fConvertedText[I + 2] = b_L) or
-              (fConvertedText[I + 2] = b_b) or (fConvertedText[I + 2] = A_T_R_2H) or (fConvertedText[I + 2] = A_T_UKar_2H)) then
+            (fConvertedText[I + 2] = b_b) or (fConvertedText[I + 2] = A_T_R_2H) or (fConvertedText[I + 2] = A_T_UKar_2H)) then
           SB.Append(A_N_1H_1)
         else if (I + 2 <= Length(fConvertedText)) and ((fConvertedText[I + 2] = b_m) or (fConvertedText[I + 2] = b_n)) then
           SB.Append(A_N[1])
@@ -1281,44 +1291,71 @@ var
   Take:       Integer;
   C2, C3:     Char;
 
-  // Resolve which glyph replaces this r-fola and how far it reaches back into
-  // the output (0 = only hasanta+ra, 1 = also the consonant before them).
-  // Mirrors the rule/fallback logic of the in-place version exactly.
+  // Block-based group matching for Ra-Phala glyph selection.
+  // Unlike MatchGroupLength (which checks HasHasantaBefore for vowel-kar
+  // matching), this performs a pure backwards block match against the tail
+  // of the StringBuilder buffer.  Multi-char ANSI conjuncts that were
+  // already resolved by ReplaceFullForms (e.g. A_N_Dh, A_NGA_K) are
+  // matched atomically — not character-by-character.
+  //
+  // Returns the length of the longest group entry matching the tail of SB,
+  // or 0 if no entry matches.
+  function MatchTailGroup(const GroupName: string): Integer;
+  var
+    Arr:   TArray<string>;
+    S:     string;
+    SLen:  Integer;
+    SBStr: string;
+  begin
+    Result := 0;
+    SBStr := SB.ToString;
+    if (ConsonantGroupMap <> nil) and ConsonantGroupMap.TryGetValue(GroupName, Arr) then
+      for S in Arr do
+      begin
+        SLen := Length(S);
+        if (SLen <= SB.Length) and (Copy(SBStr, SB.Length - SLen + 1, SLen) = S) then
+        begin
+          if SLen > Result then
+            Result := SLen;
+        end;
+      end;
+  end;
+
+// Resolve which glyph replaces this r-fola and how far it reaches back
+// into the output buffer.  Uses block-based tail matching against
+// ConsonantGroupMap entries so that multi-character ANSI conjuncts
+// (e.g. A_N_Dh = 2 bytes, A_NGA_K = 2 bytes) are matched atomically.
   procedure MatchRfola;
   var
     Matched:  Boolean;
     LoopRule: TRfolaRule;
+    MatchLen: Integer;
   begin
     Matched := False;
     if Length(RfolaRules) > 0 then
     begin
-      // The loop variable must be local to this nested routine (Delphi
-      // requires for-loop control variables to be simple locals); Rule is
-      // copied out so the matched rule stays visible to the caller.
       for LoopRule in RfolaRules do
       begin
         Rule := LoopRule;
-        // Check context group first (e.g., t preceded by K/t)
-        if (Rule.ContextGroup <> '') and CharInGroup(string(PrevC), Rule.Consonants) then
+        // Block-based tail match: find the longest entry in
+        // Rule.Consonants that matches the end of the SB buffer.
+        MatchLen := MatchTailGroup(Rule.Consonants);
+        if MatchLen > 0 then
         begin
-          // Check if the character before PrevC's Hasanta is in ContextGroup
-          if IsHalfForm and (C3 <> #0) then
+          // Check context group first (e.g. ত preceded by ক/ত → variant 2)
+          if (Rule.ContextGroup <> '') and IsHalfForm and (C3 <> #0) then
           begin
             if CharInGroup(string(C3), Rule.ContextGroup) then
             begin
               Val := Rule.ContextValue;
-              Take := 0; // ContextReplaceLen is 2 in the mappings: hasanta + ra
+              Take := 0;
               Matched := True;
               break;
             end;
           end;
-        end;
-        // Check main consonant group
-        if CharInGroup(string(PrevC), Rule.Consonants) then
-        begin
+          // Main match
           if Rule.ReplaceLen > 2 then
           begin
-            // Dynamic replace length (3, 4, 5, etc.) - reaches one char back
             Take := Rule.ReplaceLen - 2;
             if IsHalfForm and (Rule.HalfValue <> '') then
               Val := Rule.HalfValue
@@ -1327,7 +1364,6 @@ var
           end
           else
           begin
-            // Default 2-char: replace hasanta + ra
             Val := Rule.Value;
             Take := 0;
           end;
@@ -1337,7 +1373,10 @@ var
       end;
     end;
 
-    // Fallback to hardcoded defaults if no rule matched
+    // Fallback: if no RfolaRules entry matched (or RfolaRules is empty),
+    // use the hardcoded defaults for special consonants that need
+    // combined glyphs (ভ→A_Bh_R, ক→A_K_R, ত→A_T_R).  These have
+    // replaceLen=3 semantics (consume the consonant too).
     if not Matched then
     begin
       if (PrevC = b_p) or (PrevC = b_g) or (PrevC = b_sh) then
@@ -1406,12 +1445,10 @@ begin
   // Convert Hasanta
   fConvertedText := ReplaceStr(fConvertedText, b_Hasanta + zwnj, A_Hasanta);
 
-  // Convert R-Fola - single left-to-right pass. The old repeat/Pos +
-  // WideStuffString loop rescanned from the top and rebuilt the whole string
-  // for every r-fola - O(N^2) on conjunct-heavy text. The (hasanta + ra) match
-  // is always found in the input here; the consonant before it (and the
-  // 3-char reach-back) is read from the output built so far, exactly like the
-  // in-place version's evolved prefix.
+  // Convert R-Fola — single left-to-right pass with block-based tail matching.
+  // The StringBuilder accumulates output characters.  When we encounter
+  // b_Hasanta + b_r in the input, we look backwards into the SB to find
+  // the preceding consonant or conjunct and select the correct rfola glyph.
   SB := TStringBuilder.Create(Length(fConvertedText) + 16);
   try
     I := 1;
@@ -1453,11 +1490,9 @@ begin
   end;
 end;
 
-{ =============================================================================== }
-
 procedure TUnicodeToBijoy2000.DeNormalize;
 var
-  SB:         TStringBuilder;
+  SB:           TStringBuilder;
   I, J, RunLen: Integer;
 begin
   fConvertedText := ReplaceStr(fConvertedText, b_z + b_Nukta, b_y);
@@ -1522,10 +1557,10 @@ end;
 
 procedure TUnicodeToBijoy2000.ReArrangeKars;
 var
-  I, OutIdx: Integer;
+  I, OutIdx:   Integer;
   wCTmp, fKar: Char;
-  Len: Integer;
-  TempList: TList<Char>;
+  Len:         Integer;
+  TempList:    TList<Char>;
 
   function MoveAbleKar(const wKar: Char): Boolean;
   begin
@@ -2085,15 +2120,14 @@ begin
           if SB.Chars[StartPos - 1 + P] <> K[P + 1] then
           begin
             Match := False;
-            Break;
+            break;
           end;
         if not Match then
           Continue;
 
         // Hasanta immediately before the match? (e.g., 'gu' inside 'nggu')
         HPos := StartPos - 1;
-        while (HPos >= 1) and (StartPos - HPos <= LookBackWindow) and
-              ((SB.Chars[HPos - 1] = zwj) or (SB.Chars[HPos - 1] = zwnj)) do
+        while (HPos >= 1) and (StartPos - HPos <= LookBackWindow) and ((SB.Chars[HPos - 1] = zwj) or (SB.Chars[HPos - 1] = zwnj)) do
           Dec(HPos);
         HasH := (HPos >= 1) and (SB.Chars[HPos - 1] = b_Hasanta);
 
@@ -2148,7 +2182,7 @@ begin
       if fConvertedText[I] = b_Ekar then
       begin
         if (SB.Length = 0) or (SB.Chars[SB.Length - 1] = ' ') or (SB.Chars[SB.Length - 1] = #13) or (SB.Chars[SB.Length - 1] = #10) or
-            (SB.Chars[SB.Length - 1] = #9) then
+          (SB.Chars[SB.Length - 1] = #9) then
           SB.Append(A_EKar1)
         else
           SB.Append(GetAnsiVarValue('A_EKar2'));
@@ -2174,7 +2208,7 @@ begin
       if fConvertedText[I] = b_OIKar then
       begin
         if (SB.Length = 0) or (SB.Chars[SB.Length - 1] = ' ') or (SB.Chars[SB.Length - 1] = #13) or (SB.Chars[SB.Length - 1] = #10) or
-            (SB.Chars[SB.Length - 1] = #9) then
+          (SB.Chars[SB.Length - 1] = #9) then
           SB.Append(A_OIKar1)
         else
           SB.Append(GetAnsiVarValue('A_OIKar2'));
@@ -2935,18 +2969,18 @@ procedure LoadAnsiMapping(const Path: string; ErrorLog: TStringList = nil);
   end;
 
 var
-  JSON:                                                                       string;
-  P:                                                                          Integer;
+  JSON: string;
+  P:    Integer;
   Key, ConstName, ConstValue, UnicodeKeyValue, CatName, FieldName, ToggleVal, ConstComment: string;
-  Rec:                                                                        TAnsiVarRec;
-  Lines:                                                                      TStringList;
-  Items:                                                                      TList<string>;
-  RawItems:                                                                   TList<string>;
-  RawStr:                                                                     string;
-  GCorrGroup, GCorrFrom, GCorrTo:                                             string;
-  GroupMembers:                                                               TArray<string>;
-  GCorrMember:                                                                string;
-  GCorrPair:                                                                  TReplacementPair;
+  Rec:                            TAnsiVarRec;
+  Lines:                          TStringList;
+  Items:                          TList<string>;
+  RawItems:                       TList<string>;
+  RawStr:                         string;
+  GCorrGroup, GCorrFrom, GCorrTo: string;
+  GroupMembers:                   TArray<string>;
+  GCorrMember:                    string;
+  GCorrPair:                      TReplacementPair;
 begin
   ResetAnsiToDefaults;
 
