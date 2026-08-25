@@ -949,16 +949,6 @@
       "Comment": "স্ক্র"
     },
     {
-      "Key": "স্ক্রু",
-      "Value": "#$00D5#$02DC#$007A",
-      "Comment": "স্ক্রু"
-    },
-    {
-      "Key": "স্ক্রূ",
-      "Value": "#$00D5#$02DC#$201E",
-      "Comment": "স্ক্রূ"
-    },
-    {
       "Key": "ন্ট",
       "Value": "±U",
       "Comment": "ন্ট"
@@ -999,11 +989,6 @@
       "Comment": "ন্ধ"
     },
     {
-      "Key": "দ্র",
-      "Value": "`È",
-      "Comment": "দ্র"
-    },
-    {
       "Key": "ল্ল",
       "Value": "jÏ",
       "Comment": "ল্ল"
@@ -1019,11 +1004,6 @@
       "Comment": "ন্দ্ব"
     },
     {
-      "Key": "ন্ধ্র",
-      "Value": "®¬Ì",
-      "Comment": "ন্ধ্র"
-    },
-    {
       "Key": "স্ত্র",
       "Value": "Õ¨",
       "Comment": "স্ত্র"
@@ -1032,6 +1012,21 @@
       "Key": "ক্ল",
       "Value": "KÑ",
       "Comment": "ক্ল"
+    },
+    {
+      "Key": "ক্ব",
+      "Value": "#$DB",
+      "Comment": "ক্ব"
+    },
+    {
+      "Key": "ত্ন",
+      "Value": "#$F0",
+      "Comment": "ত্ন"
+    },
+    {
+      "Key": "ড়্গ",
+      "Value": "#$FF",
+      "Comment": "ড়্গ"
     }
   ],
   "PreReplacements": [
@@ -1088,12 +1083,36 @@
         },
         {
           "consonants": "RaPhalas1",
-          "value": "#{A_UKar2}",
+          "value": "#{A_UKar3}",
           "process": "post",
           "matchMode": 1
         },
         {
           "consonants": "RaPhalas2",
+          "value": "#{A_UKar3}",
+          "process": "post",
+          "matchMode": 1
+        },
+        {
+          "consonants": "RaPhalas3",
+          "value": "#{A_UKar2}",
+          "process": "post",
+          "matchMode": 1
+        },
+        {
+          "consonants": "RaPhalas4",
+          "value": "#{A_UKar3}",
+          "process": "post",
+          "matchMode": 1
+        },
+        {
+          "consonants": "RaPhalas5",
+          "value": "#{A_UKar3}",
+          "process": "post",
+          "matchMode": 1
+        },
+        {
+          "consonants": "RaPhalas6",
           "value": "#{A_UKar1}",
           "process": "post",
           "matchMode": 1
@@ -1157,8 +1176,38 @@
         },
         {
           "consonants": "RaPhalas2",
+          "value": "#{A_UUKar2}",
+          "process": "post",
+          "matchMode": 1
+        },
+        {
+          "consonants": "RaPhalas3",
+          "value": "#{A_UUKar2}",
+          "process": "post",
+          "matchMode": 1
+        },
+        {
+          "consonants": "RaPhalas4",
+          "value": "#{A_UUKar2}",
+          "process": "post",
+          "matchMode": 1
+        },
+        {
+          "consonants": "RaPhalas5",
+          "value": "#{A_UUKar2}",
+          "process": "post",
+          "matchMode": 1
+        },
+        {
+          "consonants": "RaPhalas6",
           "value": "#{A_UUKar1}",
           "process": "post",
+          "matchMode": 1
+        },
+        {
+          "consonants": "RR_RRH",
+          "value": "#{A_UUKar2}",
+          "process": "pre",
           "matchMode": 1
         }
       ]
@@ -1198,7 +1247,7 @@
         },
         {
           "consonants": "RaPhalas1",
-          "value": "#{A_RRIKar2}",
+          "value": "#{A_RRIKar1}",
           "process": "post",
           "matchMode": 1
         },
@@ -1207,20 +1256,58 @@
           "value": "#{A_RRIKar1}",
           "process": "post",
           "matchMode": 1
+        },
+        {
+          "consonants": "RaPhalas3",
+          "value": "#{A_RRIKar1}",
+          "process": "post",
+          "matchMode": 1
+        },
+        {
+          "consonants": "RaPhalas4",
+          "value": "#{A_RRIKar1}",
+          "process": "post",
+          "matchMode": 1
+        },
+        {
+          "consonants": "RaPhalas5",
+          "value": "#{A_RRIKar1}",
+          "process": "post",
+          "matchMode": 1
+        },
+        {
+          "consonants": "RaPhalas6",
+          "value": "#{A_RRIKar2}",
+          "process": "post",
+          "matchMode": 1
+        },
+        {
+          "consonants": "RR_RRH",
+          "value": "#{A_RRIKar1}",
+          "process": "pre",
+          "matchMode": 1
         }
       ]
     }
   },
   "RaPhalaGroups": {
     "RaPhalas1": [
-      "#{A_RFola_1}",
-      "#{A_RFola_3}",
-      "#{A_RFola_4}",
-      "#{A_RFola_5}",
-      "#{A_RFola_6}"
+      "#{A_RFola_1}"
     ],
     "RaPhalas2": [
       "#{A_RFola_2}"
+    ],
+    "RaPhalas3": [
+      "#{A_RFola_3}"
+    ],
+    "RaPhalas4": [
+      "#{A_RFola_4}"
+    ],
+    "RaPhalas5": [
+      "#{A_RFola_5}"
+    ],
+    "RaPhalas6": [
+      "#{A_RFola_6}"
     ],
     "Connectors": []
   },
@@ -1232,7 +1319,13 @@
       "#$09A2#$09CD#$09B0"
     ],
     "Conjunction": [
-      "#$09AC#$09CD#$09B2"
+      "#$09AC#$09CD#$09B2",
+      "#$09A4#$09CD#$09B0",
+      "#$09B8#$09CD#$09A4#$09CD#$09B0",
+      "#$09A6#$09CD#$09AC",
+      "#$09A6#$09CD#$09AE",
+      "#$09AE#$09CD#$09AE",
+      "#$099C#$09CD#$099C"
     ],
     "Customkar1": [
       "#$09B8#$09CD#$09A4#$09CD#$09B0",
@@ -1358,15 +1451,15 @@
       "#$09A4"
     ],
     "Rfola2Group": [
-      "#{A_N_Dh}",
       "#{A_M_Ph}",
       "#{A_L_Ph}",
       "#{A_K_Ss}",
-      "#$09AB",
       "#{A_K_T}",
       "#$09B9",
       "#$099B",
-      "#$099C"
+      "#$099C",
+      "#{A_N_Tth}",
+      "#{A_J_J}"
     ],
     "Rfola3Group": [
       "#$09AA",
@@ -1381,11 +1474,18 @@
     ],
     "Rfola5Group": [
       "#$099E",
-      "#$09A2"
+      "#$09A6",
+      "#$00B1#$0060"
     ],
     "Rfola6Group": [
       "#{A_NGA_K}",
-      "#$099D"
+      "#$099D",
+      "#$09AB",
+      "#{A_D_Dh}",
+      "#{A_K_K}",
+      "#{A_N_Dh}",
+      "#{A_K_Ss}",
+      "#{A_H_M}"
     ],
     "ConnectorsSwapGroup": [],
     "ConnectorsKeepGroup": []
