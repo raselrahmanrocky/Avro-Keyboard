@@ -1,4 +1,4 @@
-{
+﻿{
   =============================================================================
   This Source Code Form is subject to the terms of the Mozilla Public
   License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -62,6 +62,8 @@ uses
   uFrmSplash in 'Forms\uFrmSplash.pas' {frmSplash} ,
   clsAbbreviation in 'Classes\clsAbbreviation.pas',
   clsUnicodeToBijoy2000 in '..\Unicode to ascii converter\clsUnicodeToBijoy2000.pas',
+  clsAnsiSequenceLookup in '..\Unicode to ascii converter\clsAnsiSequenceLookup.pas',
+  uCaretContextSniffer in 'Units\uCaretContextSniffer.pas',
   ufrmEncodingWarning in 'Forms\ufrmEncodingWarning.pas' {frmEncodingWarning} ,
   DebugLog in 'Units\DebugLog.pas',
   Vcl.Themes,

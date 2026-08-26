@@ -7,6 +7,7 @@
 }
 
 {$INCLUDE ../ProjectDefines.inc}
+{$O-}  // Disable optimizer to avoid internal compiler error AV63296C56
 unit clsUnicodeToBijoy2000;
 
 interface
@@ -41,6 +42,22 @@ type
     IsZfola: Boolean;
   end;
 
+  TAnsiSequenceEntry = record
+    AnsiOutput:       string;   // The resolved ANSI glyph(s) to emit
+    EraseCount:       Integer;  // ANSI glyphs to backspace before emitting =
+                                // length of the CONTEXT rendering that is replaced
+    IsToggleEntry:    Boolean;  // Whether this supports backspace-toggle
+    AltAnsiOutput:    string;   // Alternate ANSI output (for toggles)
+  end;
+
+  TAnsiSequenceMap = TDictionary<string, TAnsiSequenceEntry>;
+
+  // Several distinct Bangla clusters can share one ANSI rendering in a given
+  // mapping version, so the sniffer reverse map stores ALL candidates.
+  TAnsiUniCandidates = TArray<string>;
+
+  TAnsiToUniMap = TDictionary<string, TAnsiUniCandidates>;
+
 type
   // Fired by Convert at each pipeline stage so a caller can show progress.
   // Percent is 0..100; Stage is a short ASCII identifier of the current pass.
@@ -53,6 +70,7 @@ type
       fConvertedText: string;
       fToggleStates:  TDictionary<string, Boolean>;
       fLastUniText:   string;
+      fIsoConverter:  TUnicodeToBijoy2000;
       FOnProgress:    TConverterProgress;
       procedure ReportProgress(Percent: Integer; const Stage: string);
       procedure ReArrangeKars;
@@ -72,8 +90,7 @@ type
       // Utility Functions
       function BaseLineRightCharacter(const wC: string): Boolean;
       function IsVowel(C: Char): Boolean;
-      function GetToggleState(const Context, Key: string; OccurrenceIndex: Integer): Boolean;
-      procedure SetToggleState(const Context, Key: string; OccurrenceIndex: Integer; Value: Boolean);
+
       function RuleHasAnyToggle(const Rule: TVowelRule): Boolean;
       function FindMappingToggle(const Rule: TVowelRule; const ConsonantPart: string; out MappingToggleOnBackspace: Boolean;
         out MatchedCluster: string): Boolean;
@@ -82,6 +99,27 @@ type
     public
       destructor Destroy; override;
       function Convert(const UniText: string): string;
+      // Toggle state accessors (needed by layout engines for isolated modifier handling)
+      function GetToggleState(const Context, Key: string; OccurrenceIndex: Integer): Boolean;
+      procedure SetToggleState(const Context, Key: string; OccurrenceIndex: Integer; Value: Boolean);
+      // Isolated-modifier toggle flip (called when the emitted glyph is backspaced)
+      procedure FlipIsolatedToggle(const ClusterKey: string);
+      // Reverse map lookup: ANSI glyph string -> ALL candidate Unicode clusters
+      // (distinct clusters may share one ANSI rendering in a mapping version)
+      function UnicodeCandidatesOfAnsi(const AnsiGlyph: string): TAnsiUniCandidates;
+      // Lazy converter instance used ONLY for isolated-sequence fallbacks so
+      // fLastUniText / toggle machinery of the interactive instance stays clean
+      procedure EnsureIsoConverter;
+      // Fast incremental ANSI resolution for isolated modifiers at word boundaries.
+      function ResolveAnsiSequence(
+        const PrecedingContext: string;
+        const ModifierChar: string;
+        out ResolvedAnsi: string;
+        out EraseCount: Integer;
+        out MatchedContext: string;
+        out IsToggle: Boolean;
+        out UsedAlt: Boolean
+      ): Boolean;
       // Optional progress callback fired by Convert between pipeline stages.
       property OnProgress: TConverterProgress read FOnProgress write FOnProgress;
   end;
@@ -153,6 +191,8 @@ var
   KarCorrections:           TArray<TKarCorrection>;
   GroupKarCorrections:      TArray<TGroupKarCorrection>;
   ConsonantGroupRawMap:     TDictionary<string, TArray<string>>;
+  AnsiSequenceLookup:       TAnsiSequenceMap;
+  AnsiToUniMap:             TAnsiToUniMap; // ANSI glyph -> Unicode cluster candidates (sniffer reverse map)
 
 procedure ResetAnsiToDefaults;
 procedure LoadAnsiMapping(const Path: string; ErrorLog: TStringList = nil);
@@ -161,12 +201,15 @@ procedure LoadCurrentActiveMapping(ErrorLog: TStringList = nil);
 function ValidateAnsiMappingFile(const Path: string; out ErrorMessage: string): Boolean;
 function TrySetAnsiVersion(const NewVersion: string; out ErrorMessage: string): Boolean;
 procedure OptimizeMemoryUsage;
+function ResolveValue(const S: string): string;
+function CommonPrefixLen(const A, B: string): Integer;
 
 implementation
 
 uses
   Windows,
   Strutils,
+  clsAnsiSequenceLookup,
   BanglaChars,
   System.SysUtils,
   System.Generics.Defaults;
@@ -397,6 +440,26 @@ begin
   begin
     Inc(Result);
     PosIdx := PosEx(SubStr, S, PosIdx + Length(SubStr));
+  end;
+end;
+
+// Length of the leading run shared by A and B. Used to derive how many ANSI
+// glyphs of a context rendering are actually replaced by a resolved output
+// (EraseCount := Length(CtxAnsi) - CommonPrefixLen(CtxAnsi, OutAnsi)).
+function CommonPrefixLen(const A, B: string): Integer;
+var
+  I, N: Integer;
+begin
+  Result := 0;
+  N := Length(A);
+  if Length(B) < N then
+    N := Length(B);
+  for I := 1 to N do
+  begin
+    if A[I] = B[I] then
+      Inc(Result)
+    else
+      Break;
   end;
 end;
 
@@ -1062,6 +1125,7 @@ end;
 destructor TUnicodeToBijoy2000.Destroy;
 begin
   fToggleStates.Free;
+  FreeAndNil(fIsoConverter);
   inherited;
 end;
 
@@ -1085,6 +1149,24 @@ begin
   if fToggleStates = nil then
     fToggleStates := TDictionary<string, Boolean>.Create;
   fToggleStates.AddOrSetValue(CombinedKey, Value);
+end;
+
+procedure TUnicodeToBijoy2000.FlipIsolatedToggle(const ClusterKey: string);
+begin
+  SetToggleState('ISO', ClusterKey, 0, not GetToggleState('ISO', ClusterKey, 0));
+end;
+
+function TUnicodeToBijoy2000.UnicodeCandidatesOfAnsi(const AnsiGlyph: string): TAnsiUniCandidates;
+begin
+  Result := nil;
+  if (AnsiToUniMap <> nil) and (AnsiGlyph <> '') then
+    AnsiToUniMap.TryGetValue(AnsiGlyph, Result);
+end;
+
+procedure TUnicodeToBijoy2000.EnsureIsoConverter;
+begin
+  if fIsoConverter = nil then
+    fIsoConverter := TUnicodeToBijoy2000.Create;
 end;
 
 { =============================================================================== }
@@ -2892,6 +2974,7 @@ begin
   if ConsonantGroupRawMap <> nil then
     ConsonantGroupRawMap.Clear;
   PrepareActiveReplacements;
+  CompileAnsiSequenceMap;
 end;
 
 { =============================================================================== }
@@ -4061,6 +4144,7 @@ begin
       end));
 
   PrepareActiveReplacements;
+  CompileAnsiSequenceMap;
   JSON := '';
   OptimizeMemoryUsage;
 end;
@@ -4623,6 +4707,123 @@ begin
   SetProcessWorkingSetSize(GetCurrentProcess, $FFFFFFFF, $FFFFFFFF);
 end;
 
+
+function TUnicodeToBijoy2000.ResolveAnsiSequence(
+  const PrecedingContext: string;
+  const ModifierChar: string;
+  out ResolvedAnsi: string;
+  out EraseCount: Integer;
+  out MatchedContext: string;
+  out IsToggle: Boolean;
+  out UsedAlt: Boolean
+): Boolean;
+var
+  Entry:      TAnsiSequenceEntry;
+  UniProbe:   string;   // Unicode form of the context used for probing
+  ProbeLen:   Integer;
+  ClusterKey: string;
+  ConvFull, ConvCtx: string;
+  PLen:       Integer;
+  Candidates: TAnsiUniCandidates;
+  I:          Integer;
+
+  // Tries the precompiled map with Probe + Modifier. On success fills Entry
+  // and reports which trailing part of the probe actually matched.
+  function ExtractEntry(const Probe: string): Boolean;
+  begin
+    Result := False;
+    if Probe = '' then
+      Exit;
+    if AnsiSequenceLookup.TryGetValue(Probe + ModifierChar, Entry) then
+    begin
+      MatchedContext := Probe;
+      Result := True;
+    end;
+  end;
+
+  // Fills the out-parameters from the currently extracted Entry.
+  procedure FillFromEntry;
+  begin
+    IsToggle := Entry.IsToggleEntry;
+    ClusterKey := MatchedContext + ModifierChar;
+    UsedAlt := IsToggle and GetToggleState('ISO', ClusterKey, 0);
+    ResolvedAnsi := Entry.AnsiOutput;
+    if UsedAlt and (Entry.AltAnsiOutput <> '') then
+      ResolvedAnsi := Entry.AltAnsiOutput;
+    EraseCount := Entry.EraseCount;
+  end;
+
+  { Longest-suffix walk over the precompiled map, then a generic Convert
+    fallback that covers every conjunct/kar combination not explicitly
+    enumerated in the JSON mapping. Returns True when outs are filled. }
+  function TryResolveUnicode(const Probe: string): Boolean;
+  begin
+    Result := False;
+    if Probe = '' then
+      Exit;
+
+    ProbeLen := Length(Probe);
+    if ExtractEntry(Probe) or
+      ((ProbeLen >= 3) and ExtractEntry(Copy(Probe, ProbeLen - 2, 3))) or
+      ((ProbeLen >= 2) and ExtractEntry(Copy(Probe, ProbeLen - 1, 2))) or
+      ExtractEntry(Probe[ProbeLen]) then
+    begin
+      FillFromEntry;
+      Result := True;
+      Exit;
+    end;
+
+    ConvFull := fIsoConverter.Convert(Probe + ModifierChar);
+    if ConvFull = '' then
+      Exit;
+    ConvCtx := fIsoConverter.Convert(Probe);
+    if ConvFull = ConvCtx then
+      Exit; // modifier produced no visible change - treat as unresolvable
+
+    PLen := CommonPrefixLen(ConvCtx, ConvFull);
+    ResolvedAnsi := Copy(ConvFull, PLen + 1, MaxInt); // only the new suffix
+    EraseCount := Length(ConvCtx) - PLen;
+    MatchedContext := Probe;
+    IsToggle := False;
+    UsedAlt := False;
+    Result := True;
+  end;
+
+begin
+  Result := False;
+  ResolvedAnsi := '';
+  EraseCount := 0;
+  MatchedContext := '';
+  IsToggle := False;
+  UsedAlt := False;
+
+  if (AnsiSequenceLookup = nil) or (PrecedingContext = '') or (ModifierChar = '') then
+    Exit;
+
+  EnsureIsoConverter;
+
+  { --- ANSI context (sniffed from a Bijoy-encoded document)? --- }
+  if Ord(PrecedingContext[1]) < $0980 then
+  begin
+    if AnsiSequenceLookup.TryGetValue(PrecedingContext + ModifierChar, Entry) then
+    begin
+      MatchedContext := PrecedingContext;
+      FillFromEntry;
+      Result := True;
+      Exit;
+    end;
+
+    { Distinct clusters may share this ANSI rendering - try each candidate. }
+    Candidates := UnicodeCandidatesOfAnsi(PrecedingContext);
+    for I := 0 to High(Candidates) do
+      if TryResolveUnicode(Candidates[I]) then
+        Exit(True);
+    Exit; // unknown ANSI glyph - cannot resolve
+  end;
+
+  Result := TryResolveUnicode(PrecedingContext);
+end;
+
 initialization
 
 EnsureAnsiRegistry;
@@ -4630,6 +4831,8 @@ EnsureAnsiOverrides;
 
 finalization
 
+AnsiSequenceLookup.Free;
+AnsiToUniMap.Free;
 AnsiRegistry.Free;
 AnsiRegistryMap.Free;
 AnsiOverrides.Free;
