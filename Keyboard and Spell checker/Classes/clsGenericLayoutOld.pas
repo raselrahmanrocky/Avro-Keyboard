@@ -1,4 +1,4 @@
-{
+﻿{
   =============================================================================
   This Source Code Form is subject to the terms of the Mozilla Public
   License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -32,6 +32,12 @@ type
       LastChars:                  array [1 .. TrackL] of string;
       PrevBanglaT, NewBanglaText: string;
       CommittedBanglaT:           string;
+      LastCommittedUnicode:       string;  // Unicode text sent before delimiter
+      LastCommittedAnsi:          string;  // ANSI text sent before delimiter
+      IsAtWordBoundary:           Boolean; // True after Space/Enter until next char
+      SpacePendingCount:          Integer; // Delimiters we inserted; modifiers may cross them
+      LastIsoContext:             string;  // Virtual Unicode context of last isolated emission
+      LastIsoToggleKey:           string;  // '' = last isolated emission is not toggleable
 
       // Kar Variables for Full Old Style Typing
       EKarActive, IKarActive, OIKarActive: Boolean;
@@ -44,6 +50,8 @@ type
       procedure SetLastChar(const wChar: string);
       procedure DeleteLastCharSteps_Ex(StepCount: Integer);
       procedure ResetLastChar;
+      procedure ClearIsoState;
+      function HandleIsolatedModifier(const ModifierStr: string): Boolean;
       function MyProcessVKeyDown(const KeyCode: Integer; var Block: Boolean; const var_IsLogicalShift, var_IsTrueShift, var_IsAltGr: Boolean): string;
       procedure MyProcessVKeyUP(const KeyCode: Integer; var Block: Boolean; const var_IsLogicalShift: Boolean; const var_IsTrueShift: Boolean;
         const var_IsAltGr: Boolean);
@@ -67,7 +75,8 @@ uses
   clsLayout,
   VirtualKeycode,
   WindowsVersion,
-  uRegistrySettings;
+  uRegistrySettings,
+  uCaretContextSniffer;
 
 { =============================================================================== }
 
@@ -84,6 +93,12 @@ begin
   // DetermineZWNJ_ZWJ := ZWNJ;
 
   Bijoy := TUnicodeToBijoy2000.Create;
+  LastCommittedUnicode := '';
+  LastCommittedAnsi := '';
+  IsAtWordBoundary := False;
+  SpacePendingCount := 0;
+  LastIsoContext := '';
+  LastIsoToggleKey := '';
 end;
 
 { =============================================================================== }
@@ -126,9 +141,62 @@ var
   BijoyNewBanglaText: string;
   SavedChar:          string;
   L:                  Integer;
+  DeleteCount:        Integer;
+  IsRephTail:         Boolean;
   SavedCommitted:     string;
 begin
-  if (Length(PrevBanglaT) - 1) <= 0 then
+
+  { === Delimiter / isolated-modifier bookkeeping (ANSI contextual engine) === }
+  if (NewBanglaText = '') and (PrevBanglaT = '') then
+  begin
+    // 1. Deleting the space we just inserted: caret becomes directly adjacent
+    //    to LastCommittedUnicode, so the next modifier must attach cleanly.
+    if SpacePendingCount > 0 then
+    begin
+      Dec(SpacePendingCount);
+      if CommittedBanglaT <> '' then
+        Delete(CommittedBanglaT, Length(CommittedBanglaT), 1);
+      ClearIsoState;
+      Block := False; // native backspace removes the delimiter
+      Exit;
+    end;
+    // 2. Deleting an isolated emission: flip the JSON backspace-toggle state
+    //    (e.g. রু <-> A_UKar4/A_UKar2) so an immediate retype alternates.
+    if (LastIsoToggleKey <> '') or (LastIsoContext <> '') then
+    begin
+      if (LastIsoToggleKey <> '') and (Bijoy <> nil) then
+        Bijoy.FlipIsolatedToggle(LastIsoToggleKey);
+      ClearIsoState;
+      Block := False; // native backspace removes the glyph
+      Exit;
+    end;
+  end;
+
+  { --- Reph / Phala tail detection --- }
+  IsRephTail := (Length(PrevBanglaT) >= 3) and
+                (PrevBanglaT[Length(PrevBanglaT) - 2] = b_R) and
+                (PrevBanglaT[Length(PrevBanglaT) - 1] = b_Hasanta) and
+                IsPureConsonent(PrevBanglaT[Length(PrevBanglaT)]);
+
+  DeleteCount := 1;
+  if not IsRephTail then
+  begin
+    if (Length(PrevBanglaT) >= 3) and
+       ((PrevBanglaT[Length(PrevBanglaT)-2] = ZWJ) or (PrevBanglaT[Length(PrevBanglaT)-2] = ZWNJ)) and
+       (PrevBanglaT[Length(PrevBanglaT)-1] = b_Hasanta) and
+       (PrevBanglaT[Length(PrevBanglaT)] = b_Z) then
+      DeleteCount := 3
+    else if (Length(PrevBanglaT) >= 2) and
+            (PrevBanglaT[Length(PrevBanglaT)-1] = b_Hasanta) and
+            (PrevBanglaT[Length(PrevBanglaT)] = b_Z) then
+      DeleteCount := 2
+    else if (Length(PrevBanglaT) >= 2) and
+            (PrevBanglaT[Length(PrevBanglaT)-1] = b_Hasanta) and
+            (PrevBanglaT[Length(PrevBanglaT)] = b_R) then
+      DeleteCount := 2;
+  end;
+
+  if (Length(PrevBanglaT) - DeleteCount) <= 0 then
   begin
 
     if OutputIsBijoy <> 'YES' then
@@ -147,6 +215,33 @@ begin
           Backspace(3);
           SendKey_Char(SavedChar);
           CommittedBanglaT := LeftStr(CommittedBanglaT, L - 3) + SavedChar;
+          Block := True;
+          Exit;
+        end;
+        { Check for Ya-phala with explicit joiner in committed text }
+        if (L >= 4) and
+           ((CommittedBanglaT[L-3] = ZWJ) or (CommittedBanglaT[L-3] = ZWNJ)) and
+           (CommittedBanglaT[L-2] = b_Hasanta) and (CommittedBanglaT[L-1] = b_Z) then
+        begin
+          Backspace(3);
+          CommittedBanglaT := LeftStr(CommittedBanglaT, L - 3);
+          Block := True;
+          Exit;
+        end;
+        { Check for Ya-phala in committed text }
+        if (L >= 3) and (CommittedBanglaT[L-1] = b_Hasanta) and (CommittedBanglaT[L] = b_Z) and
+           (CommittedBanglaT[L-2] <> b_R) then
+        begin
+          Backspace(2);
+          CommittedBanglaT := LeftStr(CommittedBanglaT, L - 2);
+          Block := True;
+          Exit;
+        end;
+        { Check for Ra-phala in committed text }
+        if (L >= 3) and (CommittedBanglaT[L-1] = b_Hasanta) and (CommittedBanglaT[L] = b_R) then
+        begin
+          Backspace(2);
+          CommittedBanglaT := LeftStr(CommittedBanglaT, L - 2);
           Block := True;
           Exit;
         end;
@@ -177,8 +272,7 @@ begin
   else
   begin
     Block := True;
-    if (Length(PrevBanglaT) >= 3) and (PrevBanglaT[Length(PrevBanglaT) - 2] = b_R) and (PrevBanglaT[Length(PrevBanglaT) - 1] = b_Hasanta) and
-      IsPureConsonent(PrevBanglaT[Length(PrevBanglaT)]) then
+    if IsRephTail then
     begin
       SavedChar := PrevBanglaT[Length(PrevBanglaT)];
       if OutputIsBijoy = 'YES' then
@@ -196,8 +290,10 @@ begin
       SetLastChar(SavedChar);
     end
     else
-      InternalBackspace;
-    // ParseAndSendNow;
+    begin
+      InternalBackspace(DeleteCount);
+      ParseAndSendNow;
+    end;
   end;
 end;
 
@@ -568,7 +664,8 @@ begin
           CommittedBanglaT := CommittedBanglaT + PrevBanglaT + ' ';
           if Length(CommittedBanglaT) > 500 then
             Delete(CommittedBanglaT, 1, Length(CommittedBanglaT) - 500);
-          ResetLastChar;
+          ResetLastChar;            // soft-saves LastCommitted* context
+          Inc(SpacePendingCount);   // delimiter now sits between caret & context
           MyProcessVKeyDown := '';
           Exit;
         end;
@@ -855,8 +952,9 @@ end;
 
 function TGenericLayoutOld.ProcessVKeyDown(const KeyCode: Integer; var Block: Boolean): string;
 var
-  m_Block: Boolean;
-  m_Str:   string;
+  m_Block:      Boolean;
+  m_Str:        string;
+  IsoChainCont: Boolean;
 begin
   m_Block := False;
 
@@ -877,10 +975,34 @@ begin
   end;
 
   m_Str := MyProcessVKeyDown(KeyCode, m_Block, IsLogicalShift, IsTrueShift, IsAltGr);
-  if m_Str <> '' then
+
+  // === Isolated Modifier Interception (ANSI contextual engine) ===
+  // Kars/phalas/hasanta typed while the word buffer is empty attach to what
+  // sits before the caret: the committed context, across our own pending
+  // delimiter(s), or a sniffed glyph at an arbitrary document position.
+  // When a chained hasanta is pending (e.g. 'ক'+'্' emitted isolated), any
+  // single Bangla char continues the conjunct (ক্ষ, ভ্র, ম্ভ্র ...).
+  IsoChainCont := (LastIsoContext <> '') and (RightStr(LastIsoContext, 1) = b_Hasanta) and
+    (Length(m_Str) = 1) and (Ord(m_Str[1]) >= $0980);
+
+  if (m_Str <> '') and (not uCaretContextSniffer.SniffingActive) and (OutputIsBijoy = 'YES') and (NewBanglaText = '') and
+    (IsModifierOrJoiner(m_Str) or IsoChainCont) then
+  begin
+    if HandleIsolatedModifier(m_Str) then
+    begin
+      Block := True;
+      ProcessVKeyDown := '';
+      Exit;
+    end;
+  end;
+
+  if (m_Str <> '') then
   begin
     m_Block := True;
     SetLastChar(m_Str);
+    IsAtWordBoundary := False;
+    ClearIsoState;
+    SpacePendingCount := 0;
   end;
 
   NewBanglaText := NewBanglaText + m_Str;
@@ -938,6 +1060,22 @@ procedure TGenericLayoutOld.ResetLastChar;
 var
   I: Integer;
 begin
+  // Save committed context before clearing (soft reset)
+  if PrevBanglaT <> '' then
+  begin
+    LastCommittedUnicode := PrevBanglaT;
+    if Bijoy <> nil then
+    begin
+      if OutputIsBijoy = 'YES' then
+        LastCommittedAnsi := Bijoy.Convert(PrevBanglaT)
+      else
+        LastCommittedAnsi := PrevBanglaT;
+    end;
+  end;
+  IsAtWordBoundary := True;
+  ClearIsoState;
+  SpacePendingCount := 0;
+
   for I := 1 to TrackL do
     LastChars[I] := ' ';
 
@@ -945,6 +1083,89 @@ begin
   ResetAllKarsToInactive;
   PrevBanglaT := '';
   NewBanglaText := '';
+end;
+
+{ =============================================================================== }
+
+procedure TGenericLayoutOld.ClearIsoState;
+begin
+  LastIsoContext := '';
+  LastIsoToggleKey := '';
+end;
+
+{ =============================================================================== }
+{
+  Attaches an isolated modifier (kar / phala / hasanta) to whatever sits
+  before the caret, resolving the exact contextual ANSI glyph for the active
+  JSON mapping version. Returns True when the keystroke was fully handled.
+}
+function TGenericLayoutOld.HandleIsolatedModifier(const ModifierStr: string): Boolean;
+var
+  Ctx, Sniffed, ResolvedAnsi, MatchedContext, ChainCtx: string;
+  CandArr:            TAnsiUniCandidates;
+  EraseCount:         Integer;
+  IsToggle, UsedAlt:  Boolean;
+  Kind:               TSniffResult;
+begin
+  Result := False;
+  if Bijoy = nil then
+    Exit;
+
+  { --- 1. Establish PrecedingContext --- }
+  if LastIsoContext <> '' then
+    Ctx := LastIsoContext // chained isolated emission (ক -> ক্ -> ক্র)
+  else if (SpacePendingCount > 0) and (LastCommittedUnicode <> '') then
+    Ctx := LastCommittedUnicode // cross our own delimiter(s)
+  else
+  begin
+    if not SniffCharBeforeCaret(Sniffed, Kind) then
+      Exit;
+    case Kind of
+      srDelimiter:
+        Exit; // foreign space/newline - leave untouched
+      srUnicodeChar, srAnsiGlyph:
+        Ctx := Sniffed;
+    else
+      Exit; // nothing resolvable before the caret
+    end;
+  end;
+
+  { --- 2. Resolve (precompiled map fast path, generic Convert fallback) --- }
+  if not Bijoy.ResolveAnsiSequence(Ctx, ModifierStr, ResolvedAnsi, EraseCount, MatchedContext, IsToggle, UsedAlt) then
+    Exit;
+
+  { --- 3. Emit with exact diff counts --- }
+  if SpacePendingCount > 0 then
+    Backspace(SpacePendingCount); // remove only our delimiter(s)
+  if EraseCount > 0 then
+    Backspace(EraseCount);        // replace the default/context glyph
+  SendKey_Char(ResolvedAnsi);
+
+  { --- 4. Track state for chaining and backspace-toggles --- }
+  if IsToggle then
+    LastIsoToggleKey := MatchedContext + ModifierStr
+  else
+    LastIsoToggleKey := '';
+
+  ChainCtx := MatchedContext;
+  if (ChainCtx <> '') and (Ord(ChainCtx[1]) < $0980) then
+  begin
+    // ANSI sniff: pick the first candidate cluster for chain bookkeeping;
+    // resolution correctness is already handled inside ResolveAnsiSequence.
+    CandArr := Bijoy.UnicodeCandidatesOfAnsi(ChainCtx);
+    if Length(CandArr) > 0 then
+      ChainCtx := CandArr[0]
+    else
+      ChainCtx := '';
+  end;
+  if ChainCtx <> '' then
+    LastIsoContext := ChainCtx + ModifierStr
+  else
+    LastIsoContext := '';
+
+  SpacePendingCount := 0;
+  IsAtWordBoundary := False;
+  Result := True;
 end;
 
 { =============================================================================== }

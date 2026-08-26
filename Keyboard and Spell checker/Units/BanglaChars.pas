@@ -191,6 +191,7 @@ const
 function IsVowel(const strX: string): Boolean;
 function IsPureConsonent(const strX: string): Boolean;
 function IsKar(const strX: string): Boolean;
+function IsModifierOrJoiner(const S: string): Boolean;
 
 implementation
 
@@ -254,5 +255,35 @@ begin
 
 end;
 {$HINTS On}
+
+function IsModifierOrJoiner(const S: string): Boolean;
+var
+  L: Integer;
+begin
+
+  Result := false;
+
+  L := Length(S);
+  if L = 0 then
+    Exit;
+
+  if L = 1 then
+  begin
+    // All Bengali vowel signs (kars) + the bare hasanta joiner
+    Result := IsKar(S) or (S[1] = b_Hasanta);
+    Exit;
+  end;
+
+  if L = 2 then
+  begin
+    // b_Hasanta + b_r  = Ra-phala (্র)
+    // b_Hasanta + b_z  = Ja-phala (্য)
+    // b_R + b_Hasanta  = Reph     (র্)
+    Result := ((S[1] = b_Hasanta) and ((S[2] = b_R) or (S[2] = b_Z))) or
+      ((S[1] = b_R) and (S[2] = b_Hasanta));
+    Exit;
+  end;
+
+end;
 
 end.

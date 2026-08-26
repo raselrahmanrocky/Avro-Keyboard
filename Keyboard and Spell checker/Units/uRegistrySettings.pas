@@ -79,6 +79,7 @@ var
   NumPadBangla:            string;
   FullOldStyleTyping:      string;
   AutomaticallyFixChandra: string;
+  EnableCaretSniffer:      string;
 
   // Keyboard Layout Viewer Settings
   ShowLayoutOnTop:     string;
@@ -187,6 +188,7 @@ begin
   NumPadBangla := UpperCase(XML.GetValue('NumPadBangla', 'Yes'));
   FullOldStyleTyping := UpperCase(XML.GetValue('FullOldStyleTyping', 'No'));
   AutomaticallyFixChandra := UpperCase(XML.GetValue('AutomaticallyFixChandra', 'Yes'));
+  EnableCaretSniffer := UpperCase(XML.GetValue('EnableCaretSniffer', 'Yes'));
 
   // Keyboard Layout Viewer Settings
   DefaultLayout := XML.GetValue('DefaultLayout', 'avrophonetic*');
@@ -272,6 +274,7 @@ begin
   XML.SetValue('NumPadBangla', NumPadBangla);
   XML.SetValue('AutomaticallyFixChandra', AutomaticallyFixChandra);
   XML.SetValue('FullOldStyleTyping', FullOldStyleTyping);
+  XML.SetValue('EnableCaretSniffer', EnableCaretSniffer);
 
   // Keyboard Layout Viewer Settings
   XML.SetValue('DefaultLayout', DefaultLayout);
@@ -363,6 +366,7 @@ begin
     NumPadBangla := UpperCase(Reg.ReadStringDef('NumPadBangla', 'Yes'));
     FullOldStyleTyping := UpperCase(Reg.ReadStringDef('FullOldStyleTyping', 'No'));
     AutomaticallyFixChandra := UpperCase(Reg.ReadStringDef('AutomaticallyFixChandra', 'Yes'));
+    EnableCaretSniffer := UpperCase(Reg.ReadStringDef('EnableCaretSniffer', 'Yes'));
 
     // Keyboard Layout Viewer Settings
     DefaultLayout := Reg.ReadStringDef('DefaultLayout', 'avrophonetic*');
@@ -453,6 +457,7 @@ begin
     Reg.WriteString('NumPadBangla', NumPadBangla);
     Reg.WriteString('AutomaticallyFixChandra', AutomaticallyFixChandra);
     Reg.WriteString('FullOldStyleTyping', FullOldStyleTyping);
+    Reg.WriteString('EnableCaretSniffer', EnableCaretSniffer);
 
     // Keyboard Layout Viewer Settings
     Reg.WriteString('DefaultLayout', DefaultLayout);
@@ -606,6 +611,8 @@ begin
     FullOldStyleTyping := 'No';
   if not((AutomaticallyFixChandra = 'YES') or (AutomaticallyFixChandra = 'NO')) then
     AutomaticallyFixChandra := 'YES';
+  if not((EnableCaretSniffer = 'YES') or (EnableCaretSniffer = 'NO')) then
+    EnableCaretSniffer := 'YES';
 
   // Keyboard Layout Viewer Settings
   if not((ShowLayoutOnTop = 'YES') or (ShowLayoutOnTop = 'NO')) then
