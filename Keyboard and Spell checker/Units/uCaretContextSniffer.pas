@@ -1,4 +1,4 @@
-{
+﻿{
   =============================================================================
   This Source Code Form is subject to the terms of the Mozilla Public
   License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -186,6 +186,9 @@ end;
 
 function TryReadViaClipboard(out Ch: string): Boolean;
 var
+  hEdit: HWND;
+  Res: LRESULT;
+  SelStart, SelEnd: Integer;
   SavedClip: string;
   HadClip:   Boolean;
 begin
@@ -193,6 +196,21 @@ begin
   Ch := '';
   SavedClip := '';
   HadClip := False;
+
+  // Abort if the target has an active selection – the clipboard round-trip
+  // (Shift+Left / Ctrl+C / Right) would collapse it, disturbing the user.
+  hEdit := GetFocusedEditHandle;
+  if hEdit <> 0 then
+  begin
+    Res := SendMessageTimeout(hEdit, EM_GETSEL, 0, 0, SMTO_ABORTIFHUNG, SNIFF_MSG_TIMEOUT, nil);
+    if Res <> 0 then
+    begin
+      SelStart := DWORD(Res) and $FFFF;
+      SelEnd := (DWORD(Res) shr 16) and $FFFF;
+      if SelStart <> SelEnd then
+        Exit; // active selection – do not disturb
+    end;
+  end;
 
   // Snapshot the existing clipboard text (best effort)
   try

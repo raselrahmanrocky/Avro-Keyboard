@@ -69,7 +69,8 @@ uses
   Vcl.Themes,
   Vcl.Styles,
   WindowsDarkMode in 'Units\WindowsDarkMode.pas',
-  uKeyboardMacro in 'Units\uKeyboardMacro.pas';
+  uKeyboardMacro in 'Units\uKeyboardMacro.pas',
+  Avro.Types in 'Units\Avro.Types.pas';
 
 var
   Mutex: THandle;
