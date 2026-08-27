@@ -990,6 +990,7 @@ begin
   begin
     if HandleIsolatedModifier(m_Str) then
     begin
+      SetLastChar(m_Str);
       Block := True;
       ProcessVKeyDown := '';
       Exit;
@@ -1109,6 +1110,11 @@ var
 begin
   Result := False;
   if Bijoy = nil then
+    Exit;
+
+  { Hasanta after a space starts a new word — don't treat as isolated modifier }
+  if (SpacePendingCount > 0) and (Length(ModifierStr) = 1) and
+     (ModifierStr[1] = b_Hasanta) then
     Exit;
 
   { --- 1. Establish PrecedingContext --- }
