@@ -383,6 +383,89 @@ begin
     end;
 
     // =====================================================================
+    // Hasanta Handling: Hasanta + Kar -> Independent Vowel, Double Hasanta -> ZWNJ
+    // =====================================================================
+    if LastChar = b_Hasanta then
+    begin
+      if CharForKey = b_Hasanta then
+      begin
+        MyProcessVKeyDown := ZWNJ;
+        DeadKey := True;
+        Exit;
+      end
+      else if CharForKey = b_AAkar then
+      begin
+        InternalBackspace;
+        MyProcessVKeyDown := b_AA;
+        DeadKey := True;
+        Exit;
+      end
+      else if CharForKey = b_Ikar then
+      begin
+        InternalBackspace;
+        MyProcessVKeyDown := b_I;
+        DeadKey := True;
+        Exit;
+      end
+      else if CharForKey = b_IIkar then
+      begin
+        InternalBackspace;
+        MyProcessVKeyDown := b_II;
+        DeadKey := True;
+        Exit;
+      end
+      else if CharForKey = b_Ukar then
+      begin
+        InternalBackspace;
+        MyProcessVKeyDown := b_U;
+        DeadKey := True;
+        Exit;
+      end
+      else if CharForKey = b_UUkar then
+      begin
+        InternalBackspace;
+        MyProcessVKeyDown := b_UU;
+        DeadKey := True;
+        Exit;
+      end
+      else if CharForKey = b_RRIkar then
+      begin
+        InternalBackspace;
+        MyProcessVKeyDown := b_RRI;
+        DeadKey := True;
+        Exit;
+      end
+      else if CharForKey = b_Ekar then
+      begin
+        InternalBackspace;
+        MyProcessVKeyDown := b_E;
+        DeadKey := True;
+        Exit;
+      end
+      else if CharForKey = b_OIkar then
+      begin
+        InternalBackspace;
+        MyProcessVKeyDown := b_OI;
+        DeadKey := True;
+        Exit;
+      end
+      else if CharForKey = b_Okar then
+      begin
+        InternalBackspace;
+        MyProcessVKeyDown := b_O;
+        DeadKey := True;
+        Exit;
+      end
+      else if CharForKey = b_OUkar then
+      begin
+        InternalBackspace;
+        MyProcessVKeyDown := b_OU;
+        DeadKey := True;
+        Exit;
+      end;
+    end;
+
+    // =====================================================================
     // Automatic Vowel Formation at Word Boundary (VowelFormating enabled)
     // =====================================================================
     // FIX: this used to be gated on "if DeadKey then", so it only fired
@@ -480,86 +563,6 @@ begin
       end
       else
         DeadKey := False;
-    end;
-
-    if LastChar = b_Hasanta then
-    begin
-      if CharForKey = b_AAkar then
-      begin
-        InternalBackspace;
-        MyProcessVKeyDown := b_AA;
-        DeadKey := True;
-        Exit;
-      end
-      else if CharForKey = b_Ikar then
-      begin
-        InternalBackspace;
-        MyProcessVKeyDown := b_I;
-        DeadKey := True;
-        Exit;
-      end
-      else if CharForKey = b_IIkar then
-      begin
-        InternalBackspace;
-        MyProcessVKeyDown := b_II;
-        DeadKey := True;
-        Exit;
-      end
-      else if CharForKey = b_Ukar then
-      begin
-        InternalBackspace;
-        MyProcessVKeyDown := b_U;
-        DeadKey := True;
-        Exit;
-      end
-      else if CharForKey = b_UUkar then
-      begin
-        InternalBackspace;
-        MyProcessVKeyDown := b_UU;
-        DeadKey := True;
-        Exit;
-      end
-      else if CharForKey = b_RRIkar then
-      begin
-        InternalBackspace;
-        MyProcessVKeyDown := b_RRI;
-        DeadKey := True;
-        Exit;
-      end
-      else if CharForKey = b_Ekar then
-      begin
-        InternalBackspace;
-        MyProcessVKeyDown := b_E;
-        DeadKey := True;
-        Exit;
-      end
-      else if CharForKey = b_OIkar then
-      begin
-        InternalBackspace;
-        MyProcessVKeyDown := b_OI;
-        DeadKey := True;
-        Exit;
-      end
-      else if CharForKey = b_Okar then
-      begin
-        InternalBackspace;
-        MyProcessVKeyDown := b_O;
-        DeadKey := True;
-        Exit;
-      end
-      else if CharForKey = b_OUkar then
-      begin
-        InternalBackspace;
-        MyProcessVKeyDown := b_OU;
-        DeadKey := True;
-        Exit;
-      end
-      else if CharForKey = b_Hasanta then
-      begin
-        MyProcessVKeyDown := ZWNJ;
-        DeadKey := True;
-        Exit;
-      end;
     end;
 
     case KeyCode of
