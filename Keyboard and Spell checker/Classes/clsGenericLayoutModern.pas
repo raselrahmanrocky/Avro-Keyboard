@@ -237,10 +237,73 @@ function TGenericLayoutModern.InsertKar(const sKar: string): string;
 begin
   if AutomaticallyFixChandra = 'YES' then
   begin
+    // ===================================================================
+    // Rule 1: Direct Duplicate Kar Prevention (without Chandra)
+    // ===================================================================
+    // If the last char is already the same kar, ignore the keystroke
+    // to prevent duplicate stacking (e.g. চ + া + া -> চা, not চাা).
+    if LastChar = sKar then
+    begin
+      InsertKar := '';
+      Exit;
+    end;
+
+    // ===================================================================
+    // Rule 2: Chandrabindu Active (LastChar = b_Chandra)
+    // ===================================================================
     if LastChar = b_Chandra then
     begin
-      InternalBackspace;
-      InsertKar := sKar + b_Chandra;
+      // Case A: Duplicate Kar after Chandra
+      // If the kar before chandrabindu is the same as the incoming kar,
+      // ignore to prevent infinite stacking (e.g. চাঁ + া -> চাঁ).
+      if (TrackL >= 2) and (LastChars[2] = sKar) then
+      begin
+        InsertKar := '';
+        Exit;
+      end
+
+      // Case B: E-kar Ligature with Chandra
+      // E-kar + Chandrabindu + AA-kar -> O-kar + Chandra (েঁা -> োঁ)
+      // E-kar + Chandrabindu + OU-kar/LengthMark -> OU-kar + Chandra (েঁৌ -> ৌঁ)
+      else if (TrackL >= 2) and (LastChars[2] = b_Ekar) and
+              ((sKar = b_AAkar) or (sKar = b_OUkar) or (sKar = b_LengthMark)) then
+      begin
+        InternalBackspace(2);
+        if sKar = b_AAkar then
+          InsertKar := b_Okar + b_Chandra
+        else
+          InsertKar := b_OUkar + b_Chandra;
+        Exit;
+      end
+
+      // Case C: Replacing Existing Kar before Chandra
+      // If a different kar already exists before chandrabindu, replace it
+      // to prevent invalid multi-Kar stacking (e.g. কৌঁ + ি -> কিঁ).
+      else if (TrackL >= 2) and IsKar(LastChars[2]) then
+      begin
+        InternalBackspace(2);
+        InsertKar := sKar + b_Chandra;
+        Exit;
+      end
+
+      // Case D: First Kar after Consonant + Chandra
+      // Insert kar before chandrabindu for canonical Unicode ordering
+      // (e.g. কঁ + ো -> কোঁ).
+      else if (TrackL >= 2) and IsPureConsonent(LastChars[2]) then
+      begin
+        InternalBackspace(1);
+        InsertKar := sKar + b_Chandra;
+        Exit;
+      end
+
+      // Default: Chandrabindu active but no specific pattern matched
+      // Fall back to basic chandrabindu reorder
+      else
+      begin
+        InternalBackspace(1);
+        InsertKar := sKar + b_Chandra;
+        Exit;
+      end;
     end
     else
       InsertKar := sKar;
@@ -429,6 +492,21 @@ begin
     end;
 
     // =====================================================================
+    // Chandrabindu + E-Kar + LengthMark Ligature Fix:
+    //   E-kar + Chandrabindu + LengthMark -> OU-kar + Chandra
+    // =====================================================================
+    // LengthMark is not recognized as a kar by IsKar, so it bypasses
+    // InsertKar. Handle it here: when Chandrabindu follows E-kar and
+    // the incoming key is LengthMark, form OU-kar + Chandra.
+    if (LastChar = b_Chandra) and (TrackL >= 2) and (LastChars[2] = b_Ekar) and
+       (CharForKey = b_LengthMark) then
+    begin
+      InternalBackspace(2);
+      DeadKey := False;
+      MyProcessVKeyDown := b_OUkar + b_Chandra;
+      Exit;
+    end;
+
     // Hasanta Handling: Hasanta + Kar -> Independent Vowel, Double Hasanta -> ZWNJ
     // =====================================================================
     if LastChar = b_Hasanta then
@@ -530,7 +608,7 @@ begin
     // is already kept accurate through every Backspace by
     // DeleteLastCharSteps_Ex / SetLastChar, so no separate memory is
     // needed at all:
-    //   - Pure consonant precedes -> NOT a word boundary: fall through to
+    //   - Pure consonant precedes (or Chandrabindu-after-consonant-or-E-kar) -> NOT a word boundary: fall through to
     //     normal processing (the kar attaches via InsertKar below).
     //   - Anything else precedes (empty buffer, after space/tab/enter,
     //     after Backspace reveals a non-consonant, or LastChar is itself a
@@ -538,9 +616,9 @@ begin
     //     independent full vowel letter.
     if (VowelFormating <> 'NO') then
     begin
-      if IsPureConsonent(LastChar) then
+      if IsPureConsonent(LastChar) or ((LastChar = b_Chandra) and (TrackL >= 2) and (IsPureConsonent(LastChars[2]) or (LastChars[2] = b_Ekar))) then
       begin
-        // Consonant precedes: fall through to normal character processing
+        // Consonant (or Chandrabindu-after-consonant/E-kar) precedes: fall through to normal character processing
         // (the kar will attach via InsertKar in the general else block
         // below). DeadKey is still cleared here for bookkeeping only -
         // nothing in this unit reads DeadKey's value anymore except this
@@ -644,6 +722,9 @@ begin
         end;
       else
         begin
+          // Block raw English key for all recognized Bangla layout keys.
+          // Unmapped keys (CharForKey = '') override this with Block := False below.
+          Block := True;
           if CharForKey = b_R + b_Hasanta then
           begin
             MyProcessVKeyDown := InsertReph;
