@@ -109,6 +109,7 @@ begin
   // :=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=
 
   ResetLastChar;
+  DeadKey := True;
 
   // If IsWinVistaOrLater Then
   DetermineZWNJ_ZWJ := ZWJ;
@@ -384,23 +385,37 @@ begin
     // =====================================================================
     // Automatic Vowel Formation at Word Boundary (VowelFormating enabled)
     // =====================================================================
-    // When DeadKey is active and a kar key is pressed:
-    //   - If a pure consonant immediately precedes the cursor, the kar
-    //     attaches to that consonant normally (NOT a word boundary).
-    //   - Otherwise (empty buffer, after space/enter, or LastChar is a
-    //     kar, vowel, hasanta, or other non-consonant), treat it as a
-    //     word boundary: convert the kar to its corresponding independent
-    //     full vowel letter (e.g. AA-kar -> AA, I-kar -> I, etc.).
-    // This preserves the existing Hasanta + kar -> full vowel behavior
-    // (handled separately below) and ensures DeadKey state does not bleed
-    // into subsequent keystrokes when a consonant is present.
-    if DeadKey then
+    // FIX: this used to be gated on "if DeadKey then", so it only fired
+    // while DeadKey happened to still be True. DeadKey gets cleared by ANY
+    // key that isn't one of the ten kar keys below - including Backspace,
+    // whose CharForKey is empty and fell through to "else DeadKey := False"
+    // further down this same block. Once DeadKey was False, this entire
+    // block was skipped on the NEXT keystroke, so a kar typed right after
+    // a Backspace attached as a bare, unattached kar even at a genuine
+    // word boundary - e.g. type AA-kar (-> "আ"), Backspace it away, type
+    // AA-kar again and it wrongly produced "া" instead of "আ" again.
+    //
+    // The fix drops the dependency on DeadKey and asks the one question
+    // that actually matters, fresh, on every relevant keystroke: does a
+    // pure consonant sit immediately before the cursor RIGHT NOW? LastChar
+    // is already kept accurate through every Backspace by
+    // DeleteLastCharSteps_Ex / SetLastChar, so no separate memory is
+    // needed at all:
+    //   - Pure consonant precedes -> NOT a word boundary: fall through to
+    //     normal processing (the kar attaches via InsertKar below).
+    //   - Anything else precedes (empty buffer, after space/tab/enter,
+    //     after Backspace reveals a non-consonant, or LastChar is itself a
+    //     kar/vowel/hasanta) -> word boundary: convert the kar key to its
+    //     independent full vowel letter.
+    if (VowelFormating <> 'NO') then
     begin
       if IsPureConsonent(LastChar) then
       begin
-        // Consonant precedes: clear DeadKey and fall through to normal
-        // character processing (the kar will attach via InsertKar in the
-        // general else block below).
+        // Consonant precedes: fall through to normal character processing
+        // (the kar will attach via InsertKar in the general else block
+        // below). DeadKey is still cleared here for bookkeeping only -
+        // nothing in this unit reads DeadKey's value anymore except this
+        // block's own condition above, which no longer depends on it.
         DeadKey := False;
       end
       else if CharForKey = b_AAkar then
@@ -791,7 +806,7 @@ end;
 
 procedure TGenericLayoutModern.ResetDeadKey;
 begin
-  DeadKey := False;
+  DeadKey := True;
   ResetLastChar;
 end;
 
