@@ -157,9 +157,36 @@ end;
 procedure TGenericLayoutModern.DoBackspace(var Block: Boolean);
 var
   BijoyNewBanglaText: string;
+  SavedChar:          string;
+  DeleteCount:        Integer;
+  IsRephTail:         Boolean;
 begin
 
-  if (Length(PrevBanglaT) - 1) <= 0 then
+  { --- Reph / Phala tail detection --- }
+  IsRephTail := (Length(PrevBanglaT) >= 3) and
+                (PrevBanglaT[Length(PrevBanglaT) - 2] = b_R) and
+                (PrevBanglaT[Length(PrevBanglaT) - 1] = b_Hasanta) and
+                IsPureConsonent(PrevBanglaT[Length(PrevBanglaT)]);
+
+  DeleteCount := 1;
+  if not IsRephTail then
+  begin
+    if (Length(PrevBanglaT) >= 3) and
+       ((PrevBanglaT[Length(PrevBanglaT)-2] = ZWJ) or (PrevBanglaT[Length(PrevBanglaT)-2] = ZWNJ)) and
+       (PrevBanglaT[Length(PrevBanglaT)-1] = b_Hasanta) and
+       (PrevBanglaT[Length(PrevBanglaT)] = b_Z) then
+      DeleteCount := 3
+    else if (Length(PrevBanglaT) >= 2) and
+            (PrevBanglaT[Length(PrevBanglaT)-1] = b_Hasanta) and
+            (PrevBanglaT[Length(PrevBanglaT)] = b_Z) then
+      DeleteCount := 2
+    else if (Length(PrevBanglaT) >= 2) and
+            (PrevBanglaT[Length(PrevBanglaT)-1] = b_Hasanta) and
+            (PrevBanglaT[Length(PrevBanglaT)] = b_R) then
+      DeleteCount := 2;
+  end;
+
+  if (Length(PrevBanglaT) - DeleteCount) <= 0 then
   begin
 
     if OutputIsBijoy <> 'YES' then
@@ -180,8 +207,27 @@ begin
   else
   begin
     Block := True;
-    InternalBackspace;
-    // ParseAndSendNow;
+    if IsRephTail then
+    begin
+      SavedChar := PrevBanglaT[Length(PrevBanglaT)];
+      if OutputIsBijoy = 'YES' then
+      begin
+        Backspace(Length(Bijoy.Convert(MidStr(PrevBanglaT, Length(PrevBanglaT) - 2, 3))));
+        SendKey_Char(Bijoy.Convert(SavedChar));
+      end
+      else
+      begin
+        Backspace(3);
+        SendKey_Char(SavedChar);
+      end;
+      PrevBanglaT := LeftStr(PrevBanglaT, Length(PrevBanglaT) - 3) + SavedChar;
+      NewBanglaText := PrevBanglaT;
+      SetLastChar(SavedChar);
+    end
+    else
+    begin
+      InternalBackspace(DeleteCount);
+    end;
   end;
 end;
 
