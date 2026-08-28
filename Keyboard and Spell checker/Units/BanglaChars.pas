@@ -248,7 +248,7 @@ begin
   WC := strX[1];
 
   if (WC = b_AAkar) or (WC = b_IIkar) or (WC = b_Ikar) or (WC = b_Ukar) or (WC = b_UUkar) or (WC = b_RRIkar) or (WC = b_Ekar) or (WC = b_OIkar) or
-    (WC = b_OUkar) or (WC = b_Vocalic_RR_Kar) or (WC = b_Vocalic_L_Kar) or (WC = b_Vocalic_LL_Kar) then
+    (WC = b_Okar) or (WC = b_OUkar) or (WC = b_Vocalic_RR_Kar) or (WC = b_Vocalic_L_Kar) or (WC = b_Vocalic_LL_Kar) then
     Result := True
   else
     Result := false;
