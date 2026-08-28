@@ -33,13 +33,6 @@ type
       DetermineZWNJ_ZWJ:          string;
       LastChars:                  array [1 .. TrackL] of string;
       PrevBanglaT, NewBanglaText: string;
-      CommittedBanglaT:           string;
-      LastCommittedUnicode:       string;  // Unicode text sent before delimiter
-      LastCommittedAnsi:          string;  // ANSI text sent before delimiter
-      IsAtWordBoundary:           Boolean; // True after Space/Enter until next char
-      SpacePendingCount:          Integer; // Delimiters we inserted; modifiers may cross them
-      LastIsoContext:             string;  // Virtual Unicode context of last isolated emission
-      LastIsoToggleKey:           string;  // '' = last isolated emission is not toggleable
 
       procedure InternalBackspace(KeyRepeat: Integer = 1);
       procedure DoBackspace(var Block: Boolean);
@@ -49,8 +42,6 @@ type
       procedure DeleteLastCharSteps_Ex(StepCount: Integer);
       procedure SetLastChar(const wChar: string);
       procedure ResetLastChar;
-      procedure ClearIsoState;
-      function HandleIsolatedModifier(const ModifierStr: string): Boolean;
       function MyProcessVKeyDown(const KeyCode: Integer; var Block: Boolean; const var_IsLogicalShift, var_IsTrueShift, var_IsAltGr: Boolean): string;
       procedure MyProcessVKeyUP(const KeyCode: Integer; var Block: Boolean; const var_IsLogicalShift: Boolean; const var_IsTrueShift: Boolean;
         const var_IsAltGr: Boolean);
@@ -77,7 +68,6 @@ uses
   clsLayout,
   VirtualKeycode,
   WindowsVersion,
-  uCaretContextSniffer,
   DebugLog;
 
 { =============================================================================== }
@@ -126,12 +116,6 @@ begin
   // DetermineZWNJ_ZWJ := ZWNJ;
 
   Bijoy := TUnicodeToBijoy2000.Create;
-  LastCommittedUnicode := '';
-  LastCommittedAnsi := '';
-  IsAtWordBoundary := False;
-  SpacePendingCount := 0;
-  LastIsoContext := '';
-  LastIsoToggleKey := '';
 end;
 
 { =============================================================================== }
@@ -172,161 +156,31 @@ end;
 procedure TGenericLayoutModern.DoBackspace(var Block: Boolean);
 var
   BijoyNewBanglaText: string;
-  SavedChar:          string;
-  L:                  Integer;
-  DeleteCount:        Integer;
-  IsRephTail:         Boolean;
-  SavedCommitted:     string;
 begin
 
-  { === Delimiter / isolated-modifier bookkeeping (ANSI contextual engine) === }
-  if (NewBanglaText = '') and (PrevBanglaT = '') then
-  begin
-    // 1. Deleting the space we just inserted: caret becomes directly adjacent
-    //    to LastCommittedUnicode, so the next modifier must attach cleanly.
-    if SpacePendingCount > 0 then
-    begin
-      Dec(SpacePendingCount);
-      if CommittedBanglaT <> '' then
-        Delete(CommittedBanglaT, Length(CommittedBanglaT), 1);
-      ClearIsoState;
-      Block := False; // native backspace removes the delimiter
-      Exit;
-    end;
-    // 2. Deleting an isolated emission: flip the JSON backspace-toggle state
-    //    (e.g. রু <-> A_UKar4/A_UKar2) so an immediate retype alternates.
-    if (LastIsoToggleKey <> '') or (LastIsoContext <> '') then
-    begin
-      if (LastIsoToggleKey <> '') and (Bijoy <> nil) then
-        Bijoy.FlipIsolatedToggle(LastIsoToggleKey);
-      ClearIsoState;
-      Block := False; // native backspace removes the glyph
-      Exit;
-    end;
-  end;
-
-  { --- Reph / Phala tail detection --- }
-  IsRephTail := (Length(PrevBanglaT) >= 3) and
-                (PrevBanglaT[Length(PrevBanglaT) - 2] = b_R) and
-                (PrevBanglaT[Length(PrevBanglaT) - 1] = b_Hasanta) and
-                IsPureConsonent(PrevBanglaT[Length(PrevBanglaT)]);
-
-  DeleteCount := 1;
-  if not IsRephTail then
-  begin
-    if (Length(PrevBanglaT) >= 3) and
-       ((PrevBanglaT[Length(PrevBanglaT)-2] = ZWJ) or (PrevBanglaT[Length(PrevBanglaT)-2] = ZWNJ)) and
-       (PrevBanglaT[Length(PrevBanglaT)-1] = b_Hasanta) and
-       (PrevBanglaT[Length(PrevBanglaT)] = b_Z) then
-      DeleteCount := 3
-    else if (Length(PrevBanglaT) >= 2) and
-            (PrevBanglaT[Length(PrevBanglaT)-1] = b_Hasanta) and
-            (PrevBanglaT[Length(PrevBanglaT)] = b_Z) then
-      DeleteCount := 2
-    else if (Length(PrevBanglaT) >= 2) and
-            (PrevBanglaT[Length(PrevBanglaT)-1] = b_Hasanta) and
-            (PrevBanglaT[Length(PrevBanglaT)] = b_R) then
-      DeleteCount := 2;
-  end;
-
-  if (Length(PrevBanglaT) - DeleteCount) <= 0 then
+  if (Length(PrevBanglaT) - 1) <= 0 then
   begin
 
     if OutputIsBijoy <> 'YES' then
     begin
-      if Length(NewBanglaText) >= 1 then
-      begin
-        Backspace(Length(NewBanglaText));
-        Block := True;
-      end
-      else if CommittedBanglaT <> '' then
-      begin
-        L := Length(CommittedBanglaT);
-        if (L >= 3) and (CommittedBanglaT[L - 2] = b_R) and (CommittedBanglaT[L - 1] = b_Hasanta) and IsPureConsonent(CommittedBanglaT[L]) then
-        begin
-          SavedChar := CommittedBanglaT[L];
-          Backspace(3);
-          SendKey_Char(SavedChar);
-          CommittedBanglaT := LeftStr(CommittedBanglaT, L - 3) + SavedChar;
-          Block := True;
-          Exit;
-        end;
-        { Check for Ya-phala with explicit joiner in committed text }
-        if (L >= 4) and
-           ((CommittedBanglaT[L-3] = ZWJ) or (CommittedBanglaT[L-3] = ZWNJ)) and
-           (CommittedBanglaT[L-2] = b_Hasanta) and (CommittedBanglaT[L-1] = b_Z) then
-        begin
-          Backspace(3);
-          CommittedBanglaT := LeftStr(CommittedBanglaT, L - 3);
-          Block := True;
-          Exit;
-        end;
-        { Check for Ya-phala in committed text }
-        if (L >= 3) and (CommittedBanglaT[L-1] = b_Hasanta) and (CommittedBanglaT[L] = b_Z) and
-           (CommittedBanglaT[L-2] <> b_R) then
-        begin
-          Backspace(2);
-          CommittedBanglaT := LeftStr(CommittedBanglaT, L - 2);
-          Block := True;
-          Exit;
-        end;
-        { Check for Ra-phala in committed text }
-        if (L >= 3) and (CommittedBanglaT[L-1] = b_Hasanta) and (CommittedBanglaT[L] = b_R) then
-        begin
-          Backspace(2);
-          CommittedBanglaT := LeftStr(CommittedBanglaT, L - 2);
-          Block := True;
-          Exit;
-        end;
-        Backspace(1);
-        CommittedBanglaT := LeftStr(CommittedBanglaT, L - 1);
-        Block := True;
-        Exit;
-      end
-      else
-        Block := False;
+      if (Length(NewBanglaText) - 1) >= 1 then
+        Backspace(Length(NewBanglaText) - 1);
     end
     else
     begin
       BijoyNewBanglaText := Bijoy.Convert(NewBanglaText);
-      if Length(BijoyNewBanglaText) >= 1 then
-      begin
-        Backspace(Length(BijoyNewBanglaText));
-        Block := True;
-      end
-      else
-        Block := False;
+      if (Length(BijoyNewBanglaText) - 1) >= 1 then
+        Backspace(Length(BijoyNewBanglaText) - 1);
     end;
 
-    SavedCommitted := CommittedBanglaT;
     ResetDeadKey;
-    CommittedBanglaT := SavedCommitted;
+    Block := False;
   end
   else
   begin
     Block := True;
-    if IsRephTail then
-    begin
-      SavedChar := PrevBanglaT[Length(PrevBanglaT)];
-      if OutputIsBijoy = 'YES' then
-      begin
-        Backspace(Length(Bijoy.Convert(MidStr(PrevBanglaT, Length(PrevBanglaT) - 2, 3))));
-        SendKey_Char(Bijoy.Convert(SavedChar));
-      end
-      else
-      begin
-        Backspace(3);
-        SendKey_Char(SavedChar);
-      end;
-      PrevBanglaT := LeftStr(PrevBanglaT, Length(PrevBanglaT) - 3) + SavedChar;
-      NewBanglaText := PrevBanglaT;
-      SetLastChar(SavedChar);
-    end
-    else
-    begin
-      InternalBackspace(DeleteCount);
-      ParseAndSendNow;
-    end;
+    InternalBackspace;
+    // ParseAndSendNow;
   end;
 end;
 
@@ -472,8 +326,7 @@ end;
 {$HINTS ON}
 { =============================================================================== }
 
-function TGenericLayoutModern.MyProcessVKeyDown(const KeyCode: Integer; var Block: Boolean;
-  const var_IsLogicalShift, var_IsTrueShift, var_IsAltGr: Boolean): string;
+function TGenericLayoutModern.MyProcessVKeyDown(const KeyCode: Integer; var Block: Boolean; const var_IsLogicalShift, var_IsTrueShift, var_IsAltGr: Boolean): string;
 var
   CharForKey: string;
 begin
@@ -487,15 +340,70 @@ begin
   else if AvroMainForm1.GetMyCurrentKeyboardMode = bangla then
   begin
     CharForKey := GetCharForKey(KeyCode, var_IsLogicalShift, var_IsTrueShift, var_IsAltGr);
-    Log(Format('Keycode: %d, CharForKey:%s, var_IsLogicalShift:%s, var_IsTrueShift:%s, var_IsAltGr:%s',
-        [KeyCode, CharForKey, BoolToStr(var_IsLogicalShift, True), BoolToStr(var_IsTrueShift, True), BoolToStr(var_IsAltGr, True)]));
+    Log(Format('Keycode: %d, CharForKey:%s, var_IsLogicalShift:%s, var_IsTrueShift:%s, var_IsAltGr:%s', [KeyCode, CharForKey, BoolToStr(var_IsLogicalShift, True),
+          BoolToStr(var_IsTrueShift, True), BoolToStr(var_IsAltGr, True)]));
 
     if VowelFormating = 'NO' then
       DeadKey := False;
 
-    if DeadKey then
+    // =====================================================================
+    // E-Kar Ligature Fix: E-kar (ে) + AA-kar (া) -> O-kar (ো)
+    //                     E-kar (ে) + OU-kar/LengthMark -> OU-kar (ৌ)
+    // =====================================================================
+    // When the previous character is E-kar and the incoming key is AA-kar,
+    // remove the previous E-kar via InternalBackspace and emit the O-kar
+    // ligature (ো) attached to the preceding consonant via InsertKar.
+    // Same for OU-kar (ৌ): E-kar + OU-kar or E-kar + LengthMark.
+    // This runs BEFORE the DeadKey vowel-formation block so it takes
+    // priority in both VowelFormating=YES and VowelFormating=NO modes.
+    if LastChar = b_Ekar then
     begin
       if CharForKey = b_AAkar then
+      begin
+        InternalBackspace;
+        DeadKey := False;
+        MyProcessVKeyDown := InsertKar(b_Okar);
+        Exit;
+      end
+      else if CharForKey = b_OUkar then
+      begin
+        InternalBackspace;
+        DeadKey := False;
+        MyProcessVKeyDown := InsertKar(b_OUkar);
+        Exit;
+      end
+      else if CharForKey = b_LengthMark then
+      begin
+        InternalBackspace;
+        DeadKey := False;
+        MyProcessVKeyDown := InsertKar(b_OUkar);
+        Exit;
+      end;
+    end;
+
+    // =====================================================================
+    // Automatic Vowel Formation at Word Boundary (VowelFormating enabled)
+    // =====================================================================
+    // When DeadKey is active and a kar key is pressed:
+    //   - If a pure consonant immediately precedes the cursor, the kar
+    //     attaches to that consonant normally (NOT a word boundary).
+    //   - Otherwise (empty buffer, after space/enter, or LastChar is a
+    //     kar, vowel, hasanta, or other non-consonant), treat it as a
+    //     word boundary: convert the kar to its corresponding independent
+    //     full vowel letter (e.g. AA-kar -> AA, I-kar -> I, etc.).
+    // This preserves the existing Hasanta + kar -> full vowel behavior
+    // (handled separately below) and ensures DeadKey state does not bleed
+    // into subsequent keystrokes when a consonant is present.
+    if DeadKey then
+    begin
+      if IsPureConsonent(LastChar) then
+      begin
+        // Consonant precedes: clear DeadKey and fall through to normal
+        // character processing (the kar will attach via InsertKar in the
+        // general else block below).
+        DeadKey := False;
+      end
+      else if CharForKey = b_AAkar then
       begin
         MyProcessVKeyDown := b_AA;
         DeadKey := True;
@@ -555,11 +463,6 @@ begin
         DeadKey := True;
         Exit;
       end
-      // ElseIf KeyCode = VK_LSHIFT Or KeyCode = VK_RSHIFT Or KeyCode = VK_CAPITAL Or KeyCode = VK_NUMLOCK Or KeyCode = VK_LCONTROL Or KeyCode = VK_RCONTROL Or KeyCode = VK_CONTROL Or KeyCode = VK_MENU Or KeyCode = VK_LMENU Or KeyCode = VK_RMENU Then
-      // DeadKey = True
-      // MyProcessVKeyDown = ""
-      // Block = False
-      // Exit Function
       else
         DeadKey := False;
     end;
@@ -649,7 +552,6 @@ begin
         begin
           Block := False;
           DeadKey := True;
-          CommittedBanglaT := CommittedBanglaT + PrevBanglaT + ' ';
           ResetLastChar;
           MyProcessVKeyDown := '';
           Exit;
@@ -658,11 +560,7 @@ begin
         begin
           Block := False;
           DeadKey := True;
-          CommittedBanglaT := CommittedBanglaT + PrevBanglaT + ' ';
-          if Length(CommittedBanglaT) > 500 then
-            Delete(CommittedBanglaT, 1, Length(CommittedBanglaT) - 500);
-          ResetLastChar;            // soft-saves LastCommitted* context
-          Inc(SpacePendingCount);   // delimiter now sits between caret & context
+          ResetLastChar;
           MyProcessVKeyDown := '';
           Exit;
         end;
@@ -705,22 +603,6 @@ begin
             else
             begin
               MyProcessVKeyDown := b_Hasanta + b_Z;
-              Exit;
-            end;
-          end
-          else if CharForKey = b_Hasanta then
-          begin
-            if LastChar = ZWNJ then
-            begin
-              Block := True;
-              DeadKey := False;
-              MyProcessVKeyDown := '';
-              Exit;
-            end
-            else
-            begin
-              DeadKey := False;
-              MyProcessVKeyDown := b_Hasanta;
               Exit;
             end;
           end
@@ -850,17 +732,14 @@ end;
 
 function TGenericLayoutModern.ProcessVKeyDown(const KeyCode: Integer; var Block: Boolean): string;
 var
-  m_Block:      Boolean;
-  m_Str:        string;
-  IsoChainCont: Boolean;
+  m_Block: Boolean;
+  m_Str:   string;
 begin
   m_Block := False;
 
   if (IsWinKey = True) or (IsOnlyCtrlKey = True) or (IsOnlyLeftAltKey = True) then
   begin
     Block := False;
-    CommittedBanglaT := '';
-    ResetDeadKey;
     ProcessVKeyDown := '';
     Exit;
   end;
@@ -873,38 +752,13 @@ begin
   end;
 
   m_Str := MyProcessVKeyDown(KeyCode, m_Block, IsLogicalShift, IsTrueShift, IsAltGr);
-
-  Log(Format('m_Block:%s, m_Str:%s', [BoolToStr(m_Block, True), m_Str]));
-
-  // === Isolated Modifier Interception (ANSI contextual engine) ===
-  // Kars/phalas/hasanta typed while the word buffer is empty attach to what
-  // sits before the caret: the committed context, across our own pending
-  // delimiter(s), or a sniffed glyph at an arbitrary document position.
-  // When a chained hasanta is pending (e.g. 'ক'+'্' emitted isolated), any
-  // single Bangla char continues the conjunct (ক্ষ, ভ্র, ম্ভ্র ...).
-  IsoChainCont := (LastIsoContext <> '') and (RightStr(LastIsoContext, 1) = b_Hasanta) and
-    (Length(m_Str) = 1) and (Ord(m_Str[1]) >= $0980);
-
-  if (m_Str <> '') and (not uCaretContextSniffer.SniffingActive) and (OutputIsBijoy = 'YES') and (NewBanglaText = '') and
-    (IsModifierOrJoiner(m_Str) or IsoChainCont) then
-  begin
-    if HandleIsolatedModifier(m_Str) then
-    begin
-      SetLastChar(m_Str);
-      Block := True;
-      ProcessVKeyDown := '';
-      Exit;
-    end;
-  end;
-
-  if (m_Str <> '') then
+  if m_Str <> '' then
   begin
     m_Block := True;
     SetLastChar(m_Str);
-    IsAtWordBoundary := False;
-    ClearIsoState;
-    SpacePendingCount := 0;
   end;
+
+  Log(Format('m_Block:%s, m_Str:%s', [BoolToStr(m_Block, True), m_Str]));
 
   NewBanglaText := NewBanglaText + m_Str;
 
@@ -947,116 +801,12 @@ procedure TGenericLayoutModern.ResetLastChar;
 var
   I: Integer;
 begin
-  // Save committed context before clearing (soft reset)
-  if PrevBanglaT <> '' then
-  begin
-    LastCommittedUnicode := PrevBanglaT;
-    if Bijoy <> nil then
-    begin
-      if OutputIsBijoy = 'YES' then
-        LastCommittedAnsi := Bijoy.Convert(PrevBanglaT)
-      else
-        LastCommittedAnsi := PrevBanglaT;
-    end;
-  end;
-  IsAtWordBoundary := True;
-  ClearIsoState;
-  SpacePendingCount := 0;
-
   for I := 1 to TrackL do
     LastChars[I] := ' ';
 
   LastChar := ' ';
   PrevBanglaT := '';
   NewBanglaText := '';
-end;
-
-{ =============================================================================== }
-
-procedure TGenericLayoutModern.ClearIsoState;
-begin
-  LastIsoContext := '';
-  LastIsoToggleKey := '';
-end;
-
-{ =============================================================================== }
-{
-  Attaches an isolated modifier (kar / phala / hasanta) to whatever sits
-  before the caret, resolving the exact contextual ANSI glyph for the active
-  JSON mapping version. Returns True when the keystroke was fully handled.
-}
-function TGenericLayoutModern.HandleIsolatedModifier(const ModifierStr: string): Boolean;
-var
-  Ctx, Sniffed, ResolvedAnsi, MatchedContext, ChainCtx: string;
-  CandArr:            TAnsiUniCandidates;
-  EraseCount:         Integer;
-  IsToggle, UsedAlt:  Boolean;
-  Kind:               TSniffResult;
-begin
-  Result := False;
-  if Bijoy = nil then
-    Exit;
-
-  { Hasanta after a space starts a new word — don't treat as isolated modifier }
-  if (SpacePendingCount > 0) and (Length(ModifierStr) = 1) and
-     (ModifierStr[1] = b_Hasanta) then
-    Exit;
-
-  { --- 1. Establish PrecedingContext --- }
-  if LastIsoContext <> '' then
-    Ctx := LastIsoContext // chained isolated emission (ক -> ক্ -> ক্র)
-  else if (SpacePendingCount > 0) and (LastCommittedUnicode <> '') then
-    Ctx := LastCommittedUnicode // cross our own delimiter(s)
-  else
-  begin
-    if not SniffCharBeforeCaret(Sniffed, Kind) then
-      Exit;
-    case Kind of
-      srDelimiter:
-        Exit; // foreign space/newline - leave untouched
-      srUnicodeChar, srAnsiGlyph:
-        Ctx := Sniffed;
-    else
-      Exit; // nothing resolvable before the caret
-    end;
-  end;
-
-  { --- 2. Resolve (precompiled map fast path, generic Convert fallback) --- }
-  if not Bijoy.ResolveAnsiSequence(Ctx, ModifierStr, ResolvedAnsi, EraseCount, MatchedContext, IsToggle, UsedAlt) then
-    Exit;
-
-  { --- 3. Emit with exact diff counts --- }
-  if SpacePendingCount > 0 then
-    Backspace(SpacePendingCount); // remove only our delimiter(s)
-  if EraseCount > 0 then
-    Backspace(EraseCount);        // replace the default/context glyph
-  SendKey_Char(ResolvedAnsi);
-
-  { --- 4. Track state for chaining and backspace-toggles --- }
-  if IsToggle then
-    LastIsoToggleKey := MatchedContext + ModifierStr
-  else
-    LastIsoToggleKey := '';
-
-  ChainCtx := MatchedContext;
-  if (ChainCtx <> '') and (Ord(ChainCtx[1]) < $0980) then
-  begin
-    // ANSI sniff: pick the first candidate cluster for chain bookkeeping;
-    // resolution correctness is already handled inside ResolveAnsiSequence.
-    CandArr := Bijoy.UnicodeCandidatesOfAnsi(ChainCtx);
-    if Length(CandArr) > 0 then
-      ChainCtx := CandArr[0]
-    else
-      ChainCtx := '';
-  end;
-  if ChainCtx <> '' then
-    LastIsoContext := ChainCtx + ModifierStr
-  else
-    LastIsoContext := '';
-
-  SpacePendingCount := 0;
-  IsAtWordBoundary := False;
-  Result := True;
 end;
 
 { =============================================================================== }
