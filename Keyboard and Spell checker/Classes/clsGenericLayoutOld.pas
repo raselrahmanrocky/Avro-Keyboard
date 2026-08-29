@@ -9,6 +9,25 @@
 {$INCLUDE ../ProjectDefines.inc}
 { COMPLETE TRANSFERING! }
 
+{ ============================================================================
+  OLD STYLE TYPING MODIFICATION (Bijoy keyboard behaviour):
+
+  Pre-base kars (ে, ি, ী, ৈ) now behave like the old Bijoy typewriter:
+  * A SINGLE press shows the kar immediately at the caret (floating kar).
+  * To attach a kar to a letter, the kar MUST be typed first; the next
+    consonant reorders it automatically (consonant first, kar after), so
+    the stored Unicode is always canonical:  ে+ক -> কে,  ি+ক -> কি ...
+  * ে + া -> ো  and  ে + ৗ -> ৌ  still compose on the fly.
+  * A repeated press of the same kar key is swallowed (it is already
+    visible); another pre-base kar replaces the floating one.
+  * Right after a consonant the kar simply attaches in normal order
+    (ক + ি -> কি), so mixed/modern typing keeps working untouched.
+  * Backspacing the visible floating kar also disarms the reorder state.
+  * In Bijoy (ANSI) output mode the pre-base kars are excluded from the
+    isolated-modifier engine while floating, so kar-first typing always
+    starts a fresh word instead of touching the previous committed word.
+  ============================================================================ }
+
 unit clsGenericLayoutOld;
 
 interface
@@ -40,7 +59,9 @@ type
       LastIsoToggleKey:           string;  // '' = last isolated emission is not toggleable
 
       // Kar Variables for Full Old Style Typing
-      EKarActive, IKarActive, OIKarActive: Boolean;
+      // (pre-base kars: ে, ি, ী, ৈ - visible on a single press; they float
+      //  until the consonant arrives and are then reordered after it)
+      EKarActive, IKarActive, IIKarActive, OIKarActive: Boolean;
 
       procedure InternalBackspace(KeyRepeat: Integer = 1);
       procedure DoBackspace(var Block: Boolean);
@@ -52,6 +73,8 @@ type
       procedure ResetLastChar;
       procedure ClearIsoState;
       function HandleIsolatedModifier(const ModifierStr: string): Boolean;
+      function GetActivePreBaseKar: string;
+      function PressPreBaseKar(const KarChar: string): string;
       function MyProcessVKeyDown(const KeyCode: Integer; var Block: Boolean; const var_IsLogicalShift, var_IsTrueShift, var_IsAltGr: Boolean): string;
       procedure MyProcessVKeyUP(const KeyCode: Integer; var Block: Boolean; const var_IsLogicalShift: Boolean; const var_IsTrueShift: Boolean;
         const var_IsAltGr: Boolean);
@@ -144,6 +167,7 @@ var
   DeleteCount:        Integer;
   IsRephTail:         Boolean;
   SavedCommitted:     string;
+  ArmedKar:           string;
 begin
 
   { === Delimiter / isolated-modifier bookkeeping (ANSI contextual engine) === }
@@ -171,6 +195,12 @@ begin
       Exit;
     end;
   end;
+
+  { OLD STYLE: deleting the visible floating pre-base kar also disarms it,
+    so a backspaced ে/ি/ী/ৈ cannot re-attach to the next consonant }
+  ArmedKar := GetActivePreBaseKar;
+  if (ArmedKar <> '') and (PrevBanglaT <> '') and (RightStr(PrevBanglaT, 1) = ArmedKar) then
+    ResetAllKarsToInactive;
 
   { --- Reph / Phala tail detection --- }
   IsRephTail := (Length(PrevBanglaT) >= 3) and
@@ -453,10 +483,80 @@ end;
 {$HINTS ON}
 { =============================================================================== }
 
+{
+  OLD STYLE: returns the currently floating (armed) pre-base kar
+  (ে, ি, ী or ৈ); '' when no reorder is pending.
+}
+function TGenericLayoutOld.GetActivePreBaseKar: string;
+begin
+  if EKarActive then
+    GetActivePreBaseKar := b_Ekar
+  else if IKarActive then
+    GetActivePreBaseKar := b_Ikar
+  else if IIKarActive then
+    GetActivePreBaseKar := b_IIkar
+  else if OIKarActive then
+    GetActivePreBaseKar := b_OIkar
+  else
+    GetActivePreBaseKar := '';
+end;
+
+{ =============================================================================== }
+
+{
+  OLD STYLE (Bijoy behaviour) handling of a pre-base kar key press:
+  * The kar is emitted immediately, so it becomes visible with a single press.
+  * It stays "floating" (armed): the next consonant reorders it
+    (consonant first in the buffer, kar reordered after it).
+  * Pressing the SAME kar again is swallowed (it is already visible).
+  * Pressing a DIFFERENT pre-base kar replaces the floating one.
+  * Directly after a consonant there is nothing to reorder, so the kar
+    attaches in normal order (ক + ি -> কি) and no state is armed.
+}
+function TGenericLayoutOld.PressPreBaseKar(const KarChar: string): string;
+begin
+  // Same kar already floating and shown - swallow the repeat press
+  if GetActivePreBaseKar = KarChar then
+  begin
+    PressPreBaseKar := '';
+    Exit;
+  end;
+
+  // A different pre-base kar is floating - replace it with the new one
+  if (GetActivePreBaseKar <> '') and (RightStr(NewBanglaText, 1) = GetActivePreBaseKar) then
+    InternalBackspace(1);
+
+  ResetAllKarsToInactive;
+
+  // Right after a consonant the kar attaches normally - nothing to reorder
+  if IsPureConsonent(LastChar) then
+  begin
+    PressPreBaseKar := KarChar;
+    Exit;
+  end;
+
+  // Otherwise the kar floats visibly and awaits its consonant
+  if KarChar = b_Ekar then
+    EKarActive := True
+  else if KarChar = b_Ikar then
+    IKarActive := True
+  else if KarChar = b_IIkar then
+    IIKarActive := True
+  else if KarChar = b_OIkar then
+    OIKarActive := True;
+
+  PressPreBaseKar := KarChar;
+end;
+
+{ =============================================================================== }
+
 function TGenericLayoutOld.MyProcessVKeyDown(const KeyCode: Integer; var Block: Boolean;
   const var_IsLogicalShift, var_IsTrueShift, var_IsAltGr: Boolean): string;
 var
   CharForKey, tmpString, PendingKar: string;
+  ArmedKar, mKar: string;
+  KarInBuffer:   Boolean;
+  IsRephTailCtx: Boolean;
 begin
 
   if AvroMainForm1.GetMyCurrentKeyboardMode = SysDefault then
@@ -472,153 +572,132 @@ begin
 
     if LastChar = b_Hasanta then
     begin
+      { OLD STYLE: after a typed reph (র্) the pre-base kars must keep
+        floating for the coming consonant instead of turning into a vowel
+        letter (needed for e.g. ক + র্ + ে + ম -> কর্মে) }
+      IsRephTailCtx := (LastChars[2] = b_R) and (LastChars[3] <> b_Hasanta);
 
-      if EKarActive then
-        PendingKar := b_Ekar
-      else if IKarActive then
-        PendingKar := b_Ikar
-      else if OIKarActive then
-        PendingKar := b_OIkar
-      else
-        PendingKar := '';
+      if (not IsRephTailCtx) or
+         ((CharForKey <> b_Ekar) and (CharForKey <> b_Ikar) and
+          (CharForKey <> b_IIkar) and (CharForKey <> b_OIkar)) then
+      begin
 
-      if CharForKey = b_AAkar then
-      begin
-        InternalBackspace;
-        MyProcessVKeyDown := InsertKar(PendingKar) + b_AA;
-        ResetAllKarsToInactive;
-        Exit;
-      end
-      else if CharForKey = b_Ikar then
-      begin
-        InternalBackspace;
-        MyProcessVKeyDown := InsertKar(PendingKar) + b_I;
-        ResetAllKarsToInactive;
-        Exit;
-      end
-      else if CharForKey = b_IIkar then
-      begin
-        InternalBackspace;
-        MyProcessVKeyDown := InsertKar(PendingKar) + b_II;
-        ResetAllKarsToInactive;
-        Exit;
-      end
-      else if CharForKey = b_Ukar then
-      begin
-        InternalBackspace;
-        MyProcessVKeyDown := InsertKar(PendingKar) + b_U;
-        ResetAllKarsToInactive;
-        Exit;
-      end
-      else if CharForKey = b_UUkar then
-      begin
-        InternalBackspace;
-        MyProcessVKeyDown := InsertKar(PendingKar) + b_UU;
-        ResetAllKarsToInactive;
-        Exit;
-      end
-      else if CharForKey = b_RRIkar then
-      begin
-        InternalBackspace;
-        MyProcessVKeyDown := InsertKar(PendingKar) + b_RRI;
-        ResetAllKarsToInactive;
-        Exit;
-      end
-      else if CharForKey = b_Ekar then
-      begin
-        InternalBackspace;
-        MyProcessVKeyDown := InsertKar(PendingKar) + b_E;
-        ResetAllKarsToInactive;
-        Exit;
-      end
-      else if CharForKey = b_OIkar then
-      begin
-        InternalBackspace;
-        MyProcessVKeyDown := InsertKar(PendingKar) + b_OI;
-        ResetAllKarsToInactive;
-        Exit;
-      end
-      else if CharForKey = b_Okar then
-      begin
-        InternalBackspace;
-        MyProcessVKeyDown := InsertKar(PendingKar) + b_O;
-        ResetAllKarsToInactive;
-        Exit;
-      end
-      else if CharForKey = b_OUkar then
-      begin
-        InternalBackspace;
-        MyProcessVKeyDown := InsertKar(PendingKar) + b_OU;
-        ResetAllKarsToInactive;
-        Exit;
-      end
-      else if CharForKey = b_LengthMark then
-      begin
-        InternalBackspace;
-        MyProcessVKeyDown := InsertKar(PendingKar) + b_OU;
-        ResetAllKarsToInactive;
-        Exit;
-      end
-      else if CharForKey = b_Hasanta then
-      begin
-        MyProcessVKeyDown := ZWNJ;
-        ResetAllKarsToInactive;
-        Exit;
+        if EKarActive then
+          PendingKar := b_Ekar
+        else if IKarActive then
+          PendingKar := b_Ikar
+        else if IIKarActive then
+          PendingKar := b_IIkar
+        else if OIKarActive then
+          PendingKar := b_OIkar
+        else
+          PendingKar := '';
+
+        if CharForKey = b_AAkar then
+        begin
+          InternalBackspace;
+          MyProcessVKeyDown := InsertKar(PendingKar) + b_AA;
+          ResetAllKarsToInactive;
+          Exit;
+        end
+        else if CharForKey = b_Ikar then
+        begin
+          InternalBackspace;
+          MyProcessVKeyDown := InsertKar(PendingKar) + b_I;
+          ResetAllKarsToInactive;
+          Exit;
+        end
+        else if CharForKey = b_IIkar then
+        begin
+          InternalBackspace;
+          MyProcessVKeyDown := InsertKar(PendingKar) + b_II;
+          ResetAllKarsToInactive;
+          Exit;
+        end
+        else if CharForKey = b_Ukar then
+        begin
+          InternalBackspace;
+          MyProcessVKeyDown := InsertKar(PendingKar) + b_U;
+          ResetAllKarsToInactive;
+          Exit;
+        end
+        else if CharForKey = b_UUkar then
+        begin
+          InternalBackspace;
+          MyProcessVKeyDown := InsertKar(PendingKar) + b_UU;
+          ResetAllKarsToInactive;
+          Exit;
+        end
+        else if CharForKey = b_RRIkar then
+        begin
+          InternalBackspace;
+          MyProcessVKeyDown := InsertKar(PendingKar) + b_RRI;
+          ResetAllKarsToInactive;
+          Exit;
+        end
+        else if CharForKey = b_Ekar then
+        begin
+          InternalBackspace;
+          MyProcessVKeyDown := InsertKar(PendingKar) + b_E;
+          ResetAllKarsToInactive;
+          Exit;
+        end
+        else if CharForKey = b_OIkar then
+        begin
+          InternalBackspace;
+          MyProcessVKeyDown := InsertKar(PendingKar) + b_OI;
+          ResetAllKarsToInactive;
+          Exit;
+        end
+        else if CharForKey = b_Okar then
+        begin
+          InternalBackspace;
+          MyProcessVKeyDown := InsertKar(PendingKar) + b_O;
+          ResetAllKarsToInactive;
+          Exit;
+        end
+        else if CharForKey = b_OUkar then
+        begin
+          InternalBackspace;
+          MyProcessVKeyDown := InsertKar(PendingKar) + b_OU;
+          ResetAllKarsToInactive;
+          Exit;
+        end
+        else if CharForKey = b_LengthMark then
+        begin
+          InternalBackspace;
+          MyProcessVKeyDown := InsertKar(PendingKar) + b_OU;
+          ResetAllKarsToInactive;
+          Exit;
+        end
+        else if CharForKey = b_Hasanta then
+        begin
+          MyProcessVKeyDown := ZWNJ;
+          ResetAllKarsToInactive;
+          Exit;
+        end;
+
       end;
     end;
 
-    if CharForKey = b_Ekar then
+    { =====================================================================
+      OLD STYLE (Bijoy behaviour) - pre-base kars: ে, ি, ী, ৈ
+      * Single press shows the kar immediately (it floats at the caret).
+      * The NEXT consonant reorders it: consonant first, kar after.
+      * Same kar pressed again: swallowed (already visible).
+      * Another pre-base kar pressed: replaces the floating one.
+      * Right after a consonant it attaches normally (ক + ি -> কি).
+      ===================================================================== }
+    if (CharForKey = b_Ekar) or (CharForKey = b_Ikar) or (CharForKey = b_IIkar) or (CharForKey = b_OIkar) then
     begin
-      if EKarActive = True then
-      begin
-        EKarActive := False;
-        MyProcessVKeyDown := InsertKar(b_Ekar);
-        Exit;
-      end
-      else
-      begin
-        ResetAllKarsToInactive;
-        EKarActive := True;
-        Block := True;
-        MyProcessVKeyDown := '';
-        Exit;
-      end;
-    end;
-
-    if CharForKey = b_Ikar then
-    begin
-      if IKarActive = True then
-      begin
-        IKarActive := False;
-        MyProcessVKeyDown := InsertKar(b_Ikar);
-        Exit;
-      end
-      else
-      begin
-        ResetAllKarsToInactive;
-        IKarActive := True;
-        Block := True;
-        MyProcessVKeyDown := '';
-        Exit;
-      end;
-    end;
-
-    if CharForKey = b_OIkar then
-    begin
-      if OIKarActive = True then
-      begin
-        OIKarActive := False;
-        MyProcessVKeyDown := InsertKar(b_OIkar);
-        Exit;
-      end
-      else
-      begin
-        ResetAllKarsToInactive;
-        OIKarActive := True;
-        Block := True;
-        MyProcessVKeyDown := '';
-        Exit;
-      end;
+      { NOTE: never read MyProcessVKeyDown in an expression - the bare
+        function name on the right side means a recursive CALL in Pascal
+        (E2035). Use a local temp instead. }
+      mKar := PressPreBaseKar(CharForKey);
+      if mKar = '' then
+        Block := True; // repeat press - kar already visible, nothing to emit
+      MyProcessVKeyDown := mKar;
+      Exit;
     end;
 
     if CharForKey = b_AAkar then
@@ -656,6 +735,13 @@ begin
       begin
         InternalBackspace;
         IKarActive := True;
+        MyProcessVKeyDown := b_Hasanta;
+        Exit;
+      end
+      else if LastChar = b_IIkar then
+      begin
+        InternalBackspace;
+        IIKarActive := True;
         MyProcessVKeyDown := b_Hasanta;
         Exit;
       end
@@ -714,24 +800,36 @@ begin
         end;
       else
         begin
-          if EKarActive = True then
+          ArmedKar := GetActivePreBaseKar;
+
+          if ArmedKar <> '' then
           begin
+            { OLD STYLE: a pre-base kar is floating. The visible kar sits at
+              the end of the buffer; a re-armed one (after hasanta-cancel)
+              does not. Attach the kar to whatever is being typed now. }
+            KarInBuffer := (NewBanglaText <> '') and (RightStr(NewBanglaText, 1) = ArmedKar);
+            ResetAllKarsToInactive;
+
             if CharForKey = b_R + b_Hasanta then
             begin
-              EKarActive := False;
-              MyProcessVKeyDown := InsertReph + InsertKar(b_Ekar);
+              if KarInBuffer then
+                MyProcessVKeyDown := InsertReph // visible kar folds into the moved cluster
+              else
+                MyProcessVKeyDown := InsertReph + ArmedKar;
               Exit;
             end
             else if CharForKey = b_AAkar then
             begin
-              EKarActive := False;
-              MyProcessVKeyDown := InsertKar(b_Okar);
+              if KarInBuffer then
+                InternalBackspace(1);
+              MyProcessVKeyDown := b_Okar; // ে + া -> ো
               Exit;
             end
             else if CharForKey = b_LengthMark then
             begin
-              EKarActive := False;
-              MyProcessVKeyDown := InsertKar(b_OUkar);
+              if KarInBuffer then
+                InternalBackspace(1);
+              MyProcessVKeyDown := b_OUkar; // ে + ৗ -> ৌ
               Exit;
             end
             else if CharForKey = '' then
@@ -743,52 +841,9 @@ begin
             end
             else
             begin
-              EKarActive := False;
-              MyProcessVKeyDown := CharForKey + b_Ekar;
-              Exit;
-            end;
-          end
-          else if IKarActive = True then
-          begin
-            if CharForKey = b_R + b_Hasanta then
-            begin
-              IKarActive := False;
-              MyProcessVKeyDown := InsertReph + InsertKar(b_Ikar);
-              Exit;
-            end
-            else if CharForKey = '' then
-            begin
-              ResetLastChar;
-              Block := False;
-              MyProcessVKeyDown := '';
-              Exit;
-            end
-            else
-            begin
-              IKarActive := False;
-              MyProcessVKeyDown := CharForKey + b_Ikar;
-              Exit;
-            end;
-          end
-          else if OIKarActive = True then
-          begin
-            if CharForKey = b_R + b_Hasanta then
-            begin
-              OIKarActive := False;
-              MyProcessVKeyDown := InsertReph + InsertKar(b_OIkar);
-              Exit;
-            end
-            else if CharForKey = '' then
-            begin
-              ResetLastChar;
-              Block := False;
-              MyProcessVKeyDown := '';
-              Exit;
-            end
-            else
-            begin
-              OIKarActive := False;
-              MyProcessVKeyDown := CharForKey + b_OIkar;
+              if KarInBuffer then
+                InternalBackspace(1);
+              MyProcessVKeyDown := CharForKey + ArmedKar; // reorder: key first, kar after
               Exit;
             end;
           end
@@ -1015,11 +1070,14 @@ begin
   // delimiter(s), or a sniffed glyph at an arbitrary document position.
   // When a chained hasanta is pending (e.g. 'ক'+'্' emitted isolated), any
   // single Bangla char continues the conjunct (ক্ষ, ভ্র, ম্ভ্র ...).
+  // OLD STYLE: a floating pre-base kar (ে/ি/ী/ৈ just pressed) belongs to the
+  // word being typed - never divert it to the isolated engine, so kar-first
+  // typing always starts a fresh word. Other modifiers keep old behaviour.
   IsoChainCont := (LastIsoContext <> '') and (RightStr(LastIsoContext, 1) = b_Hasanta) and
     (Length(m_Str) = 1) and (Ord(m_Str[1]) >= $0980);
 
   if (m_Str <> '') and (not uCaretContextSniffer.SniffingActive) and (OutputIsBijoy = 'YES') and (NewBanglaText = '') and
-    (IsModifierOrJoiner(m_Str) or IsoChainCont) then
+    (GetActivePreBaseKar = '') and (IsModifierOrJoiner(m_Str) or IsoChainCont) then
   begin
     if HandleIsolatedModifier(m_Str) then
     begin
@@ -1078,6 +1136,7 @@ procedure TGenericLayoutOld.ResetAllKarsToInactive;
 begin
   EKarActive := False;
   IKarActive := False;
+  IIKarActive := False;
   OIKarActive := False;
 end;
 
