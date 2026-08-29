@@ -77,9 +77,7 @@ uses
 constructor TGenericLayoutModern.Create;
 begin
   inherited;
-  // :=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:
   // Initialize DeadKeyChar Variable
-  // :=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=
   // Standards Symbols
 
   DeadKeyChars := '`~!@#$%^+*-_=+\|"/;:,./?><()[]{}' + #39;
@@ -104,9 +102,7 @@ begin
   DeadKeyChars := DeadKeyChars + b_LengthMark + b_RupeeMark + b_CurrencyNumerator1 + b_CurrencyNumerator2 + b_CurrencyNumerator3 + b_CurrencyNumerator4 +
     b_CurrencyNumerator1LessThanDenominator + b_CurrencyDenominator16;
 
-  // :=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=
   // End Initialize DeadKeyChar Variable
-  // :=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=:=
 
   ResetLastChar;
   DeadKey := True;
@@ -486,7 +482,30 @@ begin
       Exit;
     end;
 
+    // =====================================================================
+    // LengthMark (ৗ) Attach Fix: Consonant + ৗ -> OU-kar (ৌ)
+    // =====================================================================
+    // ৗ (U+09D7, AU Length Mark) is only the SECOND half of the two-part
+    // vowel sign; the layout's OU key may emit it instead of OU-kar (ৌ).
+    // On its own after a consonant it renders broken (কৗ), and IsKar()
+    // does not recognize it, so it would bypass InsertKar forever.
+    // Canonical storage for a consonant is OU-kar: ক + ৗ -> কৌ.
+    // Chandrabindu is included so কঁ + ৗ -> কৌঁ via InsertKar Case D.
+    // E-kar + ৗ and E-kar + Chandrabindu + ৗ are already handled by the
+    // two blocks above. Like the E-kar ligature fix, this runs BEFORE the
+    // vowel-formation block and works in both VowelFormating modes.
+    if (CharForKey = b_LengthMark) and
+       (IsPureConsonent(LastChar) or
+        ((LastChar = b_Chandra) and (TrackL >= 2) and
+         (IsPureConsonent(LastChars[2]) or (LastChars[2] = b_Ekar)))) then
+    begin
+      DeadKey := False;
+      MyProcessVKeyDown := InsertKar(b_OUkar);
+      Exit;
+    end;
+
     // Hasanta Handling: Hasanta + Kar -> Independent Vowel, Double Hasanta -> ZWNJ
+    //                 + Hasanta + ও -> O-kar (ো),  Hasanta + ৗ -> OU-kar (ৌ)
     // =====================================================================
     if LastChar = b_Hasanta then
     begin
@@ -563,6 +582,27 @@ begin
       begin
         InternalBackspace;
         MyProcessVKeyDown := b_OU;
+        DeadKey := True;
+        Exit;
+      end
+      else if CharForKey = b_O then
+      begin
+        // ্ + ও -> ো-কার: drop the hasanta and emit O-kar, so it
+        // attaches to the consonant that preceded the hasanta
+        // (ক + ্ + ও -> কো). This branch sits in the hasanta block,
+        // which runs BEFORE the vowel-formation block, so it works
+        // with "Automatic Vowel Forming" ON and OFF alike.
+        InternalBackspace;
+        MyProcessVKeyDown := b_Okar;
+        DeadKey := True;
+        Exit;
+      end
+      else if CharForKey = b_LengthMark then
+      begin
+        // ্ + ৗ -> ৌ-কার (twin of the rule above, because some layouts'
+        // OU key emits the AU Length Mark): ক + ্ + ৗ -> কৌ.
+        InternalBackspace;
+        MyProcessVKeyDown := b_OUkar;
         DeadKey := True;
         Exit;
       end;
@@ -660,6 +700,17 @@ begin
       end
       else if CharForKey = b_OUkar then
       begin
+        MyProcessVKeyDown := b_OU;
+        DeadKey := True;
+        Exit;
+      end
+      else if CharForKey = b_LengthMark then
+      begin
+        // FIX: the OU key of some fixed layouts emits the AU Length Mark
+        // (ৗ, U+09D7) instead of OU-kar (ৌ, U+09CC). It was not handled
+        // here and IsKar() does not recognize it either, so at a word
+        // boundary a bare "ৗ" leaked out instead of the full vowel.
+        // ঔ (U+0994) is canonically ও + ৗ, so convert it to b_OU.
         MyProcessVKeyDown := b_OU;
         DeadKey := True;
         Exit;
