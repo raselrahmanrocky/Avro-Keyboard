@@ -238,34 +238,14 @@ begin
   if AutomaticallyFixChandra = 'YES' then
   begin
     // ===================================================================
-    // Rule 1: Direct Duplicate Kar Prevention (without Chandra)
-    // ===================================================================
-    // If the last char is already the same kar, ignore the keystroke
-    // to prevent duplicate stacking (e.g. চ + া + া -> চা, not চাা).
-    if LastChar = sKar then
-    begin
-      InsertKar := '';
-      Exit;
-    end;
-
-    // ===================================================================
     // Rule 2: Chandrabindu Active (LastChar = b_Chandra)
     // ===================================================================
     if LastChar = b_Chandra then
     begin
-      // Case A: Duplicate Kar after Chandra
-      // If the kar before chandrabindu is the same as the incoming kar,
-      // ignore to prevent infinite stacking (e.g. চাঁ + া -> চাঁ).
-      if (TrackL >= 2) and (LastChars[2] = sKar) then
-      begin
-        InsertKar := '';
-        Exit;
-      end
-
       // Case B: E-kar Ligature with Chandra
       // E-kar + Chandrabindu + AA-kar -> O-kar + Chandra (েঁা -> োঁ)
       // E-kar + Chandrabindu + OU-kar/LengthMark -> OU-kar + Chandra (েঁৌ -> ৌঁ)
-      else if (TrackL >= 2) and (LastChars[2] = b_Ekar) and
+      if (TrackL >= 2) and (LastChars[2] = b_Ekar) and
               ((sKar = b_AAkar) or (sKar = b_OUkar) or (sKar = b_LengthMark)) then
       begin
         InternalBackspace(2);
@@ -281,8 +261,7 @@ begin
       // to prevent invalid multi-Kar stacking (e.g. কৌঁ + ি -> কিঁ).
       else if (TrackL >= 2) and IsKar(LastChars[2]) then
       begin
-        InternalBackspace(2);
-        InsertKar := sKar + b_Chandra;
+        InsertKar := sKar;
         Exit;
       end
 

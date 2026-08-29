@@ -301,30 +301,60 @@ end;
 
 function TGenericLayoutOld.InsertKar(const sKar: string): string;
 begin
-  if LastChar = b_Chandra then
+  if AutomaticallyFixChandra = 'YES' then
   begin
-    if LastChars[2] = b_Ekar then
+    // ===================================================================
+    // Rule 2: Chandrabindu Active (LastChar = b_Chandra)
+    // ===================================================================
+    if LastChar = b_Chandra then
     begin
-      if sKar = b_AAkar then
+      // Case B: E-kar Ligature with Chandra
+      // E-kar + Chandrabindu + AA-kar -> O-kar + Chandra
+      // E-kar + Chandrabindu + OU-kar/LengthMark -> OU-kar + Chandra
+      if (TrackL >= 2) and (LastChars[2] = b_Ekar) and
+              ((sKar = b_AAkar) or (sKar = b_OUkar) or (sKar = b_LengthMark)) then
       begin
         InternalBackspace(2);
-        InsertKar := b_Okar + b_Chandra;
+        if sKar = b_AAkar then
+          InsertKar := b_Okar + b_Chandra
+        else
+          InsertKar := b_OUkar + b_Chandra;
+        Exit;
       end
-      else if sKar = b_LengthMark then
+
+      // Case C: Kar after Chandra on completed syllable
+      // A kar follows chandrabindu where a kar already exists before it.
+      // Simply append the kar after chandrabindu without backspacing.
+      else if (TrackL >= 2) and IsKar(LastChars[2]) then
       begin
-        InternalBackspace(2);
-        InsertKar := b_OUkar + b_Chandra;
-      end
-      else
         InsertKar := sKar;
+        Exit;
+      end
+
+      // Case D: First Kar after Consonant + Chandra
+      // Insert kar before chandrabindu for canonical Unicode ordering.
+      else if (TrackL >= 2) and IsPureConsonent(LastChars[2]) then
+      begin
+        InternalBackspace(1);
+        InsertKar := sKar + b_Chandra;
+        Exit;
+      end
+
+      // Default: Chandrabindu active but no specific pattern matched
+      // Fall back to basic chandrabindu reorder
+      else
+      begin
+        InternalBackspace(1);
+        InsertKar := sKar + b_Chandra;
+        Exit;
+      end;
     end
     else
-    begin
       InsertKar := sKar;
-    end;
   end
   else
     InsertKar := sKar;
+
 end;
 
 { =============================================================================== }
@@ -542,7 +572,7 @@ begin
       if EKarActive = True then
       begin
         EKarActive := False;
-        MyProcessVKeyDown := b_Ekar;
+        MyProcessVKeyDown := InsertKar(b_Ekar);
         Exit;
       end
       else
@@ -560,7 +590,7 @@ begin
       if IKarActive = True then
       begin
         IKarActive := False;
-        MyProcessVKeyDown := b_Ikar;
+        MyProcessVKeyDown := InsertKar(b_Ikar);
         Exit;
       end
       else
@@ -578,7 +608,7 @@ begin
       if OIKarActive = True then
       begin
         OIKarActive := False;
-        MyProcessVKeyDown := b_OIkar;
+        MyProcessVKeyDown := InsertKar(b_OIkar);
         Exit;
       end
       else
@@ -714,7 +744,7 @@ begin
             else
             begin
               EKarActive := False;
-              MyProcessVKeyDown := CharForKey + InsertKar(b_Ekar);
+              MyProcessVKeyDown := CharForKey + b_Ekar;
               Exit;
             end;
           end
@@ -736,7 +766,7 @@ begin
             else
             begin
               IKarActive := False;
-              MyProcessVKeyDown := CharForKey + InsertKar(b_Ikar);
+              MyProcessVKeyDown := CharForKey + b_Ikar;
               Exit;
             end;
           end
@@ -758,12 +788,15 @@ begin
             else
             begin
               OIKarActive := False;
-              MyProcessVKeyDown := CharForKey + InsertKar(b_OIkar);
+              MyProcessVKeyDown := CharForKey + b_OIkar;
               Exit;
             end;
           end
           else
           begin
+            // Block raw English key for all recognized Bangla layout keys.
+            // Unmapped keys (CharForKey = '') override this with Block := False below.
+            Block := True;
             if CharForKey = b_R + b_Hasanta then
             begin
               MyProcessVKeyDown := InsertReph;
@@ -779,7 +812,7 @@ begin
               end
               else
               begin
-                MyProcessVKeyDown := b_AAkar;
+                MyProcessVKeyDown := InsertKar(b_AAkar);
                 Exit;
               end;
             end
