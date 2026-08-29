@@ -730,6 +730,29 @@ begin
           ResetAllKarsToInactive;
           Exit;
         end
+        else if CharForKey = b_O then
+        begin
+          // ্ + ও -> ো-কার: drop the hasanta and attach O-kar to the
+          // consonant before it (ক + ্ + ও -> কো). This branch lives in
+          // the hasanta block, which old style processes unconditionally,
+          // so it works no matter what the vowel-format setting is -
+          // exactly like the hasanta + kar -> independent vowel rules
+          // around it.
+          InternalBackspace;
+          MyProcessVKeyDown := InsertKar(PendingKar) + b_Okar;
+          ResetAllKarsToInactive;
+          Exit;
+        end
+        else if CharForKey = b_OU then
+        begin
+          // ্ + ঔ -> ৌ-কার (twin of the rule above): drop the hasanta
+          // and attach OU-kar to the consonant before it
+          // (ক + ্ + ঔ -> কৌ).
+          InternalBackspace;
+          MyProcessVKeyDown := InsertKar(PendingKar) + b_OUkar;
+          ResetAllKarsToInactive;
+          Exit;
+        end
         else if CharForKey = b_OUkar then
         begin
           InternalBackspace;
