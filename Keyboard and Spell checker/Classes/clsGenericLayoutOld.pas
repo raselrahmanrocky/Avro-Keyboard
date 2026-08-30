@@ -12,12 +12,28 @@
 { ============================================================================
   OLD STYLE TYPING MODIFICATION (Bijoy keyboard behaviour):
 
-  Pre-base kars (ে, ি, ী, ৈ) now behave like the old Bijoy typewriter:
+  Pre-base kars (ে, ি, ৈ) now behave like the old Bijoy typewriter:
   * A SINGLE press shows the kar immediately at the caret (floating kar).
   * To attach a kar to a letter, the kar MUST be typed first; the next
     consonant reorders it automatically (consonant first, kar after), so
     the stored Unicode is always canonical:  ে+ক -> কে,  ি+ক -> কি ...
+  * STRICT RULE: a pre-base kar NEVER attaches to the letter typed BEFORE
+    it - even right after a consonant it stays floating and belongs to the
+    NEXT consonant:  দ + ি + ত -> দতি   (only kar-first attaches: ি+দ->দি)
+  * SINGLE press right after a letter = DETACHED float (ZWNJ): the user
+    sees ব followed by a free-standing ি, waiting for the NEXT consonant:
+    ব ি ধ র -> বধির,  ব ে দ র -> বদের,  ব ৈ দ র -> বদৈর.
+  * DOUBLE press = COMMIT to the previous letter: ব িি -> বি
+    (so বিধি = ব িি ধ িি). Repeats where nothing can be committed
+    (word start) still stack, like a typewriter: ি -> িি -> িিি.
+  * The consonant takes only the LAST kar and sits before it:
+    িিিিি + দ -> িিিি + দি; earlier copies stay in place.
+  * A different kar over a BARE run only JOINS the run - earlier copies
+    are never deleted: িিি + ে -> িিিে,  িিি + ৈ -> িিিৈ.
+    (After a consonant the detached float is swapped instead: ক ◌ি ে -> ক ◌ে.)
   * ে + া -> ো  and  ে + ৗ -> ৌ  still compose on the fly.
+  * ী (II-kar) is a POST-base kar: it attaches directly to the consonant
+    typed before it, exactly like modern typing (স+ত+ী+ন -> সতীন).
   * A repeated press of the same kar key is swallowed (it is already
     visible); another pre-base kar replaces the floating one.
   * Right after a consonant the kar simply attaches in normal order
@@ -65,13 +81,16 @@ type
       LastIsoToggleKey:           string;  // '' = last isolated emission is not toggleable
 
       // Kar Variables for Full Old Style Typing
-      // (pre-base kars: ে, ি, ী, ৈ - visible on a single press; they float
-      //  until the consonant arrives and are then reordered after it)
-      EKarActive, IKarActive, IIKarActive, OIKarActive: Boolean;
+      // (pre-base kars ে, ি, ৈ - visible on a single press; they float
+      //  until the consonant arrives and are then reordered after it.
+      //  ী is a POST-base kar and attaches directly, like modern typing)
+      EKarActive, IKarActive, OIKarActive: Boolean;
 
       // OLD STYLE backspace un-reorder state:
       KarFirstKar:    string;  // pre-base kar that was typed BEFORE its consonant
       UnwindConjunct: Boolean; // last join completed a conjunct after [kar ্] (জি্ + ব -> জ্বি)
+      KarConsumed:    Boolean; // KarFirstKar was reordered onto its consonant (True) vs still floating (False)
+      KarRunCount:    Integer; // copies in the current kar-first run (floating OR consumed)
 
       procedure InternalBackspace(KeyRepeat: Integer = 1);
       procedure DoBackspace(var Block: Boolean);
@@ -86,6 +105,7 @@ type
       function GetActivePreBaseKar: string;
       function PressPreBaseKar(const KarChar: string): string;
       procedure ArmPreBaseFlag(const KarChar: string);
+      function ResolveHasantaVowelPrefix(const PendingKar: string): string;
       function MyProcessVKeyDown(const KeyCode: Integer; var Block: Boolean; const var_IsLogicalShift, var_IsTrueShift, var_IsAltGr: Boolean): string;
       procedure MyProcessVKeyUP(const KeyCode: Integer; var Block: Boolean; const var_IsLogicalShift: Boolean; const var_IsTrueShift: Boolean;
         const var_IsAltGr: Boolean);
@@ -135,6 +155,8 @@ begin
   LastIsoToggleKey := '';
   KarFirstKar := '';
   UnwindConjunct := False;
+  KarConsumed := False;
+  KarRunCount := 0;
 end;
 
 { =============================================================================== }
@@ -181,6 +203,7 @@ var
   IsRephTail:         Boolean;
   SavedCommitted:     string;
   ArmedKar:           string;
+  ZwnjFloat:          Boolean;
 begin
 
   { === Delimiter / isolated-modifier bookkeeping (ANSI contextual engine) === }
@@ -216,12 +239,12 @@ begin
       জ্বি -> জি্   (half-consonant removed, kar shows before hasanta) }
   if (KarFirstKar <> '') and (Length(PrevBanglaT) >= 2) and (RightStr(PrevBanglaT, 1) = KarFirstKar) then
   begin
-    if UnwindConjunct and (Length(PrevBanglaT) >= 3) and
-       (PrevBanglaT[Length(PrevBanglaT) - 2] = b_Hasanta) and
-       IsPureConsonent(PrevBanglaT[Length(PrevBanglaT) - 1]) then
+    if UnwindConjunct and (Length(PrevBanglaT) >= KarRunCount + 2) and
+       (PrevBanglaT[Length(PrevBanglaT) - KarRunCount - 1] = b_Hasanta) and
+       IsPureConsonent(PrevBanglaT[Length(PrevBanglaT) - KarRunCount]) then
     begin
-      InternalBackspace(3);
-      NewBanglaText := NewBanglaText + KarFirstKar + b_Hasanta;
+      InternalBackspace(KarRunCount + 2);
+      NewBanglaText := NewBanglaText + DupeString(KarFirstKar, KarRunCount) + b_Hasanta;
       SetLastChar(KarFirstKar);
       SetLastChar(b_Hasanta);
       UnwindConjunct := False;
@@ -229,12 +252,17 @@ begin
       Block := True;
       Exit;
     end
-    else if (not UnwindConjunct) and IsPureConsonent(PrevBanglaT[Length(PrevBanglaT) - 1]) then
+    else if (not UnwindConjunct) and KarConsumed and (Length(PrevBanglaT) >= KarRunCount + 1) and
+            IsPureConsonent(PrevBanglaT[Length(PrevBanglaT) - KarRunCount]) then
     begin
-      InternalBackspace(2);
-      NewBanglaText := NewBanglaText + KarFirstKar;
-      SetLastChar(KarFirstKar);
+      InternalBackspace(KarRunCount + 1);
+      if IsPureConsonent(LastChar) or IsKar(LastChar) then
+        NewBanglaText := NewBanglaText + ZWNJ + DupeString(KarFirstKar, KarRunCount)   // detached float: ক ◌ে
+      else
+        NewBanglaText := NewBanglaText + DupeString(KarFirstKar, KarRunCount);
+      SetLastChar(DupeString(KarFirstKar, KarRunCount));
       UnwindConjunct := False;
+      KarConsumed := False;    // kar run floats visibly again
       ArmPreBaseFlag(KarFirstKar);
       ParseAndSendNow;
       Block := True;
@@ -244,12 +272,34 @@ begin
 
   { OLD STYLE: deleting the visible floating pre-base kar also disarms it,
     so a backspaced ে/ি/ী/ৈ cannot re-attach to the next consonant }
+  ZwnjFloat := False;
   ArmedKar := GetActivePreBaseKar;
-  if (ArmedKar <> '') and (PrevBanglaT <> '') and (RightStr(PrevBanglaT, 1) = ArmedKar) then
+  if (ArmedKar <> '') and (not KarConsumed) and (PrevBanglaT <> '') and (RightStr(PrevBanglaT, 1) = ArmedKar) then
   begin
-    ResetAllKarsToInactive;
-    KarFirstKar := '';
-    UnwindConjunct := False;
+    if (Length(PrevBanglaT) >= 2) and (RightStr(PrevBanglaT, 2) = ZWNJ + ArmedKar) then
+    begin
+      // detached float (ZWNJ + kar): both go in one backspace
+      ZwnjFloat := True;
+      ResetAllKarsToInactive;
+      KarFirstKar := '';
+      UnwindConjunct := False;
+      KarConsumed := False;
+      KarRunCount := 0;
+    end
+    else
+    begin
+      // bare floating run: backspace removes ONE copy at a time
+      // (িিি -> িি -> ি -> none); the run stays armed while copies remain
+      Dec(KarRunCount);
+      if KarRunCount <= 0 then
+      begin
+        ResetAllKarsToInactive;
+        KarFirstKar := '';
+        UnwindConjunct := False;
+        KarConsumed := False;
+        KarRunCount := 0;
+      end;
+    end;
   end;
 
   { --- Reph / Phala tail detection --- }
@@ -275,6 +325,9 @@ begin
             (PrevBanglaT[Length(PrevBanglaT)] = b_R) then
       DeleteCount := 2;
   end;
+
+  if ZwnjFloat then
+    DeleteCount := 2;   // detached float occupies ZWNJ + kar
 
   if (Length(PrevBanglaT) - DeleteCount) <= 0 then
   begin
@@ -535,7 +588,7 @@ end;
 
 {
   OLD STYLE: returns the currently floating (armed) pre-base kar
-  (ে, ি, ী or ৈ); '' when no reorder is pending.
+  (ে, ি or ৈ); '' when no reorder is pending.
 }
 function TGenericLayoutOld.GetActivePreBaseKar: string;
 begin
@@ -543,8 +596,6 @@ begin
     GetActivePreBaseKar := b_Ekar
   else if IKarActive then
     GetActivePreBaseKar := b_Ikar
-  else if IIKarActive then
-    GetActivePreBaseKar := b_IIkar
   else if OIKarActive then
     GetActivePreBaseKar := b_OIkar
   else
@@ -565,41 +616,124 @@ end;
 }
 function TGenericLayoutOld.PressPreBaseKar(const KarChar: string): string;
 begin
-  // Same kar already floating and shown - swallow the repeat press
-  if GetActivePreBaseKar = KarChar then
+  // ী (II-kar) is a POST-base kar: it attaches directly to the consonant
+  // typed before it, like modern typing (ত + ী -> তী, so
+  // স + ত + ী + ন -> সতীন). It never floats and never joins the kar-first
+  // reorder. If a pre-base kar (ে/ি/ৈ) is floating visibly, replace it so
+  // the engine state stays clean.
+  if KarChar = b_IIkar then
   begin
-    PressPreBaseKar := '';
-    Exit;
-  end;
-
-  // A different pre-base kar is floating - replace it with the new one
-  if (GetActivePreBaseKar <> '') and (RightStr(NewBanglaText, 1) = GetActivePreBaseKar) then
-    InternalBackspace(1);
-
-  ResetAllKarsToInactive;
-
-  // Right after a consonant the kar attaches normally - nothing to reorder
-  if IsPureConsonent(LastChar) then
-  begin
-    KarFirstKar := '';      // consonant-first typing: normal single delete on backspace
+    if (GetActivePreBaseKar <> '') and (not KarConsumed) and (RightStr(NewBanglaText, 1) = GetActivePreBaseKar) then
+    begin
+      if (Length(NewBanglaText) >= 2) and (RightStr(NewBanglaText, 2) = ZWNJ + GetActivePreBaseKar) then
+        InternalBackspace(2)
+      else
+        InternalBackspace(KarRunCount);
+    end;
+    ResetAllKarsToInactive;
+    KarFirstKar := '';
     UnwindConjunct := False;
+    KarConsumed := False;
+    KarRunCount := 0;
     PressPreBaseKar := KarChar;
     Exit;
   end;
 
-  // Otherwise the kar floats visibly and awaits its consonant
+  // Same kar pressed again on a VISIBLE float:
+  if GetActivePreBaseKar = KarChar then
+  begin
+    if (not KarConsumed) and (RightStr(NewBanglaText, 1) = KarChar) then
+    begin
+      { DOUBLE PRESS = COMMIT: the detached float (ZWNJ + kar) that follows
+        a consonant is replaced by a plain kar attached to THAT consonant:
+        ব + িি -> বি  (so বিধি = ব িি ধ িি).
+        A SINGLE press keeps it waiting for the next consonant instead
+        (ব + ি + ধ + র -> বধির). }
+      if (Length(NewBanglaText) >= 2) and (RightStr(NewBanglaText, 2) = ZWNJ + KarChar) then
+      begin
+        InternalBackspace(2);
+        ResetAllKarsToInactive;
+        KarConsumed := True;
+        KarRunCount := 1;
+        KarFirstKar := KarChar;   // kar-first typed: backspace peels it back to a float
+        PressPreBaseKar := KarChar;
+        Exit;
+      end;
+      { BARE float (word start, after hasanta/vowel - no consonant to commit
+        to): a repeat press inserts another copy, like a typewriter
+        (ি -> িি -> িিি). }
+      Inc(KarRunCount);
+      PressPreBaseKar := KarChar;
+      Exit;
+    end;
+    PressPreBaseKar := '';
+    Exit;
+  end;
+
+  // A different pre-base kar is FLOATING (not yet consumed):
+  // * DETACHED float after a consonant (ZWNJ + kar): swap it in place,
+  //   the user is changing the vowel of THAT letter (ক ◌ি ে -> ক ◌ে).
+  // * BARE run (word start): earlier kars are typewriter ink and are
+  //   NEVER deleted - the new kar simply joins the run:
+  //   িিি + ে -> িিিে,   িিি + ৈ -> িিিৈ.
+  if (GetActivePreBaseKar <> '') and (not KarConsumed) and (RightStr(NewBanglaText, 1) = GetActivePreBaseKar) then
+  begin
+    if (Length(NewBanglaText) >= 2) and (RightStr(NewBanglaText, 2) = ZWNJ + GetActivePreBaseKar) then
+    begin
+      InternalBackspace(2);    // detached run: ZWNJ + kar, swap in place
+      ResetAllKarsToInactive;
+      if KarChar = b_Ekar then
+        EKarActive := True
+      else if KarChar = b_Ikar then
+        IKarActive := True
+      else if KarChar = b_OIkar then
+        OIKarActive := True;
+      KarFirstKar := KarChar;
+      UnwindConjunct := False;
+      KarConsumed := False;
+      KarRunCount := 1;
+      PressPreBaseKar := ZWNJ + KarChar;
+      Exit;
+    end;
+    ResetAllKarsToInactive;
+    if KarChar = b_Ekar then
+      EKarActive := True
+    else if KarChar = b_Ikar then
+      IKarActive := True
+    else if KarChar = b_OIkar then
+      OIKarActive := True;
+    KarFirstKar := KarChar;
+    UnwindConjunct := False;
+    KarConsumed := False;
+    KarRunCount := 1;
+    PressPreBaseKar := KarChar;   // bare append: nothing is deleted
+    Exit;
+  end;
+
+  ResetAllKarsToInactive;
+
+  { OLD STYLE strict rule (Bijoy behaviour): a pre-base kar NEVER attaches
+    to the letter typed before it on a single press - it waits for the
+    NEXT consonant:  ব + ি + ধ + র -> বধির,  ব + ে + দ + র -> বদের.
+    Right after a Bangla letter the kar would still RENDER attached to it
+    (ব + ি -> "বি"), so a single press is DETACHED with ZWNJ: the user
+    sees ব followed by a free-standing kar. The double press commits it. }
   if KarChar = b_Ekar then
     EKarActive := True
   else if KarChar = b_Ikar then
     IKarActive := True
-  else if KarChar = b_IIkar then
-    IIKarActive := True
   else if KarChar = b_OIkar then
     OIKarActive := True;
 
-  KarFirstKar := KarChar;   // kar-first typing: remember for backspace un-reorder
+  KarFirstKar := KarChar;   // remember for backspace un-reorder
   UnwindConjunct := False;
-  PressPreBaseKar := KarChar;
+  KarConsumed := False;     // floating - not yet attached to any consonant
+  KarRunCount := 1;         // one copy floating now
+
+  if (NewBanglaText <> '') and (IsPureConsonent(LastChar) or IsKar(LastChar)) then
+    PressPreBaseKar := ZWNJ + KarChar   // detached float: ব + ◌ি
+  else
+    PressPreBaseKar := KarChar;         // bare float: word start / after hasanta etc.
 end;
 
 { =============================================================================== }
@@ -616,10 +750,76 @@ begin
     EKarActive := True
   else if KarChar = b_Ikar then
     IKarActive := True
-  else if KarChar = b_IIkar then
-    IIKarActive := True
   else if KarChar = b_OIkar then
     OIKarActive := True;
+end;
+
+{ =============================================================================== }
+
+{
+  OLD STYLE: a kar key arrives while a hasanta is pending. The pending
+  hasanta is dropped and the vowel letter emitted. Three situations:
+  * kar visibly sits before the hasanta, ATTACHED to a consonant
+    (করে + ্): drop ONLY the hasanta, keep the kar on its consonant:
+    ি(key) -> করে + ই = করেই
+  * kar visibly sits before the hasanta, NOT attached (bare/detached):
+    drop kar + hasanta, emit just the vowel:  ে + ্ + ি(key) -> ই
+  * no visible kar (legacy hidden state): drop the hasanta and
+    re-materialize the pending kar in front of the vowel.
+}
+function TGenericLayoutOld.ResolveHasantaVowelPrefix(const PendingKar: string): string;
+begin
+  if (KarFirstKar <> '') and (not KarConsumed) and (NewBanglaText <> '') then
+  begin
+    // detached float before the hasanta: ZWNJ + kar + hasanta
+    if (Length(NewBanglaText) >= 3) and
+       (RightStr(NewBanglaText, 3) = ZWNJ + KarFirstKar + b_Hasanta) then
+    begin
+      InternalBackspace(3);
+      KarFirstKar := '';
+      UnwindConjunct := False;
+      KarConsumed := False;
+      KarRunCount := 0;
+      Result := '';
+      Exit;
+    end;
+    // kar run (possibly attached) right before the hasanta
+    if (Length(NewBanglaText) >= KarRunCount + 1) and
+       (RightStr(NewBanglaText, KarRunCount + 1) = DupeString(KarFirstKar, KarRunCount) + b_Hasanta) then
+    begin
+      if (Length(NewBanglaText) >= KarRunCount + 2) and
+         IsPureConsonent(NewBanglaText[Length(NewBanglaText) - KarRunCount - 1]) then
+      begin
+        // ATTACHED (করে + ্): keep the kar on its consonant, drop the hasanta
+        InternalBackspace(1);
+        KarConsumed := True;
+        KarRunCount := 1;
+        UnwindConjunct := False;
+        Result := '';
+        Exit;
+      end
+      else
+      begin
+        // BARE (ে + ্ at word start): drop the whole run + hasanta
+        InternalBackspace(KarRunCount + 1);
+        KarFirstKar := '';
+        UnwindConjunct := False;
+        KarConsumed := False;
+        KarRunCount := 0;
+        Result := '';
+        Exit;
+      end;
+    end;
+  end;
+  // legacy hidden path: just drop the hasanta, re-emit pending kar + vowel
+  InternalBackspace;
+  if PendingKar <> '' then
+  begin
+    KarConsumed := True;
+    KarRunCount := 1;
+    UnwindConjunct := False;
+  end;
+  Result := InsertKar(PendingKar);
 end;
 
 { =============================================================================== }
@@ -646,22 +846,24 @@ begin
 
     if LastChar = b_Hasanta then
     begin
-      { OLD STYLE: after a typed reph (র্) the pre-base kars must keep
-        floating for the coming consonant instead of turning into a vowel
-        letter (needed for e.g. ক + র্ + ে + ম -> কর্মে) }
+      { OLD STYLE: after a typed reph (র্) a pre-base kar key still floats
+        for the coming consonant (ক + র্ + ে + ম -> কর্মে) - BUT only when
+        no kar is HIDDEN behind this hasanta. With a hidden kar
+        (ক + ে + র + ্, the ে waiting for the reph's consonant) a kar key
+        means the INDEPENDENT VOWEL instead: the hidden kar re-attaches and
+        the vowel letter follows: ক + ে + র + ্ + ি(key) -> করেই }
       IsRephTailCtx := (LastChars[2] = b_R) and (LastChars[3] <> b_Hasanta);
 
       if (not IsRephTailCtx) or
+         ((KarFirstKar <> '') and (not KarConsumed)) or
          ((CharForKey <> b_Ekar) and (CharForKey <> b_Ikar) and
-          (CharForKey <> b_IIkar) and (CharForKey <> b_OIkar)) then
+          (CharForKey <> b_OIkar)) then
       begin
 
         if EKarActive then
           PendingKar := b_Ekar
         else if IKarActive then
           PendingKar := b_Ikar
-        else if IIKarActive then
-          PendingKar := b_IIkar
         else if OIKarActive then
           PendingKar := b_OIkar
         else
@@ -669,64 +871,55 @@ begin
 
         if CharForKey = b_AAkar then
         begin
-          InternalBackspace;
-          MyProcessVKeyDown := InsertKar(PendingKar) + b_AA;
+          MyProcessVKeyDown := ResolveHasantaVowelPrefix(PendingKar) + b_AA;
           ResetAllKarsToInactive;
           Exit;
         end
         else if CharForKey = b_Ikar then
         begin
-          InternalBackspace;
-          MyProcessVKeyDown := InsertKar(PendingKar) + b_I;
+          MyProcessVKeyDown := ResolveHasantaVowelPrefix(PendingKar) + b_I;
           ResetAllKarsToInactive;
           Exit;
         end
         else if CharForKey = b_IIkar then
         begin
-          InternalBackspace;
-          MyProcessVKeyDown := InsertKar(PendingKar) + b_II;
+          MyProcessVKeyDown := ResolveHasantaVowelPrefix(PendingKar) + b_II;
           ResetAllKarsToInactive;
           Exit;
         end
         else if CharForKey = b_Ukar then
         begin
-          InternalBackspace;
-          MyProcessVKeyDown := InsertKar(PendingKar) + b_U;
+          MyProcessVKeyDown := ResolveHasantaVowelPrefix(PendingKar) + b_U;
           ResetAllKarsToInactive;
           Exit;
         end
         else if CharForKey = b_UUkar then
         begin
-          InternalBackspace;
-          MyProcessVKeyDown := InsertKar(PendingKar) + b_UU;
+          MyProcessVKeyDown := ResolveHasantaVowelPrefix(PendingKar) + b_UU;
           ResetAllKarsToInactive;
           Exit;
         end
         else if CharForKey = b_RRIkar then
         begin
-          InternalBackspace;
-          MyProcessVKeyDown := InsertKar(PendingKar) + b_RRI;
+          MyProcessVKeyDown := ResolveHasantaVowelPrefix(PendingKar) + b_RRI;
           ResetAllKarsToInactive;
           Exit;
         end
         else if CharForKey = b_Ekar then
         begin
-          InternalBackspace;
-          MyProcessVKeyDown := InsertKar(PendingKar) + b_E;
+          MyProcessVKeyDown := ResolveHasantaVowelPrefix(PendingKar) + b_E;
           ResetAllKarsToInactive;
           Exit;
         end
         else if CharForKey = b_OIkar then
         begin
-          InternalBackspace;
-          MyProcessVKeyDown := InsertKar(PendingKar) + b_OI;
+          MyProcessVKeyDown := ResolveHasantaVowelPrefix(PendingKar) + b_OI;
           ResetAllKarsToInactive;
           Exit;
         end
         else if CharForKey = b_Okar then
         begin
-          InternalBackspace;
-          MyProcessVKeyDown := InsertKar(PendingKar) + b_O;
+          MyProcessVKeyDown := ResolveHasantaVowelPrefix(PendingKar) + b_O;
           ResetAllKarsToInactive;
           Exit;
         end
@@ -738,8 +931,7 @@ begin
           // so it works no matter what the vowel-format setting is -
           // exactly like the hasanta + kar -> independent vowel rules
           // around it.
-          InternalBackspace;
-          MyProcessVKeyDown := InsertKar(PendingKar) + b_Okar;
+          MyProcessVKeyDown := ResolveHasantaVowelPrefix(PendingKar) + b_Okar;
           ResetAllKarsToInactive;
           Exit;
         end
@@ -748,22 +940,19 @@ begin
           // ্ + ঔ -> ৌ-কার (twin of the rule above): drop the hasanta
           // and attach OU-kar to the consonant before it
           // (ক + ্ + ঔ -> কৌ).
-          InternalBackspace;
-          MyProcessVKeyDown := InsertKar(PendingKar) + b_OUkar;
+          MyProcessVKeyDown := ResolveHasantaVowelPrefix(PendingKar) + b_OUkar;
           ResetAllKarsToInactive;
           Exit;
         end
         else if CharForKey = b_OUkar then
         begin
-          InternalBackspace;
-          MyProcessVKeyDown := InsertKar(PendingKar) + b_OU;
+          MyProcessVKeyDown := ResolveHasantaVowelPrefix(PendingKar) + b_OU;
           ResetAllKarsToInactive;
           Exit;
         end
         else if CharForKey = b_LengthMark then
         begin
-          InternalBackspace;
-          MyProcessVKeyDown := InsertKar(PendingKar) + b_OU;
+          MyProcessVKeyDown := ResolveHasantaVowelPrefix(PendingKar) + b_OU;
           ResetAllKarsToInactive;
           Exit;
         end
@@ -802,7 +991,10 @@ begin
       if LastChar = b_Ekar then
       begin
         ResetAllKarsToInactive;
-        InternalBackspace;
+        if (Length(NewBanglaText) >= 2) and (RightStr(NewBanglaText, 2) = ZWNJ + b_Ekar) then
+          InternalBackspace(2)   // detached floating ে
+        else
+          InternalBackspace;     // attached ে (consonant-first typing)
         MyProcessVKeyDown := InsertKar(b_Okar);
         Exit;
       end;
@@ -813,7 +1005,10 @@ begin
       if LastChar = b_Ekar then
       begin
         ResetAllKarsToInactive;
-        InternalBackspace;
+        if (Length(NewBanglaText) >= 2) and (RightStr(NewBanglaText, 2) = ZWNJ + b_Ekar) then
+          InternalBackspace(2)   // detached floating ে
+        else
+          InternalBackspace;     // attached ে (consonant-first typing)
         MyProcessVKeyDown := InsertKar(b_OUkar);
         Exit;
       end;
@@ -823,37 +1018,33 @@ begin
     begin
       if LastChar = b_Ekar then
       begin
-        InternalBackspace;
+        { OLD STYLE: the kar STAYS VISIBLE (typewriter ink). The hasanta
+          only marks a pending conjunct while the kar waits for the next
+          consonant: করে + ্ shows করে্, and ম completes it to কর্মে }
         EKarActive := True;
         KarFirstKar := b_Ekar;
         UnwindConjunct := False;
+        KarConsumed := False;   // reserved for the next consonant
         MyProcessVKeyDown := b_Hasanta;
         Exit;
       end
       else if LastChar = b_Ikar then
       begin
-        InternalBackspace;
+        { OLD STYLE: the kar STAYS VISIBLE (typewriter ink) - see b_Ekar }
         IKarActive := True;
         KarFirstKar := b_Ikar;
         UnwindConjunct := False;
-        MyProcessVKeyDown := b_Hasanta;
-        Exit;
-      end
-      else if LastChar = b_IIkar then
-      begin
-        InternalBackspace;
-        IIKarActive := True;
-        KarFirstKar := b_IIkar;
-        UnwindConjunct := False;
+        KarConsumed := False;   // reserved for the next consonant
         MyProcessVKeyDown := b_Hasanta;
         Exit;
       end
       else if LastChar = b_OIkar then
       begin
-        InternalBackspace;
+        { OLD STYLE: the kar STAYS VISIBLE (typewriter ink) - see b_Ekar }
         OIKarActive := True;
         KarFirstKar := b_OIkar;
         UnwindConjunct := False;
+        KarConsumed := False;   // reserved for the next consonant
         MyProcessVKeyDown := b_Hasanta;
         Exit;
       end
@@ -910,12 +1101,26 @@ begin
           { OLD STYLE: a kar typed first sits before a pending hasanta
             (জি্). A consonant now completes the conjunct and the kar
             re-forms AFTER it: জি্ + ব -> জ্বি }
-          if (KarFirstKar <> '') and (Length(NewBanglaText) >= 2) and
-             (RightStr(NewBanglaText, 2) = KarFirstKar + b_Hasanta) and
+          if (KarFirstKar <> '') and (KarRunCount >= 1) and
+             (Length(NewBanglaText) >= KarRunCount + 1) and
+             (RightStr(NewBanglaText, KarRunCount + 1) = DupeString(KarFirstKar, KarRunCount) + b_Hasanta) and
              (Length(CharForKey) = 1) and IsPureConsonent(CharForKey) then
           begin
-            InternalBackspace(2);
+            { Only the LAST kar of the hidden run goes with the consonant;
+              earlier copies stay in the buffer before it, in typed order
+              (িি + ্ + ব -> ি + ্বি) }
+            if (Length(NewBanglaText) >= 3) and (RightStr(NewBanglaText, 3) = ZWNJ + KarFirstKar + b_Hasanta) then
+              InternalBackspace(3)   // detached kar: ZWNJ + kar + hasanta
+            else
+              InternalBackspace(2);  // attached/bare kar + hasanta
+            if (NewBanglaText <> '') and (RightStr(NewBanglaText, 1) = b_Hasanta) then
+              InternalBackspace(1);  // absorb an earlier (reph) hasanta into the new conjunct
+            ResetAllKarsToInactive;  // the kar is SPENT on this consonant - the next
+                                     // consonant must not pull it again
+                                     // (জ্বি + ত -> জ্বিত, NOT জ্বতি)
             UnwindConjunct := True;
+            KarConsumed := True;
+            KarRunCount := 1;
             MyProcessVKeyDown := b_Hasanta + CharForKey + KarFirstKar;
             Exit;
           end;
@@ -933,6 +1138,7 @@ begin
               unwinds the conjunct (জ্বি -> জি্) instead of just revealing
               the floating kar. }
             UnwindConjunct := (not KarInBuffer) and (NewBanglaText <> '') and (RightStr(NewBanglaText, 1) = b_Hasanta);
+            KarConsumed := True;   { the kar was reordered onto the letter just typed }
 
             if CharForKey = b_R + b_Hasanta then
             begin
@@ -940,20 +1146,39 @@ begin
                 MyProcessVKeyDown := InsertReph // visible kar folds into the moved cluster
               else
                 MyProcessVKeyDown := InsertReph + ArmedKar;
+              KarRunCount := 1;
               Exit;
             end
             else if CharForKey = b_AAkar then
             begin
               if KarInBuffer then
-                InternalBackspace(1);
+              begin
+                if (Length(NewBanglaText) >= 2) and (RightStr(NewBanglaText, 2) = ZWNJ + ArmedKar) then
+                  InternalBackspace(2)
+                else
+                  InternalBackspace(1);
+              end
+              else if (KarRunCount >= 1) and (Length(NewBanglaText) >= KarRunCount + 1) and
+                      (RightStr(NewBanglaText, KarRunCount + 1) = DupeString(ArmedKar, KarRunCount) + b_Hasanta) then
+                InternalBackspace(KarRunCount + 1);   // kar visibly waits before the pending hasanta
               MyProcessVKeyDown := b_Okar; // ে + া -> ো
+              KarRunCount := 1;
               Exit;
             end
             else if CharForKey = b_LengthMark then
             begin
               if KarInBuffer then
-                InternalBackspace(1);
+              begin
+                if (Length(NewBanglaText) >= 2) and (RightStr(NewBanglaText, 2) = ZWNJ + ArmedKar) then
+                  InternalBackspace(2)
+                else
+                  InternalBackspace(1);
+              end
+              else if (KarRunCount >= 1) and (Length(NewBanglaText) >= KarRunCount + 1) and
+                      (RightStr(NewBanglaText, KarRunCount + 1) = DupeString(ArmedKar, KarRunCount) + b_Hasanta) then
+                InternalBackspace(KarRunCount + 1);   // kar visibly waits before the pending hasanta
               MyProcessVKeyDown := b_OUkar; // ে + ৗ -> ৌ
+              KarRunCount := 1;
               Exit;
             end
             else if CharForKey = '' then
@@ -965,10 +1190,45 @@ begin
             end
             else
             begin
-              if KarInBuffer then
-                InternalBackspace(1);
-              MyProcessVKeyDown := CharForKey + ArmedKar; // reorder: key first, kar after
-              Exit;
+              { OLD STYLE: only a real consonant takes the floating kar run
+                (reorder: key first, kar run after) - works whether the run
+                is still visible (ি + দ -> দি) or hidden-pending after a
+                hasanta (জ্ + ব -> জ্বি). Any other key - punctuation,
+                digit, vowel, sign - must NOT be pushed before the kar:
+                emit it after the floating kar exactly as typed
+                (ি + '-' -> ি-) and disarm the pending state. }
+              if (Length(CharForKey) = 1) and IsPureConsonent(CharForKey) then
+              begin
+                { The consonant takes only the LAST kar and sits before it:
+                  িিিিি + দ -> িিিি + দি. A VISIBLE run keeps its earlier
+                  copies in the buffer; a HIDDEN run (after hasanta-cancel)
+                  re-emits its earlier copies before the new hasanta
+                  (িি + ্ + ব -> ি + ্বি) }
+                if KarInBuffer then
+                begin
+                  if (Length(NewBanglaText) >= 2) and (RightStr(NewBanglaText, 2) = ZWNJ + ArmedKar) then
+                    InternalBackspace(2)   // detached float: remove ZWNJ + kar
+                  else
+                    InternalBackspace(1);  // bare copy
+                  MyProcessVKeyDown := CharForKey + ArmedKar;
+                end
+                else
+                begin
+                  InternalBackspace(1);    // pending hasanta
+                  MyProcessVKeyDown := DupeString(ArmedKar, KarRunCount - 1) + b_Hasanta + CharForKey + ArmedKar;
+                end;
+                KarRunCount := 1;
+                Exit;
+              end
+              else
+              begin
+                KarFirstKar := '';
+                UnwindConjunct := False;
+                KarConsumed := False;
+                KarRunCount := 0;
+                MyProcessVKeyDown := CharForKey;
+                Exit;
+              end;
             end;
           end
           else
@@ -1260,7 +1520,6 @@ procedure TGenericLayoutOld.ResetAllKarsToInactive;
 begin
   EKarActive := False;
   IKarActive := False;
-  IIKarActive := False;
   OIKarActive := False;
 end;
 
@@ -1294,6 +1553,8 @@ begin
   SpacePendingCount := 0;
   KarFirstKar := '';
   UnwindConjunct := False;
+  KarConsumed := False;
+  KarRunCount := 0;
 
   for I := 1 to TrackL do
     LastChars[I] := ' ';
