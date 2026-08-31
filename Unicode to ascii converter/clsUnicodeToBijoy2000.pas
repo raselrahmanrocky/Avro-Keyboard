@@ -43,11 +43,11 @@ type
   end;
 
   TAnsiSequenceEntry = record
-    AnsiOutput:       string;   // The resolved ANSI glyph(s) to emit
-    EraseCount:       Integer;  // ANSI glyphs to backspace before emitting =
-                                // length of the CONTEXT rendering that is replaced
-    IsToggleEntry:    Boolean;  // Whether this supports backspace-toggle
-    AltAnsiOutput:    string;   // Alternate ANSI output (for toggles)
+    AnsiOutput: string;  // The resolved ANSI glyph(s) to emit
+    EraseCount: Integer; // ANSI glyphs to backspace before emitting =
+    // length of the CONTEXT rendering that is replaced
+    IsToggleEntry: Boolean; // Whether this supports backspace-toggle
+    AltAnsiOutput: string;  // Alternate ANSI output (for toggles)
   end;
 
   TAnsiSequenceMap = TDictionary<string, TAnsiSequenceEntry>;
@@ -111,15 +111,8 @@ type
       // fLastUniText / toggle machinery of the interactive instance stays clean
       procedure EnsureIsoConverter;
       // Fast incremental ANSI resolution for isolated modifiers at word boundaries.
-      function ResolveAnsiSequence(
-        const PrecedingContext: string;
-        const ModifierChar: string;
-        out ResolvedAnsi: string;
-        out EraseCount: Integer;
-        out MatchedContext: string;
-        out IsToggle: Boolean;
-        out UsedAlt: Boolean
-      ): Boolean;
+      function ResolveAnsiSequence(const PrecedingContext: string; const ModifierChar: string; out ResolvedAnsi: string; out EraseCount: Integer;
+        out MatchedContext: string; out IsToggle: Boolean; out UsedAlt: Boolean): Boolean;
       // Optional progress callback fired by Convert between pipeline stages.
       property OnProgress: TConverterProgress read FOnProgress write FOnProgress;
   end;
@@ -1432,7 +1425,7 @@ var
               Val := Rule.ContextValue;
               Take := 0;
               Matched := True;
-              break;
+              Break;
             end;
           end;
           // Main match
@@ -1450,7 +1443,7 @@ var
             Take := 0;
           end;
           Matched := True;
-          break;
+          Break;
         end;
       end;
     end;
@@ -1982,7 +1975,7 @@ begin
     if Rule.KarChar = KarChar then
     begin
       Found := True;
-      break;
+      Break;
     end;
 
   if not Found then
@@ -2202,7 +2195,7 @@ begin
           if SB.Chars[StartPos - 1 + P] <> K[P + 1] then
           begin
             Match := False;
-            break;
+            Break;
           end;
         if not Match then
           Continue;
@@ -2252,10 +2245,6 @@ var
   I:  Integer;
   SB: TStringBuilder;
 begin
-  // Convert Ekar - single left-to-right pass. The old repeat/Pos loop
-  // restarted the scan and rebuilt the string for every e-kar - O(N^2) on
-  // kar-heavy text. Replacements are 1->1 so positions never shift; the
-  // predecessor check reads the output tail (the same evolved prefix).
   SB := TStringBuilder.Create(Length(fConvertedText) + 8);
   try
     I := 1;
@@ -2265,33 +2254,16 @@ begin
       begin
         if (SB.Length = 0) or (SB.Chars[SB.Length - 1] = ' ') or (SB.Chars[SB.Length - 1] = #13) or (SB.Chars[SB.Length - 1] = #10) or
           (SB.Chars[SB.Length - 1] = #9) then
-          SB.Append(A_EKar1)
+          SB.Append(GetAnsiVarValue('A_EKar1'))
         else
           SB.Append(GetAnsiVarValue('A_EKar2'));
         Inc(I);
       end
-      else
-      begin
-        SB.Append(fConvertedText[I]);
-        Inc(I);
-      end;
-    end;
-    fConvertedText := SB.ToString;
-  finally
-    SB.Free;
-  end;
-
-  // Convert OIKar
-  SB := TStringBuilder.Create(Length(fConvertedText) + 8);
-  try
-    I := 1;
-    while I <= Length(fConvertedText) do
-    begin
-      if fConvertedText[I] = b_OIKar then
+      else if fConvertedText[I] = b_OIKar then
       begin
         if (SB.Length = 0) or (SB.Chars[SB.Length - 1] = ' ') or (SB.Chars[SB.Length - 1] = #13) or (SB.Chars[SB.Length - 1] = #10) or
           (SB.Chars[SB.Length - 1] = #9) then
-          SB.Append(A_OIKar1)
+          SB.Append(GetAnsiVarValue('A_OIKar1'))
         else
           SB.Append(GetAnsiVarValue('A_OIKar2'));
         Inc(I);
@@ -2307,24 +2279,24 @@ begin
     SB.Free;
   end;
 
-  // Convert rest of the Kars
-  fConvertedText := ReplaceStr(fConvertedText, b_AAKar, A_AAKar);
-  fConvertedText := ReplaceStr(fConvertedText, b_IKar, A_IKar);
-  fConvertedText := ReplaceStr(fConvertedText, b_IIKar, A_IIKar);
-  fConvertedText := ReplaceStr(fConvertedText, b_LengthMark, A_OUKar);
+  // Remaining kars and independent vowels conversion...
+  fConvertedText := ReplaceStr(fConvertedText, b_AAKar, GetAnsiVarValue('A_AAKar'));
+  fConvertedText := ReplaceStr(fConvertedText, b_IKar, GetAnsiVarValue('A_IKar'));
+  fConvertedText := ReplaceStr(fConvertedText, b_IIKar, GetAnsiVarValue('A_IIKar'));
+  fConvertedText := ReplaceStr(fConvertedText, b_LengthMark, GetAnsiVarValue('A_OUKar'));
 
   // Convert Vowels
-  fConvertedText := ReplaceStr(fConvertedText, b_A, A_A);
-  fConvertedText := ReplaceStr(fConvertedText, b_AA, A_AA);
+  fConvertedText := ReplaceStr(fConvertedText, b_A, GetAnsiVarValue('A_A'));
+  fConvertedText := ReplaceStr(fConvertedText, b_AA, GetAnsiVarValue('A_AA'));
   fConvertedText := ReplaceStr(fConvertedText, b_I, GetAnsiVarValue('A_I'));
-  fConvertedText := ReplaceStr(fConvertedText, b_II, A_II);
+  fConvertedText := ReplaceStr(fConvertedText, b_II, GetAnsiVarValue('A_II'));
   fConvertedText := ReplaceStr(fConvertedText, b_U, GetAnsiVarValue('A_U'));
-  fConvertedText := ReplaceStr(fConvertedText, b_UU, A_UU);
-  fConvertedText := ReplaceStr(fConvertedText, b_RRI, A_RRI);
-  fConvertedText := ReplaceStr(fConvertedText, b_E, A_E);
-  fConvertedText := ReplaceStr(fConvertedText, b_OI, A_OI);
-  fConvertedText := ReplaceStr(fConvertedText, b_O, A_O);
-  fConvertedText := ReplaceStr(fConvertedText, b_OU, A_OU);
+  fConvertedText := ReplaceStr(fConvertedText, b_UU, GetAnsiVarValue('A_UU'));
+  fConvertedText := ReplaceStr(fConvertedText, b_RRI, GetAnsiVarValue('A_RRI'));
+  fConvertedText := ReplaceStr(fConvertedText, b_E, GetAnsiVarValue('A_E'));
+  fConvertedText := ReplaceStr(fConvertedText, b_OI, GetAnsiVarValue('A_OI'));
+  fConvertedText := ReplaceStr(fConvertedText, b_O, GetAnsiVarValue('A_O'));
+  fConvertedText := ReplaceStr(fConvertedText, b_OU, GetAnsiVarValue('A_OU'));
 end;
 
 { =============================================================================== }
@@ -2662,7 +2634,7 @@ begin
               else if S[P] = '"' then
               begin
                 Inc(P);
-                break;
+                Break;
               end
               else
                 Inc(P);
@@ -2741,7 +2713,7 @@ begin
               if JSON[LookAhead] > ' ' then
               begin
                 NextC := JSON[LookAhead];
-                break;
+                Break;
               end;
               Inc(LookAhead);
             end;
@@ -3000,7 +2972,7 @@ procedure LoadAnsiMapping(const Path: string; ErrorLog: TStringList = nil);
         if (Pos > Length(S)) or (S[Pos] = ']') then
         begin
           Inc(Pos);
-          break;
+          Break;
         end;
         if S[Pos] = ',' then
         begin
@@ -3019,7 +2991,7 @@ procedure LoadAnsiMapping(const Path: string; ErrorLog: TStringList = nil);
             if (Pos > Length(S)) or (S[Pos] = '}') then
             begin
               Inc(Pos);
-              break;
+              Break;
             end;
             if S[Pos] = ',' then
             begin
@@ -3103,7 +3075,7 @@ begin
   begin
     JSkipWS(JSON, P);
     if (P > Length(JSON)) or (JSON[P] = '}') then
-      break;
+      Break;
     if JSON[P] = ',' then
     begin
       Inc(P);
@@ -3129,7 +3101,7 @@ begin
         if (P > Length(JSON)) or (JSON[P] = '}') then
         begin
           Inc(P);
-          break;
+          Break;
         end;
         if JSON[P] = ',' then
         begin
@@ -3151,7 +3123,7 @@ begin
           if (P > Length(JSON)) or (JSON[P] = '}') then
           begin
             Inc(P);
-            break;
+            Break;
           end;
           if JSON[P] = ',' then
           begin
@@ -3175,7 +3147,7 @@ begin
               if (P > Length(JSON)) or (JSON[P] = '}') then
               begin
                 Inc(P);
-                break;
+                Break;
               end;
               if JSON[P] = ',' then
               begin
@@ -3248,7 +3220,7 @@ begin
         if (P > Length(JSON)) or (JSON[P] = '}') then
         begin
           Inc(P);
-          break;
+          Break;
         end;
         if JSON[P] = ',' then
         begin
@@ -3271,7 +3243,7 @@ begin
             if (P > Length(JSON)) or (JSON[P] = '}') then
             begin
               Inc(P);
-              break;
+              Break;
             end;
             if JSON[P] = ',' then
             begin
@@ -3333,7 +3305,7 @@ begin
         if (P > Length(JSON)) or (JSON[P] = '}') then
         begin
           Inc(P);
-          break;
+          Break;
         end;
         if JSON[P] = ',' then
         begin
@@ -3356,7 +3328,7 @@ begin
             if (P > Length(JSON)) or (JSON[P] = '}') then
             begin
               Inc(P);
-              break;
+              Break;
             end;
             if JSON[P] = ',' then
             begin
@@ -3418,7 +3390,7 @@ begin
         if (P > Length(JSON)) or (JSON[P] = '}') then
         begin
           Inc(P);
-          break;
+          Break;
         end;
         if JSON[P] = ',' then
         begin
@@ -3441,7 +3413,7 @@ begin
             if (P > Length(JSON)) or (JSON[P] = '}') then
             begin
               Inc(P);
-              break;
+              Break;
             end;
             if JSON[P] = ',' then
             begin
@@ -3503,7 +3475,7 @@ begin
         if (P > Length(JSON)) or (JSON[P] = '}') then
         begin
           Inc(P);
-          break;
+          Break;
         end;
         if JSON[P] = ',' then
         begin
@@ -3526,7 +3498,7 @@ begin
             if (P > Length(JSON)) or (JSON[P] = '}') then
             begin
               Inc(P);
-              break;
+              Break;
             end;
             if JSON[P] = ',' then
             begin
@@ -3595,7 +3567,7 @@ begin
         if (P > Length(JSON)) or (JSON[P] = '}') then
         begin
           Inc(P);
-          break;
+          Break;
         end;
         if JSON[P] = ',' then
         begin
@@ -3625,7 +3597,7 @@ begin
               if (P > Length(JSON)) or (JSON[P] = '}') then
               begin
                 Inc(P);
-                break;
+                Break;
               end;
               if JSON[P] = ',' then
               begin
@@ -3656,7 +3628,7 @@ begin
                   if (P > Length(JSON)) or (JSON[P] = ']') then
                   begin
                     Inc(P);
-                    break;
+                    Break;
                   end;
                   if JSON[P] = ',' then
                   begin
@@ -3681,7 +3653,7 @@ begin
                         if (P > Length(JSON)) or (JSON[P] = '}') then
                         begin
                           Inc(P);
-                          break;
+                          Break;
                         end;
                         if JSON[P] = ',' then
                         begin
@@ -3746,7 +3718,7 @@ begin
         if (P > Length(JSON)) or (JSON[P] = ']') then
         begin
           Inc(P);
-          break;
+          Break;
         end;
         if JSON[P] = ',' then
         begin
@@ -3776,7 +3748,7 @@ begin
               if (P > Length(JSON)) or (JSON[P] = '}') then
               begin
                 Inc(P);
-                break;
+                Break;
               end;
               if JSON[P] = ',' then
               begin
@@ -3841,7 +3813,7 @@ begin
         if (P > Length(JSON)) or (JSON[P] = ']') then
         begin
           Inc(P);
-          break;
+          Break;
         end;
         if JSON[P] = ',' then
         begin
@@ -3867,7 +3839,7 @@ begin
               if (P > Length(JSON)) or (JSON[P] = '}') then
               begin
                 Inc(P);
-                break;
+                Break;
               end;
               if JSON[P] = ',' then
               begin
@@ -3911,7 +3883,7 @@ begin
         if (P > Length(JSON)) or (JSON[P] = ']') then
         begin
           Inc(P);
-          break;
+          Break;
         end;
         if JSON[P] = ',' then
         begin
@@ -3930,7 +3902,7 @@ begin
             if (P > Length(JSON)) or (JSON[P] = '}') then
             begin
               Inc(P);
-              break;
+              Break;
             end;
             if JSON[P] = ',' then
             begin
@@ -4006,7 +3978,7 @@ begin
         if (P > Length(JSON)) or (JSON[P] = '}') then
         begin
           Inc(P);
-          break;
+          Break;
         end;
         if JSON[P] = ',' then
         begin
@@ -4030,7 +4002,7 @@ begin
               if (P > Length(JSON)) or (JSON[P] = ']') then
               begin
                 Inc(P);
-                break;
+                Break;
               end;
               if JSON[P] = ',' then
               begin
@@ -4073,7 +4045,7 @@ begin
         if (P > Length(JSON)) or (JSON[P] = '}') then
         begin
           Inc(P);
-          break;
+          Break;
         end;
         if JSON[P] = ',' then
         begin
@@ -4097,7 +4069,7 @@ begin
               if (P > Length(JSON)) or (JSON[P] = ']') then
               begin
                 Inc(P);
-                break;
+                Break;
               end;
               if JSON[P] = ',' then
               begin
@@ -4570,7 +4542,7 @@ begin
   begin
     JSkipWS(JSON, P);
     if (P > Length(JSON)) or (JSON[P] = '}') then
-      break;
+      Break;
     if JSON[P] = ',' then
     begin
       Inc(P);
@@ -4609,7 +4581,7 @@ begin
       begin
         JSkipWS(JSON, P);
         if (P > Length(JSON)) or (JSON[P] = ']') then
-          break;
+          Break;
         if JSON[P] = ',' then
         begin
           Inc(P);
@@ -4623,7 +4595,7 @@ begin
           begin
             JSkipWS(JSON, P);
             if (P > Length(JSON)) or (JSON[P] = '}') then
-              break;
+              Break;
             if JSON[P] = ',' then
             begin
               Inc(P);
@@ -4707,25 +4679,17 @@ begin
   SetProcessWorkingSetSize(GetCurrentProcess, $FFFFFFFF, $FFFFFFFF);
 end;
 
-
-function TUnicodeToBijoy2000.ResolveAnsiSequence(
-  const PrecedingContext: string;
-  const ModifierChar: string;
-  out ResolvedAnsi: string;
-  out EraseCount: Integer;
-  out MatchedContext: string;
-  out IsToggle: Boolean;
-  out UsedAlt: Boolean
-): Boolean;
+function TUnicodeToBijoy2000.ResolveAnsiSequence(const PrecedingContext: string; const ModifierChar: string; out ResolvedAnsi: string; out EraseCount: Integer;
+out MatchedContext: string; out IsToggle: Boolean; out UsedAlt: Boolean): Boolean;
 var
-  Entry:      TAnsiSequenceEntry;
-  UniProbe:   string;   // Unicode form of the context used for probing
-  ProbeLen:   Integer;
-  ClusterKey: string;
+  Entry:             TAnsiSequenceEntry;
+  UniProbe:          string; // Unicode form of the context used for probing
+  ProbeLen:          Integer;
+  ClusterKey:        string;
   ConvFull, ConvCtx: string;
-  PLen:       Integer;
-  Candidates: TAnsiUniCandidates;
-  I:          Integer;
+  PLen:              Integer;
+  Candidates:        TAnsiUniCandidates;
+  I:                 Integer;
 
   // Tries the precompiled map with Probe + Modifier. On success fills Entry
   // and reports which trailing part of the probe actually matched.
@@ -4741,7 +4705,7 @@ var
     end;
   end;
 
-  // Fills the out-parameters from the currently extracted Entry.
+// Fills the out-parameters from the currently extracted Entry.
   procedure FillFromEntry;
   begin
     IsToggle := Entry.IsToggleEntry;
@@ -4753,9 +4717,9 @@ var
     EraseCount := Entry.EraseCount;
   end;
 
-  { Longest-suffix walk over the precompiled map, then a generic Convert
-    fallback that covers every conjunct/kar combination not explicitly
-    enumerated in the JSON mapping. Returns True when outs are filled. }
+{ Longest-suffix walk over the precompiled map, then a generic Convert
+  fallback that covers every conjunct/kar combination not explicitly
+  enumerated in the JSON mapping. Returns True when outs are filled. }
   function TryResolveUnicode(const Probe: string): Boolean;
   begin
     Result := False;
@@ -4763,10 +4727,8 @@ var
       Exit;
 
     ProbeLen := Length(Probe);
-    if ExtractEntry(Probe) or
-      ((ProbeLen >= 3) and ExtractEntry(Copy(Probe, ProbeLen - 2, 3))) or
-      ((ProbeLen >= 2) and ExtractEntry(Copy(Probe, ProbeLen - 1, 2))) or
-      ExtractEntry(Probe[ProbeLen]) then
+    if ExtractEntry(Probe) or ((ProbeLen >= 3) and ExtractEntry(Copy(Probe, ProbeLen - 2, 3))) or
+      ((ProbeLen >= 2) and ExtractEntry(Copy(Probe, ProbeLen - 1, 2))) or ExtractEntry(Probe[ProbeLen]) then
     begin
       FillFromEntry;
       Result := True;
@@ -4815,7 +4777,7 @@ begin
 
     { Distinct clusters may share this ANSI rendering - try each candidate. }
     Candidates := UnicodeCandidatesOfAnsi(PrecedingContext);
-    for I := 0 to High(Candidates) do
+    for I := 0 to high(Candidates) do
       if TryResolveUnicode(Candidates[I]) then
         Exit(True);
     Exit; // unknown ANSI glyph - cannot resolve
