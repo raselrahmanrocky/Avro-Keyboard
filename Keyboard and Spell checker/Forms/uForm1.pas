@@ -773,12 +773,15 @@ end;
 {$HINTS Off}
 
 procedure TAvroMainForm1.IdleTimerTimer(Sender: TObject);
+var
+  liInfo:      TLastInputInfo;
+  SecondsIdle: DWord;
 begin
-  { PERF: this used to call TrimAppMemorySize (SetProcessWorkingSetSize(-1,-1))
-    after 30 s idle. That flushed the whole working set to disk, so the next
-    keystrokes paid a hard page-fault storm - the "hang after a pause" and the
-    progressive slowdown. Trimming does not save memory on modern Windows.
-    Intentionally left empty. }
+  liInfo.cbSize := SizeOf(TLastInputInfo);
+  GetLastInputInfo(liInfo);
+  SecondsIdle := (GetTickCount - liInfo.dwTime) div 1000;
+  if SecondsIdle > 30 then
+    TrimAppMemorySize;
 end;
 
 procedure TAvroMainForm1.WMAvroEmit(var Msg: TMessage);
@@ -1978,8 +1981,16 @@ begin
 end;
 
 procedure TAvroMainForm1.TrimAppMemorySize;
+var
+  MainHandle: THandle;
 begin
-  { PERF: intentional no-op - see IdleTimerTimer. }
+  try
+    MainHandle := OpenProcess(PROCESS_ALL_ACCESS, False, GetCurrentProcessID);
+    SetProcessWorkingSetSize(MainHandle, $FFFFFFFF, $FFFFFFFF);
+    CloseHandle(MainHandle);
+  except
+  end;
+  Application.ProcessMessages;
 end;
 
 procedure TAvroMainForm1.TypeJoNuktawithShiftJ1Click(Sender: TObject);
