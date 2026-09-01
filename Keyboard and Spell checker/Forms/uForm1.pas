@@ -358,6 +358,7 @@ type
       PendingANSISwitch:            Boolean;
       PreviousModeBeforeANSISwitch: enumMode;
       FActiveMappingLastWriteTime:  TDateTime;
+      FMappingCheckCountdown:       Integer; // throttles the ANSI mapping disk check
 
       procedure ChangeTypingStyle(const sStyle: string);
       function IgnorableWindow(const lngHWND: HWND): Boolean;
@@ -2035,26 +2036,37 @@ end;
 
 procedure TAvroMainForm1.WindowCheckTimer(Sender: TObject);
 var
-  WindoRecord: TWindowRecord;
-  hforewnd:    HWND;
+  WindoRecord:  TWindowRecord;
+  hforewnd:     HWND;
+  MapPath:      string;    // cached: this path used to be rebuilt 3x per tick
+  MapWriteTime: TDateTime; // one disk stat per throttled tick
 begin
 
-  // --- Auto-refresh: check if JSON mapping file changed externally (Safe Wrapper) ---
+  { --- Auto-refresh: check if the JSON mapping file changed externally.
+    This timer fires every 100 ms (DFM: WindowCheck.Interval = 100), so the
+    disk stat is throttled to once per second (10 ticks). Doing it on every
+    tick meant ~20 disk stats per second on the main thread, competing with
+    the deferred output flush (WM_AVRO_EMIT) - one of the remaining sources
+    of typing lag. The exception logger was also removed: while the file was
+    missing it wrote to disk ten times a second. }
   if (AnsiVersion <> 'Default') and (AnsiMappingDir <> '') then
   begin
-    try
-      if TFile.Exists(AnsiMappingDir + AnsiVersion + '.json') then
-      begin
-        if TFile.GetLastWriteTime(AnsiMappingDir + AnsiVersion + '.json') <> FActiveMappingLastWriteTime then
+    Dec(FMappingCheckCountdown);
+    if FMappingCheckCountdown <= 0 then
+    begin
+      FMappingCheckCountdown := 10; // ~1 second at Interval = 100 ms
+      try
+        MapPath := AnsiMappingDir + AnsiVersion + '.json';
+        MapWriteTime := TFile.GetLastWriteTime(MapPath);
+        if (MapWriteTime <> 0) and (MapWriteTime <> FActiveMappingLastWriteTime) then
         begin
-          FActiveMappingLastWriteTime := TFile.GetLastWriteTime(AnsiMappingDir + AnsiVersion + '.json');
+          FActiveMappingLastWriteTime := MapWriteTime;
           LoadCurrentActiveMapping;
           Log('ANSI Mapping Auto-Refreshed: ' + AnsiVersion);
         end;
+      except
+        // file missing or locked - the next throttled tick simply retries
       end;
-    except
-      on E: Exception do
-        Log('Error checking/loading mapping file: ' + E.Message);
     end;
   end;
 
