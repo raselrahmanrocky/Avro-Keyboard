@@ -195,7 +195,7 @@ uses
   Turn it OFF for the release build by commenting out the AVRO_PROFILE
   DEFINE line below.
   =============================================================================== }
-{$DEFINE AVRO_PROFILE}
+//{$DEFINE AVRO_PROFILE}
 { ===============================================================================
   OPTIONAL DEFERRED INJECTION  -  AVRO_DEFER_EMIT
   -------------------------------------------------------------------------------
