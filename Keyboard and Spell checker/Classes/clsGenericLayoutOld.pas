@@ -227,14 +227,13 @@ type
     EraseCount: Integer;
     Text: string;
   end;
+
 var
   {$IFDEF AVRO_DEFER_EMIT}
   FEmitN: Integer;
   FEmitQ: array of TEmitRec;
   {$ENDIF}
-
   {$IFDEF AVRO_PROFILE}
-
 function QueryPerformanceCounter(var lpPerformanceCount: Int64): LongBool; stdcall; external 'kernel32.dll' name 'QueryPerformanceCounter';
 function QueryPerformanceFrequency(var lpFrequency: Int64): LongBool; stdcall; external 'kernel32.dll' name 'QueryPerformanceFrequency';
 procedure OutputDebugStringA(lpOutputString: PAnsiChar); stdcall; external 'kernel32.dll' name 'OutputDebugStringA';
@@ -288,9 +287,11 @@ begin
   Say(Format('  send + everything : %8.3f ms', [MS]));
   Say(Format('  INJECTED events   : %6.2f per key   (worst erase = %d)', [ProfEmitted / K, ProfMaxErase]));
   MS := ProfTickSend / ProfFreq * 1000.0 / K;
-  Say(Format('  SendInput         : %8.3f ms   (%.2f calls/key, %.3f ms each)', [MS, ProfSendCalls / K, MS / (ProfSendCalls / K)]));
-  MS := (ProfTickParse - ProfTickSend) / ProfFreq * 1000.0 / K;
-  Say(Format('  diff + string ops : %8.3f ms', [MS]));
+  Say(Format('  SendInput         : %8.3f ms   (%.2f calls/key, %.3f ms each) DEFERRED', [MS, ProfSendCalls / K, MS / (ProfSendCalls / K)]));
+  { SendInput no longer runs inside ParseAndSendNow (AVRO_DEFER_EMIT), so it
+    must NOT be subtracted here - that produced a negative number. }
+  MS := ProfTickParse / ProfFreq * 1000.0 / K;
+  Say(Format('  diff + string ops : %8.3f ms   (queue fill only)', [MS]));
 
   ProfKeys := 0;
   ProfTickTotal := 0;
