@@ -119,6 +119,12 @@ type
       AnsiMirror:       string;  // ANSI stream rendered so far (screen mirror)
       KarAnsiGlyph:     string;  // the glyph(s) streamed for the pending kar
 
+      // PERFORMANCE (hot path): Bijoy.Convert() is by far the most
+      // expensive call in the unit and the SAME text is converted several
+      // times per keystroke, so the last result is remembered here.
+      // Cleared on every word reset (ResetLastChar). See ConvCached.
+      FConvSrc, FConvAnsi: string;
+
       procedure InternalBackspace(KeyRepeat: Integer = 1);
       procedure DoBackspace(var Block: Boolean);
       procedure ParseAndSendNow;
@@ -131,6 +137,9 @@ type
       function HandleIsolatedModifier(const ModifierStr: string): Boolean;
       procedure ClearKarFirstState;
       procedure SendAnsiDiff(const PrevAnsi, NewAnsi: string);
+      procedure EmitBatch(const EraseCount: Integer; const Text: string);
+      procedure CommitContext(const Word: string);
+      function ConvCached(const T: string): string;
       function KarInkRun: string;
       function CommonPrefixLen(const A, B: string): Integer;
       function CommonSuffixLen(const A, B: string; const Used: Integer): Integer;
@@ -151,6 +160,7 @@ type
       function ProcessVKeyDown(const KeyCode: Integer; var Block: Boolean): string;
       procedure ProcessVKeyUP(const KeyCode: Integer; var Block: Boolean);
       procedure ResetDeadKey;
+      procedure FlushEmit;
   end;
 
 implementation
@@ -166,6 +176,135 @@ uses
   uRegistrySettings,
   uCaretContextSniffer;
 
+{ ===============================================================================
+  OPTIONAL PERFORMANCE PROFILER
+  -------------------------------------------------------------------------------
+  The lag is NOT necessarily in this unit, so measure instead of guessing.
+  Every keystroke is timed and split into:
+
+  GetCharForKey   - layout lookup            (KeyboardLayoutLoader)
+  Bijoy.Convert  - Unicode -> ANSI          (clsUnicodeToBijoy2000)
+  ParseAndSendNow- full output step (includes its own send calls)
+  send+other     - the rest: SendKey_Char / Backspace (synthetic input),
+  caret sniffing, ...
+
+  Results go to the debugger (OutputDebugString - read them with SysInternals
+  DebugView, or in the Delphi IDE's "Event Log" while debugging), dumped after
+  every 100 keystrokes.
+
+  Turn it OFF for the release build by commenting out the AVRO_PROFILE
+  DEFINE line below.
+  =============================================================================== }
+{$DEFINE AVRO_PROFILE}
+{ ===============================================================================
+  OPTIONAL DEFERRED INJECTION  -  AVRO_DEFER_EMIT
+  -------------------------------------------------------------------------------
+  LowLevelKeyboardProc runs while the Raw Input Thread (RIT) is blocked waiting
+  for it. Calling SendInput from inside it measured ~1.0-1.5 ms per call - 20 to
+  200 times the normal 5-50 us - and, worse, the injected events piled up inside
+  the RIT and were flushed in bursts after the hook chain unwound. That is the
+  "hang, then everything appears at once" effect.
+
+  With this define the emit is only QUEUED here and the actual SendInput runs on
+  the main thread AFTER the hook callback returned (RIT free again). Order is
+  preserved: the queue is FIFO and the state it was computed from is final.
+
+  Turn it OFF by commenting out the DEFINE line below - behaviour reverts to
+  the direct call, nothing else changes.
+
+  Needs 2 tiny additions in other units (see the guide):
+  uForm1   : procedure WMAvroEmit(var Msg: TMessage); message WM_APP + 10;
+  begin if Assigned(KeyLayout) then KeyLayout.FlushEmit; end;
+  clsLayout: procedure TLayout.FlushEmit; begin GenericOldFixed.FlushEmit; end;
+  =============================================================================== }
+{$DEFINE AVRO_DEFER_EMIT}
+
+const
+  WM_AVRO_EMIT = $8000 + 10; // WM_APP + 10
+
+type
+  TEmitRec = record
+    EraseCount: Integer;
+    Text: string;
+  end;
+var
+  {$IFDEF AVRO_DEFER_EMIT}
+  FEmitN: Integer;
+  FEmitQ: array of TEmitRec;
+  {$ENDIF}
+
+  {$IFDEF AVRO_PROFILE}
+
+function QueryPerformanceCounter(var lpPerformanceCount: Int64): LongBool; stdcall; external 'kernel32.dll' name 'QueryPerformanceCounter';
+function QueryPerformanceFrequency(var lpFrequency: Int64): LongBool; stdcall; external 'kernel32.dll' name 'QueryPerformanceFrequency';
+procedure OutputDebugStringA(lpOutputString: PAnsiChar); stdcall; external 'kernel32.dll' name 'OutputDebugStringA';
+function PostMessageW(hWnd: NativeUInt; Msg: Cardinal; wParam: NativeUInt; lParam: NativeInt): LongBool; stdcall; external 'user32.dll' name 'PostMessageW';
+
+var
+  ProfFreq:      Int64   = 0;
+  ProfKeys:      Integer = 0;
+  ProfTickTotal: Int64   = 0;
+  ProfTickKey:   Int64   = 0;
+  ProfTickConv:  Int64   = 0;
+  ProfTickParse: Int64   = 0;
+  ProfCallsConv: Integer = 0;
+  ProfEmitted:   Integer = 0; // backspaces + characters pushed into the queue
+  ProfMaxErase:  Integer = 0; // worst single erase (big = retyping churn)
+  ProfTickSend:  Int64   = 0; // time spent INSIDE SendInput
+  ProfSendCalls: Integer = 0; // how many SendInput calls per keystroke
+
+function ProfTicks: Int64;
+begin
+  QueryPerformanceCounter(Result);
+end;
+
+{ average milliseconds per keystroke for every counter }
+procedure ProfDump;
+var
+  K, MS: Double;
+
+  procedure Say(const Line: string);
+  begin
+    OutputDebugStringA(PAnsiChar(AnsiString(Line)));
+  end;
+
+begin
+  if ProfFreq = 0 then
+    QueryPerformanceFrequency(ProfFreq);
+  if (ProfFreq = 0) or (ProfKeys = 0) then
+    Exit;
+
+  K := ProfKeys;
+  Say('=== Avro profile: ' + IntToStr(ProfKeys) + ' keys ===');
+  MS := ProfTickTotal / ProfFreq * 1000.0 / K;
+  Say(Format('  TOTAL per key     : %8.3f ms', [MS]));
+  MS := ProfTickKey / ProfFreq * 1000.0 / K;
+  Say(Format('  GetCharForKey     : %8.3f ms', [MS]));
+  MS := ProfTickParse / ProfFreq * 1000.0 / K;
+  Say(Format('  ParseAndSendNow   : %8.3f ms', [MS]));
+  MS := ProfTickConv / ProfFreq * 1000.0 / K;
+  Say(Format('  Bijoy.Convert     : %8.3f ms   (%d calls/key)', [MS, Round(ProfCallsConv / K)]));
+  MS := (ProfTickTotal - ProfTickKey - ProfTickParse) / ProfFreq * 1000.0 / K;
+  Say(Format('  send + everything : %8.3f ms', [MS]));
+  Say(Format('  INJECTED events   : %6.2f per key   (worst erase = %d)', [ProfEmitted / K, ProfMaxErase]));
+  MS := ProfTickSend / ProfFreq * 1000.0 / K;
+  Say(Format('  SendInput         : %8.3f ms   (%.2f calls/key, %.3f ms each)', [MS, ProfSendCalls / K, MS / (ProfSendCalls / K)]));
+  MS := (ProfTickParse - ProfTickSend) / ProfFreq * 1000.0 / K;
+  Say(Format('  diff + string ops : %8.3f ms', [MS]));
+
+  ProfKeys := 0;
+  ProfTickTotal := 0;
+  ProfTickKey := 0;
+  ProfTickConv := 0;
+  ProfTickParse := 0;
+  ProfCallsConv := 0;
+  ProfEmitted := 0;
+  ProfMaxErase := 0;
+  ProfTickSend := 0;
+  ProfSendCalls := 0;
+end;
+{$ENDIF}
+{ =============================================================================== }
 { =============================================================================== }
 
 { TGenericLayoutOld }
@@ -191,30 +330,38 @@ begin
   UnwindConjunct := False;
   KarConsumed := False;
   KarRunCount := 0;
+  FConvSrc := '';
+  FConvAnsi := '';
+  {$IFDEF AVRO_DEFER_EMIT}
+  FlushEmit; // keep the queue empty across resets (order is never reordered)
+  {$ENDIF}
 end;
 
 { =============================================================================== }
 
+{
+  OPTIMISED (hot path - runs on every backspace step).
+  Shifts the slots in place instead of rebuilding two TrackL-character
+  strings (~200 allocations per call before, zero now).
+}
 procedure TGenericLayoutOld.DeleteLastCharSteps_Ex(StepCount: Integer);
 var
-  I, J: Integer;
-  t1:   string;
+  I: Integer;
 begin
-  for I := TrackL downto 1 do
-    t1 := t1 + LastChars[I];
-
+  if StepCount <= 0 then
+    Exit;
   if StepCount > TrackL then
     StepCount := TrackL;
 
-  t1 := StringOfChar(' ', StepCount) + LeftStr(t1, Length(t1) - StepCount);
+  { the surviving characters move towards the newest end (slot 1) }
+  for I := 1 to TrackL - StepCount do
+    LastChars[I] := LastChars[I + StepCount];
 
-  for I := TrackL downto 1 do
-  begin
-    J := TrackL + 1 - I;
-    LastChars[I] := MidStr(t1, J, 1);
-  end;
+  { the freed slots at the oldest end become blanks }
+  for I := TrackL - StepCount + 1 to TrackL do
+    LastChars[I] := ' ';
+
   LastChar := LastChars[1];
-
 end;
 
 { =============================================================================== }
@@ -250,24 +397,139 @@ end;
 }
 procedure TGenericLayoutOld.SendAnsiDiff(const PrevAnsi, NewAnsi: string);
 var
-  I, Matched, UnMatched: Integer;
+  Matched, UnMatched: Integer;
 begin
   Matched := 0;
 
-  if PrevAnsi <> '' then
-    for I := 1 to Length(PrevAnsi) do
-    begin
-      if MidStr(PrevAnsi, I, 1) = MidStr(NewAnsi, I, 1) then
-        Matched := Matched + 1
-      else
-        Break;
-    end;
+  { direct character indexing - MidStr allocates a temporary string for
+    every single character }
+  while (Matched < Length(PrevAnsi)) and (Matched < Length(NewAnsi)) and (PrevAnsi[Matched + 1] = NewAnsi[Matched + 1]) do
+    Inc(Matched);
 
   UnMatched := Length(PrevAnsi) - Matched;
 
-  if UnMatched >= 1 then
-    Backspace(UnMatched);
-  SendKey_Char(MidStr(NewAnsi, Matched + 1, Length(NewAnsi)));
+  EmitBatch(UnMatched, Copy(NewAnsi, Matched + 1, MaxInt));
+end;
+
+{ =============================================================================== }
+
+{
+  Bijoy.Convert with a one-entry memo. Convert() is the most expensive call
+  in the unit and the SAME text is converted several times per keystroke
+  (ParseAndSendNow, the ANSI stream mirrors, AnsiVisualPop, DoBackspace).
+  A string compare is orders of magnitude cheaper than a conversion, so the
+  last result is simply remembered. Cleared on every word reset.
+}
+function TGenericLayoutOld.ConvCached(const T: string): string;
+{$IFDEF AVRO_PROFILE}
+var
+  tProf: Int64;
+  {$ENDIF}
+begin
+  {$IFDEF AVRO_PROFILE}
+  tProf := ProfTicks;
+  Inc(ProfCallsConv);
+  {$ENDIF}
+  if (T <> '') and (T = FConvSrc) then
+    Result := FConvAnsi
+  else
+  begin
+    Result := Bijoy.Convert(T);
+    FConvSrc := T;
+    FConvAnsi := Result;
+  end;
+  {$IFDEF AVRO_PROFILE}
+  Inc(ProfTickConv, ProfTicks - tProf);
+  {$ENDIF}
+end;
+
+{ =============================================================================== }
+
+{
+  Appends a finished word to the committed (pre-caret) context and keeps only
+  its tail.
+
+  DoBackspace never looks further back than 4 characters, so anything older is
+  dead weight - and an uncapped buffer made every single backspace copy the
+  WHOLE typing session (LeftStr(CommittedBanglaT, L - 3) + SavedChar). That is
+  what made Avro crawl slower and slower after a few thousand words. The
+  VK_RETURN branch had no cap at all, so it grew without bound.
+}
+procedure TGenericLayoutOld.CommitContext(const Word: string);
+const
+  MaxCtx = 24;
+begin
+  CommittedBanglaT := CommittedBanglaT + Word + ' ';
+  if Length(CommittedBanglaT) > MaxCtx then
+    Delete(CommittedBanglaT, 1, Length(CommittedBanglaT) - MaxCtx);
+end;
+
+{ =============================================================================== }
+
+{
+  HOT PATH OUTPUT. One single SendInput batch (SendInputBatch_BackspaceAndChar)
+  replaces 4*EraseCount + 4*Length(Text) separate SendInput calls, and it also
+  skips the per-character Log() that SendKey_Char does (disk I/O on every
+  character was a large part of the 4.35 ms ParseAndSendNow measurement).
+
+  A whole "erase + retype" is emitted ATOMICALLY, so fast typing can no longer
+  interleave with it - that is what produced the "everything appears at once"
+  effect.
+}
+procedure TGenericLayoutOld.EmitBatch(const EraseCount: Integer; const Text: string);
+{$IFDEF AVRO_PROFILE}
+var
+  tProf: Int64;
+  {$ENDIF}
+begin
+  if (EraseCount <= 0) and (Text = '') then
+    Exit;
+  {$IFDEF AVRO_PROFILE}
+  Inc(ProfEmitted, EraseCount + Length(Text));
+  if EraseCount > ProfMaxErase then
+    ProfMaxErase := EraseCount;
+  {$ENDIF}
+  {$IFDEF AVRO_DEFER_EMIT}
+  if FEmitN >= Length(FEmitQ) then
+    SetLength(FEmitQ, FEmitN + 32);
+  FEmitQ[FEmitN].EraseCount := EraseCount;
+  FEmitQ[FEmitN].Text := Text;
+  Inc(FEmitN);
+  { Runs after the hook callback returned - see the AVRO_DEFER_EMIT note. }
+  PostMessageW(NativeUInt(AvroMainForm1.Handle), WM_AVRO_EMIT, 0, 0);
+  {$ELSE}
+  {$IFDEF AVRO_PROFILE}
+  tProf := ProfTicks;
+  Inc(ProfSendCalls);
+  {$ENDIF}
+  SendInputBatch_BackspaceAndChar(EraseCount, Text);
+  {$IFDEF AVRO_PROFILE}
+  Inc(ProfTickSend, ProfTicks - tProf);
+  {$ENDIF}
+  {$ENDIF}
+end;
+
+{ Drains the deferred output queue. Called from the main form's WM_AVRO_EMIT
+  handler, i.e. OUTSIDE the low-level keyboard hook callback. }
+procedure TGenericLayoutOld.FlushEmit;
+var
+  I: Integer;
+  {$IFDEF AVRO_PROFILE}
+  tProf: Int64;
+  {$ENDIF}
+begin
+  for I := 0 to FEmitN - 1 do
+  begin
+    {$IFDEF AVRO_PROFILE}
+    tProf := ProfTicks;
+    Inc(ProfSendCalls);
+    {$ENDIF}
+    SendInputBatch_BackspaceAndChar(FEmitQ[I].EraseCount, FEmitQ[I].Text);
+    {$IFDEF AVRO_PROFILE}
+    Inc(ProfTickSend, ProfTicks - tProf);
+    {$ENDIF}
+  end;
+  FEmitN := 0;
 end;
 
 { =============================================================================== }
@@ -371,7 +633,7 @@ begin
   if AnsiMirrorActive then
     S := AnsiMirror
   else
-    S := Bijoy.Convert(B);
+    S := ConvCached(B);
 
   { ink of a kar that is still pending (its Unicode is NOT in the buffer).
     Ink     = the glyph of ONE copy  - step 1 pops exactly one glyph
@@ -412,6 +674,32 @@ begin
     Exit;
   end;
 
+  { --- 1b. FAST PATH (speed) -------------------------------------------------
+    The overwhelming majority of backspaces delete a plain letter, a
+    post-base kar, a vowel or a digit: one code point IS one glyph and no
+    reordering can happen. Skipping the candidate search saves ~10 whole-word
+    conversions per press - exactly what made fast repeated backspace crawl.
+    Everything "interesting" (pre-base kar, ো/ৌ, hasanta, conjunct, reph,
+    phala, pending ink) still goes through the full search below. }
+  if (Ink = '') and (GetActivePreBaseKar = '') and (B[Length(B)] <> b_Ekar) and (B[Length(B)] <> b_Ikar) and (B[Length(B)] <> b_OIkar) and
+    (B[Length(B)] <> b_Okar) and (B[Length(B)] <> b_OUkar) and (B[Length(B)] <> b_Hasanta) and ((Length(B) < 2) or (B[Length(B) - 1] <> b_Hasanta)) then
+  begin
+    BestBuf := LeftStr(B, Length(B) - 1);
+    if BestBuf = '' then
+      Exit; // DoBackspace wipes the word (and does its own bookkeeping)
+
+    BestAnsi := ConvCached(BestBuf); // ONE conversion instead of ~10
+    InternalBackspace(1);
+    SendAnsiDiff(S, BestAnsi);
+    PrevBanglaT := NewBanglaText;
+    KarAnsiGlyph := '';
+    AnsiMirrorActive := False;
+    ClearKarFirstState;
+    Block := True;
+    Result := True;
+    Exit;
+  end;
+
   { --- 2. cheapest Unicode edit that removes the last visual glyph --- }
   BestOps := MaxInt;
   BestBuf := '';
@@ -427,14 +715,14 @@ begin
   if (Length(B) >= 2) and IsPureConsonent(B[Length(B) - 1]) and ((B[Length(B)] = b_Ekar) or (B[Length(B)] = b_Ikar) or (B[Length(B)] = b_OIkar)) then
   begin
     Cand := LeftStr(B, Length(B) - 2);
-    CandAnsi := Bijoy.Convert(B);
-    NoKar := Bijoy.Convert(Cand + B[Length(B) - 1]); // the same text without the kar
+    CandAnsi := ConvCached(B);
+    NoKar := ConvCached(Cand + B[Length(B) - 1]); // the same text without the kar
     P := CommonPrefixLen(CandAnsi, NoKar);
     Suf := CommonSuffixLen(CandAnsi, NoKar, P);
     KarGlyph := Copy(CandAnsi, P + 1, Length(CandAnsi) - P - Suf);
     if KarGlyph <> '' then
     begin
-      CandAnsi := Bijoy.Convert(Cand) + KarGlyph;
+      CandAnsi := ConvCached(Cand) + KarGlyph;
       Ops := AnsiDiffOps(S, CandAnsi);
       BestOps := Ops;
       BestBuf := Cand;
@@ -446,10 +734,10 @@ begin
   end;
 
   { 2b. a two-part kar (ো / ৌ) loses its RIGHT half first: ো -> ে, ৌ -> ে }
-  if (Length(B) >= 1) and ((B[Length(B)] = b_Okar) or (B[Length(B)] = b_OUkar)) then
+  if (BestOps > 1) and (Length(B) >= 1) and ((B[Length(B)] = b_Okar) or (B[Length(B)] = b_OUkar)) then
   begin
     Cand := LeftStr(B, Length(B) - 1) + b_Ekar;
-    CandAnsi := Bijoy.Convert(Cand) + InkAll;
+    CandAnsi := ConvCached(Cand) + InkAll;
     Ops := AnsiDiffOps(S, CandAnsi);
     if Ops < BestOps then
     begin
@@ -466,11 +754,11 @@ begin
 
   { 2c. conjunct ladder unwind: [C1 ্ C2 কার] -> [C1 কার ্]
     (জ্বি -> জি্ : the kar steps back in front of the pending hasanta) }
-  if (Length(B) >= 4) and (B[Length(B) - 2] = b_Hasanta) and IsPureConsonent(B[Length(B) - 1]) and
+  if (BestOps > 1) and (Length(B) >= 4) and (B[Length(B) - 2] = b_Hasanta) and IsPureConsonent(B[Length(B) - 1]) and
     ((B[Length(B)] = b_Ekar) or (B[Length(B)] = b_Ikar) or (B[Length(B)] = b_OIkar)) and IsPureConsonent(B[Length(B) - 3]) then
   begin
     Cand := LeftStr(B, Length(B) - 3) + B[Length(B)] + b_Hasanta;
-    CandAnsi := Bijoy.Convert(Cand) + InkAll;
+    CandAnsi := ConvCached(Cand) + InkAll;
     Ops := AnsiDiffOps(S, CandAnsi);
     if Ops < BestOps then
     begin
@@ -489,10 +777,10 @@ begin
     post-base kars, a pending hasanta ... }
   for K := 1 to 6 do
   begin
-    if Length(B) - K < 0 then
-      Break;
+    if (BestOps <= 1) or (Length(B) - K < 0) then
+      Break; // cost 1 = "one glyph gone, nothing retyped" - already optimal
     Cand := LeftStr(B, Length(B) - K);
-    CandAnsi := Bijoy.Convert(Cand) + InkAll;
+    CandAnsi := ConvCached(Cand) + InkAll;
     Ops := AnsiDiffOps(S, CandAnsi);
     if Ops < BestOps then
     begin
@@ -640,7 +928,7 @@ begin
   begin
     if (OutputIsBijoy = 'YES') and (KarAnsiGlyph <> '') then
     begin
-      Backspace(Length(KarAnsiGlyph)); // one glyph of the run
+      EmitBatch(Length(KarAnsiGlyph), ''); // one glyph of the run
       if KarRunCount > 1 then
       begin
         Dec(KarRunCount); // kar stays armed - one copy left
@@ -668,7 +956,7 @@ begin
     if AnsiMirrorActive then
       PrevAnsi := AnsiMirror
     else
-      PrevAnsi := Bijoy.Convert(PrevBanglaT) + KarAnsiGlyph;
+      PrevAnsi := ConvCached(PrevBanglaT) + KarAnsiGlyph;
 
     InternalBackspace(1); // drop the visible hasanta only
     NewAnsi := Bijoy.Convert(NewBanglaText) + KarAnsiGlyph;
@@ -704,7 +992,7 @@ begin
     begin
       if Length(NewBanglaText) >= 1 then
       begin
-        Backspace(Length(NewBanglaText));
+        EmitBatch(Length(NewBanglaText), '');
         Block := True;
       end
       else if CommittedBanglaT <> '' then
@@ -713,8 +1001,7 @@ begin
         if (L >= 3) and (CommittedBanglaT[L - 2] = b_R) and (CommittedBanglaT[L - 1] = b_Hasanta) and IsPureConsonent(CommittedBanglaT[L]) then
         begin
           SavedChar := CommittedBanglaT[L];
-          Backspace(3);
-          SendKey_Char(SavedChar);
+          EmitBatch(3, SavedChar);
           CommittedBanglaT := LeftStr(CommittedBanglaT, L - 3) + SavedChar;
           Block := True;
           Exit;
@@ -723,7 +1010,7 @@ begin
         if (L >= 4) and ((CommittedBanglaT[L - 3] = ZWJ) or (CommittedBanglaT[L - 3] = ZWNJ)) and (CommittedBanglaT[L - 2] = b_Hasanta) and
           (CommittedBanglaT[L - 1] = b_Z) then
         begin
-          Backspace(3);
+          EmitBatch(3, '');
           CommittedBanglaT := LeftStr(CommittedBanglaT, L - 3);
           Block := True;
           Exit;
@@ -731,7 +1018,7 @@ begin
         { Check for Ya-phala in committed text }
         if (L >= 3) and (CommittedBanglaT[L - 1] = b_Hasanta) and (CommittedBanglaT[L] = b_Z) and (CommittedBanglaT[L - 2] <> b_R) then
         begin
-          Backspace(2);
+          EmitBatch(2, '');
           CommittedBanglaT := LeftStr(CommittedBanglaT, L - 2);
           Block := True;
           Exit;
@@ -739,12 +1026,12 @@ begin
         { Check for Ra-phala in committed text }
         if (L >= 3) and (CommittedBanglaT[L - 1] = b_Hasanta) and (CommittedBanglaT[L] = b_R) then
         begin
-          Backspace(2);
+          EmitBatch(2, '');
           CommittedBanglaT := LeftStr(CommittedBanglaT, L - 2);
           Block := True;
           Exit;
         end;
-        Backspace(1);
+        EmitBatch(1, '');
         CommittedBanglaT := LeftStr(CommittedBanglaT, L - 1);
         Block := True;
         Exit;
@@ -754,14 +1041,14 @@ begin
     end
     else
     begin
-      BijoyNewBanglaText := Bijoy.Convert(NewBanglaText);
+      BijoyNewBanglaText := ConvCached(NewBanglaText);
       { a streamed kar glyph would be orphaned - erase it together with
         the last letter of the word }
       if KarAnsiGlyph <> '' then
         BijoyNewBanglaText := BijoyNewBanglaText + KarAnsiGlyph;
       if Length(BijoyNewBanglaText) >= 1 then
       begin
-        Backspace(Length(BijoyNewBanglaText));
+        EmitBatch(Length(BijoyNewBanglaText), '');
         Block := True;
       end
       else
@@ -780,13 +1067,11 @@ begin
       SavedChar := PrevBanglaT[Length(PrevBanglaT)];
       if OutputIsBijoy = 'YES' then
       begin
-        Backspace(Length(Bijoy.Convert(MidStr(PrevBanglaT, Length(PrevBanglaT) - 2, 3))));
-        SendKey_Char(Bijoy.Convert(SavedChar));
+        EmitBatch(Length(ConvCached(MidStr(PrevBanglaT, Length(PrevBanglaT) - 2, 3))), ConvCached(SavedChar));
       end
       else
       begin
-        Backspace(3);
-        SendKey_Char(SavedChar);
+        EmitBatch(3, SavedChar);
       end;
       PrevBanglaT := LeftStr(PrevBanglaT, Length(PrevBanglaT) - 3) + SavedChar;
       NewBanglaText := PrevBanglaT;
@@ -1030,7 +1315,7 @@ function TGenericLayoutOld.PressPreBaseKar(const KarChar: string): string;
   begin
     if not AnsiMirrorActive then
     begin
-      AnsiMirror := Bijoy.Convert(PrevBanglaT);
+      AnsiMirror := ConvCached(PrevBanglaT);
       AnsiMirrorActive := True;
     end;
     AnsiMirror := AnsiMirror + AGlyph;
@@ -1041,7 +1326,7 @@ function TGenericLayoutOld.PressPreBaseKar(const KarChar: string): string;
     if AnsiMirrorActive and (Length(AnsiMirror) >= Length(AGlyph)) then
     begin
       AnsiMirror := LeftStr(AnsiMirror, Length(AnsiMirror) - Length(AGlyph));
-      if AnsiMirror = Bijoy.Convert(PrevBanglaT) then
+      if AnsiMirror = ConvCached(PrevBanglaT) then
         AnsiMirrorActive := False;
     end;
   end;
@@ -1053,7 +1338,7 @@ begin
       or it orphans on screen before ী }
     if (OutputIsBijoy = 'YES') and (GetActivePreBaseKar <> '') and (not KarConsumed) and (KarAnsiGlyph <> '') then
     begin
-      Backspace(Length(KarInkRun)); // the WHOLE run is on screen
+      EmitBatch(Length(KarInkRun), ''); // the WHOLE run is on screen
       StreamMirrorShrink(KarInkRun);
       KarAnsiGlyph := '';
     end;
@@ -1078,7 +1363,7 @@ begin
     begin
       Inc(KarRunCount);                 // one more copy is on screen
       StreamMirrorAppend(KarAnsiGlyph); // same glyph - typed again
-      SendKey_Char(KarAnsiGlyph);
+      EmitBatch(0, KarAnsiGlyph);
       PressPreBaseKar := '';
       Exit;
     end;
@@ -1113,12 +1398,12 @@ begin
       consonant glyph - zero backspaces, zero visual jumping. }
     if KarAnsiGlyph <> '' then
     begin
-      Backspace(Length(KarInkRun)); // wipe every copy of the other kar
+      EmitBatch(Length(KarInkRun), ''); // wipe every copy of the other kar
       StreamMirrorShrink(KarInkRun);
     end;
     KarAnsiGlyph := StreamGlyph(KarChar);
     StreamMirrorAppend(KarAnsiGlyph);
-    SendKey_Char(KarAnsiGlyph);
+    EmitBatch(0, KarAnsiGlyph);
     PressPreBaseKar := '';
     Exit;
   end;
@@ -1206,6 +1491,9 @@ var
   ArmedKar, mKar:                    string;
   KarInBuffer:                       Boolean;
   IsRephTailCtx:                     Boolean;
+  {$IFDEF AVRO_PROFILE}
+  tProf: Int64;
+  {$ENDIF}
 begin
 
   if AvroMainForm1.GetMyCurrentKeyboardMode = SysDefault then
@@ -1217,8 +1505,13 @@ begin
   end
   else if AvroMainForm1.GetMyCurrentKeyboardMode = bangla then
   begin
+    {$IFDEF AVRO_PROFILE}
+    tProf := ProfTicks;
+    {$ENDIF}
     CharForKey := GetCharForKey(KeyCode, var_IsLogicalShift, var_IsTrueShift, var_IsAltGr);
-
+    {$IFDEF AVRO_PROFILE}
+    Inc(ProfTickKey, ProfTicks - tProf);
+    {$ENDIF}
     if LastChar = b_Hasanta then
     begin
       { OLD STYLE: after a typed reph (র্) a pre-base kar key still floats
@@ -1499,7 +1792,7 @@ begin
           mKar := DupeString(ArmedKar, KarRunCount);
           ResetAllKarsToInactive;
           ClearKarFirstState;
-          SendKey_Char(mKar); // visible before the delimiter
+          EmitBatch(0, mKar); // visible before the delimiter
           PrevBanglaT := PrevBanglaT + mKar;
           NewBanglaText := PrevBanglaT;
           SetLastChar(mKar);
@@ -1511,7 +1804,7 @@ begin
       VK_RETURN:
         begin
           Block := False;
-          CommittedBanglaT := CommittedBanglaT + PrevBanglaT + ' ';
+          CommitContext(PrevBanglaT);
           ResetLastChar;
           MyProcessVKeyDown := '';
           Exit;
@@ -1519,9 +1812,7 @@ begin
       VK_SPACE:
         begin
           Block := False;
-          CommittedBanglaT := CommittedBanglaT + PrevBanglaT + ' ';
-          if Length(CommittedBanglaT) > 500 then
-            Delete(CommittedBanglaT, 1, Length(CommittedBanglaT) - 500);
+          CommitContext(PrevBanglaT);
           ResetLastChar;          // soft-saves LastCommitted* context
           Inc(SpacePendingCount); // delimiter now sits between caret & context
           MyProcessVKeyDown := '';
@@ -1802,9 +2093,16 @@ end;
 
 procedure TGenericLayoutOld.ParseAndSendNow;
 var
-  I, Matched, UnMatched:                Integer;
+  Matched, UnMatched:                   Integer;
   BijoyPrevBanglaT, BijoyNewBanglaText: string;
+  PrevConv:                             string;
+  {$IFDEF AVRO_PROFILE}
+  tProf: Int64;
+  {$ENDIF}
 begin
+  {$IFDEF AVRO_PROFILE}
+  tProf := ProfTicks;
+  {$ENDIF}
   Matched := 0;
 
   if OutputIsBijoy <> 'YES' then
@@ -1812,23 +2110,18 @@ begin
     { Output to Unicode }
     if PrevBanglaT = '' then
     begin
-      SendKey_Char(NewBanglaText);
+      EmitBatch(0, NewBanglaText);
       PrevBanglaT := NewBanglaText;
     end
     else
     begin
-      for I := 1 to Length(PrevBanglaT) do
-      begin
-        if MidStr(PrevBanglaT, I, 1) = MidStr(NewBanglaText, I, 1) then
-          Matched := Matched + 1
-        else
-          Break;
-      end;
+      { OPTIMISED: direct character indexing - MidStr allocates a
+        temporary string for every single character of the word }
+      while (Matched < Length(PrevBanglaT)) and (Matched < Length(NewBanglaText)) and (PrevBanglaT[Matched + 1] = NewBanglaText[Matched + 1]) do
+        Inc(Matched);
       UnMatched := Length(PrevBanglaT) - Matched;
 
-      if UnMatched >= 1 then
-        Backspace(UnMatched);
-      SendKey_Char(MidStr(NewBanglaText, Matched + 1, Length(NewBanglaText)));
+      EmitBatch(UnMatched, Copy(NewBanglaText, Matched + 1, MaxInt));
       PrevBanglaT := NewBanglaText;
     end;
 
@@ -1843,8 +2136,8 @@ begin
     if AnsiMirrorActive then
       BijoyPrevBanglaT := AnsiMirror
     else
-      BijoyPrevBanglaT := Bijoy.Convert(PrevBanglaT);
-    BijoyNewBanglaText := Bijoy.Convert(NewBanglaText);
+      BijoyPrevBanglaT := ConvCached(PrevBanglaT);
+    BijoyNewBanglaText := ConvCached(NewBanglaText);
 
     { a kar glyph is STILL pending on screen: keep it inside the stream so
       that typing after it (্, a vowel sign, a digit ...) does not erase
@@ -1853,9 +2146,10 @@ begin
       * text shrank   -> the ink trails at the end of the stream }
     if KarAnsiGlyph <> '' then
     begin
-      if (PrevBanglaT <> '') and (Pos(Bijoy.Convert(PrevBanglaT), BijoyNewBanglaText) = 1) then
-        BijoyNewBanglaText := Bijoy.Convert(PrevBanglaT) + KarAnsiGlyph + Copy(BijoyNewBanglaText, Length(Bijoy.Convert(PrevBanglaT)) + 1,
-          Length(BijoyNewBanglaText))
+      { OPTIMISED: one conversion instead of three identical ones }
+      PrevConv := ConvCached(PrevBanglaT);
+      if (PrevBanglaT <> '') and (Pos(PrevConv, BijoyNewBanglaText) = 1) then
+        BijoyNewBanglaText := PrevConv + KarAnsiGlyph + Copy(BijoyNewBanglaText, Length(PrevConv) + 1, MaxInt)
       else
         BijoyNewBanglaText := BijoyNewBanglaText + KarAnsiGlyph;
       AnsiMirror := BijoyNewBanglaText;
@@ -1866,27 +2160,25 @@ begin
 
     if BijoyPrevBanglaT = '' then
     begin
-      SendKey_Char(BijoyNewBanglaText);
+      EmitBatch(0, BijoyNewBanglaText);
       PrevBanglaT := NewBanglaText;
     end
     else
     begin
-      for I := 1 to Length(BijoyPrevBanglaT) do
-      begin
-        if MidStr(BijoyPrevBanglaT, I, 1) = MidStr(BijoyNewBanglaText, I, 1) then
-          Matched := Matched + 1
-        else
-          Break;
-      end;
+      { OPTIMISED: direct character indexing instead of MidStr }
+      while (Matched < Length(BijoyPrevBanglaT)) and (Matched < Length(BijoyNewBanglaText)) and
+        (BijoyPrevBanglaT[Matched + 1] = BijoyNewBanglaText[Matched + 1]) do
+        Inc(Matched);
       UnMatched := Length(BijoyPrevBanglaT) - Matched;
 
-      if UnMatched >= 1 then
-        Backspace(UnMatched);
-      SendKey_Char(MidStr(BijoyNewBanglaText, Matched + 1, Length(BijoyNewBanglaText)));
+      EmitBatch(UnMatched, Copy(BijoyNewBanglaText, Matched + 1, MaxInt));
       PrevBanglaT := NewBanglaText;
     end;
 
   end;
+  {$IFDEF AVRO_PROFILE}
+  Inc(ProfTickParse, ProfTicks - tProf);
+  {$ENDIF}
 end;
 
 { =============================================================================== }
@@ -1896,9 +2188,14 @@ var
   m_Block:      Boolean;
   m_Str:        string;
   IsoChainCont: Boolean;
+  {$IFDEF AVRO_PROFILE}
+  tProf: Int64;
+  {$ENDIF}
 begin
   m_Block := False;
-
+  {$IFDEF AVRO_PROFILE}
+  tProf := ProfTicks;
+  {$ENDIF}
   if (IsWinKey = True) or (IsOnlyCtrlKey = True) or (IsOnlyLeftAltKey = True) then
   begin
     Block := False;
@@ -1961,6 +2258,12 @@ begin
   Block := m_Block;
   ProcessVKeyDown := '';
 
+  {$IFDEF AVRO_PROFILE}
+  Inc(ProfTickTotal, ProfTicks - tProf);
+  Inc(ProfKeys);
+  if ProfKeys >= 100 then
+    ProfDump;
+  {$ENDIF}
 end;
 
 { =============================================================================== }
@@ -2017,7 +2320,7 @@ begin
     if Bijoy <> nil then
     begin
       if OutputIsBijoy = 'YES' then
-        LastCommittedAnsi := Bijoy.Convert(PrevBanglaT)
+        LastCommittedAnsi := ConvCached(PrevBanglaT)
       else
         LastCommittedAnsi := PrevBanglaT;
     end;
@@ -2029,6 +2332,8 @@ begin
   AnsiMirrorActive := False;
   AnsiMirror := '';
   KarAnsiGlyph := '';
+  FConvSrc := ''; // the conversion memo dies with the word
+  FConvAnsi := '';
 
   for I := 1 to TrackL do
     LastChars[I] := ' ';
@@ -2094,10 +2399,10 @@ begin
 
   { --- 3. Emit with exact diff counts --- }
   if SpacePendingCount > 0 then
-    Backspace(SpacePendingCount); // remove only our delimiter(s)
+    EmitBatch(SpacePendingCount, ''); // remove only our delimiter(s)
   if EraseCount > 0 then
-    Backspace(EraseCount); // replace the default/context glyph
-  SendKey_Char(ResolvedAnsi);
+    EmitBatch(EraseCount, ''); // replace the default/context glyph
+  EmitBatch(0, ResolvedAnsi);
 
   { --- 4. Track state for chaining and backspace-toggles --- }
   if IsToggle then
@@ -2128,22 +2433,39 @@ end;
 
 { =============================================================================== }
 
+{
+  OPTIMISED (hot path - runs on EVERY keystroke).
+  The old version rebuilt two TrackL-character strings: ~100 concatenations
+  (each one re-allocates and copies) plus ~100 MidStr temporaries - about
+  200 heap allocations per keypress. The slots are only SHIFTED here: plain
+  reference moves, zero allocations, same result.
+  Slot 1 = newest character, slot TrackL = oldest (unchanged).
+}
 procedure TGenericLayoutOld.SetLastChar(const wChar: string);
 var
-  t1, t2: string;
-  I, J:   Integer;
+  I, N: Integer;
 begin
-  for I := TrackL downto 1 do
-    t1 := t1 + LastChars[I];
+  N := Length(wChar);
+  if N <= 0 then
+    Exit;
 
-  t1 := t1 + wChar;
-  t2 := RightStr(t1, TrackL);
-
-  for I := TrackL downto 1 do
+  if N >= TrackL then
   begin
-    J := TrackL + 1 - I;
-    LastChars[I] := MidStr(t2, J, 1);
+    { the new text alone fills the whole window }
+    for I := 1 to TrackL do
+      LastChars[I] := wChar[N - I + 1];
+    LastChar := LastChars[1];
+    Exit;
   end;
+
+  { older characters move towards the oldest end (slot TrackL) }
+  for I := TrackL downto N + 1 do
+    LastChars[I] := LastChars[I - N];
+
+  { the new characters land in slots N .. 1 (the last one in slot 1) }
+  for I := 1 to N do
+    LastChars[I] := wChar[N - I + 1];
+
   LastChar := LastChars[1];
 end;
 

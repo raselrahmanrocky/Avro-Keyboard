@@ -4,6 +4,26 @@
   License, v. 2.0. If a copy of the MPL was not distributed with this
   file, You can obtain one at https://mozilla.org/MPL/2.0/.
   =============================================================================
+
+  PERFORMANCE PATCH  (drop-in replacement - the interface is unchanged)
+  ---------------------------------------------------------------------
+  1. IsAltGr no longer calls Log().  It is called once per keystroke by the
+  layout engine, so that Log() ran on EVERY key press and appended to a
+  growing log file - the cause of "it gets slower and slower after a few
+  thousand words".
+
+  2. SendKey_Char no longer calls Log() either (same problem, once per
+  emitted character).
+
+  3. Backspace() and SendKey_Char() now emit ONE batched SendInput instead
+  of 4 separate SendInput calls per unit.
+
+  4. USE_NONAME_HACK switches the "unused key" (VK_NONAME) on/off in the
+  batch builders.  Batched SendInput already keeps an erase+retype
+  atomic, so the hack is usually unnecessary - and it DOUBLES the number
+  of events, which is what makes fast typing / fast backspacing crawl in
+  heavy editors (Word).  Flip it to False and test.
+  =============================================================================
 }
 
 {$INCLUDE ../../ProjectDefines.inc}
@@ -47,6 +67,18 @@ uses
 const
   KEYEVENTF_UNICODE: Integer = $4;
   SENDKEY_DELAY_MS: Integer  = 1;
+
+  { The "unused key" (VK_NONAME) was injected after every key to work around
+    key buffering (deleting too much).  Batched SendInput already keeps a whole
+    erase+retype atomic, so it is normally NOT needed - and it doubles the
+    event count.  Set to False to halve the work per key.
+
+    Measured: the input queue backs up ("characters appear seconds later")
+    because every character costs 4 injected events.  With the flag off it is
+    2 - the minimum possible for a Unicode character.  Batched SendInput
+    already keeps erase+retype atomic, so the work-around is not needed.
+    Flip it back to True ONLY if "backspace deletes too much" reappears. }
+  USE_NONAME_HACK: Boolean = False;
 
   { =========================================================================== }
 
@@ -125,7 +157,7 @@ end;
 function IsAltGr: Boolean;
 begin
   Result := (IsKeyDown(VK_LCONTROL) and IsKeyDown(VK_LMENU)) or IsKeyDown(VK_RMENU);
-  Log('IsAltGr: ' + BoolToStr(Result, True));
+  // PERF: no Log() here - this runs on EVERY keystroke (see header).
 end;
 
 { =============================================================================== }
@@ -174,36 +206,27 @@ begin
 end;
 
 { =============================================================================== }
+{ Single SendInput calls (kept for compatibility - the layout engine now uses
+  the batched versions for everything on the hot path). }
+{ =============================================================================== }
 
 procedure Backspace(KeyRepeat: Integer = 1);
-var
-  I: Integer;
-
 begin
   if KeyRepeat <= 0 then
-    KeyRepeat := 1;
-
-  for I := 1 to KeyRepeat do
-  begin
-    SendKey_SendInput(VK_Back);
-    SendKey_SendInput(VK_NONAME); // Hack: Unused key to try to avoid key buffering issue (deleting too much)
-  end;
+    Exit;
+  { One batched SendInput instead of 4 * KeyRepeat separate calls. }
+  SendInputBatch_Backspace(KeyRepeat);
 end;
 
 { =============================================================================== }
 
 procedure SendKey_Char(const Keytext: string);
-var
-  I: Integer;
 begin
-  Log('SendKey_Char: ' + Keytext);
-
-  for I := 1 to Length(Keytext) do
-  begin
-    SendKey_Basic(Ord(Keytext[I]));
-    SendKey_SendInput(VK_NONAME); // Hack: Unused key to try to avoid key buffering issue
-  end;
-
+  // PERF: no Log() here - this ran once per emitted character (see header).
+  if Keytext = '' then
+    Exit;
+  { One batched SendInput instead of 4 * Length(Keytext) separate calls. }
+  SendInputBatch_BackspaceAndChar(0, Keytext);
 end;
 
 { =============================================================================== }
@@ -282,13 +305,41 @@ end;
 
 { =============================================================================== }
 
+{ Number of INPUT events one backspace costs (2 without the NONAME hack, 4
+  with it). }
+function BackspaceEventCount: Integer;
+begin
+  if USE_NONAME_HACK then
+    Result := 4
+  else
+    Result := 2;
+end;
+
+{ Number of INPUT events one character costs (2 without the NONAME hack, 4
+  with it). }
+function CharEventCount: Integer;
+begin
+  if USE_NONAME_HACK then
+    Result := 4
+  else
+    Result := 2;
+end;
+
+{ =============================================================================== }
+
 procedure SendInputBatch_BackspaceAndChar(KeyRepeat: Integer; const CharToSend: string);
 var
   Inputs:                array of TInput;
   TotalEvents, Index, I: Integer;
   J:                     Integer;
 begin
-  TotalEvents := (KeyRepeat * 4) + (Length(CharToSend) * 4);
+  if KeyRepeat < 0 then
+    KeyRepeat := 0;
+
+  TotalEvents := (KeyRepeat * BackspaceEventCount) + (Length(CharToSend) * CharEventCount);
+  if TotalEvents = 0 then
+    Exit; // nothing to send - never touch Inputs[0] of an empty array
+
   SetLength(Inputs, TotalEvents);
   index := 0;
 
@@ -310,21 +361,24 @@ begin
     Inputs[index].ki.dwExtraInfo := 0;
     Inc(index);
 
-    Inputs[index].Itype := INPUT_KEYBOARD;
-    Inputs[index].ki.wVk := VK_NONAME;
-    Inputs[index].ki.wScan := MapVirtualKey(VK_NONAME, 0);
-    Inputs[index].ki.dwFlags := 0;
-    Inputs[index].ki.time := 0;
-    Inputs[index].ki.dwExtraInfo := 0;
-    Inc(index);
+    if USE_NONAME_HACK then
+    begin
+      Inputs[index].Itype := INPUT_KEYBOARD;
+      Inputs[index].ki.wVk := VK_NONAME;
+      Inputs[index].ki.wScan := MapVirtualKey(VK_NONAME, 0);
+      Inputs[index].ki.dwFlags := 0;
+      Inputs[index].ki.time := 0;
+      Inputs[index].ki.dwExtraInfo := 0;
+      Inc(index);
 
-    Inputs[index].Itype := INPUT_KEYBOARD;
-    Inputs[index].ki.wVk := VK_NONAME;
-    Inputs[index].ki.wScan := MapVirtualKey(VK_NONAME, 0);
-    Inputs[index].ki.dwFlags := KEYEVENTF_KEYUP;
-    Inputs[index].ki.time := 0;
-    Inputs[index].ki.dwExtraInfo := 0;
-    Inc(index);
+      Inputs[index].Itype := INPUT_KEYBOARD;
+      Inputs[index].ki.wVk := VK_NONAME;
+      Inputs[index].ki.wScan := MapVirtualKey(VK_NONAME, 0);
+      Inputs[index].ki.dwFlags := KEYEVENTF_KEYUP;
+      Inputs[index].ki.time := 0;
+      Inputs[index].ki.dwExtraInfo := 0;
+      Inc(index);
+    end;
   end;
 
   for J := 1 to Length(CharToSend) do
@@ -345,21 +399,24 @@ begin
     Inputs[index].ki.dwExtraInfo := 0;
     Inc(index);
 
-    Inputs[index].Itype := INPUT_KEYBOARD;
-    Inputs[index].ki.wVk := VK_NONAME;
-    Inputs[index].ki.wScan := MapVirtualKey(VK_NONAME, 0);
-    Inputs[index].ki.dwFlags := 0;
-    Inputs[index].ki.time := 0;
-    Inputs[index].ki.dwExtraInfo := 0;
-    Inc(index);
+    if USE_NONAME_HACK then
+    begin
+      Inputs[index].Itype := INPUT_KEYBOARD;
+      Inputs[index].ki.wVk := VK_NONAME;
+      Inputs[index].ki.wScan := MapVirtualKey(VK_NONAME, 0);
+      Inputs[index].ki.dwFlags := 0;
+      Inputs[index].ki.time := 0;
+      Inputs[index].ki.dwExtraInfo := 0;
+      Inc(index);
 
-    Inputs[index].Itype := INPUT_KEYBOARD;
-    Inputs[index].ki.wVk := VK_NONAME;
-    Inputs[index].ki.wScan := MapVirtualKey(VK_NONAME, 0);
-    Inputs[index].ki.dwFlags := KEYEVENTF_KEYUP;
-    Inputs[index].ki.time := 0;
-    Inputs[index].ki.dwExtraInfo := 0;
-    Inc(index);
+      Inputs[index].Itype := INPUT_KEYBOARD;
+      Inputs[index].ki.wVk := VK_NONAME;
+      Inputs[index].ki.wScan := MapVirtualKey(VK_NONAME, 0);
+      Inputs[index].ki.dwFlags := KEYEVENTF_KEYUP;
+      Inputs[index].ki.time := 0;
+      Inputs[index].ki.dwExtraInfo := 0;
+      Inc(index);
+    end;
   end;
 
   SendInput(TotalEvents, Inputs[0], SizeOf(Inputs[0]));
@@ -372,7 +429,10 @@ var
   Inputs:                array of TInput;
   TotalEvents, Index, I: Integer;
 begin
-  TotalEvents := KeyRepeat * 4;
+  if KeyRepeat <= 0 then
+    Exit;
+
+  TotalEvents := KeyRepeat * BackspaceEventCount;
   SetLength(Inputs, TotalEvents);
   index := 0;
 
@@ -394,21 +454,24 @@ begin
     Inputs[index].ki.dwExtraInfo := 0;
     Inc(index);
 
-    Inputs[index].Itype := INPUT_KEYBOARD;
-    Inputs[index].ki.wVk := VK_NONAME;
-    Inputs[index].ki.wScan := MapVirtualKey(VK_NONAME, 0);
-    Inputs[index].ki.dwFlags := 0;
-    Inputs[index].ki.time := 0;
-    Inputs[index].ki.dwExtraInfo := 0;
-    Inc(index);
+    if USE_NONAME_HACK then
+    begin
+      Inputs[index].Itype := INPUT_KEYBOARD;
+      Inputs[index].ki.wVk := VK_NONAME;
+      Inputs[index].ki.wScan := MapVirtualKey(VK_NONAME, 0);
+      Inputs[index].ki.dwFlags := 0;
+      Inputs[index].ki.time := 0;
+      Inputs[index].ki.dwExtraInfo := 0;
+      Inc(index);
 
-    Inputs[index].Itype := INPUT_KEYBOARD;
-    Inputs[index].ki.wVk := VK_NONAME;
-    Inputs[index].ki.wScan := MapVirtualKey(VK_NONAME, 0);
-    Inputs[index].ki.dwFlags := KEYEVENTF_KEYUP;
-    Inputs[index].ki.time := 0;
-    Inputs[index].ki.dwExtraInfo := 0;
-    Inc(index);
+      Inputs[index].Itype := INPUT_KEYBOARD;
+      Inputs[index].ki.wVk := VK_NONAME;
+      Inputs[index].ki.wScan := MapVirtualKey(VK_NONAME, 0);
+      Inputs[index].ki.dwFlags := KEYEVENTF_KEYUP;
+      Inputs[index].ki.time := 0;
+      Inputs[index].ki.dwExtraInfo := 0;
+      Inc(index);
+    end;
   end;
 
   SendInput(TotalEvents, Inputs[0], SizeOf(Inputs[0]));

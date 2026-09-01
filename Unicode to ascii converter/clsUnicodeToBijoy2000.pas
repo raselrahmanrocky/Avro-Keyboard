@@ -4676,7 +4676,8 @@ end;
 
 procedure OptimizeMemoryUsage;
 begin
-  SetProcessWorkingSetSize(GetCurrentProcess, $FFFFFFFF, $FFFFFFFF);
+  // no-op - same working-set flush as TrimAppMemorySize, fired on every
+  // LoadCurrentActiveMapping (i.e. after every settings change).
 end;
 
 function TUnicodeToBijoy2000.ResolveAnsiSequence(const PrecedingContext: string; const ModifierChar: string; out ResolvedAnsi: string; out EraseCount: Integer;

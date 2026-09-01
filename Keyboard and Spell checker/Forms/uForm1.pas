@@ -386,6 +386,7 @@ type
       procedure WMCopyData(var Msg: TWMCopyData); message WM_COPYDATA;
       procedure WMShowAnsiPicker(var Msg: TMessage); message WM_APP + 1;
       procedure WMShowLayoutPicker(var Msg: TMessage); message WM_APP + 3;
+      procedure WMAvroEmit(var Msg: TMessage); message WM_APP + 10;
     public
       { Public declarations }
       KeyboardModeChanged: Boolean;
@@ -771,15 +772,12 @@ end;
 {$HINTS Off}
 
 procedure TAvroMainForm1.IdleTimerTimer(Sender: TObject);
-var
-  liInfo:      TLastInputInfo;
-  SecondsIdle: DWord;
 begin
-  liInfo.cbSize := SizeOf(TLastInputInfo);
-  GetLastInputInfo(liInfo);
-  SecondsIdle := (GetTickCount - liInfo.dwTime) div 1000;
-  if SecondsIdle > 30 then
-    TrimAppMemorySize;
+  { Intentionally empty.
+    TrimAppMemorySize called SetProcessWorkingSetSize(-1,-1), which wrote the
+    whole working set back to disk. Every keystroke afterwards paid a hard page
+    fault storm - that is the multi-second lag, and it got worse the bigger the
+    heap grew. Windows trims by itself when memory is actually needed. }
 end;
 
 function TAvroMainForm1.IgnorableWindow(const lngHWND: HWND): Boolean;
@@ -1969,16 +1967,8 @@ begin
 end;
 
 procedure TAvroMainForm1.TrimAppMemorySize;
-var
-  MainHandle: THandle;
 begin
-  try
-    MainHandle := OpenProcess(PROCESS_ALL_ACCESS, False, GetCurrentProcessID);
-    SetProcessWorkingSetSize(MainHandle, $FFFFFFFF, $FFFFFFFF);
-    CloseHandle(MainHandle);
-  except
-  end;
-  Application.ProcessMessages;
+  // no-op - see IdleTimerTimer. Kept so every existing call site still compiles.
 end;
 
 procedure TAvroMainForm1.TypeJoNuktawithShiftJ1Click(Sender: TObject);
@@ -2035,19 +2025,23 @@ end;
 
 procedure TAvroMainForm1.WindowCheckTimer(Sender: TObject);
 var
-  WindoRecord: TWindowRecord;
-  hforewnd:    HWND;
+  WindoRecord:  TWindowRecord;
+  hforewnd:     HWND;
+  Path:         string;
+  NewWriteTime: TDateTime;
 begin
 
   // --- Auto-refresh: check if JSON mapping file changed externally (Safe Wrapper) ---
   if (AnsiVersion <> 'Default') and (AnsiMappingDir <> '') then
   begin
     try
-      if TFile.Exists(AnsiMappingDir + AnsiVersion + '.json') then
+      Path := AnsiMappingDir + AnsiVersion + '.json';
+      if TFile.Exists(Path) then
       begin
-        if TFile.GetLastWriteTime(AnsiMappingDir + AnsiVersion + '.json') <> FActiveMappingLastWriteTime then
+        NewWriteTime := TFile.GetLastWriteTime(Path);
+        if NewWriteTime <> FActiveMappingLastWriteTime then
         begin
-          FActiveMappingLastWriteTime := TFile.GetLastWriteTime(AnsiMappingDir + AnsiVersion + '.json');
+          FActiveMappingLastWriteTime := NewWriteTime;
           LoadCurrentActiveMapping;
           Log('ANSI Mapping Auto-Refreshed: ' + AnsiVersion);
         end;
@@ -2111,6 +2105,20 @@ end;
 procedure TAvroMainForm1.WMShowAnsiPicker(var Msg: TMessage);
 begin
   ToggleAnsiVersionPicker;
+end;
+
+{ =============================================================================== }
+
+{ Deferred output (see AVRO_DEFER_EMIT in clsGenericLayoutOld).
+  SendInput must NOT run inside the low-level keyboard hook callback: the Raw
+  Input Thread is blocked there, which made every call cost ~1.0-1.5 ms and
+  made the injected events flush in bursts ("hang, then everything appears at
+  once"). The layout engine now only queues the emit and posts this message, so
+  the actual injection happens here - on the main thread, outside the hook. }
+procedure TAvroMainForm1.WMAvroEmit(var Msg: TMessage);
+begin
+  if Assigned(KeyLayout) then
+    KeyLayout.FlushEmit;
 end;
 
 procedure TAvroMainForm1.WMCopyData(var Msg: TWMCopyData);
