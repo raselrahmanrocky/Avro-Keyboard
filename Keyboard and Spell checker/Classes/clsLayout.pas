@@ -72,6 +72,7 @@ type
       function ProcessVKeyDown(const KeyCode: Integer; var Block: Boolean): string;
       procedure ProcessVKeyUP(const KeyCode: Integer; var Block: Boolean);
       procedure ResetDeadKey;
+      procedure FlushEmit; // Deferred output: drains the old-style layout emit queue
       procedure ToggleMode;
       procedure BanglaMode;
       procedure SysMode;
@@ -208,6 +209,19 @@ begin
   AvroPhonetic.ResetDeadKey;
   GenericModernFixed.ResetDeadKey;
   GenericOldFixed.ResetDeadKey;
+end;
+
+{ =============================================================================== }
+
+{ Deferred output (see clsGenericLayoutOld / AVRO_DEFER_EMIT).
+  The old-style layout queues its SendInput work and posts WM_AVRO_EMIT; the
+  main form forwards that message here, and the queue is drained OUTSIDE the
+  low-level keyboard hook callback (the Raw Input Thread is blocked in there).
+  The modern layout emits directly, so there is nothing to flush for it. }
+procedure TLayout.FlushEmit;
+begin
+  if Assigned(GenericOldFixed) then
+    GenericOldFixed.FlushEmit;
 end;
 
 { =============================================================================== }
