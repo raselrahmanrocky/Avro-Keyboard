@@ -332,6 +332,7 @@ type
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
     procedure Spellcheck1Click(Sender: TObject);
     procedure IdleTimerTimer(Sender: TObject);
+    procedure WMAvroEmit(var Msg: TMessage); message WM_APP + 10;
     procedure AboutCurrentskin1Click(Sender: TObject);
     procedure UnicodetoBijoytextconverter1Click(Sender: TObject);
     procedure FormCloseQuery(Sender: TObject; var CanClose: Boolean);
@@ -386,7 +387,6 @@ type
       procedure WMCopyData(var Msg: TWMCopyData); message WM_COPYDATA;
       procedure WMShowAnsiPicker(var Msg: TMessage); message WM_APP + 1;
       procedure WMShowLayoutPicker(var Msg: TMessage); message WM_APP + 3;
-      procedure WMAvroEmit(var Msg: TMessage); message WM_APP + 10;
     public
       { Public declarations }
       KeyboardModeChanged: Boolean;
@@ -773,11 +773,21 @@ end;
 
 procedure TAvroMainForm1.IdleTimerTimer(Sender: TObject);
 begin
-  { Intentionally empty.
-    TrimAppMemorySize called SetProcessWorkingSetSize(-1,-1), which wrote the
-    whole working set back to disk. Every keystroke afterwards paid a hard page
-    fault storm - that is the multi-second lag, and it got worse the bigger the
-    heap grew. Windows trims by itself when memory is actually needed. }
+  { PERF: this used to call TrimAppMemorySize (SetProcessWorkingSetSize(-1,-1))
+    after 30 s idle. That flushed the whole working set to disk, so the next
+    keystrokes paid a hard page-fault storm - the "hang after a pause" and the
+    progressive slowdown. Trimming does not save memory on modern Windows.
+    Intentionally left empty. }
+end;
+
+procedure TAvroMainForm1.WMAvroEmit(var Msg: TMessage);
+begin
+  { Deferred output: clsGenericLayoutOld.EmitBatch queues the output and posts
+    WM_AVRO_EMIT (WM_APP + 10) instead of calling SendInput from inside the
+    low-level keyboard hook. Draining the queue here - on the main thread,
+    after the hook returned - keeps the Raw Input Thread unblocked. }
+  if Assigned(KeyLayout) then
+    KeyLayout.FlushEmit;
 end;
 
 function TAvroMainForm1.IgnorableWindow(const lngHWND: HWND): Boolean;
@@ -1968,7 +1978,7 @@ end;
 
 procedure TAvroMainForm1.TrimAppMemorySize;
 begin
-  // no-op - see IdleTimerTimer. Kept so every existing call site still compiles.
+  { PERF: intentional no-op - see IdleTimerTimer. }
 end;
 
 procedure TAvroMainForm1.TypeJoNuktawithShiftJ1Click(Sender: TObject);
@@ -2025,23 +2035,19 @@ end;
 
 procedure TAvroMainForm1.WindowCheckTimer(Sender: TObject);
 var
-  WindoRecord:  TWindowRecord;
-  hforewnd:     HWND;
-  Path:         string;
-  NewWriteTime: TDateTime;
+  WindoRecord: TWindowRecord;
+  hforewnd:    HWND;
 begin
 
   // --- Auto-refresh: check if JSON mapping file changed externally (Safe Wrapper) ---
   if (AnsiVersion <> 'Default') and (AnsiMappingDir <> '') then
   begin
     try
-      Path := AnsiMappingDir + AnsiVersion + '.json';
-      if TFile.Exists(Path) then
+      if TFile.Exists(AnsiMappingDir + AnsiVersion + '.json') then
       begin
-        NewWriteTime := TFile.GetLastWriteTime(Path);
-        if NewWriteTime <> FActiveMappingLastWriteTime then
+        if TFile.GetLastWriteTime(AnsiMappingDir + AnsiVersion + '.json') <> FActiveMappingLastWriteTime then
         begin
-          FActiveMappingLastWriteTime := NewWriteTime;
+          FActiveMappingLastWriteTime := TFile.GetLastWriteTime(AnsiMappingDir + AnsiVersion + '.json');
           LoadCurrentActiveMapping;
           Log('ANSI Mapping Auto-Refreshed: ' + AnsiVersion);
         end;
@@ -2105,20 +2111,6 @@ end;
 procedure TAvroMainForm1.WMShowAnsiPicker(var Msg: TMessage);
 begin
   ToggleAnsiVersionPicker;
-end;
-
-{ =============================================================================== }
-
-{ Deferred output (see AVRO_DEFER_EMIT in clsGenericLayoutOld).
-  SendInput must NOT run inside the low-level keyboard hook callback: the Raw
-  Input Thread is blocked there, which made every call cost ~1.0-1.5 ms and
-  made the injected events flush in bursts ("hang, then everything appears at
-  once"). The layout engine now only queues the emit and posts this message, so
-  the actual injection happens here - on the main thread, outside the hook. }
-procedure TAvroMainForm1.WMAvroEmit(var Msg: TMessage);
-begin
-  if Assigned(KeyLayout) then
-    KeyLayout.FlushEmit;
 end;
 
 procedure TAvroMainForm1.WMCopyData(var Msg: TWMCopyData);
