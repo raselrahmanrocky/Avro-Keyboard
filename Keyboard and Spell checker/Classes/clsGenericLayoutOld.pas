@@ -166,6 +166,8 @@ type
 implementation
 
 uses
+  Windows,
+  Messages,
   Banglachars,
   KeyboardFunctions,
   uForm1,
@@ -176,26 +178,6 @@ uses
   uRegistrySettings,
   uCaretContextSniffer;
 
-{ ===============================================================================
-  OPTIONAL PERFORMANCE PROFILER
-  -------------------------------------------------------------------------------
-  The lag is NOT necessarily in this unit, so measure instead of guessing.
-  Every keystroke is timed and split into:
-
-  GetCharForKey   - layout lookup            (KeyboardLayoutLoader)
-  Bijoy.Convert  - Unicode -> ANSI          (clsUnicodeToBijoy2000)
-  ParseAndSendNow- full output step (includes its own send calls)
-  send+other     - the rest: SendKey_Char / Backspace (synthetic input),
-  caret sniffing, ...
-
-  Results go to the debugger (OutputDebugString - read them with SysInternals
-  DebugView, or in the Delphi IDE's "Event Log" while debugging), dumped after
-  every 100 keystrokes.
-
-  Turn it OFF for the release build by commenting out the AVRO_PROFILE
-  DEFINE line below.
-  =============================================================================== }
-//{$DEFINE AVRO_PROFILE}
 { ===============================================================================
   OPTIONAL DEFERRED INJECTION  -  AVRO_DEFER_EMIT
   -------------------------------------------------------------------------------
@@ -233,82 +215,10 @@ var
   FEmitN: Integer;
   FEmitQ: array of TEmitRec;
   {$ENDIF}
-  {$IFDEF AVRO_PROFILE}
-function QueryPerformanceCounter(var lpPerformanceCount: Int64): LongBool; stdcall; external 'kernel32.dll' name 'QueryPerformanceCounter';
-function QueryPerformanceFrequency(var lpFrequency: Int64): LongBool; stdcall; external 'kernel32.dll' name 'QueryPerformanceFrequency';
-procedure OutputDebugStringA(lpOutputString: PAnsiChar); stdcall; external 'kernel32.dll' name 'OutputDebugStringA';
-function PostMessageW(hWnd: NativeUInt; Msg: Cardinal; wParam: NativeUInt; lParam: NativeInt): LongBool; stdcall; external 'user32.dll' name 'PostMessageW';
+  { =============================================================================== }
+  { =============================================================================== }
 
-var
-  ProfFreq:      Int64   = 0;
-  ProfKeys:      Integer = 0;
-  ProfTickTotal: Int64   = 0;
-  ProfTickKey:   Int64   = 0;
-  ProfTickConv:  Int64   = 0;
-  ProfTickParse: Int64   = 0;
-  ProfCallsConv: Integer = 0;
-  ProfEmitted:   Integer = 0; // backspaces + characters pushed into the queue
-  ProfMaxErase:  Integer = 0; // worst single erase (big = retyping churn)
-  ProfTickSend:  Int64   = 0; // time spent INSIDE SendInput
-  ProfSendCalls: Integer = 0; // how many SendInput calls per keystroke
-
-function ProfTicks: Int64;
-begin
-  QueryPerformanceCounter(Result);
-end;
-
-{ average milliseconds per keystroke for every counter }
-procedure ProfDump;
-var
-  K, MS: Double;
-
-  procedure Say(const Line: string);
-  begin
-    OutputDebugStringA(PAnsiChar(AnsiString(Line)));
-  end;
-
-begin
-  if ProfFreq = 0 then
-    QueryPerformanceFrequency(ProfFreq);
-  if (ProfFreq = 0) or (ProfKeys = 0) then
-    Exit;
-
-  K := ProfKeys;
-  Say('=== Avro profile: ' + IntToStr(ProfKeys) + ' keys ===');
-  MS := ProfTickTotal / ProfFreq * 1000.0 / K;
-  Say(Format('  TOTAL per key     : %8.3f ms', [MS]));
-  MS := ProfTickKey / ProfFreq * 1000.0 / K;
-  Say(Format('  GetCharForKey     : %8.3f ms', [MS]));
-  MS := ProfTickParse / ProfFreq * 1000.0 / K;
-  Say(Format('  ParseAndSendNow   : %8.3f ms', [MS]));
-  MS := ProfTickConv / ProfFreq * 1000.0 / K;
-  Say(Format('  Bijoy.Convert     : %8.3f ms   (%d calls/key)', [MS, Round(ProfCallsConv / K)]));
-  MS := (ProfTickTotal - ProfTickKey - ProfTickParse) / ProfFreq * 1000.0 / K;
-  Say(Format('  send + everything : %8.3f ms', [MS]));
-  Say(Format('  INJECTED events   : %6.2f per key   (worst erase = %d)', [ProfEmitted / K, ProfMaxErase]));
-  MS := ProfTickSend / ProfFreq * 1000.0 / K;
-  Say(Format('  SendInput         : %8.3f ms   (%.2f calls/key, %.3f ms each) DEFERRED', [MS, ProfSendCalls / K, MS / (ProfSendCalls / K)]));
-  { SendInput no longer runs inside ParseAndSendNow (AVRO_DEFER_EMIT), so it
-    must NOT be subtracted here - that produced a negative number. }
-  MS := ProfTickParse / ProfFreq * 1000.0 / K;
-  Say(Format('  diff + string ops : %8.3f ms   (queue fill only)', [MS]));
-
-  ProfKeys := 0;
-  ProfTickTotal := 0;
-  ProfTickKey := 0;
-  ProfTickConv := 0;
-  ProfTickParse := 0;
-  ProfCallsConv := 0;
-  ProfEmitted := 0;
-  ProfMaxErase := 0;
-  ProfTickSend := 0;
-  ProfSendCalls := 0;
-end;
-{$ENDIF}
-{ =============================================================================== }
-{ =============================================================================== }
-
-{ TGenericLayoutOld }
+  { TGenericLayoutOld }
 
 constructor TGenericLayoutOld.Create;
 begin
@@ -422,15 +332,7 @@ end;
   last result is simply remembered. Cleared on every word reset.
 }
 function TGenericLayoutOld.ConvCached(const T: string): string;
-{$IFDEF AVRO_PROFILE}
-var
-  tProf: Int64;
-  {$ENDIF}
 begin
-  {$IFDEF AVRO_PROFILE}
-  tProf := ProfTicks;
-  Inc(ProfCallsConv);
-  {$ENDIF}
   if (T <> '') and (T = FConvSrc) then
     Result := FConvAnsi
   else
@@ -439,9 +341,6 @@ begin
     FConvSrc := T;
     FConvAnsi := Result;
   end;
-  {$IFDEF AVRO_PROFILE}
-  Inc(ProfTickConv, ProfTicks - tProf);
-  {$ENDIF}
 end;
 
 { =============================================================================== }
@@ -478,18 +377,9 @@ end;
   effect.
 }
 procedure TGenericLayoutOld.EmitBatch(const EraseCount: Integer; const Text: string);
-{$IFDEF AVRO_PROFILE}
-var
-  tProf: Int64;
-  {$ENDIF}
 begin
   if (EraseCount <= 0) and (Text = '') then
     Exit;
-  {$IFDEF AVRO_PROFILE}
-  Inc(ProfEmitted, EraseCount + Length(Text));
-  if EraseCount > ProfMaxErase then
-    ProfMaxErase := EraseCount;
-  {$ENDIF}
   {$IFDEF AVRO_DEFER_EMIT}
   if FEmitN >= Length(FEmitQ) then
     SetLength(FEmitQ, FEmitN + 32);
@@ -497,16 +387,9 @@ begin
   FEmitQ[FEmitN].Text := Text;
   Inc(FEmitN);
   { Runs after the hook callback returned - see the AVRO_DEFER_EMIT note. }
-  PostMessageW(NativeUInt(AvroMainForm1.Handle), WM_AVRO_EMIT, 0, 0);
+  PostMessage(AvroMainForm1.Handle, WM_AVRO_EMIT, 0, 0);
   {$ELSE}
-  {$IFDEF AVRO_PROFILE}
-  tProf := ProfTicks;
-  Inc(ProfSendCalls);
-  {$ENDIF}
   SendInputBatch_BackspaceAndChar(EraseCount, Text);
-  {$IFDEF AVRO_PROFILE}
-  Inc(ProfTickSend, ProfTicks - tProf);
-  {$ENDIF}
   {$ENDIF}
 end;
 
@@ -515,20 +398,10 @@ end;
 procedure TGenericLayoutOld.FlushEmit;
 var
   I: Integer;
-  {$IFDEF AVRO_PROFILE}
-  tProf: Int64;
-  {$ENDIF}
 begin
   for I := 0 to FEmitN - 1 do
   begin
-    {$IFDEF AVRO_PROFILE}
-    tProf := ProfTicks;
-    Inc(ProfSendCalls);
-    {$ENDIF}
     SendInputBatch_BackspaceAndChar(FEmitQ[I].EraseCount, FEmitQ[I].Text);
-    {$IFDEF AVRO_PROFILE}
-    Inc(ProfTickSend, ProfTicks - tProf);
-    {$ENDIF}
   end;
   FEmitN := 0;
 end;
@@ -1492,9 +1365,6 @@ var
   ArmedKar, mKar:                    string;
   KarInBuffer:                       Boolean;
   IsRephTailCtx:                     Boolean;
-  {$IFDEF AVRO_PROFILE}
-  tProf: Int64;
-  {$ENDIF}
 begin
 
   if AvroMainForm1.GetMyCurrentKeyboardMode = SysDefault then
@@ -1506,13 +1376,7 @@ begin
   end
   else if AvroMainForm1.GetMyCurrentKeyboardMode = bangla then
   begin
-    {$IFDEF AVRO_PROFILE}
-    tProf := ProfTicks;
-    {$ENDIF}
     CharForKey := GetCharForKey(KeyCode, var_IsLogicalShift, var_IsTrueShift, var_IsAltGr);
-    {$IFDEF AVRO_PROFILE}
-    Inc(ProfTickKey, ProfTicks - tProf);
-    {$ENDIF}
     if LastChar = b_Hasanta then
     begin
       { OLD STYLE: after a typed reph (র্) a pre-base kar key still floats
@@ -2097,13 +1961,7 @@ var
   Matched, UnMatched:                   Integer;
   BijoyPrevBanglaT, BijoyNewBanglaText: string;
   PrevConv:                             string;
-  {$IFDEF AVRO_PROFILE}
-  tProf: Int64;
-  {$ENDIF}
 begin
-  {$IFDEF AVRO_PROFILE}
-  tProf := ProfTicks;
-  {$ENDIF}
   Matched := 0;
 
   if OutputIsBijoy <> 'YES' then
@@ -2177,9 +2035,6 @@ begin
     end;
 
   end;
-  {$IFDEF AVRO_PROFILE}
-  Inc(ProfTickParse, ProfTicks - tProf);
-  {$ENDIF}
 end;
 
 { =============================================================================== }
@@ -2189,14 +2044,8 @@ var
   m_Block:      Boolean;
   m_Str:        string;
   IsoChainCont: Boolean;
-  {$IFDEF AVRO_PROFILE}
-  tProf: Int64;
-  {$ENDIF}
 begin
   m_Block := False;
-  {$IFDEF AVRO_PROFILE}
-  tProf := ProfTicks;
-  {$ENDIF}
   if (IsWinKey = True) or (IsOnlyCtrlKey = True) or (IsOnlyLeftAltKey = True) then
   begin
     Block := False;
@@ -2258,13 +2107,6 @@ begin
 
   Block := m_Block;
   ProcessVKeyDown := '';
-
-  {$IFDEF AVRO_PROFILE}
-  Inc(ProfTickTotal, ProfTicks - tProf);
-  Inc(ProfKeys);
-  if ProfKeys >= 100 then
-    ProfDump;
-  {$ENDIF}
 end;
 
 { =============================================================================== }
