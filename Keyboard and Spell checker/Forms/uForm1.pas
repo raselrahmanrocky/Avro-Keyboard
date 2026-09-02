@@ -376,10 +376,10 @@ type
 
       procedure HandleThemes;
       procedure AnsiVersionMenuClick(Sender: TObject);
-      procedure ImportAnsiMappingClick(Sender: TObject);
       procedure ReadAnsiDescriptionClick(Sender: TObject);
       procedure ExportSpecificMappingClick(Sender: TObject);
       procedure DeleteAnsiMappingClick(Sender: TObject);
+      procedure ImportAnsiMappingClick(Sender: TObject);
       procedure OpenAnsiMappingDirClick(Sender: TObject);
       procedure IgnoreCapsLockClick(Sender: TObject);
       procedure PopupToolsPopup(Sender: TObject);
@@ -698,7 +698,6 @@ end;
 procedure TAvroMainForm1.FormClose(Sender: TObject; var Action: TCloseAction);
 begin
   Action := caFree;
-
   AvroMainForm1 := nil;
 end;
 
@@ -718,7 +717,6 @@ begin
   Application.ProcessMessages;
 
   LoadSettings;
-
   LoadApp;
 end;
 
@@ -778,74 +776,6 @@ begin
   SecondsIdle := (GetTickCount - liInfo.dwTime) div 1000;
   if SecondsIdle > 30 then
     TrimAppMemorySize;
-end;
-
-procedure TAvroMainForm1.ReadAnsiDescriptionClick(Sender: TObject);
-var
-  MapName, FilePath, Content, DescText: string;
-begin
-  if not (Sender is TMenuItem) then Exit;
-  MapName := (Sender as TMenuItem).Hint;
-  
-  if SameText(MapName, 'Default') then
-  begin
-    MessageDlg('Default Bijoy 2000 compatible ANSI mapping built into Avro Keyboard.' + sLineBreak +
-      'Standard layout with automatic contextual post-base / pre-base kar support.', 
-      mtInformation, [mbOK], 0);
-    Exit;
-  end;
-
-  FilePath := AnsiMappingDir + MapName + '.json';
-  if FileExists(FilePath) then
-  begin
-    try
-      Content := TFile.ReadAllText(FilePath, TEncoding.UTF8);
-      DescText := 'Mapping Name: ' + MapName + sLineBreak +
-                  'File Path: ' + FilePath + sLineBreak + sLineBreak +
-                  'File Content Preview:' + sLineBreak +
-                  Copy(Content, 1, 350) + '...';
-      MessageDlg(DescText, mtInformation, [mbOK], 0);
-    except
-      on E: Exception do
-        MessageDlg('Could not read description: ' + E.Message, mtError, [mbOK], 0);
-    end;
-  end
-  else
-    MessageDlg('Mapping file not found on disk.', mtError, [mbOK], 0);
-end;
-
-procedure TAvroMainForm1.ExportSpecificMappingClick(Sender: TObject);
-var
-  MapName, SourcePath: string;
-  SaveDialog: TSaveDialog;
-begin
-  if not (Sender is TMenuItem) then Exit;
-  MapName := (Sender as TMenuItem).Hint;
-  
-  SaveDialog := TSaveDialog.Create(nil);
-  try
-    SaveDialog.Filter := 'ANSI Mapping JSON|*.json';
-    SaveDialog.DefaultExt := 'json';
-    SaveDialog.Title := 'Export ' + MapName + ' Mapping JSON';
-    SaveDialog.FileName := MapName + '.json';
-
-    if SaveDialog.Execute then
-    begin
-      if SameText(MapName, 'Default') then
-        ExportAnsiMapping(SaveDialog.FileName)
-      else
-      begin
-        SourcePath := AnsiMappingDir + MapName + '.json';
-        if FileExists(SourcePath) then
-          CopyFile(PChar(SourcePath), PChar(SaveDialog.FileName), False)
-        else
-          ExportAnsiMapping(SaveDialog.FileName);
-      end;
-      MessageDlg('Mapping exported to: '#13#10 + SaveDialog.FileName, mtInformation, [mbOK], 0);
-    end;
-  finally
-    SaveDialog.Free;
-  end;
 end;
 
 procedure TAvroMainForm1.WMAvroEmit(var Msg: TMessage);
@@ -1033,7 +963,6 @@ begin
     AvroPhoneticEnglishtoBangla3.Checked := True;
     AvroPhoneticEnglishtoBangla2.Checked := True;
     AvroPhoneticEnglishtoBangla1.Checked := True;
-
   end
   else
   begin
@@ -1057,7 +986,6 @@ begin
         if Lowercase((Popup_LayoutList.Items[I] as TMenuItemExtended).Value) = Lowercase(CurrentKeyboardLayout) then
           Popup_LayoutList.Items[I].Checked := True;
     end;
-
   end;
   MyCurrentLayout := CurrentKeyboardLayout;
   if IsFormLoaded('LayoutViewer') then
@@ -1065,7 +993,6 @@ begin
   DefaultLayout := CurrentKeyboardLayout;
 
   RefreshSettings;
-
 end;
 
 procedure TAvroMainForm1.KeyLayout_KeyboardModeChanged(CurrentMode: enumMode);
@@ -1106,7 +1033,6 @@ begin
     begin
       NewWindowRecord.Mode := 'S';
       WindowDict.AddOrSetValue(hforewnd, NewWindowRecord);
-
       MyCurrentKeyboardMode := SysDefault;
     end;
   end
@@ -1117,23 +1043,19 @@ begin
     begin
       NewWindowRecord.Mode := 'B';
       WindowDict.AddOrSetValue(hforewnd, NewWindowRecord);
-
       MyCurrentKeyboardMode := bangla;
     end
     else if CurrentMode = SysDefault then
     begin
       NewWindowRecord.Mode := 'S';
       WindowDict.AddOrSetValue(hforewnd, NewWindowRecord);
-
       MyCurrentKeyboardMode := SysDefault;
-
       WindowDict.Remove(hforewnd);
     end;
   end;
 
   { Update user interface }
   UpdateTrayIcon;
-
 end;
 
 { =============================================================================== }
@@ -1203,7 +1125,6 @@ begin
 
   {$IFDEF PortableOn}
   InstallVirtualFont(ExtractFilePath(Application.ExeName) + 'Virtual Font\Siyamrupali.ttf');
-
   {$ENDIF}
   if AvroUpdateCheck = 'YES' then
     InternetCheck.Enabled := True
@@ -1243,7 +1164,6 @@ begin
   end;
   LoadCurrentActiveMapping;
   BuildAnsiVersionMenus;
-
 end;
 
 procedure TAvroMainForm1.ManageAutoCorrectentries1Click(Sender: TObject);
@@ -1284,43 +1204,36 @@ begin
         Execute_Something(ExtractFilePath(Application.ExeName) + 'Before You Start.pdf')
       else
         Execute_Something('https://www.omicronlab.com/go.php?id=' + IntToStr(HelpID));
-
     24:
       if FileExists(ExtractFilePath(Application.ExeName) + 'Overview.pdf') then
         Execute_Something(ExtractFilePath(Application.ExeName) + 'Overview.pdf')
       else
         Execute_Something('https://www.omicronlab.com/go.php?id=' + IntToStr(HelpID));
-
     25:
       if FileExists(ExtractFilePath(Application.ExeName) + 'Customizing Avro Keyboard.pdf') then
         Execute_Something(ExtractFilePath(Application.ExeName) + 'Customizing Avro Keyboard.pdf')
       else
         Execute_Something('https://www.omicronlab.com/go.php?id=' + IntToStr(HelpID));
-
     26:
       if FileExists(ExtractFilePath(Application.ExeName) + 'Bangla Typing with Avro Phonetic.pdf') then
         Execute_Something(ExtractFilePath(Application.ExeName) + 'Bangla Typing with Avro Phonetic.pdf')
       else
         Execute_Something('https://www.omicronlab.com/go.php?id=' + IntToStr(HelpID));
-
     27:
       if FileExists(ExtractFilePath(Application.ExeName) + 'Bangla Typing with Fixed Keyboard Layouts.pdf') then
         Execute_Something(ExtractFilePath(Application.ExeName) + 'Bangla Typing with Fixed Keyboard Layouts.pdf')
       else
         Execute_Something('https://www.omicronlab.com/go.php?id=' + IntToStr(HelpID));
-
     28:
       if FileExists(ExtractFilePath(Application.ExeName) + 'Bangla Typing with Avro Mouse.pdf') then
         Execute_Something(ExtractFilePath(Application.ExeName) + 'Bangla Typing with Avro Mouse.pdf')
       else
         Execute_Something('https://www.omicronlab.com/go.php?id=' + IntToStr(HelpID));
-
     29:
       if FileExists(ExtractFilePath(Application.ExeName) + 'faq.pdf') then
         Execute_Something(ExtractFilePath(Application.ExeName) + 'faq.pdf')
       else
         Execute_Something('https://www.omicronlab.com/go.php?id=' + IntToStr(HelpID));
-
     35:
       if FileExists(ExtractFilePath(Application.ExeName) + 'Editing Keyboard Layout.pdf') then
         Execute_Something(ExtractFilePath(Application.ExeName) + 'Editing Keyboard Layout.pdf')
@@ -1696,7 +1609,6 @@ begin
 
   UpdateTrayIcon;
   SaveUISettings;
-
 end;
 
 procedure TAvroMainForm1.Remembermychoiceamongsuggestions1Click(Sender: TObject);
@@ -1723,7 +1635,6 @@ procedure TAvroMainForm1.RestoreFromTray;
 begin
   if Topbar.Visible = False then
   begin
-
     if KeyLayout.KeyboardMode = bangla then
       Topbar.SetButtonModeState(State2)
     else if KeyLayout.KeyboardMode = SysDefault then
@@ -1881,7 +1792,6 @@ begin
       RefreshSettings;
     end;
   end;
-
 end;
 
 procedure TAvroMainForm1.SetBengaliANSIMode;
@@ -1919,7 +1829,6 @@ begin
       end;
     end;
   end;
-
 end;
 
 { =============================================================================== }
@@ -2113,7 +2022,6 @@ var
   MapPath:      string;    // cached: this path used to be rebuilt 3x per tick
   MapWriteTime: TDateTime; // one disk stat per throttled tick
 begin
-
   if (AnsiVersion <> 'Default') and (AnsiMappingDir <> '') then
   begin
     Dec(FMappingCheckCountdown);
@@ -2170,7 +2078,6 @@ begin
   end;
   KeyLayout.ResetDeadKey;
   LastWindow := hforewnd;
-
 end;
 
 procedure TAvroMainForm1.WMShowAnsiPicker(var Msg: TMessage);
@@ -2235,7 +2142,6 @@ begin
     // Send something back
     Msg.Result := 21;
   end;
-
 end;
 
 procedure TAvroMainForm1.wwwOmicronLabcom1Click(Sender: TObject);
@@ -2274,6 +2180,80 @@ begin
 
   if ShowAnsiSwitchNotification = 'YES' then
     ShowAnsiToastNotification('ANSI Encoding: ' + SelectedVersion);
+end;
+
+{ =============================================================================== }
+
+{ View the description of a specific mapping }
+procedure TAvroMainForm1.ReadAnsiDescriptionClick(Sender: TObject);
+var
+  MapName, FilePath, Content, DescText: string;
+begin
+  if not (Sender is TMenuItem) then Exit;
+  MapName := (Sender as TMenuItem).Hint;
+  
+  if SameText(MapName, 'Default') then
+  begin
+    MessageDlg('Default Bijoy 2000 compatible ANSI mapping built into Avro Keyboard.' + sLineBreak +
+      'Features automatic contextual post-base & pre-base kar mapping with zero typing flicker.', 
+      mtInformation, [mbOK], 0);
+    Exit;
+  end;
+
+  FilePath := AnsiMappingDir + MapName + '.json';
+  if FileExists(FilePath) then
+  begin
+    try
+      Content := TFile.ReadAllText(FilePath, TEncoding.UTF8);
+      DescText := 'Mapping: ' + MapName + sLineBreak +
+                  'Location: ' + FilePath + sLineBreak + sLineBreak +
+                  'JSON Preview:' + sLineBreak +
+                  Copy(Content, 1, 350) + '...';
+      MessageDlg(DescText, mtInformation, [mbOK], 0);
+    except
+      on E: Exception do
+        MessageDlg('Could not read description: ' + E.Message, mtError, [mbOK], 0);
+    end;
+  end
+  else
+    MessageDlg('Mapping file not found on disk: ' + FilePath, mtError, [mbOK], 0);
+end;
+
+{ =============================================================================== }
+
+{ Exporting specific mappings }
+procedure TAvroMainForm1.ExportSpecificMappingClick(Sender: TObject);
+var
+  SaveDialog: TSaveDialog;
+  MapName, SourcePath: string;
+begin
+  if not (Sender is TMenuItem) then Exit;
+  MapName := (Sender as TMenuItem).Hint;
+
+  SaveDialog := TSaveDialog.Create(nil);
+  try
+    SaveDialog.Filter := 'ANSI Mapping JSON|*.json';
+    SaveDialog.DefaultExt := 'json';
+    SaveDialog.Title := 'Export ' + MapName + ' Mapping JSON';
+    SaveDialog.FileName := MapName + '.json';
+
+    if SaveDialog.Execute then
+    begin
+      if SameText(MapName, 'Default') then
+        ExportAnsiMapping(SaveDialog.FileName)
+      else
+      begin
+        SourcePath := AnsiMappingDir + MapName + '.json';
+        if FileExists(SourcePath) then
+          CopyFile(PChar(SourcePath), PChar(SaveDialog.FileName), False)
+        else
+          ExportAnsiMapping(SaveDialog.FileName);
+      end;
+      MessageDlg('Mapping successfully exported to:'#13#10 + SaveDialog.FileName, mtInformation, [mbOK], 0);
+    end;
+  finally
+    SaveDialog.Free;
+  end;
 end;
 
 { =============================================================================== }
@@ -2361,7 +2341,7 @@ begin
     begin
       if DeleteFile(AnsiMappingDir + MapName + '.json') then
       begin
-        if AnsiVersion = MapName then
+        if SameText(AnsiVersion, MapName) then
           AnsiVersion := 'Default';
         SaveSettings;
         LoadCurrentActiveMapping;
@@ -2420,70 +2400,62 @@ procedure TAvroMainForm1.BuildAnsiVersionMenus;
 var
   SearchRec: TSearchRec;
   FileTitle: string;
-  Sep: TMenuItem;
+  Sep, MoreOptMenu, Item: TMenuItem;
 
-  procedure AddMappingWithSubmenu(ParentMenu: TMenuItem; const AName: string; AChecked: Boolean; IsDefault: Boolean);
+  procedure AddDirectItem(ParentMenu: TMenuItem; const AName: string; AChecked: Boolean);
   var
-    MappingItem, SubItem, SepItem: TMenuItem;
+    MItem: TMenuItem;
   begin
-    MappingItem := TMenuItem.Create(ParentMenu);
-    MappingItem.Caption := AName;
-    MappingItem.Checked := AChecked;
-    MappingItem.RadioItem := True;
-    ParentMenu.Add(MappingItem);
+    MItem := TMenuItem.Create(ParentMenu);
+    MItem.Caption := AName;
+    MItem.Hint := AName;
+    MItem.Checked := AChecked;
+    MItem.RadioItem := True;
+    MItem.OnClick := AnsiVersionMenuClick;
+    ParentMenu.Add(MItem);
+  end;
 
-    // 1. Primary Selection Action
-    SubItem := TMenuItem.Create(MappingItem);
-    if AChecked then
-      SubItem.Caption := '✓ Active (Currently Selected)'
-    else
-      SubItem.Caption := 'Select "' + AName + '"';
-    SubItem.Hint := AName;
-    SubItem.Checked := AChecked;
-    SubItem.RadioItem := True;
-    SubItem.OnClick := AnsiVersionMenuClick;
-    MappingItem.Add(SubItem);
+  procedure AddMappingActionSubmenu(ParentMore: TMenuItem; const AName: string; IsDefault: Boolean);
+  var
+    MSub, ActionItem: TMenuItem;
+  begin
+    MSub := TMenuItem.Create(ParentMore);
+    MSub.Caption := AName;
+    MSub.Hint := AName;
+    ParentMore.Add(MSub);
 
-    // Separator between Selection & Actions
-    SepItem := TMenuItem.Create(MappingItem);
-    SepItem.Caption := '-';
-    MappingItem.Add(SepItem);
+    // 1. Read Description
+    ActionItem := TMenuItem.Create(MSub);
+    ActionItem.Caption := 'Read Description';
+    ActionItem.Hint := AName;
+    ActionItem.OnClick := ReadAnsiDescriptionClick;
+    MSub.Add(ActionItem);
 
-    // 2. Read Description
-    SubItem := TMenuItem.Create(MappingItem);
-    SubItem.Caption := 'Read Description';
-    SubItem.Hint := AName;
-    SubItem.OnClick := ReadAnsiDescriptionClick;
-    MappingItem.Add(SubItem);
+    // 2. Export Mapping...
+    ActionItem := TMenuItem.Create(MSub);
+    ActionItem.Caption := 'Export Mapping...';
+    ActionItem.Hint := AName;
+    ActionItem.OnClick := ExportSpecificMappingClick;
+    MSub.Add(ActionItem);
 
-    // 3. Export Mapping
-    SubItem := TMenuItem.Create(MappingItem);
-    SubItem.Caption := 'Export Mapping';
-    SubItem.Hint := AName;
-    SubItem.OnClick := ExportSpecificMappingClick;
-    MappingItem.Add(SubItem);
-
-    // 4. Delete Mapping (Default cannot be deleted)
+    // 3. Delete Mapping (Default ডিলিট হবে না)
     if not IsDefault then
     begin
-      SubItem := TMenuItem.Create(MappingItem);
-      SubItem.Caption := 'Delete Mapping';
-      SubItem.Hint := AName;
-      SubItem.OnClick := DeleteAnsiMappingClick;
-      MappingItem.Add(SubItem);
+      ActionItem := TMenuItem.Create(MSub);
+      ActionItem.Caption := 'Delete Mapping';
+      ActionItem.Hint := AName;
+      ActionItem.OnClick := DeleteAnsiMappingClick;
+      MSub.Add(ActionItem);
     end;
   end;
 
   procedure BuildSingleMenu(AMenu: TMenuItem);
-  var
-    Item: TMenuItem;
   begin
     AMenu.Clear;
-    
-    // Default Mapping
-    AddMappingWithSubmenu(AMenu, 'Default', SameText(AnsiVersion, 'Default'), True);
 
-    // List all Custom JSON Mappings
+    // --- 1. Main Flat List (1-Click Selection) ---
+    AddDirectItem(AMenu, 'Default', SameText(AnsiVersion, 'Default'));
+
     if DirectoryExists(AnsiMappingDir) then
     begin
       if FindFirst(AnsiMappingDir + '*.json', faAnyFile, SearchRec) = 0 then
@@ -2491,7 +2463,7 @@ var
         repeat
           FileTitle := ChangeFileExt(SearchRec.Name, '');
           if not SameText(FileTitle, 'Default') then
-            AddMappingWithSubmenu(AMenu, FileTitle, SameText(AnsiVersion, FileTitle), False);
+            AddDirectItem(AMenu, FileTitle, SameText(AnsiVersion, FileTitle));
         until FindNext(SearchRec) <> 0;
         FindClose(SearchRec);
       end;
@@ -2502,17 +2474,43 @@ var
     Sep.Caption := '-';
     AMenu.Add(Sep);
 
-    // Import Mapping
-    Item := TMenuItem.Create(AMenu);
+    // --- 2. 'More Options' submenu (as shown in the first image) ---
+    MoreOptMenu := TMenuItem.Create(AMenu);
+    MoreOptMenu.Caption := 'More Options';
+    AMenu.Add(MoreOptMenu);
+
+    // Submenu for each mapping within More Options
+    AddMappingActionSubmenu(MoreOptMenu, 'Default', True);
+
+    if DirectoryExists(AnsiMappingDir) then
+    begin
+      if FindFirst(AnsiMappingDir + '*.json', faAnyFile, SearchRec) = 0 then
+      begin
+        repeat
+          FileTitle := ChangeFileExt(SearchRec.Name, '');
+          if not SameText(FileTitle, 'Default') then
+            AddMappingActionSubmenu(MoreOptMenu, FileTitle, False);
+        until FindNext(SearchRec) <> 0;
+        FindClose(SearchRec);
+      end;
+    end;
+
+    // Separator inside More Options
+    Sep := TMenuItem.Create(MoreOptMenu);
+    Sep.Caption := '-';
+    MoreOptMenu.Add(Sep);
+
+    // Import Mapping...
+    Item := TMenuItem.Create(MoreOptMenu);
     Item.Caption := 'Import Mapping...';
     Item.OnClick := ImportAnsiMappingClick;
-    AMenu.Add(Item);
+    MoreOptMenu.Add(Item);
 
-    // Locate Mapping
-    Item := TMenuItem.Create(AMenu);
+    // Locate Mapping...
+    Item := TMenuItem.Create(MoreOptMenu);
     Item.Caption := 'Locate Mapping...';
     Item.OnClick := OpenAnsiMappingDirClick;
-    AMenu.Add(Item);
+    MoreOptMenu.Add(Item);
   end;
 
 begin
