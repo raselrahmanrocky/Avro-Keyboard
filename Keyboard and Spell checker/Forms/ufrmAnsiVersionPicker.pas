@@ -19,11 +19,13 @@ uses
   Controls,
   Forms,
   Dialogs,
+  Menus,
   StdCtrls,
   Generics.Collections,
   System.Types,
   uRegistrySettings,
-  clsUnicodeToBijoy2000;
+  clsUnicodeToBijoy2000,
+  System.IOUtils;
 
 const
   WM_FOCUS_PICKER = WM_APP + 2;
@@ -38,8 +40,15 @@ type
     procedure ListBoxDrawItem(Control: TWinControl; Index: Integer; Rect: TRect; State: TOwnerDrawState);
     procedure ListBoxMouseMove(Sender: TObject; Shift: TShiftState; X, Y: Integer);
     procedure ListBoxMouseLeave(Sender: TObject);
+    procedure ListBoxMouseUp(Sender: TObject; Button: TMouseButton;
+      Shift: TShiftState; X, Y: Integer);
+    procedure PopupExportClick(Sender: TObject);
+    procedure PopupDescriptionClick(Sender: TObject);
+    procedure PopupDeleteClick(Sender: TObject);
+    procedure BuildPopupMenu(const MappingName: string);
     private
       FHoverIndex:           Integer;
+      FPopup:                TPopupMenu;
       FPrevFocusedWindow:    HWND;
       FPrevForegroundWindow: HWND;
       function GetSelectedVersion: string;
@@ -67,7 +76,6 @@ uses
   uForm1,
   ufrmAnsiToast;
 
-// Force a window to the foreground using AttachThreadInput — the most reliable way
 procedure ForceForegroundWindow(HWND: HWND);
 var
   ForeThread, ThisThread: DWORD;
@@ -145,15 +153,15 @@ begin
   BorderStyle := bsNone;
   FormStyle := fsStayOnTop;
   PopupMode := pmAuto;
-  Color := RGB(242, 242, 242);
+  Color := RGB(246, 246, 246);
   ListBox := TListBox.Create(Self);
   ListBox.Parent := Self;
   ListBox.BorderStyle := bsNone;
-  ListBox.Color := RGB(242, 242, 242);
+  ListBox.Color := RGB(246, 246, 246);
   ListBox.Font.Name := 'Segoe UI';
   ListBox.Font.Size := 10;
-  ListBox.Font.Color := RGB(0, 0, 0);
-  ListBox.ItemHeight := 26;
+  ListBox.Font.Color := RGB(20, 20, 20);
+  ListBox.ItemHeight := 28;
   ListBox.Style := lbOwnerDrawFixed;
   ListBox.OnKeyDown := ListBoxKeyDown;
   ListBox.OnClick := ListBoxClick;
@@ -161,6 +169,11 @@ begin
   ListBox.OnMouseMove := ListBoxMouseMove;
   ListBox.OnMouseLeave := ListBoxMouseLeave;
   ListBox.TabStop := True;
+  ListBox.OnMouseUp := ListBoxMouseUp;
+
+  FPopup := TPopupMenu.Create(Self);
+  ListBox.PopupMenu := FPopup;
+
   OnShow := FormShow;
   OnClose := FormClose;
   PopulateVersions;
@@ -234,7 +247,7 @@ begin
     ListBox.Items.EndUpdate;
   end;
   for I := 0 to ListBox.Items.Count - 1 do
-    if UpperCase(ListBox.Items[I]) = UpperCase(AnsiVersion) then
+    if SameText(ListBox.Items[I], AnsiVersion) then
     begin
       ListBox.ItemIndex := I;
       Break;
@@ -258,9 +271,9 @@ begin
     if W > MaxW then
       MaxW := W;
   end;
-  Width := MaxW + 44;
-  Height := ListBox.Items.Count * 26 + 6;
-  ListBox.SetBounds(0, 3, Width, Height - 6);
+  Width := MaxW + 56;
+  Height := ListBox.Items.Count * 28 + 8;
+  ListBox.SetBounds(0, 4, Width, Height - 8);
 end;
 
 procedure TfrmAnsiVersionPicker.PositionFormNearCursor;
@@ -298,54 +311,49 @@ var
 begin
   if (index < 0) or (index >= ListBox.Items.Count) then
   begin
-    ListBox.Canvas.Brush.Color := RGB(242, 242, 242);
+    ListBox.Canvas.Brush.Color := RGB(246, 246, 246);
     ListBox.Canvas.FillRect(Rect);
     Exit;
   end;
-  IsActive := (AnsiVersion = ListBox.Items[index]);
+  IsActive := SameText(AnsiVersion, ListBox.Items[index]);
   IsHovered := (index = FHoverIndex) or (odSelected in State);
 
-  // 1. Base background (Always light gray)
-  ListBox.Canvas.Brush.Color := RGB(242, 242, 242);
+  // 1. Base background
+  ListBox.Canvas.Brush.Color := RGB(246, 246, 246);
   ListBox.Canvas.FillRect(Rect);
 
-  // 2. Full-row highlight when mouse is hovered or item is selected
+  // 2. Row highlight on Hover / Selected
   if IsHovered then
   begin
-    ListBox.Canvas.Brush.Color := RGB(209, 232, 255); // Light blue highlight
+    ListBox.Canvas.Brush.Color := RGB(218, 236, 255);
     ListBox.Canvas.FillRect(Rect);
   end;
 
-  // 3. Define the Gutter area (Square box on the far left)
+  // 3. Left indicator gutter
   GutterRect := Rect;
-  GutterRect.Right := Rect.Left + 28; // Set box width
+  GutterRect.Right := Rect.Left + 26;
 
-  // 4. Handle Active item state (Gutter highlight and icon)
+  // 4. Active indicator
   if IsActive then
   begin
-    // Highlight ONLY the gutter background
-    ListBox.Canvas.Brush.Color := RGB(153, 209, 245); // Solid blue for active gutter
+    ListBox.Canvas.Brush.Color := RGB(0, 120, 215);
     ListBox.Canvas.FillRect(GutterRect);
 
-    // Draw the icon (Checkmark or Dot)
-    ListBox.Canvas.Font.Color := RGB(51, 51, 51); // Dark gray icon color
+    ListBox.Canvas.Font.Color := RGB(255, 255, 255);
     ListBox.Canvas.Font.Style := [fsBold];
     DrawText(ListBox.Canvas.Handle, #$2713, -1, GutterRect, DT_CENTER or DT_VCENTER or DT_SINGLELINE);
-
-    // Reset font style for the main text
     ListBox.Canvas.Font.Style := [];
   end;
 
-  // 5. Draw the main item text (Transparent background, offset from gutter)
+  // 5. Draw item text
   ListBox.Canvas.Brush.Style := bsClear;
-  ListBox.Canvas.Font.Color := RGB(0, 0, 0);
+  ListBox.Canvas.Font.Color := RGB(20, 20, 20);
   if index < 9 then
     DisplayText := IntToStr(index + 1) + '. ' + ListBox.Items[index]
   else
     DisplayText := ListBox.Items[index];
-  ListBox.Canvas.TextOut(Rect.Left + 35, Rect.Top + 3, DisplayText);
+  ListBox.Canvas.TextOut(Rect.Left + 34, Rect.Top + 4, DisplayText);
 
-  // Reset brush style to solid for next draw cycle
   ListBox.Canvas.Brush.Style := bsSolid;
 end;
 
@@ -384,15 +392,15 @@ begin
   end;
   AnsiVersion := SelectedVersion;
   SaveSettings;
+  AvroMainForm1.BuildAnsiVersionMenus;
   if ShowAnsiSwitchNotification = 'YES' then
-    ShowAnsiToastNotification('ANSI Version Switched to: ' + SelectedVersion);
+    ShowAnsiToastNotification('ANSI Version: ' + SelectedVersion);
   if IsWindow(FPrevFocusedWindow) then
     Windows.SetFocus(FPrevFocusedWindow);
   if FPrevForegroundWindow <> 0 then
     SetForegroundWindow(FPrevForegroundWindow);
   CurrentPicker := nil;
   Release;
-  OptimizeMemoryUsage;
 end;
 
 procedure TfrmAnsiVersionPicker.ListBoxKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
@@ -437,6 +445,140 @@ begin
     ListBox.ItemIndex := TargetIdx;
     ListBoxClick(nil);
     Key := 0;
+  end;
+end;
+
+procedure TfrmAnsiVersionPicker.BuildPopupMenu(const MappingName: string);
+var
+  Item: TMenuItem;
+  IsDefault: Boolean;
+begin
+  FPopup.Items.Clear;
+  IsDefault := SameText(MappingName, 'Default');
+
+  Item := TMenuItem.Create(FPopup);
+  Item.Caption := 'Read Description';
+  Item.Hint := MappingName;
+  Item.OnClick := PopupDescriptionClick;
+  FPopup.Items.Add(Item);
+
+  Item := TMenuItem.Create(FPopup);
+  Item.Caption := 'Export Mapping...';
+  Item.Hint := MappingName;
+  Item.OnClick := PopupExportClick;
+  FPopup.Items.Add(Item);
+
+  if not IsDefault then
+  begin
+    Item := TMenuItem.Create(FPopup);
+    Item.Caption := 'Delete Mapping';
+    Item.Hint := MappingName;
+    Item.OnClick := PopupDeleteClick;
+    FPopup.Items.Add(Item);
+  end;
+end;
+
+procedure TfrmAnsiVersionPicker.ListBoxMouseUp(Sender: TObject; Button: TMouseButton;
+  Shift: TShiftState; X, Y: Integer);
+var
+  Idx: Integer;
+begin
+  if Button <> mbRight then
+    Exit;
+  Idx := ListBox.ItemAtPos(Point(X, Y), True);
+  if (Idx >= 0) and (Idx < ListBox.Items.Count) then
+  begin
+    ListBox.ItemIndex := Idx;
+    BuildPopupMenu(ListBox.Items[Idx]);
+    FPopup.Popup(Mouse.CursorPos.X, Mouse.CursorPos.Y);
+  end;
+end;
+
+procedure TfrmAnsiVersionPicker.PopupExportClick(Sender: TObject);
+var
+  MapName, SourcePath: string;
+  SaveDlg: TSaveDialog;
+begin
+  if not (Sender is TMenuItem) then Exit;
+  MapName := (Sender as TMenuItem).Hint;
+
+  SaveDlg := TSaveDialog.Create(nil);
+  try
+    SaveDlg.Filter := 'ANSI Mapping JSON|*.json';
+    SaveDlg.DefaultExt := 'json';
+    SaveDlg.Title := 'Export ' + MapName + ' Mapping';
+    SaveDlg.FileName := MapName + '.json';
+    if SaveDlg.Execute then
+    begin
+      if SameText(MapName, 'Default') then
+        ExportAnsiMapping(SaveDlg.FileName)
+      else
+      begin
+        SourcePath := AnsiMappingDir + MapName + '.json';
+        if FileExists(SourcePath) then
+          Windows.CopyFile(PChar(SourcePath), PChar(SaveDlg.FileName), False)
+        else
+          ExportAnsiMapping(SaveDlg.FileName);
+      end;
+      MessageDlg('Mapping exported to: '#13#10 + SaveDlg.FileName, mtInformation, [mbOK], 0);
+    end;
+  finally
+    SaveDlg.Free;
+  end;
+end;
+
+procedure TfrmAnsiVersionPicker.PopupDescriptionClick(Sender: TObject);
+var
+  MapName, FilePath, Content, DescText: string;
+begin
+  if not (Sender is TMenuItem) then Exit;
+  MapName := (Sender as TMenuItem).Hint;
+
+  if SameText(MapName, 'Default') then
+  begin
+    MessageDlg('Default Bijoy 2000 compatible ANSI mapping built into Avro Keyboard.', mtInformation, [mbOK], 0);
+    Exit;
+  end;
+
+  FilePath := AnsiMappingDir + MapName + '.json';
+  if FileExists(FilePath) then
+  begin
+    try
+      Content := TFile.ReadAllText(FilePath, TEncoding.UTF8);
+      DescText := 'Mapping: ' + MapName + sLineBreak +
+                  'Location: ' + FilePath + sLineBreak + sLineBreak +
+                  'Preview:' + sLineBreak +
+                  Copy(Content, 1, 350) + '...';
+      MessageDlg(DescText, mtInformation, [mbOK], 0);
+    except
+      on E: Exception do
+        MessageDlg('Could not read description: ' + E.Message, mtError, [mbOK], 0);
+    end;
+  end
+  else
+    MessageDlg('Mapping file not found.', mtError, [mbOK], 0);
+end;
+
+procedure TfrmAnsiVersionPicker.PopupDeleteClick(Sender: TObject);
+var
+  MapName: string;
+begin
+  if not (Sender is TMenuItem) then Exit;
+  MapName := (Sender as TMenuItem).Hint;
+
+  if MessageDlg('Delete mapping "' + MapName + '"?', mtConfirmation, [mbYes, mbNo], 0) = mrYes then
+  begin
+    if DeleteFile(AnsiMappingDir + MapName + '.json') then
+    begin
+      if SameText(AnsiVersion, MapName) then
+      begin
+        AnsiVersion := 'Default';
+        SaveSettings;
+      end;
+      AvroMainForm1.BuildAnsiVersionMenus;
+      PopulateVersions;
+      AutoSizeForm;
+    end;
   end;
 end;
 
