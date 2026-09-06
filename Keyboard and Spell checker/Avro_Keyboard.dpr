@@ -70,7 +70,14 @@ uses
   Vcl.Styles,
   WindowsDarkMode in 'Units\WindowsDarkMode.pas',
   uKeyboardMacro in 'Units\uKeyboardMacro.pas',
-  Avro.Types in 'Units\Avro.Types.pas';
+  Avro.Types in 'Units\Avro.Types.pas',
+  uAvroCryptoUtils in 'Units\uAvroCryptoUtils.pas',
+  uAvroEncoCrypto in 'Units\uAvroEncoCrypto.pas',
+  uAvroEncoManager in 'Units\uAvroEncoManager.pas',
+  uAvroEncoImporter in 'Units\uAvroEncoImporter.pas',
+  uAvroDirectoryWatcher in 'Units\uAvroDirectoryWatcher.pas',
+  uAvroLayoutUI in 'Units\uAvroLayoutUI.pas',
+  uAvroPasswordDlg in 'Forms\uAvroPasswordDlg.pas' {frmAvroPasswordDlg};
 
 var
   Mutex: THandle;

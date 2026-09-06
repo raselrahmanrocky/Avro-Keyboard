@@ -207,6 +207,17 @@
     </DCCReference>
     <DCCReference Include="Units\DebugLog.pas" />
     <DCCReference Include="Units\WindowsDarkMode.pas" />
+    <DCCReference Include="Units\uKeyboardMacro.pas" />
+    <DCCReference Include="Units\Avro.Types.pas" />
+    <DCCReference Include="..\Unicode to ascii converter\clsAnsiSequenceLookup.pas" />
+    <DCCReference Include="Units\uAvroEncoCrypto.pas" />
+    <DCCReference Include="Units\uAvroEncoManager.pas" />
+    <DCCReference Include="Units\uAvroEncoImporter.pas" />
+    <DCCReference Include="Units\uAvroDirectoryWatcher.pas" />
+    <DCCReference Include="Units\uAvroLayoutUI.pas" />
+    <DCCReference Include="Forms\uAvroPasswordDlg.pas">
+      <Form>frmAvroPasswordDlg</Form>
+    </DCCReference>
     <BuildConfiguration Include="Base">
       <Key>Base</Key>
     </BuildConfiguration>

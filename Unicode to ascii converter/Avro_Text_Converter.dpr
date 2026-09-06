@@ -17,6 +17,10 @@ uses
   BanglaChars in '..\Keyboard and Spell checker\Units\BanglaChars.pas',
   uFileFolderHandling in '..\Keyboard and Spell checker\Units\uFileFolderHandling.pas',
   WindowsDarkMode in '..\Keyboard and Spell checker\Units\WindowsDarkMode.pas',
+  uAvroCryptoUtils in '..\Keyboard and Spell checker\Units\uAvroCryptoUtils.pas',
+  uAvroEncoCrypto in '..\Keyboard and Spell checker\Units\uAvroEncoCrypto.pas',
+  uAvroEncoManager in '..\Keyboard and Spell checker\Units\uAvroEncoManager.pas',
+  DebugLog in '..\Keyboard and Spell checker\Units\DebugLog.pas',
   Vcl.Themes,
   Vcl.Styles;
 

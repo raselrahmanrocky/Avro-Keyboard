@@ -264,6 +264,7 @@ uses
   uRegistrySettings,
   uWindowHandlers,
   KeyboardLayoutLoader,
+  uAvroEncoImporter,
   DebugLog;
 
 { =============================================================================== }
@@ -849,6 +850,22 @@ procedure TTopBar.WMDROPFILES(var msg: TWMDropFiles);
     end;
   end;
 
+  function CheckEncoInstall(FileName: string): Boolean;
+  var
+    ErrMsg: string;
+  begin
+    Result := False;
+    if not FileExists(FileName) then
+      Exit;
+    if Uppercase(ExtractFileExt(FileName)) = '.AVROENCO' then
+    begin
+      Result := ImportEncoFile(FileName, ErrMsg);
+      if not Result and (ErrMsg <> '') then
+        Application.MessageBox(PChar(ErrMsg), 'Import Error', MB_ICONERROR or MB_OK);
+      AvroMainForm1.BuildAnsiVersionMenus;
+    end;
+  end;
+
 const
   MAXFILENAME = 255;
 var
@@ -865,6 +882,7 @@ begin
 
     CheckLayoutInstall(FileName);
     CheckSkinInstall(FileName);
+    CheckEncoInstall(FileName);
   end;
 
   // release memory

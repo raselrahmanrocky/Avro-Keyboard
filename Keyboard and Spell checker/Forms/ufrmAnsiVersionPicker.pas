@@ -74,7 +74,10 @@ implementation
 
 uses
   uForm1,
-  ufrmAnsiToast;
+  ufrmAnsiToast,
+  uAvroEncoManager,
+  uAvroEncoImporter,
+  uAvroEncoCrypto;
 
 procedure ForceForegroundWindow(HWND: HWND);
 var
@@ -198,7 +201,10 @@ end;
 
 procedure TfrmAnsiVersionPicker.WMTimer(var Msg: TMessage);
 begin
-  if GetForegroundWindow <> Handle then
+  // Never close the picker while an app-modal dialog (e.g. the password
+  // prompt) is up: closing+feeing the picker from the timer during
+  // ListBoxClick's ShowModal would continue executing on a freed form.
+  if (Application.ModalLevel = 0) and (GetForegroundWindow <> Handle) then
   begin
     KillTimer(Handle, 1);
     Close;
@@ -225,24 +231,53 @@ var
   SearchRec: TSearchRec;
   FileTitle: string;
   I:         Integer;
+
+  // Scans one folder for mapping files (.AvroEnco preferred, .json fallback).
+  // Called for the data folder AND the folders next to the executable so the
+  // picker shows the same mapping set as the tray menu (ScanAvroEncoFiles).
+  procedure ScanDir(const ADir: string);
+  begin
+    if not DirectoryExists(ADir) then
+      Exit;
+    // Scan .AvroEnco files first
+    if System.SysUtils.FindFirst(ADir + '*.AvroEnco', System.SysUtils.faAnyFile, SearchRec) = 0 then
+    begin
+      try
+        repeat
+          FileTitle := ChangeFileExt(SearchRec.Name, '');
+          if not SameText(FileTitle, 'Default') and
+             (ListBox.Items.IndexOf(FileTitle) < 0) then
+            ListBox.Items.Add(FileTitle);
+        until System.SysUtils.FindNext(SearchRec) <> 0;
+      finally
+        System.SysUtils.FindClose(SearchRec);
+      end;
+    end;
+    // Scan .json files (only if no .AvroEnco with same name)
+    if System.SysUtils.FindFirst(ADir + '*.json', System.SysUtils.faAnyFile, SearchRec) = 0 then
+    begin
+      try
+        repeat
+          FileTitle := ChangeFileExt(SearchRec.Name, '');
+          if not SameText(FileTitle, 'Default') and
+             (ListBox.Items.IndexOf(FileTitle) < 0) then
+            ListBox.Items.Add(FileTitle);
+        until System.SysUtils.FindNext(SearchRec) <> 0;
+      finally
+        System.SysUtils.FindClose(SearchRec);
+      end;
+    end;
+  end;
+
 begin
   AvroMainForm1.CleanupDuplicateMappings;
   ListBox.Items.BeginUpdate;
   try
     ListBox.Clear;
     ListBox.Items.Add('Default');
-    if DirectoryExists(AnsiMappingDir) then
-    begin
-      if System.SysUtils.FindFirst(AnsiMappingDir + '*.json', System.SysUtils.faAnyFile, SearchRec) = 0 then
-      begin
-        repeat
-          FileTitle := ChangeFileExt(SearchRec.Name, '');
-          if not SameText(FileTitle, 'Default') then
-            ListBox.Items.Add(FileTitle);
-        until System.SysUtils.FindNext(SearchRec) <> 0;
-        System.SysUtils.FindClose(SearchRec);
-      end;
-    end;
+    ScanDir(AnsiMappingDir);
+    ScanDir(ExtractFilePath(Application.ExeName) + 'assets\');
+    ScanDir(ExtractFilePath(Application.ExeName) + 'AnsiMapping\');
   finally
     ListBox.Items.EndUpdate;
   end;
@@ -377,32 +412,77 @@ end;
 
 procedure TfrmAnsiVersionPicker.ListBoxClick(Sender: TObject);
 var
-  SelectedVersion, ErrorMsg: string;
+  SelectedVersion, ErrorMsg, TargetPath: string;
+  Password: AnsiString;
 begin
   if not Assigned(CurrentPicker) then
     Exit;
+
   SelectedVersion := GetSelectedVersion;
   if SelectedVersion = '' then
     Exit;
-  if not TrySetAnsiVersion(SelectedVersion, ErrorMsg) then
+
+  // Default: fast-path
+  if SameText(SelectedVersion, 'Default') then
   begin
-    Application.MessageBox(PChar('Could not load the selected ANSI mapping.' + sLineBreak + 'Error: ' + ErrorMsg), 'ANSI Mapping Error',
-      MB_ICONWARNING or MB_OK);
+    AnsiVersion := 'Default';
+    LoadCurrentActiveMapping;
+    SaveSettings;
+    AvroMainForm1.BuildAnsiVersionMenus;
+    if ShowAnsiSwitchNotification = 'YES' then
+      ShowAnsiToastNotification('ANSI Version: Default');
+    CurrentPicker := nil;
+    Release;
     Exit;
   end;
-  AnsiVersion := SelectedVersion;
-  SaveSettings;
-  AvroMainForm1.BuildAnsiVersionMenus;
-  if ShowAnsiSwitchNotification = 'YES' then
-    ShowAnsiToastNotification('ANSI Version: ' + SelectedVersion);
-  if IsWindow(FPrevFocusedWindow) then
-    Windows.SetFocus(FPrevFocusedWindow);
-  if FPrevForegroundWindow <> 0 then
-    SetForegroundWindow(FPrevForegroundWindow);
-  CurrentPicker := nil;
-  Release;
-end;
 
+  TargetPath := GetActiveEncoFilePath(SelectedVersion, AnsiMappingDir);
+  if TargetPath = '' then
+  begin
+    Application.MessageBox(PChar('Mapping file not found: ' + SelectedVersion),
+      'ANSI Mapping Error', MB_ICONWARNING or MB_OK or MB_TOPMOST or MB_SETFOREGROUND);
+    Exit;
+  end;
+
+  // Only password-protected files (flag $01 / legacy v1) prompt, and only
+  // when no usable password is cached yet; TrySetAnsiVersion then reuses
+  // CachedEncoPassword and never prompts a second time. Default-key files
+  // (flag $00) must NEVER ask for a password - they decrypt transparently.
+  if IsEncoFile(TargetPath) and (CachedEncoPassword = '') and
+    (GetAvroEncoProtectionFlag(TargetPath) = AVROENCO_FLAG_USER_PASSWORD) then
+  begin
+    if not PromptForPasswordAndValidate(TargetPath, Password) then
+      Exit; // Cancelled - keep the picker open so another version can be chosen.
+    CachedEncoPassword := Password;
+    SaveSettings;
+  end;
+
+  if TrySetAnsiVersion(SelectedVersion, ErrorMsg) then
+  begin
+    AnsiVersion := SelectedVersion;
+    SaveSettings;
+    AvroMainForm1.BuildAnsiVersionMenus;
+    if ShowAnsiSwitchNotification = 'YES' then
+      ShowAnsiToastNotification('ANSI Version: ' + SelectedVersion);
+
+    if IsWindow(FPrevFocusedWindow) then
+      Windows.SetFocus(FPrevFocusedWindow);
+    if FPrevForegroundWindow <> 0 then
+      SetForegroundWindow(FPrevForegroundWindow);
+
+    CurrentPicker := nil;
+    Release;
+    Exit;
+  end;
+
+  // Loading failed - clear a bad cached password so the next attempt re-prompts.
+  if IsEncoFile(TargetPath) then
+    CachedEncoPassword := '';
+
+  // Keep error boxes above the always-on-top TopBar so failures are visible.
+  Application.MessageBox(PChar('Could not load the selected ANSI mapping.' + sLineBreak + 'Error: ' + ErrorMsg), 'ANSI Mapping Error',
+    MB_ICONWARNING or MB_OK or MB_TOPMOST or MB_SETFOREGROUND);
+end;
 procedure TfrmAnsiVersionPicker.ListBoxKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
 var
   TargetIdx: Integer;
@@ -504,17 +584,22 @@ begin
 
   SaveDlg := TSaveDialog.Create(nil);
   try
-    SaveDlg.Filter := 'ANSI Mapping JSON|*.json';
-    SaveDlg.DefaultExt := 'json';
+    SaveDlg.Filter := 'Avro Encoded Mapping|*.AvroEnco|ANSI Mapping JSON|*.json';
     SaveDlg.Title := 'Export ' + MapName + ' Mapping';
-    SaveDlg.FileName := MapName + '.json';
+    if FileExists(AnsiMappingDir + MapName + '.AvroEnco') then
+      SaveDlg.DefaultExt := 'AvroEnco'
+    else
+      SaveDlg.DefaultExt := 'json';
+    SaveDlg.FileName := MapName + '.' + SaveDlg.DefaultExt;
     if SaveDlg.Execute then
     begin
       if SameText(MapName, 'Default') then
         ExportAnsiMapping(SaveDlg.FileName)
       else
       begin
-        SourcePath := AnsiMappingDir + MapName + '.json';
+        SourcePath := AnsiMappingDir + MapName + '.AvroEnco';
+        if not FileExists(SourcePath) then
+          SourcePath := AnsiMappingDir + MapName + '.json';
         if FileExists(SourcePath) then
           Windows.CopyFile(PChar(SourcePath), PChar(SaveDlg.FileName), False)
         else
@@ -530,6 +615,7 @@ end;
 procedure TfrmAnsiVersionPicker.PopupDescriptionClick(Sender: TObject);
 var
   MapName, FilePath, Content, DescText: string;
+  Password: AnsiString;
 begin
   if not (Sender is TMenuItem) then Exit;
   MapName := (Sender as TMenuItem).Hint;
@@ -540,11 +626,33 @@ begin
     Exit;
   end;
 
-  FilePath := AnsiMappingDir + MapName + '.json';
+  FilePath := AnsiMappingDir + MapName + '.AvroEnco';
+  if not FileExists(FilePath) then
+    FilePath := AnsiMappingDir + MapName + '.json';
   if FileExists(FilePath) then
   begin
     try
-      Content := TFile.ReadAllText(FilePath, TEncoding.UTF8);
+      if SameText(ExtractFileExt(FilePath), '.AvroEnco') then
+      begin
+        // Only password-protected files (flag $01 / legacy v1) prompt;
+        // default-key files (flag $00) decrypt transparently with no cache.
+        if (CachedEncoPassword = '') and
+          (GetAvroEncoProtectionFlag(FilePath) = AVROENCO_FLAG_USER_PASSWORD) then
+        begin
+          if not PromptForPasswordAndValidate(FilePath, Password) then
+            Exit;
+          CachedEncoPassword := Password;
+        end;
+        Content := DecryptAvroEncoToString(FilePath, CachedEncoPassword);
+        if Content = '' then
+        begin
+          CachedEncoPassword := '';
+          MessageDlg('Failed to decrypt mapping. Password may be incorrect.', mtError, [mbOK], 0);
+          Exit;
+        end;
+      end
+      else
+        Content := TFile.ReadAllText(FilePath, TEncoding.UTF8);
       DescText := 'Mapping: ' + MapName + sLineBreak +
                   'Location: ' + FilePath + sLineBreak + sLineBreak +
                   'Preview:' + sLineBreak +
@@ -568,7 +676,8 @@ begin
 
   if MessageDlg('Delete mapping "' + MapName + '"?', mtConfirmation, [mbYes, mbNo], 0) = mrYes then
   begin
-    if DeleteFile(AnsiMappingDir + MapName + '.json') then
+    if DeleteFile(AnsiMappingDir + MapName + '.AvroEnco') or
+       DeleteFile(AnsiMappingDir + MapName + '.json') then
     begin
       if SameText(AnsiVersion, MapName) then
       begin

@@ -95,6 +95,7 @@ var
   ANSIToggleShortcut:    string;
   IgnoreCapsLock:        string;
 
+
 procedure SaveUISettings;
 procedure LoadSettings;
 procedure ValidateSettings;
@@ -113,7 +114,8 @@ uses
   uTopBar,
   WindowsVersion,
   clsUnicodeToBijoy2000,
-  uKeyboardMacro;
+  uKeyboardMacro,
+  uAvroEncoManager;
 
 { =============================================================================== }
 
@@ -207,6 +209,9 @@ begin
 
   clsUnicodeToBijoy2000.AnsiVersion := XML.GetValue('AnsiVersion', 'Default');
 
+  // AvroEnco Settings
+  CachedEncoPassword := AnsiString(XML.GetValue('CachedEncoPassword', ''));
+
   XML.Free;
 
 end;
@@ -291,6 +296,9 @@ begin
   XML.SetValue('ANSIToggleShortcut', ANSIToggleShortcut);
   XML.SetValue('IgnoreCapsLock', IgnoreCapsLock);
   XML.SetValue('AnsiVersion', clsUnicodeToBijoy2000.AnsiVersion);
+
+  // AvroEnco Settings
+  XML.SetValue('CachedEncoPassword', string(CachedEncoPassword));
 
   XML.SaveXMLData;
   XML.Free;
@@ -384,6 +392,9 @@ begin
     IgnoreCapsLock := UpperCase(Reg.ReadStringDef('IgnoreCapsLock', 'NO'));
     clsUnicodeToBijoy2000.AnsiVersion := Reg.ReadStringDef('AnsiVersion', 'Default');
 
+    // AvroEnco Settings
+    CachedEncoPassword := AnsiString(Reg.ReadStringDef('CachedEncoPassword', ''));
+
   end;
 
   Reg.Free;
@@ -474,6 +485,9 @@ begin
     Reg.WriteString('ANSIToggleShortcut', ANSIToggleShortcut);
     Reg.WriteString('IgnoreCapsLock', IgnoreCapsLock);
     Reg.WriteString('AnsiVersion', clsUnicodeToBijoy2000.AnsiVersion);
+
+    // AvroEnco Settings
+    Reg.WriteString('CachedEncoPassword', string(CachedEncoPassword));
 
   end;
 
