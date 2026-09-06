@@ -32,7 +32,8 @@ uses
   DateUtils,
   System.ImageList,
   Vcl.AppEvnts,
-  ShellAPI;
+  ShellAPI,
+  uAvroDirectoryWatcher;
 
 type
   TMenuItemExtended = class(TMenuItem)
@@ -359,6 +360,7 @@ type
       PreviousModeBeforeANSISwitch: enumMode;
       FActiveMappingLastWriteTime:  TDateTime;
       FMappingCheckCountdown:       Integer; // throttles the ANSI mapping disk check
+      FDirectoryWatcher:            TAvroDirectoryWatcher;
 
       procedure ChangeTypingStyle(const sStyle: string);
       function IgnorableWindow(const lngHWND: HWND): Boolean;
@@ -375,12 +377,7 @@ type
       procedure UpdateTrayIcon;
 
       procedure HandleThemes;
-      procedure AnsiVersionMenuClick(Sender: TObject);
-      procedure ReadAnsiDescriptionClick(Sender: TObject);
-      procedure ExportSpecificMappingClick(Sender: TObject);
-      procedure DeleteAnsiMappingClick(Sender: TObject);
-      procedure ImportAnsiMappingClick(Sender: TObject);
-      procedure OpenAnsiMappingDirClick(Sender: TObject);
+      procedure HandleLayoutDirectoryChanged(Sender: TObject);
       procedure IgnoreCapsLockClick(Sender: TObject);
       procedure PopupToolsPopup(Sender: TObject);
       procedure PopupTrayPopup(Sender: TObject);
@@ -388,6 +385,7 @@ type
       procedure WMCopyData(var Msg: TWMCopyData); message WM_COPYDATA;
       procedure WMShowAnsiPicker(var Msg: TMessage); message WM_APP + 1;
       procedure WMShowLayoutPicker(var Msg: TMessage); message WM_APP + 3;
+
     public
       { Public declarations }
       KeyboardModeChanged: Boolean;
@@ -397,6 +395,12 @@ type
       AnsiVersionSubmenu2: TMenuItem;
       IgnoreCapsLock1:     TMenuItem;
       IgnoreCapsLock2:     TMenuItem;
+      procedure AnsiVersionMenuClick(Sender: TObject);
+      procedure ReadAnsiDescriptionClick(Sender: TObject);
+      procedure ExportSpecificMappingClick(Sender: TObject);
+      procedure DeleteAnsiMappingClick(Sender: TObject);
+      procedure ImportAnsiMappingClick(Sender: TObject);
+      procedure OpenAnsiMappingDirClick(Sender: TObject);
 
       procedure BuildAnsiVersionMenus;
       function GetMyCurrentKeyboardMode: enumMode;
@@ -436,6 +440,7 @@ uses
   uRegistrySettings,
   ufrmAnsiVersionPicker,
   ufrmLayoutPicker,
+  uAvroPasswordDlg,
   ufrmAnsiToast,
   uProcessHandler,
   uAutoCorrect,
@@ -463,7 +468,11 @@ uses
   DebugLog,
   WindowsDarkMode,
   System.UITypes,
-  uKeyboardMacro;
+  uKeyboardMacro,
+  uAvroEncoCrypto,
+  uAvroEncoManager,
+  uAvroEncoImporter,
+  uAvroLayoutUI;
 
 { =============================================================================== }
 
@@ -652,6 +661,11 @@ begin
   Tray.Visible := False;
   Log('Tray invisible');
 
+  FreeAndNil(FDirectoryWatcher);
+  Log('FreeAndNil: FDirectoryWatcher');
+  FinalizeEncoManager;
+  Log('FinalizeEncoManager');
+
   FreeAndNil(WindowDict);
   FreeAndNil(KeyLayout);
   Log('FreeAndNil: WindowDict, KeyLayout');
@@ -789,30 +803,31 @@ begin
 end;
 
 function TAvroMainForm1.IgnorableWindow(const lngHWND: HWND): Boolean;
+var
+  ClsName: string;
 begin
   Result := False;
+  if lngHWND = 0 then Exit(True);
 
-  // System tray
-  if (lngHWND = FindWindow('Shell_TrayWnd', nil)) or (lngHWND = FindWindowEx(FindWindow('Shell_TrayWnd', nil), 0, 'TrayNotifyWnd', nil)) then
-    Result := True
-  else if lngHWND = Self.Handle then
-    Result := True
-  else if IsFormLoaded('TopBar') then
-  begin
-    if lngHWND = Topbar.Handle then
-      Result := True;
-  end
-  else if IsFormLoaded('frmEncodingWarning') then
-  begin
-    if lngHWND = frmEncodingWarning.Handle then
-      Result := True;
-  end
-  // Photoshop drag window exception
-  else if GetWindowClassName(lngHWND) = 'PSDocDragFeedback' then
-    Result := True
-  else if (CurrentPicker <> nil) and (lngHWND = CurrentPicker.Handle) then
-    Result := True;
+  // ১. নিজস্ব ফর্ম ও সিস্টেম ট্রে
+  if (lngHWND = FindWindow('Shell_TrayWnd', nil)) or
+     (lngHWND = FindWindowEx(FindWindow('Shell_TrayWnd', nil), 0, 'TrayNotifyWnd', nil)) or
+     (lngHWND = Self.Handle) then
+    Exit(True);
+
+  if IsFormLoaded('TopBar') and (lngHWND = Topbar.Handle) then Exit(True);
+  if IsFormLoaded('frmEncodingWarning') and (lngHWND = frmEncodingWarning.Handle) then Exit(True);
+  if (CurrentPicker <> nil) and (lngHWND = CurrentPicker.Handle) then Exit(True);
+  if (CurrentLayoutPicker <> nil) and (lngHWND = CurrentLayoutPicker.Handle) then Exit(True);
+  if IsFormLoaded('frmAvroPasswordDlg') and (frmAvroPasswordDlg <> nil) and (lngHWND = frmAvroPasswordDlg.Handle) then Exit(True);
+  if IsFormLoaded('TfrmAnsiToast') or IsFormLoaded('TfrmLayoutToast') then Exit(True);
+
+  // ২. 🛡️ অত্যন্ত গুরুত্বপূর্ণ: মেনু এবং পপআপ ক্লাস (#32768) যাতে টপবারকে সামনে এনে ক্লিক ব্লক না করে
+  ClsName := GetWindowClassName(lngHWND);
+  if (ClsName = '#32768') or (ClsName = 'PSDocDragFeedback') or (ClsName = 'ComboLBox') then
+    Exit(True);
 end;
+
 
 {$HINTS ON}
 { =============================================================================== }
@@ -1060,6 +1075,49 @@ end;
 
 { =============================================================================== }
 
+function HandleLoadEncoMapping(const AFilePath: string): Boolean;
+var
+  ErrorLog: TStringList;
+  Password: AnsiString;
+begin
+  Result := False;
+  ErrorLog := TStringList.Create;
+  try
+    // Try with cached password first
+    Result := LoadMappingFromEnco(AFilePath, CachedEncoPassword, ErrorLog);
+
+    // Failed? A stale or wrong cached password must never silently keep the
+    // previous mapping active - clear it and ask the user for the right one.
+    // Only password-protected files (flag $01 / legacy v1) ever prompt:
+    // default-key files (flag $00) decrypt transparently, so a failure there
+    // means the file itself is corrupt and a password prompt would be wrong.
+    if (not Result) and IsEncoFile(AFilePath) and
+      (GetAvroEncoProtectionFlag(AFilePath) = AVROENCO_FLAG_USER_PASSWORD) then
+    begin
+      CachedEncoPassword := '';
+      ErrorLog.Clear;
+      if PromptForPasswordAndValidate(AFilePath, Password) then
+      begin
+        CachedEncoPassword := Password;
+        SaveSettings;
+        Result := LoadMappingFromEnco(AFilePath, CachedEncoPassword, ErrorLog);
+      end;
+    end;
+
+    if not Result then
+    begin
+      if IsEncoFile(AFilePath) and
+        (GetAvroEncoProtectionFlag(AFilePath) = AVROENCO_FLAG_USER_PASSWORD) then
+        CachedEncoPassword := '';
+      Log('HandleLoadEncoMapping FAILED: ' + AFilePath + ' - ' + ErrorLog.Text);
+    end
+    else
+      Log('HandleLoadEncoMapping OK: ' + AFilePath);
+  finally
+    ErrorLog.Free;
+  end;
+end;
+
 procedure TAvroMainForm1.LoadApp;
 var
   tempLastUIMode: string;
@@ -1145,13 +1203,14 @@ begin
     frmSplash.Show;
   end;
 
-  // --- Record initial JSON file write time for auto-refresh ---
+  // --- Record initial file write time for auto-refresh ---
   if (AnsiVersion <> 'Default') and (AnsiMappingDir <> '') then
   begin
-    if TFile.Exists(AnsiMappingDir + AnsiVersion + '.json') then
-      FActiveMappingLastWriteTime := TFile.GetLastWriteTime(AnsiMappingDir + AnsiVersion + '.json')
-    else
-      FActiveMappingLastWriteTime := 0;
+    FActiveMappingLastWriteTime := 0;
+    if TFile.Exists(AnsiMappingDir + AnsiVersion + '.AvroEnco') then
+      FActiveMappingLastWriteTime := TFile.GetLastWriteTime(AnsiMappingDir + AnsiVersion + '.AvroEnco')
+    else if TFile.Exists(AnsiMappingDir + AnsiVersion + '.json') then
+      FActiveMappingLastWriteTime := TFile.GetLastWriteTime(AnsiMappingDir + AnsiVersion + '.json');
   end
   else
     FActiveMappingLastWriteTime := 0;
@@ -1162,8 +1221,47 @@ begin
     AnsiMappingDir := GetAvroDataDir + 'AnsiMapping\';
     ForceDirectories(AnsiMappingDir);
   end;
+  InitializeEncoManager;
+  ScanAvroEncoFiles(AnsiMappingDir);
+  // Wire up the .AvroEnco loader BEFORE the first LoadCurrentActiveMapping:
+  // otherwise an active .AvroEnco mapping (e.g. a password-protected one
+  // persisted from the previous session) is silently skipped at startup and
+  // ANSI typing falls back to the built-in defaults.
+  OnLoadEncoMapping := HandleLoadEncoMapping;
   LoadCurrentActiveMapping;
   BuildAnsiVersionMenus;
+
+  FDirectoryWatcher := TAvroDirectoryWatcher.Create(AnsiMappingDir);
+  FDirectoryWatcher.OnChanged := HandleLayoutDirectoryChanged;
+  FDirectoryWatcher.Active := True;
+end;
+
+procedure TAvroMainForm1.HandleLayoutDirectoryChanged(Sender: TObject);
+var
+  TargetPath: string;
+begin
+  ScanAvroEncoFiles(AnsiMappingDir);
+
+  if (AnsiVersion <> 'Default') and (AnsiMappingDir <> '') then
+  begin
+    TargetPath := GetActiveEncoFilePath(AnsiVersion, AnsiMappingDir);
+    if TargetPath <> '' then
+    begin
+      if IsEncoFile(TargetPath) then
+      begin
+        // Default-key files (flag $00) reload transparently; password
+        // protected files reload only when a usable password is cached.
+        if (GetAvroEncoProtectionFlag(TargetPath) = AVROENCO_FLAG_DEFAULT_KEY) or
+          (CachedEncoPassword <> '') then
+          LoadMappingFromEnco(TargetPath, CachedEncoPassword);
+      end
+      else
+        LoadCurrentActiveMapping;
+    end;
+  end;
+
+  BuildAnsiVersionMenus;
+  ShowAnsiToastNotification('ANSI mappings refreshed');
 end;
 
 procedure TAvroMainForm1.ManageAutoCorrectentries1Click(Sender: TObject);
@@ -1655,13 +1753,32 @@ begin
 end;
 
 procedure TAvroMainForm1.PopupToolsPopup(Sender: TObject);
+var
+  I: Integer;
 begin
-  BuildAnsiVersionMenus;
+  // Only update checkmarks on existing items -- do NOT Clear/rebuild during popup
+  if Assigned(AnsiVersionSubmenu1) then
+  begin
+    for I := 0 to AnsiVersionSubmenu1.Count - 1 do
+    begin
+      if AnsiVersionSubmenu1.Items[I].GroupIndex = 10 then
+        AnsiVersionSubmenu1.Items[I].Checked := SameText(AnsiVersionSubmenu1.Items[I].Hint, AnsiVersion);
+    end;
+  end;
 end;
 
 procedure TAvroMainForm1.PopupTrayPopup(Sender: TObject);
+var
+  I: Integer;
 begin
-  BuildAnsiVersionMenus;
+  if Assigned(AnsiVersionSubmenu2) then
+  begin
+    for I := 0 to AnsiVersionSubmenu2.Count - 1 do
+    begin
+      if AnsiVersionSubmenu2.Items[I].GroupIndex = 10 then
+        AnsiVersionSubmenu2.Items[I].Checked := SameText(AnsiVersionSubmenu2.Items[I].Hint, AnsiVersion);
+    end;
+  end;
 end;
 
 procedure TAvroMainForm1.UpdateTrayIcon;
@@ -2029,7 +2146,9 @@ begin
     begin
       FMappingCheckCountdown := 10; // ~1 second at Interval = 100 ms
       try
-        MapPath := AnsiMappingDir + AnsiVersion + '.json';
+        MapPath := AnsiMappingDir + AnsiVersion + '.AvroEnco';
+        if not FileExists(MapPath) then
+          MapPath := AnsiMappingDir + AnsiVersion + '.json';
         MapWriteTime := TFile.GetLastWriteTime(MapPath);
         if (MapWriteTime <> 0) and (MapWriteTime <> FActiveMappingLastWriteTime) then
         begin
@@ -2042,6 +2161,9 @@ begin
       end;
     end;
   end;
+
+  if Assigned(FDirectoryWatcher) then
+    FDirectoryWatcher.CheckForChanges;
 
   hforewnd := GetForegroundWindow;
   if hforewnd = 0 then
@@ -2154,10 +2276,10 @@ end;
 procedure TAvroMainForm1.AnsiVersionMenuClick(Sender: TObject);
 var
   ClickedItem: TMenuItem;
-  SelectedVersion, ErrorMsg: string;
+  SelectedVersion, ErrorMsg, TargetPath: string;
+  Password: AnsiString;
 begin
-  if not (Sender is TMenuItem) then
-    Exit;
+  if not (Sender is TMenuItem) then Exit;
   ClickedItem := TMenuItem(Sender);
 
   SelectedVersion := ClickedItem.Hint;
@@ -2167,19 +2289,58 @@ begin
     SelectedVersion := StringReplace(SelectedVersion, '&', '', [rfReplaceAll]);
   end;
 
-  if not TrySetAnsiVersion(SelectedVersion, ErrorMsg) then
+  // Default সিলেকশন
+  if SameText(SelectedVersion, 'Default') then
   begin
-    Application.MessageBox(PChar('Could not load the selected ANSI mapping.' + sLineBreak + sLineBreak +
-      'Error: ' + ErrorMsg), 'ANSI Mapping Error', MB_ICONWARNING or MB_OK);
+    AnsiVersion := 'Default';
+    LoadCurrentActiveMapping;
+    SaveSettings;
+    BuildAnsiVersionMenus;
+    if ShowAnsiSwitchNotification = 'YES' then
+      ShowAnsiToastNotification('ANSI Encoding: Default');
     Exit;
   end;
 
-  AnsiVersion := SelectedVersion;
-  SaveSettings;
-  BuildAnsiVersionMenus;
+  TargetPath := GetActiveEncoFilePath(SelectedVersion, AnsiMappingDir);
+  if TargetPath = '' then
+  begin
+    Application.MessageBox(PChar('Mapping file not found: ' + SelectedVersion), 'Error',
+      MB_ICONWARNING or MB_OK or MB_TOPMOST or MB_SETFOREGROUND);
+    Exit;
+  end;
 
-  if ShowAnsiSwitchNotification = 'YES' then
-    ShowAnsiToastNotification('ANSI Encoding: ' + SelectedVersion);
+  // For a password-protected encrypted file without a usable cached
+  // password, ask for the password once up front; TrySetAnsiVersion then
+  // reuses CachedEncoPassword and never prompts a second time.
+  // Default-key files (flag $00) load transparently and never prompt.
+  if IsEncoFile(TargetPath) and (CachedEncoPassword = '') and
+    (GetAvroEncoProtectionFlag(TargetPath) = AVROENCO_FLAG_USER_PASSWORD) then
+  begin
+    if not PromptForPasswordAndValidate(TargetPath, Password) then
+      Exit;
+    CachedEncoPassword := Password;
+    SaveSettings;
+  end;
+
+  if TrySetAnsiVersion(SelectedVersion, ErrorMsg) then
+  begin
+    AnsiVersion := SelectedVersion;
+    SaveSettings;
+    BuildAnsiVersionMenus;
+    if ShowAnsiSwitchNotification = 'YES' then
+      ShowAnsiToastNotification('ANSI Encoding: ' + SelectedVersion);
+    Exit;
+  end;
+
+  // Loading failed - clear a bad cached password so the next attempt
+  // re-prompts (password-protected files only).
+  if IsEncoFile(TargetPath) and
+    (GetAvroEncoProtectionFlag(TargetPath) = AVROENCO_FLAG_USER_PASSWORD) then
+    CachedEncoPassword := '';
+
+  // Keep error boxes above the always-on-top TopBar so a failed load is always visible.
+  Application.MessageBox(PChar('Could not load ANSI mapping.' + sLineBreak + ErrorMsg), 'Error',
+    MB_ICONWARNING or MB_OK or MB_TOPMOST or MB_SETFOREGROUND);
 end;
 
 { =============================================================================== }
@@ -2187,36 +2348,13 @@ end;
 { View the description of a specific mapping }
 procedure TAvroMainForm1.ReadAnsiDescriptionClick(Sender: TObject);
 var
-  MapName, FilePath, Content, DescText: string;
+  MapName: string;
 begin
   if not (Sender is TMenuItem) then Exit;
   MapName := (Sender as TMenuItem).Hint;
-  
-  if SameText(MapName, 'Default') then
-  begin
-    MessageDlg('Default Bijoy 2000 compatible ANSI mapping built into Avro Keyboard.' + sLineBreak +
-      'Features automatic contextual post-base & pre-base kar mapping with zero typing flicker.', 
-      mtInformation, [mbOK], 0);
-    Exit;
-  end;
-
-  FilePath := AnsiMappingDir + MapName + '.json';
-  if FileExists(FilePath) then
-  begin
-    try
-      Content := TFile.ReadAllText(FilePath, TEncoding.UTF8);
-      DescText := 'Mapping: ' + MapName + sLineBreak +
-                  'Location: ' + FilePath + sLineBreak + sLineBreak +
-                  'JSON Preview:' + sLineBreak +
-                  Copy(Content, 1, 350) + '...';
-      MessageDlg(DescText, mtInformation, [mbOK], 0);
-    except
-      on E: Exception do
-        MessageDlg('Could not read description: ' + E.Message, mtError, [mbOK], 0);
-    end;
-  end
-  else
-    MessageDlg('Mapping file not found on disk: ' + FilePath, mtError, [mbOK], 0);
+  if MapName = '' then
+    MapName := (Sender as TMenuItem).Caption;
+  ShowMappingDescription(MapName);
 end;
 
 { =============================================================================== }
@@ -2224,94 +2362,85 @@ end;
 { Exporting specific mappings }
 procedure TAvroMainForm1.ExportSpecificMappingClick(Sender: TObject);
 var
-  SaveDialog: TSaveDialog;
-  MapName, SourcePath: string;
+  MapName: string;
 begin
   if not (Sender is TMenuItem) then Exit;
   MapName := (Sender as TMenuItem).Hint;
-
-  SaveDialog := TSaveDialog.Create(nil);
-  try
-    SaveDialog.Filter := 'ANSI Mapping JSON|*.json';
-    SaveDialog.DefaultExt := 'json';
-    SaveDialog.Title := 'Export ' + MapName + ' Mapping JSON';
-    SaveDialog.FileName := MapName + '.json';
-
-    if SaveDialog.Execute then
-    begin
-      if SameText(MapName, 'Default') then
-        ExportAnsiMapping(SaveDialog.FileName)
-      else
-      begin
-        SourcePath := AnsiMappingDir + MapName + '.json';
-        if FileExists(SourcePath) then
-          CopyFile(PChar(SourcePath), PChar(SaveDialog.FileName), False)
-        else
-          ExportAnsiMapping(SaveDialog.FileName);
-      end;
-      MessageDlg('Mapping successfully exported to:'#13#10 + SaveDialog.FileName, mtInformation, [mbOK], 0);
-    end;
-  finally
-    SaveDialog.Free;
-  end;
+  if MapName = '' then
+    MapName := (Sender as TMenuItem).Caption;
+  ExportMappingFile(MapName);
 end;
 
 { =============================================================================== }
 
 procedure TAvroMainForm1.ImportAnsiMappingClick(Sender: TObject);
 var
-  OpenDialog:                TOpenDialog;
-  DestPath, ErrMsg, NewName: string;
-  ErrorLog:                  TStringList;
-  I:                         Integer;
+  OpenDialog: TOpenDialog;
+  ErrMsg, ErrorMessages: string;
+  I: Integer;
+
+  procedure AddError(const AFileName, AMessage: string);
+  begin
+    if ErrorMessages <> '' then
+      ErrorMessages := ErrorMessages + sLineBreak;
+    ErrorMessages := ErrorMessages + ExtractFileName(AFileName) + ': ' + AMessage;
+  end;
+
 begin
   OpenDialog := TOpenDialog.Create(nil);
   try
-    OpenDialog.Filter := 'ANSI Mapping JSON|*.json';
-    OpenDialog.DefaultExt := 'json';
+    OpenDialog.Filter := 'ANSI Mapping|*.json;*.AvroEnco';
+    OpenDialog.DefaultExt := 'AvroEnco';
+    OpenDialog.Title := 'Import ANSI Mapping';
+    OpenDialog.Options := OpenDialog.Options + [ofAllowMultiSelect, ofFileMustExist];
+
     if OpenDialog.Execute then
     begin
-      if not ValidateAnsiMappingFile(OpenDialog.FileName, ErrMsg) then
-      begin
-        MessageDlg('ANSI mapping import failed:'#13#10#13#10 + ErrMsg, mtError, [mbOK], 0);
-        exit;
-      end;
+      ErrorMessages := '';
 
-      ForceDirectories(AnsiMappingDir);
-      DestPath := AnsiMappingDir + ExtractFileName(OpenDialog.FileName);
-      NewName := ChangeFileExt(ExtractFileName(OpenDialog.FileName), '');
-      for I := 0 to AnsiVersionSubmenu1.Count - 1 do
-        if SameText(AnsiVersionSubmenu1.Items[I].Caption, NewName) then
+      // Each selected file is imported independently; .json and .AvroEnco
+      // files may be mixed freely inside one multi-select.
+      for I := 0 to OpenDialog.Files.Count - 1 do
+      begin
+        ErrMsg := '';
+
+        if SameText(ExtractFileExt(OpenDialog.Files[I]), '.AvroEnco') then
         begin
-          MessageDlg('A mapping with this name already exists.'#13#10 + 'Please rename the file or delete the existing one first.', mtError, [mbOK], 0);
-          exit;
+          // Flag-driven import (uAvroEncoImporter): header/flag inspection,
+          // password prompt only for password-protected files, copy, menu
+          // scan, per-file "Mapping imported: <name>" toast, and activation
+          // for password-protected imports (default-key imports stay silent).
+          if not ImportEncoFile(OpenDialog.Files[I], ErrMsg) and (ErrMsg <> '') then
+            AddError(OpenDialog.Files[I], ErrMsg);
+        end
+        else if SameText(ExtractFileExt(OpenDialog.Files[I]), '.json') then
+        begin
+          if not ValidateAnsiMappingFile(OpenDialog.Files[I], ErrMsg) then
+            AddError(OpenDialog.Files[I],
+              'ANSI mapping import failed:'#13#10#13#10 + ErrMsg)
+          else
+          begin
+            ForceDirectories(AnsiMappingDir);
+            if not CopyFile(PChar(OpenDialog.Files[I]),
+              PChar(AnsiMappingDir + ExtractFileName(OpenDialog.Files[I])), False) then
+              AddError(OpenDialog.Files[I], 'Failed to copy file to the mapping directory.')
+            else
+            begin
+              // Plain JSON mappings are unprotected: import activates them.
+              AnsiVersion := ChangeFileExt(ExtractFileName(OpenDialog.Files[I]), '');
+              SaveSettings;
+              LoadCurrentActiveMapping;
+              ShowAnsiToastNotification('Mapping imported: ' + AnsiVersion);
+            end;
+          end;
         end;
-      if FileExists(DestPath) then
-      begin
-        MessageDlg('A mapping with this name already exists.'#13#10 + 'Please rename the file and try again.', mtError, [mbOK], 0);
-        exit;
-      end;
-      if not CopyFile(PChar(OpenDialog.FileName), PChar(DestPath), False) then
-      begin
-        MessageDlg('Failed to copy file to the mapping directory.', mtError, [mbOK], 0);
-        exit;
       end;
 
-      AnsiVersion := ChangeFileExt(ExtractFileName(OpenDialog.FileName), '');
-      SaveSettings;
-
-      ErrorLog := TStringList.Create;
-      try
-        LoadCurrentActiveMapping(ErrorLog);
-        if ErrorLog.Count = 0 then
-          MessageDlg('Mapping imported successfully.', mtInformation, [mbOK], 0)
-        else
-          MessageDlg('Mapping loaded with warnings/errors:'#13#10 + ErrorLog.Text, mtWarning, [mbOK], 0);
-      finally
-        ErrorLog.Free;
-      end;
-
+      // Refresh the ANSI version menus once after the batch.
       BuildAnsiVersionMenus;
+
+      if ErrorMessages <> '' then
+        MessageDlg('Import failed:'#13#10#13#10 + ErrorMessages, mtError, [mbOK], 0);
     end;
   finally
     OpenDialog.Free;
@@ -2336,18 +2465,7 @@ begin
     MapName := (Sender as TMenuItem).Hint;
     if MapName = '' then
       MapName := (Sender as TMenuItem).Caption;
-
-    if MessageDlg('Delete mapping "' + MapName + '"?', mtConfirmation, [mbYes, mbNo], 0) = mrYes then
-    begin
-      if DeleteFile(AnsiMappingDir + MapName + '.json') then
-      begin
-        if SameText(AnsiVersion, MapName) then
-          AnsiVersion := 'Default';
-        SaveSettings;
-        LoadCurrentActiveMapping;
-        BuildAnsiVersionMenus;
-      end;
-    end;
+    DeleteMappingFile(MapName);
   end;
 end;
 
@@ -2396,10 +2514,12 @@ end;
 
 { =============================================================================== }
 
+{ =============================================================================== }
+{ Build ANSI Version Menus (Fixed) }
+{ =============================================================================== }
+
 procedure TAvroMainForm1.BuildAnsiVersionMenus;
 var
-  SearchRec: TSearchRec;
-  FileTitle: string;
   Sep, MoreOptMenu, Item: TMenuItem;
 
   procedure AddDirectItem(ParentMenu: TMenuItem; const AName: string; AChecked: Boolean);
@@ -2409,8 +2529,9 @@ var
     MItem := TMenuItem.Create(ParentMenu);
     MItem.Caption := AName;
     MItem.Hint := AName;
-    MItem.Checked := AChecked;
+    MItem.GroupIndex := 10;
     MItem.RadioItem := True;
+    MItem.Checked := AChecked;
     MItem.OnClick := AnsiVersionMenuClick;
     ParentMenu.Add(MItem);
   end;
@@ -2424,21 +2545,18 @@ var
     MSub.Hint := AName;
     ParentMore.Add(MSub);
 
-    // 1. Read Description
     ActionItem := TMenuItem.Create(MSub);
     ActionItem.Caption := 'Read Description';
     ActionItem.Hint := AName;
     ActionItem.OnClick := ReadAnsiDescriptionClick;
     MSub.Add(ActionItem);
 
-    // 2. Export Mapping...
     ActionItem := TMenuItem.Create(MSub);
     ActionItem.Caption := 'Export Mapping...';
     ActionItem.Hint := AName;
     ActionItem.OnClick := ExportSpecificMappingClick;
     MSub.Add(ActionItem);
 
-    // 3. Delete Mapping (Default ডিলিট হবে না)
     if not IsDefault then
     begin
       ActionItem := TMenuItem.Create(MSub);
@@ -2450,22 +2568,25 @@ var
   end;
 
   procedure BuildSingleMenu(AMenu: TMenuItem);
+  var
+    Key, DisplayName: string;
+    Info: TAvroEncoFileInfo;
   begin
+    if not Assigned(AMenu) then Exit;
     AMenu.Clear;
 
-    // --- 1. Main Flat List (1-Click Selection) ---
+    // ১. Default
     AddDirectItem(AMenu, 'Default', SameText(AnsiVersion, 'Default'));
 
-    if DirectoryExists(AnsiMappingDir) then
+    // ২. স্ক্যান করা সব ফাইল
+    if Assigned(AvroEncoFiles) then
     begin
-      if FindFirst(AnsiMappingDir + '*.json', faAnyFile, SearchRec) = 0 then
+      for Key in AvroEncoFiles.Keys do
       begin
-        repeat
-          FileTitle := ChangeFileExt(SearchRec.Name, '');
-          if not SameText(FileTitle, 'Default') then
-            AddDirectItem(AMenu, FileTitle, SameText(AnsiVersion, FileTitle));
-        until FindNext(SearchRec) <> 0;
-        FindClose(SearchRec);
+        Info := AvroEncoFiles[Key];
+        DisplayName := Info.DisplayName;
+        if not SameText(DisplayName, 'Default') then
+          AddDirectItem(AMenu, DisplayName, SameText(AnsiVersion, DisplayName));
       end;
     end;
 
@@ -2474,39 +2595,34 @@ var
     Sep.Caption := '-';
     AMenu.Add(Sep);
 
-    // --- 2. 'More Options' submenu (as shown in the first image) ---
+    // ৩. More Options
     MoreOptMenu := TMenuItem.Create(AMenu);
     MoreOptMenu.Caption := 'More Options';
     AMenu.Add(MoreOptMenu);
 
-    // Submenu for each mapping within More Options
     AddMappingActionSubmenu(MoreOptMenu, 'Default', True);
 
-    if DirectoryExists(AnsiMappingDir) then
+    if Assigned(AvroEncoFiles) then
     begin
-      if FindFirst(AnsiMappingDir + '*.json', faAnyFile, SearchRec) = 0 then
+      for Key in AvroEncoFiles.Keys do
       begin
-        repeat
-          FileTitle := ChangeFileExt(SearchRec.Name, '');
-          if not SameText(FileTitle, 'Default') then
-            AddMappingActionSubmenu(MoreOptMenu, FileTitle, False);
-        until FindNext(SearchRec) <> 0;
-        FindClose(SearchRec);
+        Info := AvroEncoFiles[Key];
+        DisplayName := Info.DisplayName;
+        if not SameText(DisplayName, 'Default') then
+          AddMappingActionSubmenu(MoreOptMenu, DisplayName, False);
       end;
     end;
 
-    // Separator inside More Options
+    // Separator
     Sep := TMenuItem.Create(MoreOptMenu);
     Sep.Caption := '-';
     MoreOptMenu.Add(Sep);
 
-    // Import Mapping...
     Item := TMenuItem.Create(MoreOptMenu);
     Item.Caption := 'Import Mapping...';
     Item.OnClick := ImportAnsiMappingClick;
     MoreOptMenu.Add(Item);
 
-    // Locate Mapping...
     Item := TMenuItem.Create(MoreOptMenu);
     Item.Caption := 'Locate Mapping...';
     Item.OnClick := OpenAnsiMappingDirClick;
@@ -2515,10 +2631,9 @@ var
 
 begin
   CleanupDuplicateMappings;
+  ScanAvroEncoFiles(AnsiMappingDir);
   BuildSingleMenu(AnsiVersionSubmenu1);
   BuildSingleMenu(AnsiVersionSubmenu2);
 end;
-
-{ =============================================================================== }
 
 end.

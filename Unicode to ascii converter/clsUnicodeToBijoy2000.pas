@@ -187,8 +187,15 @@ var
   AnsiSequenceLookup:       TAnsiSequenceMap;
   AnsiToUniMap:             TAnsiToUniMap; // ANSI glyph -> Unicode cluster candidates (sniffer reverse map)
 
+type
+  TLoadEncoMappingFunc = function(const AFilePath: string): Boolean;
+
+var
+  OnLoadEncoMapping: TLoadEncoMappingFunc; // ANSI glyph -> Unicode cluster candidates (sniffer reverse map)
+
 procedure ResetAnsiToDefaults;
 procedure LoadAnsiMapping(const Path: string; ErrorLog: TStringList = nil);
+procedure LoadAnsiMappingFromJSON(const AJSONContent: string; ErrorLog: TStringList = nil);
 procedure ExportAnsiMapping(const Path: string);
 procedure LoadCurrentActiveMapping(ErrorLog: TStringList = nil);
 function ValidateAnsiMappingFile(const Path: string; out ErrorMessage: string): Boolean;
@@ -205,7 +212,8 @@ uses
   clsAnsiSequenceLookup,
   BanglaChars,
   System.SysUtils,
-  System.Generics.Defaults;
+  System.Generics.Defaults,
+  uAvroEncoManager;
 
 { Bijoy2000 Font Map Constants }
 var
@@ -2952,6 +2960,44 @@ end;
 { =============================================================================== }
 
 procedure LoadAnsiMapping(const Path: string; ErrorLog: TStringList = nil);
+var
+  JSON: string;
+  Lines: TStringList;
+begin
+  ResetAnsiToDefaults;
+
+  if not FileExists(Path) then
+  begin
+    if Assigned(ErrorLog) then
+      ErrorLog.Add('Error: JSON file not found at: ' + Path);
+    Exit;
+  end;
+
+  Lines := TStringList.Create;
+  try
+    try
+      Lines.LoadFromFile(Path, TEncoding.UTF8);
+      JSON := Lines.Text;
+      if (Length(JSON) >= 3) and (JSON[1] = #$EF) and (JSON[2] = #$BB) and (JSON[3] = #$BF) then
+        Delete(JSON, 1, 3);
+    except
+      on E: Exception do
+      begin
+        if Assigned(ErrorLog) then
+          ErrorLog.Add('Critical: Invalid JSON Syntax. Message: ' + E.Message);
+        Exit;
+      end;
+    end;
+  finally
+    Lines.Free;
+  end;
+
+  LoadAnsiMappingFromJSON(JSON, ErrorLog);
+end;
+
+{ =============================================================================== }
+
+procedure LoadAnsiMappingFromJSON(const AJSONContent: string; ErrorLog: TStringList = nil);
 
   function ParseSection(const S: string; var Pos: Integer): TArray<TReplacementPair>;
   var
@@ -3028,7 +3074,6 @@ var
   P:    Integer;
   Key, ConstName, ConstValue, UnicodeKeyValue, CatName, FieldName, ToggleVal, ConstComment: string;
   Rec:                            TAnsiVarRec;
-  Lines:                          TStringList;
   Items:                          TList<string>;
   RawItems:                       TList<string>;
   RawStr:                         string;
@@ -3039,31 +3084,9 @@ var
 begin
   ResetAnsiToDefaults;
 
-  if not FileExists(Path) then
-  begin
-    if Assigned(ErrorLog) then
-      ErrorLog.Add('Error: JSON file not found at: ' + Path);
-    Exit;
-  end;
-
-  Lines := TStringList.Create;
-  try
-    try
-      Lines.LoadFromFile(Path, TEncoding.UTF8);
-      JSON := Lines.Text;
-      if (Length(JSON) >= 3) and (JSON[1] = #$EF) and (JSON[2] = #$BB) and (JSON[3] = #$BF) then
-        Delete(JSON, 1, 3);
-    except
-      on E: Exception do
-      begin
-        if Assigned(ErrorLog) then
-          ErrorLog.Add('Critical: Invalid JSON Syntax. Message: ' + E.Message);
-        Exit;
-      end;
-    end;
-  finally
-    Lines.Free;
-  end;
+  JSON := AJSONContent;
+  if (Length(JSON) >= 3) and (JSON[1] = #$EF) and (JSON[2] = #$BB) and (JSON[3] = #$BF) then
+    Delete(JSON, 1, 3);
 
   P := 1;
   JSkipWS(JSON, P);
@@ -4504,6 +4527,12 @@ begin
   Result := False;
   ErrorMessage := '';
 
+  if Lowercase(ExtractFileExt(Path)) = '.avroenco' then
+  begin
+    Result := True;
+    Exit;
+  end;
+
   if not FileExists(Path) then
   begin
     ErrorMessage := 'File does not exist.';
@@ -4630,11 +4659,33 @@ end;
 { =============================================================================== }
 
 procedure LoadCurrentActiveMapping(ErrorLog: TStringList = nil);
+var
+  FilePath: string;
 begin
   if AnsiVersion = 'Default' then
     ResetAnsiToDefaults
-  else if AnsiMappingDir <> '' then
-    LoadAnsiMapping(AnsiMappingDir + AnsiVersion + '.json', ErrorLog);
+  else
+  begin
+    // Use multi-directory resolver to find the file
+    FilePath := GetActiveEncoFilePath(AnsiVersion, AnsiMappingDir);
+    if FilePath = '' then
+      Exit;
+
+    if IsEncoFile(FilePath) then
+    begin
+      if Assigned(OnLoadEncoMapping) then
+      begin
+        if not OnLoadEncoMapping(FilePath) then
+        begin
+          // Fall back to checking for a .json version
+          if FileExists(AnsiMappingDir + AnsiVersion + '.json') then
+            LoadAnsiMapping(AnsiMappingDir + AnsiVersion + '.json', ErrorLog);
+        end;
+      end;
+    end
+    else
+      LoadAnsiMapping(FilePath, ErrorLog);
+  end;
 end;
 
 { =============================================================================== }
@@ -4655,23 +4706,39 @@ begin
     Exit;
   end;
 
-  if AnsiMappingDir = '' then
+  // Resolve file path using multi-directory resolver
+  FilePath := GetActiveEncoFilePath(NewVersion, AnsiMappingDir);
+  if FilePath = '' then
   begin
-    ErrorMessage := 'ANSI Mapping directory is not set.';
+    ErrorMessage := 'Mapping file not found: ' + NewVersion;
     Exit;
   end;
 
-  FilePath := AnsiMappingDir + NewVersion + '.json';
-
-  if not ValidateAnsiMappingFile(FilePath, ErrorMessage) then
+  if IsEncoFile(FilePath) then
   begin
-    Exit;
+    if not Assigned(OnLoadEncoMapping) then
+    begin
+      ErrorMessage := 'Encrypted mapping loader not available.';
+      Exit;
+    end;
+    if not OnLoadEncoMapping(FilePath) then
+    begin
+      ErrorMessage := 'Failed to load encrypted mapping.';
+      Exit;
+    end;
+    AnsiVersion := NewVersion;
+    OptimizeMemoryUsage;
+    Result := True;
+  end
+  else
+  begin
+    if not ValidateAnsiMappingFile(FilePath, ErrorMessage) then
+      Exit;
+    AnsiVersion := NewVersion;
+    LoadAnsiMapping(FilePath);
+    OptimizeMemoryUsage;
+    Result := True;
   end;
-
-  AnsiVersion := NewVersion;
-  LoadAnsiMapping(FilePath);
-  OptimizeMemoryUsage;
-  Result := True;
 end;
 
 procedure OptimizeMemoryUsage;
