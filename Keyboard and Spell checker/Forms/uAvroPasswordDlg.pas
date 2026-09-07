@@ -37,7 +37,7 @@ type
     { Public declarations }
   end;
 
-function ShowPasswordDialog(out APassword: AnsiString): Boolean;
+function ShowPasswordDialog(out APassword: AnsiString; const AFileName: string = ''): Boolean;
 
 var
   frmAvroPasswordDlg: TfrmAvroPasswordDlg;
@@ -46,7 +46,7 @@ implementation
 
 {$R *.dfm}
 
-function ShowPasswordDialog(out APassword: AnsiString): Boolean;
+function ShowPasswordDialog(out APassword: AnsiString; const AFileName: string): Boolean;
 var
   Dlg: TfrmAvroPasswordDlg;
 begin
@@ -59,6 +59,10 @@ begin
     // far off-screen - center on the screen instead so the prompt is ALWAYS
     // visible (otherwise the modal dialog blocks the whole app invisibly).
     Dlg.Position := poScreenCenter;
+    // Show WHICH encoding this password belongs to in the title bar, so the
+    // user can tell protected encodings apart when several exist.
+    if AFileName <> '' then
+      Dlg.Caption := 'Enter Password for ' + AFileName;
     Result := Dlg.ShowModal = mrOk;
     if Result then
       APassword := AnsiString(Dlg.edtPassword.Text);

@@ -15,7 +15,8 @@ uses
   Windows,
   SysUtils,
   Classes,
-  Generics.Collections;
+  Generics.Collections,
+  System.JSON;
 
 type
   TAvroEncoFileInfo = record
@@ -35,7 +36,9 @@ procedure ScanAvroEncoFiles(const ADirectory: string);
 function GetEncoDisplayName(const AFilePath: string): string;
 function IsEncoFile(const AFilePath: string): Boolean;
 function LoadMappingFromEnco(const AFilePath: string; const APassword: AnsiString; ErrorLog: TStringList = nil): Boolean;
-function ExtractMetadataFromJSON(const AJSONContent: string): string;
+function ExtractMetadataFromJSON(const AJSONContent: string; const AFilePath: string = ''): string;
+function GetJSONString(const AObj: TJSONValue; const AKey: string): string;
+function FindMetadataJsonPath(const ADisplayName: string; const ADirectory: string): string;
 function GetActiveEncoFilePath(const ADisplayName: string; const ADirectory: string): string;
 
 implementation
@@ -199,11 +202,103 @@ begin
   end;
 end;
 
-function ExtractMetadataFromJSON(const AJSONContent: string): string;
+function ExtractMetadataFromJSON(const AJSONContent: string; const AFilePath: string): string;
+var
+  LContent: string;
+  LJSON: TJSONValue;
+  LMeta: TJSONValue;
+  LFileBase, LFileName, LEncoding, LType, LVersion, LCompany, LDeveloper, LModifiedBy, LFont: string;
 begin
-  Result := 'Encrypted Avro ANSI Encoding Mapping.';
+  Result := '';
+  LContent := AJSONContent;
+  // Drop a leading UTF-8 BOM if one survived into the string, otherwise
+  // ParseJSONValue rejects the document and no Metadata is found.
+  if (LContent <> '') and (LContent[1] = #$FEFF) then
+    Delete(LContent, 1, 1);
+  LContent := Trim(LContent);
+  if LContent = '' then
+    Exit;
+
+  LJSON := nil;
+  try
+    LJSON := TJSONObject.ParseJSONValue(LContent);
+    if not Assigned(LJSON) then
+      Exit;
+    LMeta := nil;
+    try
+      if LJSON is TJSONObject then
+        LMeta := TJSONObject(LJSON).Values['Metadata'];
+      if not Assigned(LMeta) or not (LMeta is TJSONObject) then
+        Exit;
+      // New metadata schema; fall back to the legacy keys (Name/Font) so old
+      // .AvroEnco containers and third-party files still render.
+      // The card shows the mapping's file name (as seen in Explorer/picker):
+      // "Name" gets the full file name, "Encoding" the name without the
+      // extension. The JSON Encoding/Name keys are only a fallback for
+      // callers that pass no file path.
+      if AFilePath <> '' then
+      begin
+        LFileName := ExtractFileName(AFilePath);
+        LFileBase := GetEncoDisplayName(AFilePath);
+      end;
+      LEncoding := LFileBase;
+      if LEncoding = '' then
+      begin
+        LEncoding := GetJSONString(LMeta, 'Encoding');
+        if LEncoding = '' then
+          LEncoding := GetJSONString(LMeta, 'Name');
+      end;
+      LType      := GetJSONString(LMeta, 'Type');
+      LVersion   := GetJSONString(LMeta, 'Version');
+      LCompany   := GetJSONString(LMeta, 'Company');
+      LDeveloper := GetJSONString(LMeta, 'Developer');
+      LModifiedBy := GetJSONString(LMeta, 'Modified By');
+      LFont      := GetJSONString(LMeta, 'Suggested Font');
+      if LFont = '' then
+        LFont := GetJSONString(LMeta, 'Font');
+    finally
+      LMeta := nil;
+    end;
+  finally
+    LJSON.Free;
+  end;
+  // Build metadata text
+  if LFileName <> '' then
+    Result := Result + 'Name: ' + LFileName + sLineBreak;
+  if LEncoding <> '' then
+    Result := Result + 'Encoding: ' + LEncoding + sLineBreak;
+  if LType <> '' then
+    Result := Result + 'Type: ' + LType + sLineBreak;
+  if LVersion <> '' then
+    Result := Result + 'Version: ' + LVersion + sLineBreak;
+  if LCompany <> '' then
+    Result := Result + 'Company: ' + LCompany + sLineBreak;
+  if LDeveloper <> '' then
+    Result := Result + 'Developer: ' + LDeveloper + sLineBreak;
+  if LModifiedBy <> '' then
+    Result := Result + 'Modified By: ' + LModifiedBy + sLineBreak;
+  if LFont <> '' then
+    Result := Result + sLineBreak + 'Suggested Font: ' + LFont + sLineBreak;
 end;
 
+function GetJSONString(const AObj: TJSONValue; const AKey: string): string;
+var
+  LVal: TJSONValue;
+begin
+  Result := '';
+  if not Assigned(AObj) or not (AObj is TJSONObject) then
+    Exit;
+  LVal := TJSONObject(AObj).Values[AKey];
+  if Assigned(LVal) then
+  begin
+    if LVal is TJSONString then
+      Result := TJSONString(LVal).Value
+    else if LVal is TJSONNumber then
+      Result := TJSONNumber(LVal).Value
+    else
+      Result := LVal.Value;
+  end;
+end;
 function GetActiveEncoFilePath(const ADisplayName: string; const ADirectory: string): string;
 var
   Info: TAvroEncoFileInfo;
@@ -228,6 +323,25 @@ begin
   // 3. Fallback to .json files
   if FileExists(ADirectory + ADisplayName + '.json') then Exit(ADirectory + ADisplayName + '.json');
   if FileExists(AppDir + 'assets\' + ADisplayName + '.json') then Exit(AppDir + 'assets\' + ADisplayName + '.json');
+end;
+
+{ Returns the first existing, same-named .json for ADisplayName, used as a
+  Metadata source when an old .AvroEnco file (encrypted before Metadata
+  existed) decrypts to JSON without a Metadata block. }
+function FindMetadataJsonPath(const ADisplayName: string; const ADirectory: string): string;
+var
+  AppDir: string;
+begin
+  Result := '';
+  if ADisplayName = '' then
+    Exit;
+  AppDir := ExtractFilePath(ParamStr(0));
+  if (ADirectory <> '') and FileExists(ADirectory + ADisplayName + '.json') then
+    Exit(ADirectory + ADisplayName + '.json');
+  if FileExists(AppDir + 'assets\' + ADisplayName + '.json') then
+    Exit(AppDir + 'assets\' + ADisplayName + '.json');
+  if FileExists(AppDir + 'AnsiMapping\' + ADisplayName + '.json') then
+    Exit(AppDir + 'AnsiMapping\' + ADisplayName + '.json');
 end;
 
 end.
