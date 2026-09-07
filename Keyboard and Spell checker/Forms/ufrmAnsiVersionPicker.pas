@@ -448,12 +448,16 @@ begin
   // when no usable password is cached yet; TrySetAnsiVersion then reuses
   // CachedEncoPassword and never prompts a second time. Default-key files
   // (flag $00) must NEVER ask for a password - they decrypt transparently.
-  if IsEncoFile(TargetPath) and (CachedEncoPassword = '') and
+  // Ask only when THIS encoding was never unlocked on this computer; the
+  // per-file cache then unlocks every later switch silently (even after a
+  // full restart). Default-key files never prompt.
+  if IsEncoFile(TargetPath) and (GetEncoCachedPassword(TargetPath) = '') and
     (GetAvroEncoProtectionFlag(TargetPath) = AVROENCO_FLAG_USER_PASSWORD) then
   begin
     if not PromptForPasswordAndValidate(TargetPath, Password) then
       Exit; // Cancelled - keep the picker open so another version can be chosen.
     CachedEncoPassword := Password;
+    RememberEncoPassword(TargetPath, Password);
     SaveSettings;
   end;
 
@@ -477,7 +481,10 @@ begin
 
   // Loading failed - clear a bad cached password so the next attempt re-prompts.
   if IsEncoFile(TargetPath) then
+  begin
     CachedEncoPassword := '';
+    ForgetEncoPassword(TargetPath);
+  end;
 
   // Keep error boxes above the always-on-top TopBar so failures are visible.
   Application.MessageBox(PChar('Could not load the selected ANSI mapping.' + sLineBreak + 'Error: ' + ErrorMsg), 'ANSI Mapping Error',
@@ -537,7 +544,7 @@ begin
   IsDefault := SameText(MappingName, 'Default');
 
   Item := TMenuItem.Create(FPopup);
-  Item.Caption := 'Read Description';
+  Item.Caption := 'Information';
   Item.Hint := MappingName;
   Item.OnClick := PopupDescriptionClick;
   FPopup.Items.Add(Item);
@@ -580,6 +587,8 @@ var
   SaveDlg: TSaveDialog;
 begin
   if not (Sender is TMenuItem) then Exit;
+  // Dismiss the transient picker as soon as the action is chosen.
+  Close;
   MapName := (Sender as TMenuItem).Hint;
 
   SaveDlg := TSaveDialog.Create(nil);
@@ -614,11 +623,17 @@ end;
 
 procedure TfrmAnsiVersionPicker.PopupDescriptionClick(Sender: TObject);
 var
-  MapName, FilePath, Content, DescText: string;
+  MapName, FilePath, Content, DescText, MetaText: string;
   Password: AnsiString;
+  IsProtected: Boolean;
 begin
   if not (Sender is TMenuItem) then Exit;
+  // The picker is a transient popup: choosing any context-menu action
+  // dismisses it (Close -> FormClose -> caFree; the form is released
+  // asynchronously, so the rest of this handler keeps running safely).
+  Close;
   MapName := (Sender as TMenuItem).Hint;
+  IsProtected := False;
 
   if SameText(MapName, 'Default') then
   begin
@@ -634,29 +649,64 @@ begin
     try
       if SameText(ExtractFileExt(FilePath), '.AvroEnco') then
       begin
-        // Only password-protected files (flag $01 / legacy v1) prompt;
-        // default-key files (flag $00) decrypt transparently with no cache.
-        if (CachedEncoPassword = '') and
+        // Captured here, before the metadata fallback may swap in a same-named
+        // .json file below: mark the card when this container is protected by
+        // a user password (flag $01 / legacy v1).
+        IsProtected := (GetAvroEncoProtectionFlag(FilePath) = AVROENCO_FLAG_USER_PASSWORD);
+        // Only password-protected files (flag $01 / legacy v1) prompt, and
+        // only the very first time on this computer - the per-file cache
+        // decrypts silently afterwards. Default-key files never prompt.
+        if (GetEncoCachedPassword(FilePath) = '') and
           (GetAvroEncoProtectionFlag(FilePath) = AVROENCO_FLAG_USER_PASSWORD) then
         begin
           if not PromptForPasswordAndValidate(FilePath, Password) then
             Exit;
           CachedEncoPassword := Password;
+          RememberEncoPassword(FilePath, Password);
+          SaveSettings;
         end;
-        Content := DecryptAvroEncoToString(FilePath, CachedEncoPassword);
+        Content := DecryptAvroEncoToString(FilePath, GetEncoCachedPassword(FilePath));
         if Content = '' then
         begin
           CachedEncoPassword := '';
+          ForgetEncoPassword(FilePath);
           MessageDlg('Failed to decrypt mapping. Password may be incorrect.', mtError, [mbOK], 0);
           Exit;
         end;
       end
       else
         Content := TFile.ReadAllText(FilePath, TEncoding.UTF8);
-      DescText := 'Mapping: ' + MapName + sLineBreak +
-                  'Location: ' + FilePath + sLineBreak + sLineBreak +
-                  'Preview:' + sLineBreak +
-                  Copy(Content, 1, 350) + '...';
+
+      // Prefer the structured Metadata block (Encoding/Type/Version/Developer/Font);
+      MetaText := ExtractMetadataFromJSON(Content, FilePath);
+      if (MetaText = '') and SameText(ExtractFileExt(FilePath), '.AvroEnco') then
+      begin
+        // Old .AvroEnco files (encrypted before Metadata existed) have none;
+        // fall back to the same-named .json in the mapping folder or assets.
+        FilePath := FindMetadataJsonPath(MapName, AnsiMappingDir);
+        if FilePath <> '' then
+        begin
+          Content := TFile.ReadAllText(FilePath, TEncoding.UTF8);
+          MetaText := ExtractMetadataFromJSON(Content, FilePath);
+        end;
+      end;
+      if MetaText <> '' then
+        DescText := MetaText
+      else
+        // No Metadata at all - show a raw JSON preview.
+        DescText := 'Preview:' + sLineBreak +
+                    Copy(Content, 1, 350) + '...';
+
+      // Password-protected .AvroEnco containers get a footer line at the very
+      // bottom of the card; plain .json and default-key files do not.
+      if IsProtected then
+      begin
+        DescText := TrimRight(DescText);
+        if DescText = '' then
+          DescText := 'Encrypted Avro ANSI Encoding'
+        else
+          DescText := DescText + sLineBreak + sLineBreak + 'Encrypted Avro ANSI Encoding';
+      end;
       MessageDlg(DescText, mtInformation, [mbOK], 0);
     except
       on E: Exception do
@@ -672,6 +722,8 @@ var
   MapName: string;
 begin
   if not (Sender is TMenuItem) then Exit;
+  // Dismiss the transient picker as soon as the action is chosen.
+  Close;
   MapName := (Sender as TMenuItem).Hint;
 
   if MessageDlg('Delete mapping "' + MapName + '"?', mtConfirmation, [mbYes, mbNo], 0) = mrYes then

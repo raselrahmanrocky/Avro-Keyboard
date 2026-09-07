@@ -30,6 +30,10 @@ implementation
 uses
   uForm1,
   System.IOUtils,
+  Vcl.Forms,
+  Vcl.Controls,
+  Vcl.StdCtrls,
+  Vcl.Graphics,
   uAvroEncoCrypto,
   uAvroEncoManager,
   uAvroEncoImporter,
@@ -79,7 +83,7 @@ procedure RebuildAnviVersionMenus;
       ParentMore.Add(MSub);
 
       ActionItem := TMenuItem.Create(MSub);
-      ActionItem.Caption := 'Read Description';
+      ActionItem.Caption := 'Information';
       ActionItem.Hint := AName;
       ActionItem.OnClick := AvroMainForm1.ReadAnsiDescriptionClick;
       MSub.Add(ActionItem);
@@ -216,13 +220,14 @@ begin
 end;
 
 { =============================================================================== }
-{ Read Description }
+{ Information }
 { =============================================================================== }
 
 procedure ShowMappingDescription(const AMapName: string);
 var
-  SourcePath, JSONContent, DescText: string;
+  AnsiMappingDir, SourcePath, JsonPath, JSONContent, MetaText, DescText: string;
   Password: AnsiString;
+  IsProtected: Boolean;
 begin
   if SameText(AMapName, 'Default') then
   begin
@@ -235,29 +240,39 @@ begin
     Exit;
   end;
 
-  SourcePath := GetActiveEncoFilePath(AMapName, GetAvroDataDir + 'AnsiMapping\');
+  AnsiMappingDir := GetAvroDataDir + 'AnsiMapping\';
+  SourcePath := GetActiveEncoFilePath(AMapName, AnsiMappingDir);
   if SourcePath = '' then
   begin
     MessageDlg('Mapping file not found: ' + AMapName, mtError, [mbOK], 0);
     Exit;
   end;
 
+  // Remember whether this mapping lives in a password-protected container so
+  // the card can mark it; captured before the fallback may switch to a
+  // same-named .json file below.
+  IsProtected := IsEncoFile(SourcePath) and
+    (GetAvroEncoProtectionFlag(SourcePath) = AVROENCO_FLAG_USER_PASSWORD);
   if IsEncoFile(SourcePath) then
   begin
-    // Only password-protected files (flag $01 / legacy v1) prompt;
-    // default-key files (flag $00) decrypt transparently with no cache.
-    if (CachedEncoPassword = '') and
+    // Only password-protected files (flag $01 / legacy v1) prompt, and only
+    // the very first time on this computer - the per-file cache decrypts
+    // silently afterwards. Default-key files never prompt.
+    if (GetEncoCachedPassword(SourcePath) = '') and
       (GetAvroEncoProtectionFlag(SourcePath) = AVROENCO_FLAG_USER_PASSWORD) then
     begin
       if not PromptForPasswordAndValidate(SourcePath, Password) then
         Exit;
       CachedEncoPassword := Password;
+      RememberEncoPassword(SourcePath, Password);
+      SaveSettings;
     end;
 
-    JSONContent := DecryptAvroEncoToString(SourcePath, CachedEncoPassword);
+    JSONContent := DecryptAvroEncoToString(SourcePath, GetEncoCachedPassword(SourcePath));
     if JSONContent = '' then
     begin
       CachedEncoPassword := '';
+      ForgetEncoPassword(SourcePath);
       MessageDlg('Failed to decrypt mapping. Password may be incorrect.', mtError, [mbOK], 0);
       Exit;
     end;
@@ -275,9 +290,42 @@ begin
     end;
   end;
 
-  DescText := 'Mapping: ' + AMapName + sLineBreak +
-    'Location: ' + SourcePath + sLineBreak + sLineBreak +
-    ExtractMetadataFromJSON(JSONContent);
+  // Prefer the structured Metadata block (Encoding/Type/Version/Developer/Font).
+  MetaText := ExtractMetadataFromJSON(JSONContent, SourcePath);
+  if (MetaText = '') and IsEncoFile(SourcePath) then
+  begin
+    // .AvroEnco files created before Metadata existed decrypt to JSON without
+    // one; fall back to the same-named .json (mapping folder or assets) so the
+    // description card still shows the Metadata from the JSON file.
+    JsonPath := FindMetadataJsonPath(AMapName, AnsiMappingDir);
+    if JsonPath <> '' then
+    begin
+      JSONContent := TFile.ReadAllText(JsonPath, TEncoding.UTF8);
+      MetaText := ExtractMetadataFromJSON(JSONContent, JsonPath);
+      if MetaText <> '' then
+        SourcePath := JsonPath; // Location shows the file the card came from
+    end;
+  end;
+  if MetaText = '' then
+    MetaText := 'No metadata available for this mapping.';
+
+  DescText := MetaText;
+
+  // Password-protected .AvroEnco containers get a footer line at the very
+  // bottom of the card; plain .json and default-key files do not.
+  if IsProtected then
+  begin
+    DescText := TrimRight(DescText);
+    if DescText = '' then
+      DescText := 'Encrypted Avro ANSI Encoding'
+    else
+      DescText := DescText + sLineBreak + sLineBreak + 'Encrypted Avro ANSI Encoding';
+  end;
+
+  // Show the description with the standard info dialog. This is the reliable
+  // presentation under the app's Windows10 Dark VCL style (a hand-built TForm
+  // gets repainted by the style hook and its text can end up invisible); on a
+  // light Windows theme the same call renders as the white Picture-3 card.
   MessageDlg(DescText, mtInformation, [mbOK], 0);
 end;
 

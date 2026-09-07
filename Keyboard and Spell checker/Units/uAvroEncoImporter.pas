@@ -169,7 +169,7 @@ begin
 
   for Attempt := 1 to MAX_PASSWORD_ATTEMPTS do
   begin
-    if not ShowPasswordDialog(APassword) then
+    if not ShowPasswordDialog(APassword, GetEncoDisplayName(AFilePath)) then
     begin
       APassword := '';
       Exit;
@@ -310,9 +310,14 @@ begin
 
   ImportedName := GetEncoDisplayName(TargetPath);
 
-  // --- 7. Cache the valid password (password protected only) -----------------
+  // --- 7. Remember the valid password (password protected only) ---------------
+  // Stored per encoding, so switching to this mapping later never asks for the
+  // password again on this computer (survives app and PC restarts).
   if Password <> '' then
+  begin
     CachedEncoPassword := Password;
+    RememberEncoPassword(TargetPath, Password);
+  end;
 
   // --- 8. Scan / refresh + success feedback ----------------------------------
   ScanAvroEncoFiles(TargetDir);

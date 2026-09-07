@@ -360,6 +360,8 @@ type
       PreviousModeBeforeANSISwitch: enumMode;
       FActiveMappingLastWriteTime:  TDateTime;
       FMappingCheckCountdown:       Integer; // throttles the ANSI mapping disk check
+      FMappingListCheckCountdown:   Integer; // throttles the ANSI mapping folder-list poll
+      FAnsiMappingSnapshot:         string;  // last seen file-name list of AnsiMappingDir
       FDirectoryWatcher:            TAvroDirectoryWatcher;
 
       procedure ChangeTypingStyle(const sStyle: string);
@@ -378,6 +380,8 @@ type
 
       procedure HandleThemes;
       procedure HandleLayoutDirectoryChanged(Sender: TObject);
+      function BuildAnsiMappingFolderList: string;
+      procedure RefreshAnsiMappingList;
       procedure IgnoreCapsLockClick(Sender: TObject);
       procedure PopupToolsPopup(Sender: TObject);
       procedure PopupTrayPopup(Sender: TObject);
@@ -1083,8 +1087,11 @@ begin
   Result := False;
   ErrorLog := TStringList.Create;
   try
-    // Try with cached password first
-    Result := LoadMappingFromEnco(AFilePath, CachedEncoPassword, ErrorLog);
+    // Try with this file's remembered password first - this never prompts
+    // (each encoding asks for its password only once per computer).
+    Result := LoadMappingFromEnco(AFilePath, GetEncoCachedPassword(AFilePath), ErrorLog);
+    if Result and IsEncoFile(AFilePath) then
+      CachedEncoPassword := GetEncoCachedPassword(AFilePath);
 
     // Failed? A stale or wrong cached password must never silently keep the
     // previous mapping active - clear it and ask the user for the right one.
@@ -1095,10 +1102,12 @@ begin
       (GetAvroEncoProtectionFlag(AFilePath) = AVROENCO_FLAG_USER_PASSWORD) then
     begin
       CachedEncoPassword := '';
+      ForgetEncoPassword(AFilePath);
       ErrorLog.Clear;
       if PromptForPasswordAndValidate(AFilePath, Password) then
       begin
         CachedEncoPassword := Password;
+        RememberEncoPassword(AFilePath, Password);
         SaveSettings;
         Result := LoadMappingFromEnco(AFilePath, CachedEncoPassword, ErrorLog);
       end;
@@ -1108,7 +1117,10 @@ begin
     begin
       if IsEncoFile(AFilePath) and
         (GetAvroEncoProtectionFlag(AFilePath) = AVROENCO_FLAG_USER_PASSWORD) then
+      begin
         CachedEncoPassword := '';
+        ForgetEncoPassword(AFilePath);
+      end;
       Log('HandleLoadEncoMapping FAILED: ' + AFilePath + ' - ' + ErrorLog.Text);
     end
     else
@@ -1234,6 +1246,11 @@ begin
   FDirectoryWatcher := TAvroDirectoryWatcher.Create(AnsiMappingDir);
   FDirectoryWatcher.OnChanged := HandleLayoutDirectoryChanged;
   FDirectoryWatcher.Active := True;
+
+  // Snapshot the current mapping folder so the periodic poll below only reacts
+  // to real changes (files copied/removed while Avro Keyboard is running).
+  FMappingListCheckCountdown := 5;
+  FAnsiMappingSnapshot := BuildAnsiMappingFolderList;
 end;
 
 procedure TAvroMainForm1.HandleLayoutDirectoryChanged(Sender: TObject);
@@ -1252,8 +1269,8 @@ begin
         // Default-key files (flag $00) reload transparently; password
         // protected files reload only when a usable password is cached.
         if (GetAvroEncoProtectionFlag(TargetPath) = AVROENCO_FLAG_DEFAULT_KEY) or
-          (CachedEncoPassword <> '') then
-          LoadMappingFromEnco(TargetPath, CachedEncoPassword);
+          (GetEncoCachedPassword(TargetPath) <> '') then
+          LoadMappingFromEnco(TargetPath, GetEncoCachedPassword(TargetPath));
       end
       else
         LoadCurrentActiveMapping;
@@ -1261,7 +1278,74 @@ begin
   end;
 
   BuildAnsiVersionMenus;
+  FAnsiMappingSnapshot := BuildAnsiMappingFolderList;
   ShowAnsiToastNotification('ANSI mappings refreshed');
+end;
+
+{ =============================================================================== }
+{ Snapshot + fallback poll: the FindFirstChangeNotification watcher can lose }
+{ events fired while the watch handle is being re-armed (e.g. when a file is }
+{ copied into AnsiMappingDir from Explorer), so every ~1.5 s we also compare }
+{ the folder's current file-name list with the last one we acted on. }
+{ =============================================================================== }
+
+function TAvroMainForm1.BuildAnsiMappingFolderList: string;
+var
+  NameList: TStringList;
+  SR: TSearchRec;
+begin
+  Result := '';
+  if (AnsiMappingDir = '') or (not DirectoryExists(AnsiMappingDir)) then
+    Exit;
+
+  NameList := TStringList.Create;
+  try
+    if FindFirst(AnsiMappingDir + '*.AvroEnco', faAnyFile, SR) = 0 then
+    begin
+      try
+        repeat
+          if (SR.Name <> '.') and (SR.Name <> '..') then
+            NameList.Add(Lowercase(SR.Name));
+        until FindNext(SR) <> 0;
+      finally
+        FindClose(SR);
+      end;
+    end;
+
+    if FindFirst(AnsiMappingDir + '*.json', faAnyFile, SR) = 0 then
+    begin
+      try
+        repeat
+          if (SR.Name <> '.') and (SR.Name <> '..') then
+            NameList.Add(Lowercase(SR.Name));
+        until FindNext(SR) <> 0;
+      finally
+        FindClose(SR);
+      end;
+    end;
+
+    NameList.Sort;
+    Result := NameList.Text;
+  finally
+    NameList.Free;
+  end;
+end;
+
+procedure TAvroMainForm1.RefreshAnsiMappingList;
+var
+  Snap: string;
+begin
+  if (AnsiMappingDir = '') or (not DirectoryExists(AnsiMappingDir)) then
+    Exit;
+
+  Snap := BuildAnsiMappingFolderList;
+  if Snap = FAnsiMappingSnapshot then
+    Exit; // nothing new added / removed since the last refresh
+
+  FAnsiMappingSnapshot := Snap;
+  ScanAvroEncoFiles(AnsiMappingDir);
+  BuildAnsiVersionMenus;
+  Log('ANSI mapping folder changed - encoding list refreshed');
 end;
 
 procedure TAvroMainForm1.ManageAutoCorrectentries1Click(Sender: TObject);
@@ -2162,6 +2246,15 @@ begin
     end;
   end;
 
+  // Fallback poll: keep the encoding list in sync even if the directory
+  // watcher misses the change notification (common when copying files in).
+  Dec(FMappingListCheckCountdown);
+  if FMappingListCheckCountdown <= 0 then
+  begin
+    FMappingListCheckCountdown := 15; // ~1.5 seconds at Interval = 100 ms
+    RefreshAnsiMappingList;
+  end;
+
   if Assigned(FDirectoryWatcher) then
     FDirectoryWatcher.CheckForChanges;
 
@@ -2313,12 +2406,16 @@ begin
   // password, ask for the password once up front; TrySetAnsiVersion then
   // reuses CachedEncoPassword and never prompts a second time.
   // Default-key files (flag $00) load transparently and never prompt.
-  if IsEncoFile(TargetPath) and (CachedEncoPassword = '') and
+  // Ask only when THIS encoding was never unlocked on this computer; the
+  // per-file cache then unlocks every later switch silently (even after a
+  // full restart). Default-key files never prompt.
+  if IsEncoFile(TargetPath) and (GetEncoCachedPassword(TargetPath) = '') and
     (GetAvroEncoProtectionFlag(TargetPath) = AVROENCO_FLAG_USER_PASSWORD) then
   begin
     if not PromptForPasswordAndValidate(TargetPath, Password) then
       Exit;
     CachedEncoPassword := Password;
+    RememberEncoPassword(TargetPath, Password);
     SaveSettings;
   end;
 
@@ -2336,7 +2433,10 @@ begin
   // re-prompts (password-protected files only).
   if IsEncoFile(TargetPath) and
     (GetAvroEncoProtectionFlag(TargetPath) = AVROENCO_FLAG_USER_PASSWORD) then
+  begin
     CachedEncoPassword := '';
+    ForgetEncoPassword(TargetPath);
+  end;
 
   // Keep error boxes above the always-on-top TopBar so a failed load is always visible.
   Application.MessageBox(PChar('Could not load ANSI mapping.' + sLineBreak + ErrorMsg), 'Error',
@@ -2546,7 +2646,7 @@ var
     ParentMore.Add(MSub);
 
     ActionItem := TMenuItem.Create(MSub);
-    ActionItem.Caption := 'Read Description';
+    ActionItem.Caption := 'Information';
     ActionItem.Hint := AName;
     ActionItem.OnClick := ReadAnsiDescriptionClick;
     MSub.Add(ActionItem);

@@ -95,6 +95,17 @@ var
   ANSIToggleShortcut:    string;
   IgnoreCapsLock:        string;
 
+var
+  // Per-encoding password memory (key = lowercase full file path). A protected
+  // encoding asks for its password ONCE on this computer; every later load
+  // (even after restarting the app or the PC) decrypts silently from here.
+  EncoPasswordCache: TStringList;
+
+procedure InitEncoPasswordCache;
+procedure FreeEncoPasswordCache;
+function GetEncoCachedPassword(const AFilePath: string): AnsiString;
+procedure RememberEncoPassword(const AFilePath: string; const APassword: AnsiString);
+procedure ForgetEncoPassword(const AFilePath: string);
 
 procedure SaveUISettings;
 procedure LoadSettings;
@@ -116,6 +127,124 @@ uses
   clsUnicodeToBijoy2000,
   uKeyboardMacro,
   uAvroEncoManager;
+
+{ =============================================================================== }
+{ Per-encoding password memory (helpers)                                        }
+{ =============================================================================== }
+
+const
+  EncoCacheSep = #9; // TAB separates file path from password (never typed in a
+                     // single-line edit, and never part of an NTFS file name)
+
+procedure InitEncoPasswordCache;
+begin
+  if not Assigned(EncoPasswordCache) then
+  begin
+    EncoPasswordCache := TStringList.Create;
+    EncoPasswordCache.NameValueSeparator := EncoCacheSep;
+  end;
+end;
+
+procedure FreeEncoPasswordCache;
+begin
+  FreeAndNil(EncoPasswordCache);
+end;
+
+function EncodeEncoCache: string;
+var
+  I: Integer;
+begin
+  Result := '';
+  if not Assigned(EncoPasswordCache) or (EncoPasswordCache.Count = 0) then
+    Exit;
+  for I := 0 to EncoPasswordCache.Count - 1 do
+  begin
+    if I > 0 then
+      Result := Result + #13#10;
+    Result := Result + EncoPasswordCache.Names[I] + EncoCacheSep +
+      EncoPasswordCache.ValueFromIndex[I];
+  end;
+end;
+
+procedure DecodeEncoCache(const ABlob: string);
+var
+  Lines: TStringList;
+  I, Sep: Integer;
+  Line: string;
+begin
+  InitEncoPasswordCache;
+  EncoPasswordCache.Clear;
+  if Trim(ABlob) = '' then
+    Exit;
+  Lines := TStringList.Create;
+  try
+    Lines.Text := ABlob;
+    for I := 0 to Lines.Count - 1 do
+    begin
+      Line := Trim(Lines[I]);
+      if Line = '' then
+        Continue;
+      Sep := Pos(EncoCacheSep, Line);
+      if (Sep > 1) and (Sep < Length(Line)) then
+        EncoPasswordCache.Add(Line);
+    end;
+  finally
+    Lines.Free;
+  end;
+end;
+
+function GetEncoCachedPassword(const AFilePath: string): AnsiString;
+var
+  Key: string;
+  I: Integer;
+begin
+  Result := '';
+  Key := LowerCase(Trim(AFilePath));
+  if Key = '' then
+    Exit;
+  InitEncoPasswordCache;
+  for I := 0 to EncoPasswordCache.Count - 1 do
+    if EncoPasswordCache.Names[I] = Key then
+    begin
+      Result := AnsiString(EncoPasswordCache.ValueFromIndex[I]);
+      Exit;
+    end;
+end;
+
+procedure RememberEncoPassword(const AFilePath: string; const APassword: AnsiString);
+var
+  Key: string;
+  I: Integer;
+  Found: Boolean;
+begin
+  if (Trim(AFilePath) = '') or (APassword = '') then
+    Exit;
+  InitEncoPasswordCache;
+  Key := LowerCase(Trim(AFilePath));
+  Found := False;
+  for I := 0 to EncoPasswordCache.Count - 1 do
+    if EncoPasswordCache.Names[I] = Key then
+    begin
+      EncoPasswordCache[I] := Key + EncoCacheSep + string(APassword);
+      Found := True;
+      Break;
+    end;
+  if not Found then
+    EncoPasswordCache.Add(Key + EncoCacheSep + string(APassword));
+end;
+
+procedure ForgetEncoPassword(const AFilePath: string);
+var
+  Key: string;
+  I: Integer;
+begin
+  if not Assigned(EncoPasswordCache) then
+    Exit;
+  Key := LowerCase(Trim(AFilePath));
+  for I := EncoPasswordCache.Count - 1 downto 0 do
+    if EncoPasswordCache.Names[I] = Key then
+      EncoPasswordCache.Delete(I);
+end;
 
 { =============================================================================== }
 
@@ -211,6 +340,7 @@ begin
 
   // AvroEnco Settings
   CachedEncoPassword := AnsiString(XML.GetValue('CachedEncoPassword', ''));
+  DecodeEncoCache(XML.GetValue('EncoPasswordCache', ''));
 
   XML.Free;
 
@@ -299,6 +429,7 @@ begin
 
   // AvroEnco Settings
   XML.SetValue('CachedEncoPassword', string(CachedEncoPassword));
+  XML.SetValue('EncoPasswordCache', EncodeEncoCache);
 
   XML.SaveXMLData;
   XML.Free;
@@ -394,6 +525,7 @@ begin
 
     // AvroEnco Settings
     CachedEncoPassword := AnsiString(Reg.ReadStringDef('CachedEncoPassword', ''));
+    DecodeEncoCache(Reg.ReadStringDef('EncoPasswordCache', ''));
 
   end;
 
@@ -488,6 +620,7 @@ begin
 
     // AvroEnco Settings
     Reg.WriteString('CachedEncoPassword', string(CachedEncoPassword));
+    Reg.WriteString('EncoPasswordCache', EncodeEncoCache);
 
   end;
 
@@ -675,5 +808,9 @@ begin
 end;
 
 { =============================================================================== }
+
+initialization
+finalization
+  FreeEncoPasswordCache;
 
 end.
