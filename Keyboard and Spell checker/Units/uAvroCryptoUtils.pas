@@ -49,6 +49,24 @@ procedure AES256CBCEncryptBytes(const APlain, AKey, AIV: TBytes; out ACipher: TB
   unpadded plaintext. }
 function AES256CBCDecryptBytes(const ACipher, AKey, AIV: TBytes; out APlain: TBytes): Boolean;
 
+{ ECB-encrypts AIn with a 256-bit key (32 bytes). AIn must be a multiple of
+  16 bytes (AES_BLOCK_SIZE); AOut receives the same length. Exposes the raw
+  block engine for the AvroShield AES-256-GCM layer (GHASH + GCTR), which
+  only needs the forward cipher. }
+procedure AES256EncryptBlocksECB(const AKey, AIn: TBytes; var AOut: TBytes);
+
+{ AES-256-GCM encrypt (NIST SP 800-38D / RFC 5288). AKey must be 32 bytes
+  and ANonce 12-16 bytes, otherwise EArgumentException is raised. AAAD is
+  authenticated but not encrypted (may be empty). AOut receives
+  ciphertext || 16-byte authentication tag. }
+procedure AES256GCMEncrypt(const APlain, AKey, ANonce, AAAD: TBytes; out AOut: TBytes);
+
+{ AES-256-GCM decrypt + verify. AIn is ciphertext || 16-byte tag. Returns
+  False when the tag does not verify (wrong key, wrong nonce, wrong AAD or
+  tampered ciphertext) or the input is malformed; callers must treat False
+  as "wrong password / corrupted file" and keep the previously loaded data. }
+function AES256GCMDecrypt(const AIn, AKey, ANonce, AAAD: TBytes; out APlain: TBytes): Boolean;
+
 { Key derivation used by the .AvroEnco v2 container:
       key := SHA-256( UTF-8(ASecretString) + ASalt )
   Matching helper for Tools/build_avroenco.py (password.encode('utf-8') + salt). }
@@ -507,6 +525,272 @@ begin
   H.Update(ARawSecret);
   H.Update(ASalt);
   Result := H.HashAsBytes;
+end;
+
+procedure AES256EncryptBlocksECB(const AKey, AIn: TBytes; var AOut: TBytes);
+var
+  Schedule: TAesKeySchedule;
+  InBlk, OutBlk: TBlock;
+  Off: Integer;
+begin
+  AOut := nil;
+  if Length(AKey) <> 32 then
+    raise EArgumentException.Create('AES-256 requires a 32-byte key.');
+  if (Length(AIn) = 0) or ((Length(AIn) mod AES_BLOCK_SIZE) <> 0) then
+    raise EArgumentException.Create('AES-ECB input must be a non-empty multiple of 16 bytes.');
+
+  ExpandKey(AKey, Schedule);
+  SetLength(AOut, Length(AIn));
+
+  Off := 0;
+  while Off < Length(AIn) do
+  begin
+    Move(AIn[Off], InBlk[0], AES_BLOCK_SIZE);
+    AesEncryptBlock(Schedule, InBlk, OutBlk);
+    Move(OutBlk[0], AOut[Off], AES_BLOCK_SIZE);
+    Inc(Off, AES_BLOCK_SIZE);
+  end;
+
+  // The schedule and block buffers are locals on the stack; nothing to wipe.
+end;
+
+{ =============================================================================
+  AES-256-GCM (SP 800-38D): GHASH + GCTR built on the forward cipher only.
+  ============================================================================= }
+
+{ Stores AValue (8 bytes) big-endian at ABuf[AOff .. AOff + 7]. }
+procedure StoreUInt64BE(var ABuf: TBlock; AOff: Integer; const AValue: UInt64);
+var
+  I: Integer;
+begin
+  for I := 0 to 7 do
+    ABuf[AOff + I] := Byte(AValue shr ((7 - I) * 8));
+end;
+
+{ GF(2^128) multiply modulo P = x^128 + x^7 + x^2 + x + 1 (SP 800-38D 6.3).
+  Blocks are big-endian: index 0 is the most significant byte; bit 127 is
+  the block's MSB. Straightforward bit-serial implementation - the inputs
+  are one 128-bit H and a handful of data blocks per call. }
+function GcmMul(const AX, AY: TBlock): TBlock;
+var
+  Z, V: TBlock;
+  I, B: Integer;
+  Carry: Boolean;
+begin
+  FillChar(Z, SizeOf(Z), 0);
+  V := AY;
+  for I := 0 to 127 do
+  begin
+    // Test bit (127 - I) of AX, i.e. the I-th bit counting from the MSB.
+    if (AX[I shr 3] and (Byte($80) shr (I and 7))) <> 0 then
+      for B := 0 to 15 do
+        Z[B] := Z[B] xor V[B];
+    // V := V >> 1; reduce with R = 0xE1 || 0^15 when the LSB drops off.
+    Carry := (V[15] and 1) <> 0;
+    for B := 15 downto 1 do
+      V[B] := Byte((V[B] shr 1) or (V[B - 1] shl 7));
+    V[0] := Byte(V[0] shr 1);
+    if Carry then
+      V[0] := V[0] xor $E1;
+  end;
+  Result := Z;
+end;
+
+{ GHASH_H over (AAD padded || ciphertext padded || 64-bit bit-lengths of AAD
+  and ciphertext), SP 800-38D 6.4. }
+procedure GcmGHASH(const AH: TBlock; const AAAD, ACipher: TBytes; var AOut: TBlock);
+var
+  X, Block: TBlock;
+  Off, I: Integer;
+begin
+  FillChar(X, SizeOf(X), 0);
+
+  Off := 0;
+  while Off < Length(AAAD) do
+  begin
+    FillChar(Block, SizeOf(Block), 0);
+    for I := 0 to AES_BLOCK_SIZE - 1 do
+      if Off + I < Length(AAAD) then
+        Block[I] := AAAD[Off + I];
+    for I := 0 to 15 do
+      X[I] := X[I] xor Block[I];
+    X := GcmMul(X, AH);
+    Inc(Off, AES_BLOCK_SIZE);
+  end;
+
+  Off := 0;
+  while Off < Length(ACipher) do
+  begin
+    FillChar(Block, SizeOf(Block), 0);
+    for I := 0 to AES_BLOCK_SIZE - 1 do
+      if Off + I < Length(ACipher) then
+        Block[I] := ACipher[Off + I];
+    for I := 0 to 15 do
+      X[I] := X[I] xor Block[I];
+    X := GcmMul(X, AH);
+    Inc(Off, AES_BLOCK_SIZE);
+  end;
+
+  FillChar(Block, SizeOf(Block), 0);
+  StoreUInt64BE(Block, 0, UInt64(Length(AAAD)) * 8);
+  StoreUInt64BE(Block, 8, UInt64(Length(ACipher)) * 8);
+  for I := 0 to 15 do
+    X[I] := X[I] xor Block[I];
+  X := GcmMul(X, AH);
+  AOut := X;
+end;
+
+{ 32-bit big-endian increment of the rightmost counter word (SP 800-38D 6.5). }
+procedure GcmIncrementCounter(var ACtr: TBlock);
+var
+  I: Integer;
+begin
+  for I := 15 downto 12 do
+  begin
+    Inc(ACtr[I]);
+    if ACtr[I] <> 0 then
+      Break;
+  end;
+end;
+
+{ CTR-mode keystream XOR starting at AICB; AICB is advanced in place. GCTR
+  decrypt is identical to encrypt, so one routine serves both. }
+procedure GcmGCTR(const ASchedule: TAesKeySchedule; var AICB: TBlock;
+  const AIn: TBytes; var AOut: TBytes);
+var
+  KeyBlk: TBlock;
+  Off, I: Integer;
+begin
+  SetLength(AOut, Length(AIn));
+  Off := 0;
+  while Off < Length(AIn) do
+  begin
+    AesEncryptBlock(ASchedule, AICB, KeyBlk);
+    for I := 0 to AES_BLOCK_SIZE - 1 do
+      if Off + I < Length(AIn) then
+        AOut[Off + I] := AIn[Off + I] xor KeyBlk[I];
+    GcmIncrementCounter(AICB);
+    Inc(Off, AES_BLOCK_SIZE);
+  end;
+end;
+
+procedure AES256GCMEncrypt(const APlain, AKey, ANonce, AAAD: TBytes; out AOut: TBytes);
+var
+  Schedule: TAesKeySchedule;
+  H, J0, Ctr, TagBlk, S: TBlock;
+  Cipher: TBytes;
+  I: Integer;
+begin
+  AOut := nil;
+  if Length(AKey) <> 32 then
+    raise EArgumentException.Create('AES-256 requires a 32-byte key.');
+  if (Length(ANonce) < 12) or (Length(ANonce) > 16) then
+    raise EArgumentException.Create('AES-GCM nonce must be 12-16 bytes.');
+
+  ExpandKey(AKey, Schedule);
+
+  // H = AES_K(0^128)
+  FillChar(H, SizeOf(H), 0);
+  AesEncryptBlock(Schedule, H, H);
+
+  // J0 (SP 800-38D 7.1): 12-byte IV -> IV || 0^31 || 1; any other length
+  // -> GHASH_H(IV).
+  FillChar(J0, SizeOf(J0), 0);
+  if Length(ANonce) = 12 then
+  begin
+    Move(ANonce[0], J0[0], 12);
+    J0[15] := 1;
+  end
+  else
+    GcmGHASH(H, nil, ANonce, J0);
+
+  // Ciphertext via GCTR starting at inc32(J0) (SP 800-38D 7.1). J0 itself
+  // is reserved for the tag.
+  Ctr := J0;
+  GcmIncrementCounter(Ctr);
+  GcmGCTR(Schedule, Ctr, APlain, Cipher);
+
+  // Tag = GCTR_K(J0, GHASH_H(AAD, C))  ==  AES_K(J0) XOR GHASH output.
+  GcmGHASH(H, AAAD, Cipher, TagBlk);
+  AesEncryptBlock(Schedule, J0, S);
+  for I := 0 to 15 do
+    TagBlk[I] := TagBlk[I] xor S[I];
+
+  SetLength(AOut, Length(Cipher) + AES_BLOCK_SIZE);
+  if Length(Cipher) > 0 then
+    Move(Cipher[0], AOut[0], Length(Cipher));
+  Move(TagBlk[0], AOut[Length(Cipher)], AES_BLOCK_SIZE);
+
+  // Wipe sensitive working buffers.
+  FillChar(Cipher[0], Length(Cipher), 0);
+  SetLength(Cipher, 0);
+  FillChar(H, SizeOf(H), 0);
+  FillChar(S, SizeOf(S), 0);
+  FillChar(TagBlk, SizeOf(TagBlk), 0);
+end;
+
+function AES256GCMDecrypt(const AIn, AKey, ANonce, AAAD: TBytes; out APlain: TBytes): Boolean;
+var
+  Schedule: TAesKeySchedule;
+  H, J0, Ctr, TagBlk, S: TBlock;
+  Cipher, ExpectedTag: TBytes;
+  I, Diff: Integer;
+  TagLen: Integer;
+begin
+  APlain := nil;
+  Result := False;
+  if (Length(AKey) <> 32) then
+    Exit;
+  if (Length(ANonce) < 12) or (Length(ANonce) > 16) then
+    Exit;
+  if Length(AIn) < AES_BLOCK_SIZE then
+    Exit; // must at least carry the 16-byte tag
+
+  ExpandKey(AKey, Schedule);
+
+  FillChar(H, SizeOf(H), 0);
+  AesEncryptBlock(Schedule, H, H);
+
+  FillChar(J0, SizeOf(J0), 0);
+  if Length(ANonce) = 12 then
+  begin
+    Move(ANonce[0], J0[0], 12);
+    J0[15] := 1;
+  end
+  else
+    GcmGHASH(H, nil, ANonce, J0);
+
+  TagLen := Length(AIn) - AES_BLOCK_SIZE;
+  SetLength(Cipher, TagLen);
+  if TagLen > 0 then
+    Move(AIn[0], Cipher[0], TagLen);
+  SetLength(ExpectedTag, AES_BLOCK_SIZE);
+  Move(AIn[TagLen], ExpectedTag[0], AES_BLOCK_SIZE);
+
+  GcmGHASH(H, AAAD, Cipher, TagBlk);
+  AesEncryptBlock(Schedule, J0, S);
+  for I := 0 to 15 do
+    TagBlk[I] := TagBlk[I] xor S[I];
+
+  // Constant-time tag comparison.
+  Diff := 0;
+  for I := 0 to 15 do
+    Diff := Diff or (TagBlk[I] xor ExpectedTag[I]);
+  if Diff <> 0 then
+  begin
+    FillChar(Cipher[0], Length(Cipher), 0);
+    SetLength(Cipher, 0);
+    Exit;
+  end;
+
+  // GCTR decrypt is the same keystream XOR as encrypt, again from inc32(J0).
+  Ctr := J0;
+  GcmIncrementCounter(Ctr);
+  GcmGCTR(Schedule, Ctr, Cipher, APlain);
+  Result := True;
+
+  FillChar(Cipher[0], Length(Cipher), 0);
+  SetLength(Cipher, 0);
 end;
 
 end.

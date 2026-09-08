@@ -34,6 +34,8 @@ procedure InitializeEncoManager;
 procedure FinalizeEncoManager;
 procedure ScanAvroEncoFiles(const ADirectory: string);
 function GetEncoDisplayName(const AFilePath: string): string;
+{ True for any protected mapping container (.AvroEnco extension; both the
+  legacy CBC and the Shield container format live under this extension). }
 function IsEncoFile(const AFilePath: string): Boolean;
 function LoadMappingFromEnco(const AFilePath: string; const APassword: AnsiString; ErrorLog: TStringList = nil): Boolean;
 function ExtractMetadataFromJSON(const AJSONContent: string; const AFilePath: string = ''): string;
@@ -67,6 +69,10 @@ end;
 
 function IsEncoFile(const AFilePath: string): Boolean;
 begin
+  // Any file with the .AvroEnco extension is a protected mapping container:
+  // the legacy CBC format and the newer Shield format share this extension
+  // and both need the same handling (password prompt, cache, decrypt in
+  // RAM). The crypto layer tells the two formats apart by magic bytes.
   Result := SameText(ExtractFileExt(AFilePath), '.AvroEnco');
 end;
 
@@ -165,12 +171,15 @@ begin
   if IsEncoFile(AFilePath) then
   begin
     // DecryptAvroEncoToString returns clean text: the container is decrypted
-    // entirely in RAM (pure Pascal AES engine) and the leading UTF-8 BOM
+    // entirely in RAM (pure Pascal crypto engine) and the leading UTF-8 BOM
     // (decoded as U+FEFF) is stripped, so callers receive clean JSON that
-    // starts with '{'. Files protected with the Default Application Key
-    // (flag $00) decrypt transparently; password-protected files need the
-    // right APassword. On any failure the previously active mapping stays
-    // untouched - LoadAnsiMappingFromJSON is only reached with valid JSON.
+    // starts with '{'. Shield-format containers (magic 'AVROSHLD', also
+    // .AvroEnco extension) decrypt through the AvroShield runtime stack
+    // (HMAC -> AES-GCM -> zlib -> bytecode -> deobfuscate).
+    // Files protected with the Default Application Key (flag $00) decrypt
+    // transparently; password-protected files need the right APassword.
+    // On any failure the previously active mapping stays untouched -
+    // LoadAnsiMappingFromJSON is only reached with valid JSON.
     JSONContent := Trim(DecryptAvroEncoToString(AFilePath, APassword));
     if JSONContent = '' then
     begin
@@ -314,12 +323,12 @@ begin
 
   AppDir := ExtractFilePath(ParamStr(0));
 
-  // 2. Check .AvroEnco in all directories (priority: .AvroEnco over .json)
+  // 2. Check .AvroEnco in all directories (covers both the legacy CBC and
+  //    the Shield container format), then .json.
   if FileExists(ADirectory + ADisplayName + '.AvroEnco') then Exit(ADirectory + ADisplayName + '.AvroEnco');
   if FileExists(AppDir + 'assets\' + ADisplayName + '.AvroEnco') then Exit(AppDir + 'assets\' + ADisplayName + '.AvroEnco');
   if FileExists(AppDir + 'AnsiMapping\' + ADisplayName + '.AvroEnco') then Exit(AppDir + 'AnsiMapping\' + ADisplayName + '.AvroEnco');
   if (AppDir <> ADirectory) and FileExists(AppDir + ADisplayName + '.AvroEnco') then Exit(AppDir + ADisplayName + '.AvroEnco');
-
   // 3. Fallback to .json files
   if FileExists(ADirectory + ADisplayName + '.json') then Exit(ADirectory + ADisplayName + '.json');
   if FileExists(AppDir + 'assets\' + ADisplayName + '.json') then Exit(AppDir + 'assets\' + ADisplayName + '.json');

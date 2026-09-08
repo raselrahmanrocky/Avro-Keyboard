@@ -51,23 +51,33 @@ var
   Dlg: TfrmAvroPasswordDlg;
 begin
   APassword := '';
-  Dlg := TfrmAvroPasswordDlg.Create(Application);
+  Result := False;
+  Dlg := nil;
   try
-    // Stay above the always-on-top TopBar so the prompt is never hidden.
-    Dlg.FormStyle := fsStayOnTop;
-    // The DFM centers the dialog on the main form, which Avro Keyboard parks
-    // far off-screen - center on the screen instead so the prompt is ALWAYS
-    // visible (otherwise the modal dialog blocks the whole app invisibly).
-    Dlg.Position := poScreenCenter;
-    // Show WHICH encoding this password belongs to in the title bar, so the
-    // user can tell protected encodings apart when several exist.
-    if AFileName <> '' then
-      Dlg.Caption := 'Enter Password for ' + AFileName;
-    Result := Dlg.ShowModal = mrOk;
-    if Result then
-      APassword := AnsiString(Dlg.edtPassword.Text);
-  finally
-    Dlg.Free;
+    Dlg := TfrmAvroPasswordDlg.Create(Application);
+    try
+      // Stay above the always-on-top TopBar so the prompt is never hidden.
+      Dlg.FormStyle := fsStayOnTop;
+      // The DFM centers the dialog on the main form, which Avro Keyboard parks
+      // far off-screen - center on the screen instead so the prompt is ALWAYS
+      // visible (otherwise the modal dialog blocks the whole app invisibly).
+      Dlg.Position := poScreenCenter;
+      // Show WHICH encoding this password belongs to in the title bar, so the
+      // user can tell protected encodings apart when several exist.
+      if AFileName <> '' then
+        Dlg.Caption := 'Enter Password for ' + AFileName;
+      Result := Dlg.ShowModal = mrOk;
+      if Result then
+        APassword := AnsiString(Dlg.edtPassword.Text);
+    finally
+      Dlg.Free;
+    end;
+  except
+    // Closing the dialog (X button) or any failure inside the modal loop must
+    // never surface as an access violation: report "cancelled" so every
+    // caller (import / mapping switch / description) aborts cleanly.
+    Result := False;
+    APassword := '';
   end;
 end;
 

@@ -647,7 +647,7 @@ begin
   if FileExists(FilePath) then
   begin
     try
-      if SameText(ExtractFileExt(FilePath), '.AvroEnco') then
+      if IsEncoFile(FilePath) then
       begin
         // Captured here, before the metadata fallback may swap in a same-named
         // .json file below: mark the card when this container is protected by
