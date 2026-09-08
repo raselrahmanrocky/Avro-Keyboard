@@ -75,6 +75,8 @@ uses
   uAvroEncoCrypto in 'Units\uAvroEncoCrypto.pas',
   uAvroEncoManager in 'Units\uAvroEncoManager.pas',
   uAvroEncoImporter in 'Units\uAvroEncoImporter.pas',
+  uAvroShield in 'Units\uAvroShield.pas',
+  uAvroArgon2 in 'Units\uAvroArgon2.pas',
   uAvroDirectoryWatcher in 'Units\uAvroDirectoryWatcher.pas',
   uAvroLayoutUI in 'Units\uAvroLayoutUI.pas',
   uAvroPasswordDlg in 'Forms\uAvroPasswordDlg.pas' {frmAvroPasswordDlg};

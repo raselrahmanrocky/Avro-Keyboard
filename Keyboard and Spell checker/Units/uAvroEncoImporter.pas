@@ -87,7 +87,8 @@ const
 
   Returns:
       AVROENCO_FLAG_DEFAULT_KEY     ($00, password-less/default key)
-      AVROENCO_FLAG_USER_PASSWORD   ($01, password protected; also legacy v1)
+      AVROENCO_FLAG_USER_PASSWORD   ($01, password protected; also legacy v1
+                                     and any Shield-format container)
       AVROENCO_FLAG_INVALID         (unreadable / bad magic / bad flag)
   ============================================================================= }
 function InspectEncoProtectionFlag(const AFilePath: string): Byte;
@@ -99,6 +100,11 @@ begin
 
   if not FileExists(AFilePath) then
     Exit;
+
+  // Shield-format containers (magic 'AVROSHLD') share the .AvroEnco
+  // extension and are always password protected (no default-key mode).
+  if IsAvroShieldContainer(AFilePath) then
+    Exit(AVROENCO_FLAG_USER_PASSWORD);
 
   try
     FS := TFileStream.Create(AFilePath, fmOpenRead or fmShareDenyNone);
@@ -166,6 +172,7 @@ var
 begin
   Result := False;
   APassword := '';
+  try
 
   for Attempt := 1 to MAX_PASSWORD_ATTEMPTS do
   begin
@@ -196,6 +203,12 @@ begin
         MB_ICONERROR or MB_OK or MB_TOPMOST or MB_SETFOREGROUND);
     end;
   end;
+  except
+    // A password dialog that fails while opening/closing (user clicking the
+    // X) must abort exactly like a cancel - never an access violation dialog.
+    Result := False;
+    APassword := '';
+  end;
 end;
 
 { ============================================================================= }
@@ -210,6 +223,7 @@ var
 begin
   Result := False;
   AErrorMessage := '';
+  try
 
   // --- 1. Basic checks ------------------------------------------------------
   if not FileExists(ASourcePath) then
@@ -337,6 +351,17 @@ begin
     end
     else
       Log('Imported but could not activate ' + ImportedName + ': ' + ErrMsg);
+  end;
+  except
+    on E: Exception do
+    begin
+      // A crash inside the import flow (e.g. the password dialog being
+      // closed abruptly) must surface as a clean error message, never an
+      // access violation dialog.
+      Result := False;
+      AErrorMessage := 'Unexpected error while importing the file.';
+      Log('ImportEncoFile exception: ' + E.ClassName + ': ' + E.Message + ' - ' + ASourcePath);
+    end;
   end;
 end;
 

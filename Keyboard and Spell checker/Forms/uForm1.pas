@@ -1213,6 +1213,11 @@ begin
   begin
     frmSplash := TfrmSplash.Create(Application);
     frmSplash.Show;
+    // Paint the splash synchronously RIGHT NOW: the heavy initialization
+    // below (dictionary load, mapping scan, ...) blocks the message loop for
+    // seconds, so without this the splash window would stay unpainted
+    // (rendered as a solid black box by DWM) until the 2s timer closes it.
+    frmSplash.Update;
   end;
 
   // --- Record initial file write time for auto-refresh ---

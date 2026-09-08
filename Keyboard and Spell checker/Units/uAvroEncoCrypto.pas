@@ -75,6 +75,18 @@ const
   V1_HEADER_SIZE = MAGIC_SIZE + SALT_SIZE + IV_SIZE; // 41 bytes
   V2_HEADER_SIZE = V1_HEADER_SIZE + 1;               // 42 bytes (flag byte)
 
+  // Shield-format container markers: 'AVROSHLD' + version byte. The Shield
+  // container shares the .AvroEnco extension with the legacy CBC format;
+  // detection is by magic bytes, so both formats coexist under one extension.
+  AVROSHLD_MAGIC: array [0 .. 7] of Byte = (
+    $41, $56, $52, $4F, $53, $48, $4C, $44
+  );
+  AVROSHLD_VERSION = $01;
+  // Shield layout: header(58) + ciphertext + auth_tag(16) + hmac(64).
+  AVROSHLD_HEADER_SIZE = 58;
+  AVROSHLD_TRAILER_SIZE = 80; // auth_tag(16) + hmac(64)
+  AVROSHLD_MIN_SIZE = AVROSHLD_HEADER_SIZE + AVROSHLD_TRAILER_SIZE + 1;
+
   // Default Application Key secret. Mirrored verbatim in
   // Tools/build_avroenco.py (DEFAULT_APP_SECRET) - keep both in sync.
   AvroEncoDefaultSecret =
@@ -94,6 +106,10 @@ function DecryptAvroEncoToString(const AFilePath: string; const APassword: AnsiS
 // True only when the decrypted content looks like a valid mapping JSON
 // (starts with '{' after trimming).
 function ValidateAvroEncoPassword(const AFilePath: string; const APassword: AnsiString): Boolean;
+// True when the file is a Shield-format container (magic 'AVROSHLD' + $01).
+// Both container formats share the .AvroEnco extension; the crypto layer
+// tells them apart by these magic bytes.
+function IsAvroShieldContainer(const AFilePath: string): Boolean;
 // Writes a v2 container. APassword = '' produces a default-key protected
 // file (flag $00, loads without prompting); a non-empty APassword produces
 // a password protected file (flag $01).
@@ -103,6 +119,7 @@ implementation
 
 uses
   uAvroCryptoUtils,
+  uAvroShield,
   DebugLog;
 
 type
@@ -143,6 +160,30 @@ begin
   end;
 end;
 
+function HasAvroShieldMagic(const AFileBytes: TBytes): Boolean;
+begin
+  Result := (Length(AFileBytes) >= MAGIC_SIZE) and
+    CompareMem(@AFileBytes[0], @AVROSHLD_MAGIC[0], 8) and
+    (AFileBytes[8] = AVROSHLD_VERSION);
+end;
+
+function IsAvroShieldContainer(const AFilePath: string): Boolean;
+var
+  FileBytes: TBytes;
+begin
+  Result := False;
+  if not FileExists(AFilePath) then
+    Exit;
+  if not ReadFileBytes(AFilePath, FileBytes) then
+    Exit;
+  try
+    Result := HasAvroShieldMagic(FileBytes);
+  finally
+    FillChar(FileBytes[0], Length(FileBytes), 0);
+    SetLength(FileBytes, 0);
+  end;
+end;
+
 function ValidateAvroEncoHeader(const AFilePath: string): Boolean;
 var
   FileBytes: TBytes;
@@ -155,6 +196,11 @@ begin
   if not ReadFileBytes(AFilePath, FileBytes) then
     Exit;
   try
+    // Shield-format container (magic 'AVROSHLD'): valid shape is header +
+    // at least one cipher byte + auth tag + HMAC trailer.
+    if HasAvroShieldMagic(FileBytes) then
+      Exit(Length(FileBytes) >= AVROSHLD_MIN_SIZE);
+
     Format := DetectFormat(FileBytes);
     case Format of
       aefV1: MinSize := V1_HEADER_SIZE + AES_BLOCK_SIZE;
@@ -173,6 +219,14 @@ function GetAvroEncoProtectionFlag(const AFilePath: string): Byte;
 var
   FileBytes: TBytes;
 begin
+  // Shield-format containers (magic 'AVROSHLD') always require a password
+  // (the Shield format has no default-key mode), so the UI treats them
+  // exactly like password protected .AvroEnco files: prompt once, cache the
+  // password, decrypt. Detection is by magic bytes, not extension - both
+  // container formats share the .AvroEnco extension.
+  if IsAvroShieldContainer(AFilePath) then
+    Exit(AVROENCO_FLAG_USER_PASSWORD);
+
   Result := AVROENCO_FLAG_INVALID;
   if not FileExists(AFilePath) then
     Exit;
@@ -310,8 +364,31 @@ begin
 end;
 
 function DecryptAvroEncoToString(const AFilePath: string; const APassword: AnsiString): string;
+var
+  R: TAvroShieldResult;
 begin
   Result := '';
+
+  // Shield-format containers (magic 'AVROSHLD') decrypt through the
+  // AvroShield runtime stack (HMAC verify -> AES-GCM decrypt -> zlib ->
+  // bytecode -> deobfuscate), entirely in RAM. Password is mandatory; machine
+  // binding is enabled so machine-bound files load on this machine while
+  // portable files load too. Detection is by container magic, not extension:
+  // both the legacy CBC format and the Shield format share the .AvroEnco
+  // extension.
+  if IsAvroShieldContainer(AFilePath) then
+  begin
+    try
+      R := AvroShieldLoadFromFile(AFilePath, string(APassword), Result, True);
+      if R <> asrOk then
+        Result := '';
+      Result := Trim(Result);
+    except
+      Result := '';
+    end;
+    Exit;
+  end;
+
   // This API never raises: every failure (missing/corrupt file, wrong
   // password, encoding problems) surfaces as an empty result so callers can
   // keep the previously active mapping without crashing.
