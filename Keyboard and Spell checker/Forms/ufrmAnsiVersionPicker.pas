@@ -53,6 +53,7 @@ type
       FPrevForegroundWindow: HWND;
       function GetSelectedVersion: string;
       procedure AutoSizeForm;
+      procedure CloseAndRestoreTarget;
       procedure WMNCActivate(var Msg: TWMNCActivate); message WM_NCACTIVATE;
       procedure WMFocusPicker(var Msg: TMessage); message WM_FOCUS_PICKER;
       procedure WMTimer(var Msg: TMessage); message WM_TIMER;
@@ -373,11 +374,23 @@ begin
   ListBox.Invalidate;
 end;
 
+procedure TfrmAnsiVersionPicker.CloseAndRestoreTarget;
+begin
+  KillTimer(Handle, 1);
+  Hide;
+  if CurrentPicker = Self then CurrentPicker := nil;
+  if IsWindow(FPrevForegroundWindow) then
+    ForceForegroundWindow(FPrevForegroundWindow)
+  else if IsWindow(FPrevFocusedWindow) then
+    ForceForegroundWindow(FPrevFocusedWindow);
+  Release;
+end;
+
 procedure TfrmAnsiVersionPicker.ListBoxClick(Sender: TObject);
 var
   SelectedVersion, ErrorMsg, TargetPath: string;
   Password: AnsiString;
-  ErrorLog: TStringList;
+  PreloadThread: TAnsiPreloadThread;
 begin
   if not Assigned(CurrentPicker) then
     Exit;
@@ -386,17 +399,19 @@ begin
   if SelectedVersion = '' then
     Exit;
 
+  // End the popup/focus lifetime before any engine/settings operation.
+  CloseAndRestoreTarget;
+
   // Default: fast-path
   if SameText(SelectedVersion, 'Default') then
   begin
-    AnsiVersion := 'Default';
-    AnsiEngineManager.SwitchEngine('Default');
-    SaveSettings;
-    AvroMainForm1.UpdateAnsiVersionMenuChecks('Default');
-    if ShowAnsiSwitchNotification = 'YES' then
-      ShowAnsiToastNotification('ANSI Version: Default');
-    CurrentPicker := nil;
-    Release;
+    if AnsiEngineManager.TrySwitchCached('Default') then
+    begin
+      SaveAnsiVersionOnly;
+      AvroMainForm1.UpdateAnsiVersionMenuChecks('Default');
+      if ShowAnsiSwitchNotification = 'YES' then
+        ShowAnsiToastNotification('ANSI Version: Default');
+    end;
     Exit;
   end;
 
@@ -423,46 +438,35 @@ begin
     CachedEncoPassword := Password;
     RememberEncoPassword(TargetPath, Password);
     SaveSettings;
+    // Build this newly unlocked engine away from the UI. The first click
+    // returns immediately; a subsequent click performs a RAM-only switch.
+    PreloadThread := TAnsiPreloadThread.Create(
+      AnsiEngineManager.CapturePreloadList);
+    PreloadThread.FreeOnTerminate := True;
+    PreloadThread.Start;
   end;
 
   // The engine cache makes this switch O(1) for every preloaded (default-key)
   // engine and for any engine unlocked before: no disk I/O, no decryption,
   // no parsing happens here.
-  ErrorLog := TStringList.Create;
-  try
-    if not AnsiEngineManager.SwitchEngine(SelectedVersion, ErrorLog) then
-      ErrorMsg := ErrorLog.Text;
-  finally
-    ErrorLog.Free;
-  end;
+  ErrorMsg := '';
+  if not AnsiEngineManager.TrySwitchCached(SelectedVersion) then
+    ErrorMsg := 'Encoding is still being prepared. Please select it again.';
   if ErrorMsg = '' then
   begin
     AnsiVersion := SelectedVersion;
-    SaveSettings;
+    SaveAnsiVersionOnly;
     AvroMainForm1.UpdateAnsiVersionMenuChecks(SelectedVersion);
     if ShowAnsiSwitchNotification = 'YES' then
       ShowAnsiToastNotification('ANSI Version: ' + SelectedVersion);
 
-    if IsWindow(FPrevFocusedWindow) then
-      Windows.SetFocus(FPrevFocusedWindow);
-    if FPrevForegroundWindow <> 0 then
-      SetForegroundWindow(FPrevForegroundWindow);
-
-    CurrentPicker := nil;
-    Release;
     Exit;
   end;
 
-  // Loading failed - clear a bad cached password so the next attempt re-prompts.
-  if IsEncoFile(TargetPath) then
-  begin
-    CachedEncoPassword := '';
-    ForgetEncoPassword(TargetPath);
-  end;
-
-  // Keep error boxes above the always-on-top TopBar so failures are visible.
-  Application.MessageBox(PChar('Could not load the selected ANSI mapping.' + sLineBreak + 'Error: ' + ErrorMsg), 'ANSI Mapping Error',
-    MB_ICONWARNING or MB_OK or MB_TOPMOST or MB_SETFOREGROUND);
+  // Never block the UI or discard a valid password merely because the
+  // cache/refresh lock was busy. The next click retries the RAM-only path.
+  if ShowAnsiSwitchNotification = 'YES' then
+    ShowAnsiToastNotification('ANSI encoding is preparing - try again');
 end;
 procedure TfrmAnsiVersionPicker.ListBoxKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
 var

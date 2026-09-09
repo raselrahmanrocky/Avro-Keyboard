@@ -2462,9 +2462,10 @@ begin
   // Default সিলেকশন
   if SameText(SelectedVersion, 'Default') then
   begin
+    if not AnsiEngineManager.TrySwitchCached('Default') then
+      Exit;
     AnsiVersion := 'Default';
-    AnsiEngineManager.SwitchEngine('Default');
-    SaveSettings;
+    SaveAnsiVersionOnly;
     UpdateAnsiVersionMenuChecks('Default');
     if ShowAnsiSwitchNotification = 'YES' then
       ShowAnsiToastNotification('ANSI Encoding: Default');
@@ -2496,35 +2497,23 @@ begin
     SaveSettings;
   end;
 
-  ErrorLog := TStringList.Create;
-  try
-    if not AnsiEngineManager.SwitchEngine(SelectedVersion, ErrorLog) then
-      ErrorMsg := ErrorLog.Text;
-  finally
-    ErrorLog.Free;
-  end;
+  ErrorMsg := '';
+  if not AnsiEngineManager.TrySwitchCached(SelectedVersion) then
+    ErrorMsg := 'Encoding is still being prepared. Please select it again.';
   if ErrorMsg = '' then
   begin
     AnsiVersion := SelectedVersion;
-    SaveSettings;
+    SaveAnsiVersionOnly;
     UpdateAnsiVersionMenuChecks(SelectedVersion);
     if ShowAnsiSwitchNotification = 'YES' then
       ShowAnsiToastNotification('ANSI Encoding: ' + SelectedVersion);
     Exit;
   end;
 
-  // Loading failed - clear a bad cached password so the next attempt
-  // re-prompts (password-protected files only).
-  if IsEncoFile(TargetPath) and
-    (GetAvroEncoProtectionFlag(TargetPath) = AVROENCO_FLAG_USER_PASSWORD) then
-  begin
-    CachedEncoPassword := '';
-    ForgetEncoPassword(TargetPath);
-  end;
-
-  // Keep error boxes above the always-on-top TopBar so a failed load is always visible.
-  Application.MessageBox(PChar('Could not load ANSI mapping.' + sLineBreak + ErrorMsg), 'Error',
-    MB_ICONWARNING or MB_OK or MB_TOPMOST or MB_SETFOREGROUND);
+  // A UI click never waits for cache/parser work and never clears a valid
+  // password merely because the manager lock was momentarily busy.
+  if ShowAnsiSwitchNotification = 'YES' then
+    ShowAnsiToastNotification('ANSI encoding is preparing - try again');
 end;
 
 { =============================================================================== }

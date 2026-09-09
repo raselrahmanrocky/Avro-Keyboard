@@ -1,65 +1,55 @@
-{
-  =============================================================================
-  This Source Code Form is subject to the terms of the Mozilla Public
-  License, v. 2.0. If a copy of the MPL was not distributed with this
-  file, You can obtain one at https://mozilla.org/MPL/2.0/.
-  =============================================================================
-}
-
 unit ufrmAnsiToast;
 
 interface
 
 uses
-  Windows,
-  Messages,
-  SysUtils,
-  Classes,
-  Graphics,
-  Controls,
-  Forms,
-  ExtCtrls,
+  Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, ExtCtrls,
   StdCtrls;
 
 type
   TfrmAnsiToast = class(TForm)
-    private
-      FLabel: TLabel;
-      FTimer: TTimer;
-      procedure TimerHandler(Sender: TObject);
-      procedure FormDeactivate(Sender: TObject);
-      procedure FormClose(Sender: TObject; var Action: TCloseAction);
-      procedure ClickHandler(Sender: TObject);
-    protected
-      procedure CreateParams(var Params: TCreateParams); override;
-    public
-      procedure Setup;
-      procedure ShowToast(const AText: string);
+  private
+    FLabel: TLabel;
+    FTimer: TTimer;
+    procedure TimerHandler(Sender: TObject);
+    procedure FormClose(Sender: TObject; var Action: TCloseAction);
+  protected
+    procedure CreateParams(var Params: TCreateParams); override;
+    procedure WMMouseActivate(var Msg: TWMMouseActivate); message WM_MOUSEACTIVATE;
+  public
+    procedure Setup;
+    procedure ShowToast(const AText: string);
   end;
 
 procedure ShowAnsiToastNotification(const AText: string);
 
 implementation
 
-uses
-  clsUnicodeToBijoy2000;
+var
+  CurrentToast: TfrmAnsiToast;
 
 procedure ShowAnsiToastNotification(const AText: string);
-var
-  Toast: TfrmAnsiToast;
 begin
-  Toast := TfrmAnsiToast.CreateNew(Application);
-  Toast.Setup;
-  Toast.ShowToast(AText);
+  if not Assigned(CurrentToast) then
+  begin
+    CurrentToast := TfrmAnsiToast.CreateNew(Application);
+    CurrentToast.Setup;
+  end;
+  CurrentToast.ShowToast(AText);
 end;
-
-{ TfrmAnsiToast }
 
 procedure TfrmAnsiToast.CreateParams(var Params: TCreateParams);
 begin
   inherited;
-  Params.ExStyle := Params.ExStyle or WS_EX_TOPMOST or WS_EX_NOACTIVATE or WS_EX_TOOLWINDOW;
+  Params.Style := WS_POPUP;
+  Params.ExStyle := Params.ExStyle or WS_EX_TOPMOST or WS_EX_NOACTIVATE or
+    WS_EX_TOOLWINDOW;
   Params.WndParent := GetDesktopWindow;
+end;
+
+procedure TfrmAnsiToast.WMMouseActivate(var Msg: TWMMouseActivate);
+begin
+  Msg.Result := MA_NOACTIVATE;
 end;
 
 procedure TfrmAnsiToast.Setup;
@@ -79,51 +69,45 @@ begin
   FLabel.Font.Color := clWhite;
   FLabel.Font.Size := 11;
   FLabel.Font.Name := 'Segoe UI';
-  FLabel.OnClick := ClickHandler;
 
   FTimer := TTimer.Create(Self);
-  FTimer.Interval := 3000;
+  FTimer.Interval := 1200;
   FTimer.OnTimer := TimerHandler;
   FTimer.Enabled := False;
-
-  OnDeactivate := FormDeactivate;
   OnClose := FormClose;
-  OnClick := ClickHandler;
 end;
 
 procedure TfrmAnsiToast.ShowToast(const AText: string);
 begin
+  FTimer.Enabled := False;
   FLabel.Caption := AText;
   FLabel.Canvas.Font := FLabel.Font;
   Width := FLabel.Canvas.TextWidth(AText) + 40;
-
-  Left := Screen.Width - Width - 20;
-  Top := Screen.Height - Height - 50;
-
-  SetWindowPos(Handle, HWND_TOPMOST, Left, Top, Width, Height, SWP_NOACTIVATE or SWP_SHOWWINDOW);
+  Left := Screen.WorkAreaRect.Right - Width - 20;
+  Top := Screen.WorkAreaRect.Bottom - Height - 20;
+  SetWindowPos(Handle, HWND_TOPMOST, Left, Top, Width, Height,
+    SWP_NOACTIVATE or SWP_SHOWWINDOW);
+  ShowWindow(Handle, SW_SHOWNOACTIVATE);
   FTimer.Enabled := True;
 end;
 
 procedure TfrmAnsiToast.TimerHandler(Sender: TObject);
 begin
   FTimer.Enabled := False;
-  Close;
-end;
-
-procedure TfrmAnsiToast.FormDeactivate(Sender: TObject);
-begin
-  Close;
+  ShowWindow(Handle, SW_HIDE);
 end;
 
 procedure TfrmAnsiToast.FormClose(Sender: TObject; var Action: TCloseAction);
 begin
-  Action := caFree;
-  OptimizeMemoryUsage;
+  FTimer.Enabled := False;
+  ShowWindow(Handle, SW_HIDE);
+  Action := caNone;
 end;
 
-procedure TfrmAnsiToast.ClickHandler(Sender: TObject);
-begin
-  Close;
-end;
+initialization
+  CurrentToast := nil;
+
+finalization
+  FreeAndNil(CurrentToast);
 
 end.
