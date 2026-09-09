@@ -41,6 +41,7 @@ uses
   uFileFolderHandling,
   uRegistrySettings,
   clsUnicodeToBijoy2000,
+  uAnsiEngineManager,
   DebugLog;
 
 { =============================================================================== }
@@ -362,8 +363,9 @@ begin
   begin
     AnsiVersion := 'Default';
     SaveSettings;
-    LoadCurrentActiveMapping;
+    AnsiEngineManager.SwitchEngine('Default');
   end;
+  AnsiEngineManager.RemoveEngine(AMapName);
 
   ScanAvroEncoFiles(AnsiDir);
   AvroMainForm1.BuildAnsiVersionMenus;

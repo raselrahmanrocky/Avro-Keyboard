@@ -32,8 +32,10 @@ unit uAvroEncoCrypto;
 
   Key derivation (v2):
       key = SHA-256( UTF-8(secret) + salt )
-      where secret = AvroEncoDefaultSecret (flag $00) or the user password
-      (flag $01). SHA-256 comes from System.Hash (pure RTL).
+      where secret = the built-in default application secret, reconstructed
+      at runtime from two XOR-masked byte arrays via
+      uAvroCryptoUtils.GetAvroEncoDefaultSecret (flag $00), or the user
+      password (flag $01). SHA-256 comes from System.Hash (pure RTL).
 
   Cryptographic engine: uAvroCryptoUtils - a 100% Pure Pascal AES-256-CBC
   engine with ZERO external DLL dependencies. No bcrypt.dll / advapi32.dll /
@@ -87,10 +89,11 @@ const
   AVROSHLD_TRAILER_SIZE = 80; // auth_tag(16) + hmac(64)
   AVROSHLD_MIN_SIZE = AVROSHLD_HEADER_SIZE + AVROSHLD_TRAILER_SIZE + 1;
 
-  // Default Application Key secret. Mirrored verbatim in
-  // Tools/build_avroenco.py (DEFAULT_APP_SECRET) - keep both in sync.
-  AvroEncoDefaultSecret =
-    'AvroEncoV2::d528c276cb5b80e16206151ba69bc74f';
+  // Default Application Key secret. NOT stored as a plain string: it is
+  // reconstructed at runtime from two XOR-masked byte arrays in
+  // uAvroCryptoUtils.GetAvroEncoDefaultSecret, so a 'strings' dump of the
+  // binary reveals only random-looking tables. The builder shares this unit,
+  // so runtime and offline tooling stay in sync automatically.
 
 function ValidateAvroEncoHeader(const AFilePath: string): Boolean;
 // Protection mode of the file:
@@ -219,13 +222,18 @@ function GetAvroEncoProtectionFlag(const AFilePath: string): Byte;
 var
   FileBytes: TBytes;
 begin
-  // Shield-format containers (magic 'AVROSHLD') always require a password
-  // (the Shield format has no default-key mode), so the UI treats them
-  // exactly like password protected .AvroEnco files: prompt once, cache the
-  // password, decrypt. Detection is by magic bytes, not extension - both
+  // Shield-format containers (magic 'AVROSHLD') are password protected UNLESS
+  // they carry the default-key flag (AVROSHLD_FLAG_DEFAULT_KEY), in which case
+  // they unlock transparently with the built-in obfuscated secret, exactly
+  // like v2 flag $00 files. Detection is by magic bytes, not extension - both
   // container formats share the .AvroEnco extension.
   if IsAvroShieldContainer(AFilePath) then
-    Exit(AVROENCO_FLAG_USER_PASSWORD);
+  begin
+    if AvroShieldContainerUsesDefaultKey(AFilePath) then
+      Exit(AVROENCO_FLAG_DEFAULT_KEY)
+    else
+      Exit(AVROENCO_FLAG_USER_PASSWORD);
+  end;
 
   Result := AVROENCO_FLAG_INVALID;
   if not FileExists(AFilePath) then
@@ -307,7 +315,7 @@ begin
           Move(FileBytes[26], IV[0], IV_SIZE);
           Off := V2_HEADER_SIZE;
           if Flag = AVROENCO_FLAG_DEFAULT_KEY then
-            KeyBytes := DeriveKeySHA256FromString(AvroEncoDefaultSecret, Salt)
+            KeyBytes := DeriveKeySHA256FromString(GetAvroEncoDefaultSecret, Salt)
           else
             KeyBytes := DeriveKeySHA256FromString(string(APassword), Salt);
         end;
@@ -412,14 +420,11 @@ var
   FS: TFileStream;
   Salt, IV, PlainBytes, CipherBuf, KeyBytes: TBytes;
   Flag: Byte;
-  I:    Integer;
   L:    Integer;
 begin
   Result := False;
   if AJsonText = '' then
     Exit;
-
-  Randomize;
 
   // Empty password => Default Application Key protection (flag $00);
   // non-empty password => user password protection (flag $01).
@@ -427,21 +432,15 @@ begin
   if APassword = '' then
     Flag := AVROENCO_FLAG_DEFAULT_KEY;
 
-  // NOTE: this runtime writer is a convenience used only by offline/tooling
-  // flows; shipped assets are produced by Tools/build_avroenco.py (Python,
-  // os.urandom entropy). The salt/IV below use the RTL PRNG, which is not a
-  // CSPRNG - acceptable for this dormant path, not for real secrets.
-  SetLength(Salt, SALT_SIZE);
-  for I := 0 to SALT_SIZE - 1 do
-    Salt[I] := Byte(Random(256));
-  SetLength(IV, IV_SIZE);
-  for I := 0 to IV_SIZE - 1 do
-    IV[I] := Byte(Random(256));
+  // Entropy for salt/IV comes from the CSPRNG (RtlGenRandom) in
+  // uAvroCryptoUtils - never the RTL PRNG, which is not a CSPRNG.
+  FillRandomBytes(Salt, SALT_SIZE);
+  FillRandomBytes(IV, IV_SIZE);
 
   KeyBytes := nil;
   try
     if APassword = '' then
-      KeyBytes := DeriveKeySHA256FromString(AvroEncoDefaultSecret, Salt)
+      KeyBytes := DeriveKeySHA256FromString(GetAvroEncoDefaultSecret, Salt)
     else
       KeyBytes := DeriveKeySHA256FromString(string(APassword), Salt);
 

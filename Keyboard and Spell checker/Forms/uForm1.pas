@@ -382,6 +382,7 @@ type
       procedure HandleLayoutDirectoryChanged(Sender: TObject);
       function BuildAnsiMappingFolderList: string;
       procedure RefreshAnsiMappingList;
+      procedure RefreshAnsiMappingNames;
       procedure IgnoreCapsLockClick(Sender: TObject);
       procedure PopupToolsPopup(Sender: TObject);
       procedure PopupTrayPopup(Sender: TObject);
@@ -397,6 +398,10 @@ type
       Updater:             TUpdateCheck;
       AnsiVersionSubmenu1: TMenuItem;
       AnsiVersionSubmenu2: TMenuItem;
+      { Cached, sorted list of mapping display names (excluding 'Default'),
+        kept fresh by the directory watcher / periodic poll. The ANSI picker
+        opens from this list with zero disk I/O. }
+      AnsiMappingNames:    TStringList;
       IgnoreCapsLock1:     TMenuItem;
       IgnoreCapsLock2:     TMenuItem;
       procedure AnsiVersionMenuClick(Sender: TObject);
@@ -476,7 +481,8 @@ uses
   uAvroEncoCrypto,
   uAvroEncoManager,
   uAvroEncoImporter,
-  uAvroLayoutUI;
+  uAvroLayoutUI,
+  uAnsiEngineManager;
 
 { =============================================================================== }
 
@@ -671,6 +677,7 @@ begin
   Log('FinalizeEncoManager');
 
   FreeAndNil(WindowDict);
+  FreeAndNil(AnsiMappingNames);
   FreeAndNil(KeyLayout);
   Log('FreeAndNil: WindowDict, KeyLayout');
   RemoveHook;
@@ -734,6 +741,7 @@ begin
   Show;
   Application.ProcessMessages;
 
+  AnsiMappingNames := TStringList.Create;
   LoadSettings;
   LoadApp;
 end;
@@ -1133,6 +1141,8 @@ end;
 procedure TAvroMainForm1.LoadApp;
 var
   tempLastUIMode: string;
+  MappingPath: string;
+  PreloadThread: TAnsiPreloadThread;
 begin
   Set_Process_Priority(HIGH_PRIORITY_CLASS);
 
@@ -1240,12 +1250,47 @@ begin
   end;
   InitializeEncoManager;
   ScanAvroEncoFiles(AnsiMappingDir);
-  // Wire up the .AvroEnco loader BEFORE the first LoadCurrentActiveMapping:
-  // otherwise an active .AvroEnco mapping (e.g. a password-protected one
-  // persisted from the previous session) is silently skipped at startup and
-  // ANSI typing falls back to the built-in defaults.
+  // Wire up the .AvroEnco loader BEFORE the first engine switch: otherwise
+  // an active .AvroEnco mapping (e.g. a password-protected one persisted
+  // from the previous session) is silently skipped at startup and ANSI
+  // typing falls back to the built-in defaults.
   OnLoadEncoMapping := HandleLoadEncoMapping;
-  LoadCurrentActiveMapping;
+  // Prime the session password for a password-protected ACTIVE version from
+  // the persisted per-file cache (never prompts), so SwitchEngine below can
+  // parse it on demand without user interaction.
+  if (AnsiVersion <> 'Default') and (AnsiMappingDir <> '') then
+  begin
+    MappingPath := GetActiveEncoFilePath(AnsiVersion, AnsiMappingDir);
+    if (MappingPath <> '') and IsEncoFile(MappingPath) and
+      (GetAvroEncoProtectionFlag(MappingPath) = AVROENCO_FLAG_USER_PASSWORD) then
+      CachedEncoPassword := GetEncoCachedPassword(MappingPath);
+  end;
+  // Parse every engine that unlocks without user interaction on a
+  // BACKGROUND thread: the shipped Shield containers each run an Argon2 KDF
+  // (~1-2 s), and doing all of it on this thread would block the message
+  // loop - the splash would freeze instead of closing after its normal 2 s.
+  // The keyboard hook is paused while the worker builds the engine globals
+  // (typing must never read a half-built engine), and the pump below keeps
+  // the splash painting and its 2 s timer running, so the splash behaves
+  // exactly as before while the heavy work happens off the UI thread.
+  PreloadThread := TAnsiPreloadThread.Create(AnsiEngineManager.CapturePreloadList);
+  PreloadThread.Start;
+  WindowCheck.Enabled := False; // never re-install the hook mid-preload
+  RemoveHook;
+  try
+    while (not PreloadThread.Finished) and (not Application.Terminated) do
+    begin
+      Application.ProcessMessages;
+      Sleep(5);
+    end;
+    // O(1): the worker parked every engine; restore the saved version.
+    if not AnsiEngineManager.SwitchEngine(AnsiVersion) then
+      AnsiEngineManager.SwitchEngine('Default');
+  finally
+    PreloadThread.Free;
+    Sethook;
+    WindowCheck.Enabled := True;
+  end;
   BuildAnsiVersionMenus;
 
   FDirectoryWatcher := TAvroDirectoryWatcher.Create(AnsiMappingDir);
@@ -1269,21 +1314,29 @@ begin
     TargetPath := GetActiveEncoFilePath(AnsiVersion, AnsiMappingDir);
     if TargetPath <> '' then
     begin
+      // Default-key files (flag $00) reload transparently; password
+      // protected files reload only when a usable password is cached. The
+      // engine cache re-parses the changed file in place, so the active
+      // engine stays fresh AND later switches keep using the cached copy.
       if IsEncoFile(TargetPath) then
       begin
-        // Default-key files (flag $00) reload transparently; password
-        // protected files reload only when a usable password is cached.
         if (GetAvroEncoProtectionFlag(TargetPath) = AVROENCO_FLAG_DEFAULT_KEY) or
           (GetEncoCachedPassword(TargetPath) <> '') then
-          LoadMappingFromEnco(TargetPath, GetEncoCachedPassword(TargetPath));
+          AnsiEngineManager.InvalidateEngine(AnsiVersion);
       end
       else
-        LoadCurrentActiveMapping;
+        AnsiEngineManager.InvalidateEngine(AnsiVersion);
     end;
   end;
 
-  BuildAnsiVersionMenus;
+  // New/changed/removed engines are reconciled with the cache as well.
+  AnsiEngineManager.RefreshFromDisk;
+
+  // Folders were scanned above, so refresh the snapshot BEFORE the menu
+  // rebuild - BuildAnsiVersionMenus skips its own re-scan when nothing
+  // changed since this snapshot.
   FAnsiMappingSnapshot := BuildAnsiMappingFolderList;
+  BuildAnsiVersionMenus;
   ShowAnsiToastNotification('ANSI mappings refreshed');
 end;
 
@@ -1334,6 +1387,22 @@ begin
   finally
     NameList.Free;
   end;
+end;
+
+procedure TAvroMainForm1.RefreshAnsiMappingNames;
+var
+  Key: string;
+begin
+  if AnsiMappingNames = nil then
+    AnsiMappingNames := TStringList.Create;
+  AnsiMappingNames.Clear;
+  // AvroEncoFiles is kept fresh by the watcher / periodic poll / import /
+  // delete flows, so this is pure memory work - no disk scan.
+  if Assigned(AvroEncoFiles) then
+    for Key in AvroEncoFiles.Keys do
+      if not SameText(Key, 'default') then
+        AnsiMappingNames.Add(AvroEncoFiles[Key].DisplayName);
+  AnsiMappingNames.Sort;
 end;
 
 procedure TAvroMainForm1.RefreshAnsiMappingList;
@@ -1783,10 +1852,11 @@ begin
     OutputasANSIAreyousure2.Checked := False;
   end;
 
-  // ANSI Mapping version
+  // ANSI Mapping version (engines are already preloaded; this switch is O(1))
   AnsiMappingDir := GetAvroDataDir + 'AnsiMapping\';
   ForceDirectories(AnsiMappingDir);
-  LoadCurrentActiveMapping;
+  if not AnsiEngineManager.SwitchEngine(AnsiVersion) then
+    AnsiEngineManager.SwitchEngine('Default');
   BuildAnsiVersionMenus;
   Popup_Tools.OnPopup := PopupToolsPopup;
   Popup_Tray.OnPopup := PopupTrayPopup;
@@ -2242,7 +2312,7 @@ begin
         if (MapWriteTime <> 0) and (MapWriteTime <> FActiveMappingLastWriteTime) then
         begin
           FActiveMappingLastWriteTime := MapWriteTime;
-          LoadCurrentActiveMapping;
+          AnsiEngineManager.InvalidateEngine(AnsiVersion);
           Log('ANSI Mapping Auto-Refreshed: ' + AnsiVersion);
         end;
       except
@@ -2376,6 +2446,7 @@ var
   ClickedItem: TMenuItem;
   SelectedVersion, ErrorMsg, TargetPath: string;
   Password: AnsiString;
+  ErrorLog: TStringList;
 begin
   if not (Sender is TMenuItem) then Exit;
   ClickedItem := TMenuItem(Sender);
@@ -2391,7 +2462,7 @@ begin
   if SameText(SelectedVersion, 'Default') then
   begin
     AnsiVersion := 'Default';
-    LoadCurrentActiveMapping;
+    AnsiEngineManager.SwitchEngine('Default');
     SaveSettings;
     BuildAnsiVersionMenus;
     if ShowAnsiSwitchNotification = 'YES' then
@@ -2424,7 +2495,14 @@ begin
     SaveSettings;
   end;
 
-  if TrySetAnsiVersion(SelectedVersion, ErrorMsg) then
+  ErrorLog := TStringList.Create;
+  try
+    if not AnsiEngineManager.SwitchEngine(SelectedVersion, ErrorLog) then
+      ErrorMsg := ErrorLog.Text;
+  finally
+    ErrorLog.Free;
+  end;
+  if ErrorMsg = '' then
   begin
     AnsiVersion := SelectedVersion;
     SaveSettings;
@@ -2534,7 +2612,8 @@ begin
               // Plain JSON mappings are unprotected: import activates them.
               AnsiVersion := ChangeFileExt(ExtractFileName(OpenDialog.Files[I]), '');
               SaveSettings;
-              LoadCurrentActiveMapping;
+              AnsiEngineManager.InvalidateEngine(AnsiVersion);
+              AnsiEngineManager.SwitchEngine(AnsiVersion);
               ShowAnsiToastNotification('Mapping imported: ' + AnsiVersion);
             end;
           end;
@@ -2626,6 +2705,7 @@ end;
 procedure TAvroMainForm1.BuildAnsiVersionMenus;
 var
   Sep, MoreOptMenu, Item: TMenuItem;
+  Snap: string;
 
   procedure AddDirectItem(ParentMenu: TMenuItem; const AName: string; AChecked: Boolean);
   var
@@ -2735,8 +2815,18 @@ var
   end;
 
 begin
-  CleanupDuplicateMappings;
-  ScanAvroEncoFiles(AnsiMappingDir);
+  // Full disk re-scan only when the mapping folder actually changed: this
+  // runs on every version switch and picker refresh, and the scan + menu
+  // rebuild is the visible latency after a click. Folder-change paths
+  // (watcher / poll) scan first and refresh the snapshot themselves.
+  Snap := BuildAnsiMappingFolderList;
+  if Snap <> FAnsiMappingSnapshot then
+  begin
+    FAnsiMappingSnapshot := Snap;
+    CleanupDuplicateMappings;
+    ScanAvroEncoFiles(AnsiMappingDir);
+  end;
+  RefreshAnsiMappingNames;
   BuildSingleMenu(AnsiVersionSubmenu1);
   BuildSingleMenu(AnsiVersionSubmenu2);
 end;

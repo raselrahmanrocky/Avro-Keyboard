@@ -76,6 +76,21 @@ function DeriveKeySHA256FromString(const ASecretString: string; const ASalt: TBy
       key := SHA-256( ARawSecret + ASalt ) }
 function DeriveKeySHA256FromRawBytes(const ARawSecret: TBytes; const ASalt: TBytes): TBytes;
 
+{ Reconstructs the built-in default application secret at runtime from two
+  XOR-masked 64-byte arrays (AVROENCO_KEY_MASK / AVROENCO_KEY_XOR below), so a
+  plain 'strings' dump of the binary reveals only two random-looking tables.
+  The 44-byte secret is zero-padded to 64 bytes; reconstruction stops at the
+  first NUL. The temporary buffer is wiped before release. }
+function GetAvroEncoDefaultSecret: string;
+
+{ Fills ABuf (resized to ACount) with cryptographically strong random bytes
+  via RtlGenRandom (advapi32 SystemFunction036). Falls back to the RTL PRNG
+  only when the Windows API is unavailable (should never happen on the
+  supported platforms). Used for container salts, IVs and obfuscation seeds.
+  This is the entropy source for every writer path; the RTL PRNG alone is
+  NOT a CSPRNG and must never be used for real secrets. }
+procedure FillRandomBytes(var ABuf: TBytes; const ACount: Integer);
+
 implementation
 
 type
@@ -791,6 +806,66 @@ begin
 
   FillChar(Cipher[0], Length(Cipher), 0);
   SetLength(Cipher, 0);
+end;
+
+{ =============================================================================
+  Default application secret (obfuscated) + CSPRNG entropy source
+  ============================================================================= }
+
+const
+  // 64-byte XOR key. Derived offline; never store the plain secret itself.
+  AVROENCO_KEY_XOR: array [0 .. 63] of Byte = (
+    $74, $07, $B6, $16, $6B, $42, $26, $37, $F6, $BE, $BB, $34, $10, $1D, $F9, $3A,
+    $09, $F9, $EE, $F1, $9C, $15, $D8, $4A, $B8, $AF, $F1, $B7, $A5, $2B, $88, $AE,
+    $52, $AC, $2E, $98, $81, $62, $85, $F4, $51, $8A, $83, $86, $A5, $50, $5F, $86,
+    $A3, $40, $D0, $4D, $E6, $F9, $3E, $98, $1F, $99, $B4, $09, $18, $0D, $E7, $21
+  );
+
+  // XOR-masked secret: AVROENCO_KEY_MASK[i] XOR AVROENCO_KEY_XOR[i] ==
+  // 'AvroEncoV2::d528c276cb5b80e16206151ba69bc74f' + NUL padding to 64 bytes.
+  AVROENCO_KEY_MASK: array [0 .. 63] of Byte = (
+    $35, $71, $C4, $79, $2E, $2C, $45, $58, $A0, $8C, $81, $0E, $74, $28, $CB, $02,
+    $6A, $CB, $D9, $C7, $FF, $77, $ED, $28, $80, $9F, $94, $86, $93, $19, $B8, $98,
+    $63, $99, $1F, $FA, $E0, $54, $BC, $96, $32, $BD, $B7, $E0, $A5, $50, $5F, $86,
+    $A3, $40, $D0, $4D, $E6, $F9, $3E, $98, $1F, $99, $B4, $09, $18, $0D, $E7, $21
+  );
+
+function GetAvroEncoDefaultSecret: string;
+var
+  Tmp: TBytes;
+  I:   Integer;
+begin
+  Result := '';
+  SetLength(Tmp, 64);
+  for I := 0 to 63 do
+    Tmp[I] := AVROENCO_KEY_MASK[I] xor AVROENCO_KEY_XOR[I];
+  I := 0;
+  while (I < 64) and (Tmp[I] <> 0) do
+    Inc(I);
+  Result := TEncoding.ASCII.GetString(Tmp, 0, I);
+  FillChar(Tmp[0], Length(Tmp), 0);
+  SetLength(Tmp, 0);
+end;
+
+{ RtlGenRandom is undocumented but stable since Windows 2000 and present in
+  every supported Windows version; using it avoids a BCrypt.dll minimum-OS
+  dependency. Declared locally so no extra unit is pulled in. }
+function RtlGenRandom(Buf: Pointer; Len: Cardinal): Boolean; stdcall;
+  external 'advapi32.dll' name 'SystemFunction036';
+
+procedure FillRandomBytes(var ABuf: TBytes; const ACount: Integer);
+var
+  I: Integer;
+begin
+  SetLength(ABuf, ACount);
+  if ACount <= 0 then
+    Exit;
+  if RtlGenRandom(@ABuf[0], Cardinal(ACount)) then
+    Exit;
+  // Fallback (practically unreachable): RTL PRNG. NOT a CSPRNG - only used
+  // so the writer never silently produces deterministic salts.
+  for I := 0 to ACount - 1 do
+    ABuf[I] := Byte(Random(256));
 end;
 
 end.

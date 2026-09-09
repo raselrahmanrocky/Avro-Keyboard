@@ -51,6 +51,11 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 
 [Files]
 Source: "build\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
+; Encrypted ANSI mapping containers (Shield format, default-key): installed next
+; to the executable, where the runtime scanner already looks for them. The
+; plaintext JSON sources live in AvroEncoEngine\source-mappings (dev only) and
+; are NEVER shipped.
+Source: "assets\Ansi V*.AvroEnco"; DestDir: "{app}\AnsiMapping"; Flags: ignoreversion
 Source: "assets\autodict.dct"; DestDir: "{commonappdata}\Avro Keyboard"; Flags: ignoreversion
 Source: "assets\Database.db3"; DestDir: "{commonappdata}\Avro Keyboard"; Flags: ignoreversion
 Source: "assets\skins\*"; DestDir: "{commonappdata}\Avro Keyboard\Skin"; Flags: ignoreversion recursesubdirs createallsubdirs
