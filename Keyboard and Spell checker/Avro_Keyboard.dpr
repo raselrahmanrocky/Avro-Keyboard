@@ -1,4 +1,4 @@
-﻿{
+{
   =============================================================================
   This Source Code Form is subject to the terms of the Mozilla Public
   License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -77,6 +77,7 @@ uses
   uAvroEncoImporter in 'Units\uAvroEncoImporter.pas',
   uAvroShield in 'Units\uAvroShield.pas',
   uAvroArgon2 in 'Units\uAvroArgon2.pas',
+  uAnsiPersistentCache in 'Units\uAnsiPersistentCache.pas',
   uAnsiEngineManager in 'Units\uAnsiEngineManager.pas',
   uAvroDirectoryWatcher in 'Units\uAvroDirectoryWatcher.pas',
   uAvroLayoutUI in 'Units\uAvroLayoutUI.pas',

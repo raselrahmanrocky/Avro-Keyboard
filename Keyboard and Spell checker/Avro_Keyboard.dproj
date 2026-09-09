@@ -1,4 +1,4 @@
-﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
     <ProjectGuid>{0219940E-5F78-48B1-8960-2C65283492DA}</ProjectGuid>
     <MainSource>Avro_Keyboard.dpr</MainSource>
@@ -211,6 +211,8 @@
     <DCCReference Include="Units\Avro.Types.pas" />
     <DCCReference Include="..\Unicode to ascii converter\clsAnsiSequenceLookup.pas" />
     <DCCReference Include="Units\uAvroEncoCrypto.pas" />
+    <DCCReference Include="Units\uAnsiPersistentCache.pas" />
+    <DCCReference Include="Units\uAnsiEngineManager.pas" />
     <DCCReference Include="Units\uAvroEncoManager.pas" />
     <DCCReference Include="Units\uAvroEncoImporter.pas" />
     <DCCReference Include="Units\uAvroDirectoryWatcher.pas" />

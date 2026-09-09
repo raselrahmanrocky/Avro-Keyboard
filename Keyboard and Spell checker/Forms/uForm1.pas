@@ -412,6 +412,7 @@ type
       procedure OpenAnsiMappingDirClick(Sender: TObject);
 
       procedure BuildAnsiVersionMenus;
+      procedure UpdateAnsiVersionMenuChecks(const AName: string);
       function GetMyCurrentKeyboardMode: enumMode;
       procedure ExitApp;
       function GetMyCurrentLayout: string;
@@ -2464,7 +2465,7 @@ begin
     AnsiVersion := 'Default';
     AnsiEngineManager.SwitchEngine('Default');
     SaveSettings;
-    BuildAnsiVersionMenus;
+    UpdateAnsiVersionMenuChecks('Default');
     if ShowAnsiSwitchNotification = 'YES' then
       ShowAnsiToastNotification('ANSI Encoding: Default');
     Exit;
@@ -2506,7 +2507,7 @@ begin
   begin
     AnsiVersion := SelectedVersion;
     SaveSettings;
-    BuildAnsiVersionMenus;
+    UpdateAnsiVersionMenuChecks(SelectedVersion);
     if ShowAnsiSwitchNotification = 'YES' then
       ShowAnsiToastNotification('ANSI Encoding: ' + SelectedVersion);
     Exit;
@@ -2697,6 +2698,27 @@ begin
 end;
 
 { =============================================================================== }
+
+{ Fast switch UI update: never scans the directory and never destroys/rebuilds
+  menu objects. Full BuildAnsiVersionMenus remains reserved for file changes. }
+procedure TAvroMainForm1.UpdateAnsiVersionMenuChecks(const AName: string);
+  procedure UpdateOne(AMenu: TMenuItem);
+  var
+    I: Integer;
+    M: TMenuItem;
+  begin
+    if not Assigned(AMenu) then Exit;
+    for I := 0 to AMenu.Count - 1 do
+    begin
+      M := AMenu.Items[I];
+      if M.Hint <> '' then
+        M.Checked := SameText(M.Hint, AName);
+    end;
+  end;
+begin
+  UpdateOne(AnsiVersionSubmenu1);
+  UpdateOne(AnsiVersionSubmenu2);
+end;
 
 { =============================================================================== }
 { Build ANSI Version Menus (Fixed) }

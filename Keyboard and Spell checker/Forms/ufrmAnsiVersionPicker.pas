@@ -392,7 +392,7 @@ begin
     AnsiVersion := 'Default';
     AnsiEngineManager.SwitchEngine('Default');
     SaveSettings;
-    AvroMainForm1.BuildAnsiVersionMenus;
+    AvroMainForm1.UpdateAnsiVersionMenuChecks('Default');
     if ShowAnsiSwitchNotification = 'YES' then
       ShowAnsiToastNotification('ANSI Version: Default');
     CurrentPicker := nil;
@@ -439,7 +439,7 @@ begin
   begin
     AnsiVersion := SelectedVersion;
     SaveSettings;
-    AvroMainForm1.BuildAnsiVersionMenus;
+    AvroMainForm1.UpdateAnsiVersionMenuChecks(SelectedVersion);
     if ShowAnsiSwitchNotification = 'YES' then
       ShowAnsiToastNotification('ANSI Version: ' + SelectedVersion);
 
