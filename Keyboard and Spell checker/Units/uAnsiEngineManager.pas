@@ -125,6 +125,9 @@ type
       on failure - the previously active engine stays untouched. }
     function SwitchEngine(const AName: string;
       ErrorLog: TStringList = nil): Boolean;
+    { UI-safe fast path. Never reads/decrypts/parses files and never waits for
+      the preload/refresh lock. Returns False immediately if busy/not cached. }
+    function TrySwitchCached(const AName: string): Boolean;
     { Re-parses one cached engine from its file (directory watcher /
       auto-refresh on file change / import). If the engine is active it is
       re-activated in place; on re-parse failure the active engine falls back
@@ -489,6 +492,29 @@ begin
     FLock.Leave;
     if OwnErr then
       ErrorLog.Free;
+  end;
+end;
+
+function TAnsiEngineManager.TrySwitchCached(const AName: string): Boolean;
+var
+  Key: string;
+begin
+  Result := False;
+  Key := SlotKey(AName);
+  if Key = '' then Exit;
+
+  // A picker/menu click must never wait behind parser/refresh work.
+  if not FLock.TryEnter then Exit;
+  try
+    if (Key = FCurrentKey) and FCache.ContainsKey(Key) then Exit(True);
+    if not FCache.ContainsKey(Key) then Exit;
+    ParkCurrent;
+    RestoreEngineState(FCache[Key].State);
+    FCurrentKey := Key;
+    AnsiVersion := AName;
+    Result := True;
+  finally
+    FLock.Leave;
   end;
 end;
 

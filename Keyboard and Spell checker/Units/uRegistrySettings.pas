@@ -111,6 +111,7 @@ procedure SaveUISettings;
 procedure LoadSettings;
 procedure ValidateSettings;
 procedure SaveSettings;
+procedure SaveAnsiVersionOnly;
 
 procedure LoadSettingsFromFile;
 procedure SaveSettingsInXML;
@@ -808,6 +809,29 @@ begin
 end;
 
 { =============================================================================== }
+
+{ Saves only the value changed by an ANSI picker/menu click. The previous
+  SaveSettings call rewrote every application setting synchronously. }
+procedure SaveAnsiVersionOnly;
+{$IFNDEF PortableOn}
+var
+  Reg: TMyRegistry;
+{$ENDIF}
+begin
+  {$IFDEF PortableOn}
+  // Portable settings share one XML file; keep compatibility.
+  SaveSettingsInXML;
+  {$ELSE}
+  Reg := TMyRegistry.Create;
+  try
+    Reg.RootKey := HKEY_CURRENT_USER;
+    if Reg.OpenKey('Software\OmicronLab\Avro Keyboard', True) then
+      Reg.WriteString('AnsiVersion', clsUnicodeToBijoy2000.AnsiVersion);
+  finally
+    Reg.Free;
+  end;
+  {$ENDIF}
+end;
 
 initialization
 finalization
