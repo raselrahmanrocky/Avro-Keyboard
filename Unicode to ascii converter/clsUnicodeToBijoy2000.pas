@@ -165,6 +165,45 @@ type
     To_: string;
   end;
 
+  { Complete snapshot of the ANSI engine's global parsing state. One instance
+    is parked in the engine cache (uAnsiEngineManager) per available mapping
+    version. Ownership rules:
+      * A state record OWNS its containers (objects + dynamic arrays) while
+        they are parked; Clear frees them.
+      * While the engine is ACTIVE (restored), the containers live in the
+        unit globals and the state record holds no references (all fields
+        nil / empty).
+    CaptureEngineState / RestoreEngineState move ownership between the two
+    locations with plain pointer/array-reference moves - O(1), no deep copy. }
+  TAnsiEngineState = record
+    DisplayName: string;
+    // A_* glyph variables, captured through AnsiRegistry.Ptr indirection so
+    // per-version scalar overrides round-trip exactly.
+    ScalarValues: TDictionary<string, string>;
+    CustomFullForms:          TArray<TReplacementPair>;
+    CustomPreReplacements:    TArray<TReplacementPair>;
+    CustomPostReplacements:   TArray<TReplacementPair>;
+    ActiveReplacements:       TArray<TReplacementPair>;
+    KarInclusiveReplacements: TArray<TReplacementPair>;
+    VowelRules:               TArray<TVowelRule>;
+    RfolaRules:               TArray<TRfolaRule>;
+    KarCorrections:           TArray<TKarCorrection>;
+    GroupKarCorrections:      TArray<TGroupKarCorrection>;
+    AnsiRegistry:             TList<TAnsiVarRec>;
+    AnsiRegistryMap:          TDictionary<string, TAnsiVarRec>;
+    AnsiOverrides:            TDictionary<string, string>;
+    ConsonantGroupMap:        TDictionary<string, TArray<string>>;
+    AnsiGroupMap:             TDictionary<string, TArray<string>>;
+    AnsiGroupRawMap:          TDictionary<string, TArray<string>>;
+    ConsonantGroupRawMap:     TDictionary<string, TArray<string>>;
+    AnsiSequenceLookup:       TAnsiSequenceMap;
+    AnsiToUniMap:             TAnsiToUniMap;
+    procedure Clear;
+  end;
+
+procedure CaptureEngineState(var AState: TAnsiEngineState);
+procedure RestoreEngineState(var AState: TAnsiEngineState);
+
 var
   CustomFullForms:          TArray<TReplacementPair>;
   CustomPreReplacements:    TArray<TReplacementPair>;
@@ -2646,6 +2685,13 @@ begin
               end
               else
                 Inc(P);
+            // P is now ONE PAST the closing quote; the character right after
+            // the string (',' is harmless, but '}' / ']' MUST decrement the
+            // depth) is examined by the next loop iteration. Advancing again
+            // here would skip a closing bracket in compact JSON (a string
+            // directly followed by '}' / ']'), swallow the rest of the
+            // document and silently drop every following section.
+            Continue;
           end
           else if CharInSet(S[P], ['{', '[']) then
             Inc(Depth)
@@ -2955,6 +3001,121 @@ begin
     ConsonantGroupRawMap.Clear;
   PrepareActiveReplacements;
   CompileAnsiSequenceMap;
+end;
+
+{ =============================================================================== }
+
+procedure TAnsiEngineState.Clear;
+begin
+  DisplayName := '';
+  FreeAndNil(ScalarValues);
+  CustomFullForms := nil;
+  CustomPreReplacements := nil;
+  CustomPostReplacements := nil;
+  ActiveReplacements := nil;
+  KarInclusiveReplacements := nil;
+  VowelRules := nil;
+  RfolaRules := nil;
+  KarCorrections := nil;
+  GroupKarCorrections := nil;
+  FreeAndNil(AnsiRegistry);
+  FreeAndNil(AnsiRegistryMap);
+  FreeAndNil(AnsiOverrides);
+  FreeAndNil(ConsonantGroupMap);
+  FreeAndNil(AnsiGroupMap);
+  FreeAndNil(AnsiGroupRawMap);
+  FreeAndNil(ConsonantGroupRawMap);
+  FreeAndNil(AnsiSequenceLookup);
+  FreeAndNil(AnsiToUniMap);
+end;
+
+{ Moves the engine's global containers (and the A_* scalar values, captured
+  through the registry Ptr indirection) out of the unit globals and into
+  AState. After this call the globals are empty/nil and AState owns
+  everything; ResetAnsiToDefaults / EnsureAnsiRegistry are nil-safe, so the
+  next parse starts clean. O(1) pointer moves, no deep copies. }
+procedure CaptureEngineState(var AState: TAnsiEngineState);
+var
+  Rec: TAnsiVarRec;
+  Val: string;
+begin
+  AState.Clear;
+  AState.DisplayName := AnsiVersion;
+
+  AState.ScalarValues := TDictionary<string, string>.Create;
+  if AnsiRegistry <> nil then
+    for Rec in AnsiRegistry do
+    begin
+      if Rec.VarType = avChar then
+        Val := PChar(Rec.Ptr)^
+      else
+        Val := PString(Rec.Ptr)^;
+      AState.ScalarValues.AddOrSetValue(Rec.Name, Val);
+    end;
+
+  AState.CustomFullForms := CustomFullForms;          CustomFullForms := nil;
+  AState.CustomPreReplacements := CustomPreReplacements; CustomPreReplacements := nil;
+  AState.CustomPostReplacements := CustomPostReplacements; CustomPostReplacements := nil;
+  AState.ActiveReplacements := ActiveReplacements;    ActiveReplacements := nil;
+  AState.KarInclusiveReplacements := KarInclusiveReplacements; KarInclusiveReplacements := nil;
+  AState.VowelRules := VowelRules;                    VowelRules := nil;
+  AState.RfolaRules := RfolaRules;                    RfolaRules := nil;
+  AState.KarCorrections := KarCorrections;            KarCorrections := nil;
+  AState.GroupKarCorrections := GroupKarCorrections;  GroupKarCorrections := nil;
+  AState.AnsiRegistry := AnsiRegistry;                AnsiRegistry := nil;
+  AState.AnsiRegistryMap := AnsiRegistryMap;          AnsiRegistryMap := nil;
+  AState.AnsiOverrides := AnsiOverrides;              AnsiOverrides := nil;
+  AState.ConsonantGroupMap := ConsonantGroupMap;      ConsonantGroupMap := nil;
+  AState.AnsiGroupMap := AnsiGroupMap;                AnsiGroupMap := nil;
+  AState.AnsiGroupRawMap := AnsiGroupRawMap;          AnsiGroupRawMap := nil;
+  AState.ConsonantGroupRawMap := ConsonantGroupRawMap; ConsonantGroupRawMap := nil;
+  AState.AnsiSequenceLookup := AnsiSequenceLookup;    AnsiSequenceLookup := nil;
+  AState.AnsiToUniMap := AnsiToUniMap;                AnsiToUniMap := nil;
+end;
+
+{ Inverse of CaptureEngineState: moves AState's containers back into the unit
+  globals and rewrites the A_* scalars through the registry Ptrs. After this
+  call AState holds no references and the engine is fully active again.
+  Precondition: the globals are empty (caller parks the previously active
+  state first); every container assignment below overwrites a nil global. }
+procedure RestoreEngineState(var AState: TAnsiEngineState);
+var
+  Rec: TAnsiVarRec;
+  Val: string;
+begin
+  CustomFullForms := AState.CustomFullForms;          AState.CustomFullForms := nil;
+  CustomPreReplacements := AState.CustomPreReplacements; AState.CustomPreReplacements := nil;
+  CustomPostReplacements := AState.CustomPostReplacements; AState.CustomPostReplacements := nil;
+  ActiveReplacements := AState.ActiveReplacements;    AState.ActiveReplacements := nil;
+  KarInclusiveReplacements := AState.KarInclusiveReplacements; AState.KarInclusiveReplacements := nil;
+  VowelRules := AState.VowelRules;                    AState.VowelRules := nil;
+  RfolaRules := AState.RfolaRules;                    AState.RfolaRules := nil;
+  KarCorrections := AState.KarCorrections;            AState.KarCorrections := nil;
+  GroupKarCorrections := AState.GroupKarCorrections;  AState.GroupKarCorrections := nil;
+  AnsiRegistry := AState.AnsiRegistry;                AState.AnsiRegistry := nil;
+  AnsiRegistryMap := AState.AnsiRegistryMap;          AState.AnsiRegistryMap := nil;
+  AnsiOverrides := AState.AnsiOverrides;              AState.AnsiOverrides := nil;
+  ConsonantGroupMap := AState.ConsonantGroupMap;      AState.ConsonantGroupMap := nil;
+  AnsiGroupMap := AState.AnsiGroupMap;                AState.AnsiGroupMap := nil;
+  AnsiGroupRawMap := AState.AnsiGroupRawMap;          AState.AnsiGroupRawMap := nil;
+  ConsonantGroupRawMap := AState.ConsonantGroupRawMap; AState.ConsonantGroupRawMap := nil;
+  AnsiSequenceLookup := AState.AnsiSequenceLookup;    AState.AnsiSequenceLookup := nil;
+  AnsiToUniMap := AState.AnsiToUniMap;                AState.AnsiToUniMap := nil;
+
+  // Scalars: write the captured values back through the stable registry Ptrs.
+  if (AnsiRegistry <> nil) and (AState.ScalarValues <> nil) then
+    for Rec in AnsiRegistry do
+      if AState.ScalarValues.TryGetValue(Rec.Name, Val) then
+      begin
+        if Rec.VarType = avChar then
+        begin
+          if Val <> '' then
+            PChar(Rec.Ptr)^ := Val[1];
+        end
+        else
+          PString(Rec.Ptr)^ := Val;
+      end;
+  FreeAndNil(AState.ScalarValues);
 end;
 
 { =============================================================================== }

@@ -77,7 +77,8 @@ uses
   ufrmAnsiToast,
   uAvroEncoManager,
   uAvroEncoImporter,
-  uAvroEncoCrypto;
+  uAvroEncoCrypto,
+  uAnsiEngineManager;
 
 procedure ForceForegroundWindow(HWND: HWND);
 var
@@ -228,56 +229,18 @@ end;
 
 procedure TfrmAnsiVersionPicker.PopulateVersions;
 var
-  SearchRec: TSearchRec;
-  FileTitle: string;
-  I:         Integer;
-
-  // Scans one folder for mapping files (.AvroEnco preferred, .json fallback).
-  // Called for the data folder AND the folders next to the executable so the
-  // picker shows the same mapping set as the tray menu (ScanAvroEncoFiles).
-  procedure ScanDir(const ADir: string);
-  begin
-    if not DirectoryExists(ADir) then
-      Exit;
-    // Scan .AvroEnco files first
-    if System.SysUtils.FindFirst(ADir + '*.AvroEnco', System.SysUtils.faAnyFile, SearchRec) = 0 then
-    begin
-      try
-        repeat
-          FileTitle := ChangeFileExt(SearchRec.Name, '');
-          if not SameText(FileTitle, 'Default') and
-             (ListBox.Items.IndexOf(FileTitle) < 0) then
-            ListBox.Items.Add(FileTitle);
-        until System.SysUtils.FindNext(SearchRec) <> 0;
-      finally
-        System.SysUtils.FindClose(SearchRec);
-      end;
-    end;
-    // Scan .json files (only if no .AvroEnco with same name)
-    if System.SysUtils.FindFirst(ADir + '*.json', System.SysUtils.faAnyFile, SearchRec) = 0 then
-    begin
-      try
-        repeat
-          FileTitle := ChangeFileExt(SearchRec.Name, '');
-          if not SameText(FileTitle, 'Default') and
-             (ListBox.Items.IndexOf(FileTitle) < 0) then
-            ListBox.Items.Add(FileTitle);
-        until System.SysUtils.FindNext(SearchRec) <> 0;
-      finally
-        System.SysUtils.FindClose(SearchRec);
-      end;
-    end;
-  end;
-
+  I: Integer;
 begin
-  AvroMainForm1.CleanupDuplicateMappings;
   ListBox.Items.BeginUpdate;
   try
     ListBox.Clear;
     ListBox.Items.Add('Default');
-    ScanDir(AnsiMappingDir);
-    ScanDir(ExtractFilePath(Application.ExeName) + 'assets\');
-    ScanDir(ExtractFilePath(Application.ExeName) + 'AnsiMapping\');
+    // The name list is cached on the main form and kept fresh by the
+    // directory watcher / periodic poll / import / delete flows - opening
+    // the picker costs no disk I/O and no duplicate-cleanup side effects.
+    if Assigned(AvroMainForm1.AnsiMappingNames) then
+      for I := 0 to AvroMainForm1.AnsiMappingNames.Count - 1 do
+        ListBox.Items.Add(AvroMainForm1.AnsiMappingNames[I]);
   finally
     ListBox.Items.EndUpdate;
   end;
@@ -414,6 +377,7 @@ procedure TfrmAnsiVersionPicker.ListBoxClick(Sender: TObject);
 var
   SelectedVersion, ErrorMsg, TargetPath: string;
   Password: AnsiString;
+  ErrorLog: TStringList;
 begin
   if not Assigned(CurrentPicker) then
     Exit;
@@ -426,7 +390,7 @@ begin
   if SameText(SelectedVersion, 'Default') then
   begin
     AnsiVersion := 'Default';
-    LoadCurrentActiveMapping;
+    AnsiEngineManager.SwitchEngine('Default');
     SaveSettings;
     AvroMainForm1.BuildAnsiVersionMenus;
     if ShowAnsiSwitchNotification = 'YES' then
@@ -461,7 +425,17 @@ begin
     SaveSettings;
   end;
 
-  if TrySetAnsiVersion(SelectedVersion, ErrorMsg) then
+  // The engine cache makes this switch O(1) for every preloaded (default-key)
+  // engine and for any engine unlocked before: no disk I/O, no decryption,
+  // no parsing happens here.
+  ErrorLog := TStringList.Create;
+  try
+    if not AnsiEngineManager.SwitchEngine(SelectedVersion, ErrorLog) then
+      ErrorMsg := ErrorLog.Text;
+  finally
+    ErrorLog.Free;
+  end;
+  if ErrorMsg = '' then
   begin
     AnsiVersion := SelectedVersion;
     SaveSettings;
@@ -735,7 +709,10 @@ begin
       begin
         AnsiVersion := 'Default';
         SaveSettings;
+        AnsiEngineManager.SwitchEngine('Default');
       end;
+      // Drop the deleted engine from the cache so it cannot be restored.
+      AnsiEngineManager.RemoveEngine(MapName);
       AvroMainForm1.BuildAnsiVersionMenus;
       PopulateVersions;
       AutoSizeForm;

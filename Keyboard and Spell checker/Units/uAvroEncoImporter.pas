@@ -73,6 +73,7 @@ uses
   ufrmAnsiToast,
   uRegistrySettings,
   clsUnicodeToBijoy2000,
+  uAnsiEngineManager,
   DebugLog;
 
 const
@@ -220,6 +221,7 @@ var
   Password: AnsiString;
   ProtectionFlag: Byte;
   TargetDir, TargetPath, DisplayName, ImportedName, ErrMsg: string;
+  ErrorLog: TStringList;
 begin
   Result := False;
   AErrorMessage := '';
@@ -342,15 +344,26 @@ begin
 
   // --- 9. Activate the new mapping (password-protected imports only) ---------
   // Default-key imports are silent and never change the active mapping.
+  // InvalidateEngine first: when the imported name was already cached, the
+  // freshly copied file must replace the stale parked engine.
   if Password <> '' then
   begin
-    if TrySetAnsiVersion(ImportedName, ErrMsg) then
-    begin
-      SaveSettings; // persist the active AnsiVersion + CachedEncoPassword
-      Log('Activated imported mapping: ' + ImportedName);
-    end
-    else
-      Log('Imported but could not activate ' + ImportedName + ': ' + ErrMsg);
+    AnsiEngineManager.InvalidateEngine(ImportedName);
+    ErrorLog := TStringList.Create;
+    try
+      if AnsiEngineManager.SwitchEngine(ImportedName, ErrorLog) then
+      begin
+        SaveSettings; // persist the active AnsiVersion + CachedEncoPassword
+        Log('Activated imported mapping: ' + ImportedName);
+      end
+      else
+      begin
+        ErrMsg := ErrorLog.Text;
+        Log('Imported but could not activate ' + ImportedName + ': ' + ErrMsg);
+      end;
+    finally
+      ErrorLog.Free;
+    end;
   end;
   except
     on E: Exception do
