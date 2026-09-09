@@ -196,6 +196,9 @@ var
 begin
   FLock.Enter;
   try
+    // Globals may alias a slot. Detach before slot owners are destroyed.
+    DetachActiveEngineState;
+    FCurrentKey := '';
     for Slot in FCache.Values do
       Slot.Free;
     FCache.Free;
@@ -343,13 +346,12 @@ begin
 end;
 
 procedure TAnsiEngineManager.ParkCurrent;
-var
-  Slot: TEngineSlot;
 begin
-  if FCurrentKey = '' then
-    Exit;
-  if FCache.TryGetValue(FCurrentKey, Slot) then
-    CaptureEngineState(Slot.State);
+  if FCurrentKey = '' then Exit;
+  // Slots permanently own complete immutable states. Runtime globals are
+  // merely aliases, so parking is allocation-free and never rebuilds the
+  // ScalarValues dictionary on every switch.
+  DetachActiveEngineState;
 end;
 
 procedure TAnsiEngineManager.DropSlot(const AKey: string);
@@ -485,7 +487,7 @@ begin
 
     // O(1) engine swap: park current, restore target.
     ParkCurrent;
-    RestoreEngineState(FCache[Key].State);
+    ActivateEngineState(FCache[Key].State);
     FCurrentKey := Key;
     AnsiVersion := AName;
     Result := True;
@@ -510,7 +512,7 @@ begin
     if (Key = FCurrentKey) and FCache.ContainsKey(Key) then Exit(True);
     if not FCache.ContainsKey(Key) then Exit;
     ParkCurrent;
-    RestoreEngineState(FCache[Key].State);
+    ActivateEngineState(FCache[Key].State);
     FCurrentKey := Key;
     AnsiVersion := AName;
     Result := True;
@@ -535,13 +537,13 @@ begin
         if (Key <> FCurrentKey) and FCache.ContainsKey(Key) then
         begin
           ParkCurrent;
-          RestoreEngineState(FCache[Key].State);
+          ActivateEngineState(FCache[Key].State);
           FCurrentKey := Key;
         end;
       if (ReturnKey <> FCurrentKey) and FCache.ContainsKey(ReturnKey) then
       begin
         ParkCurrent;
-        RestoreEngineState(FCache[ReturnKey].State);
+        ActivateEngineState(FCache[ReturnKey].State);
         FCurrentKey := ReturnKey;
       end;
       AnsiVersion := AReturnTo;
@@ -581,7 +583,7 @@ begin
         // Never leave the app without a working engine: fall back to Default.
         if FCache.ContainsKey('default') then
         begin
-          RestoreEngineState(FCache['default'].State);
+          ActivateEngineState(FCache['default'].State);
           FCurrentKey := 'default';
           AnsiVersion := 'Default';
         end;
@@ -590,7 +592,7 @@ begin
     end;
     if WasActive then
     begin
-      RestoreEngineState(FCache[Key].State);
+      ActivateEngineState(FCache[Key].State);
       AnsiVersion := AName;
     end;
   finally
