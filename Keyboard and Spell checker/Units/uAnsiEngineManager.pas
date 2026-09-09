@@ -166,6 +166,7 @@ implementation
 uses
   uAvroEncoManager,
   uAvroEncoCrypto,
+  uAnsiPersistentCache,
   uRegistrySettings,
   System.IOUtils,
   System.Math,
@@ -304,7 +305,8 @@ begin
     UsePassword := APassword;
     if UsePassword = '' then
       UsePassword := CachedEncoPassword;
-    JSON := Trim(DecryptAvroEncoToString(AFilePath, UsePassword));
+    if not LoadAnsiJSONCached(AFilePath, UsePassword, JSON) then
+      JSON := '';
     if (JSON = '') or (JSON[1] <> '{') then
     begin
       if Assigned(ErrorLog) then
@@ -321,7 +323,8 @@ begin
       Exit;
     end;
     try
-      JSON := TFile.ReadAllText(AFilePath, TEncoding.UTF8);
+      if not LoadAnsiJSONCached(AFilePath, '', JSON) then
+        JSON := '';
     except
       on E: Exception do
       begin
@@ -656,13 +659,13 @@ begin
       // Shield/legacy containers: pure crypto, no shared state - safe to run
       // on worker threads. Default-key containers ignore the password;
       // cached-password containers decrypt with the persisted password.
-      R.JSON := Trim(DecryptAvroEncoToString(Item.FilePath, Item.Password));
-      R.OK := (R.JSON <> '') and (R.JSON[1] = '{');
+      R.OK := LoadAnsiJSONCached(Item.FilePath, Item.Password, R.JSON) and
+        (R.JSON <> '') and (R.JSON[1] = '{');
     end
     else
     begin
-      R.JSON := TFile.ReadAllText(Item.FilePath, TEncoding.UTF8);
-      R.OK := Trim(R.JSON) <> '';
+      R.OK := LoadAnsiJSONCached(Item.FilePath, '', R.JSON) and
+        (Trim(R.JSON) <> '');
     end;
   except
     R.OK := False;
