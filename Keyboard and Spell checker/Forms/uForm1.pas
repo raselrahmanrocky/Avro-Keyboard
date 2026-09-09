@@ -2231,16 +2231,8 @@ begin
 end;
 
 procedure TAvroMainForm1.TrimAppMemorySize;
-var
-  MainHandle: THandle;
 begin
-  try
-    MainHandle := OpenProcess(PROCESS_ALL_ACCESS, False, GetCurrentProcessID);
-    SetProcessWorkingSetSize(MainHandle, $FFFFFFFF, $FFFFFFFF);
-    CloseHandle(MainHandle);
-  except
-  end;
-  Application.ProcessMessages;
+  // Never evict keyboard engine pages. Windows manages the working set.
 end;
 
 procedure TAvroMainForm1.TypeJoNuktawithShiftJ1Click(Sender: TObject);
