@@ -1287,6 +1287,9 @@ begin
     // O(1): the worker parked every engine; restore the saved version.
     if not AnsiEngineManager.SwitchEngine(AnsiVersion) then
       AnsiEngineManager.SwitchEngine('Default');
+    // Warm every cached engine while hook is still removed. This pays all
+    // first-use allocations/page faults before the user can open the picker.
+    AnsiEngineManager.WarmAllEngines(AnsiVersion);
   finally
     PreloadThread.Free;
     Sethook;

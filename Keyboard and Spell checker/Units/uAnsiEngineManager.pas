@@ -128,6 +128,7 @@ type
     { UI-safe fast path. Never reads/decrypts/parses files and never waits for
       the preload/refresh lock. Returns False immediately if busy/not cached. }
     function TrySwitchCached(const AName: string): Boolean;
+    procedure WarmAllEngines(const AReturnTo: string);
     { Re-parses one cached engine from its file (directory watcher /
       auto-refresh on file change / import). If the engine is active it is
       re-activated in place; on re-parse failure the active engine falls back
@@ -513,6 +514,40 @@ begin
     FCurrentKey := Key;
     AnsiVersion := AName;
     Result := True;
+  finally
+    FLock.Leave;
+  end;
+end;
+
+procedure TAnsiEngineManager.WarmAllEngines(const AReturnTo: string);
+var
+  Keys: TList<string>;
+  Key, ReturnKey: string;
+begin
+  ReturnKey := SlotKey(AReturnTo);
+  FLock.Enter;
+  try
+    Keys := TList<string>.Create;
+    try
+      for Key in FCache.Keys do Keys.Add(Key);
+      // Exercise every park/restore path before the keyboard hook starts.
+      for Key in Keys do
+        if (Key <> FCurrentKey) and FCache.ContainsKey(Key) then
+        begin
+          ParkCurrent;
+          RestoreEngineState(FCache[Key].State);
+          FCurrentKey := Key;
+        end;
+      if (ReturnKey <> FCurrentKey) and FCache.ContainsKey(ReturnKey) then
+      begin
+        ParkCurrent;
+        RestoreEngineState(FCache[ReturnKey].State);
+        FCurrentKey := ReturnKey;
+      end;
+      AnsiVersion := AReturnTo;
+    finally
+      Keys.Free;
+    end;
   finally
     FLock.Leave;
   end;
