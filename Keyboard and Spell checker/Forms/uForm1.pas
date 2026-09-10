@@ -362,6 +362,7 @@ type
       FMappingCheckCountdown:       Integer; // throttles the ANSI mapping disk check
       FMappingListCheckCountdown:   Integer; // throttles the ANSI mapping folder-list poll
       FAnsiMappingSnapshot:         string;  // last seen file-name list of AnsiMappingDir
+      FWatcherGraceTicks:           Integer; // ignore watcher events right after startup
       FDirectoryWatcher:            TAvroDirectoryWatcher;
 
       procedure ChangeTypingStyle(const sStyle: string);
@@ -441,6 +442,8 @@ type
 
 var
   AvroMainForm1: TAvroMainForm1;
+  { False until every .AvroEnco engine is hydrated and the hook restored. }
+  AnsiEnginesReady: Boolean = False;
 
 implementation
 
@@ -483,7 +486,8 @@ uses
   uAvroEncoManager,
   uAvroEncoImporter,
   uAvroLayoutUI,
-  uAnsiEngineManager;
+  uAnsiEngineManager,
+  uAnsiPersistentCache;
 
 { =============================================================================== }
 
@@ -1145,6 +1149,7 @@ var
   MappingPath: string;
   PreloadThread: TAnsiPreloadThread;
 begin
+  AnsiEnginesReady := False;
   Set_Process_Priority(HIGH_PRIORITY_CLASS);
 
   InitDict;
@@ -1224,6 +1229,9 @@ begin
   begin
     frmSplash := TfrmSplash.Create(Application);
     frmSplash.Show;
+    // Do not advertise a ready application while engine hydration is still
+    // running. LoadApp closes the splash after hook installation.
+    frmSplash.SplashTimer.Enabled := False;
     // Paint the splash synchronously RIGHT NOW: the heavy initialization
     // below (dictionary load, mapping scan, ...) blocks the message loop for
     // seconds, so without this the splash window would stay unpainted
@@ -1251,6 +1259,9 @@ begin
   end;
   InitializeEncoManager;
   ScanAvroEncoFiles(AnsiMappingDir);
+  // Remove stale partial cache files left by a force-closed preload so the
+  // persistent cache can never serve or collide with a torn write.
+  CleanupAnsiCache;
   // Wire up the .AvroEnco loader BEFORE the first engine switch: otherwise
   // an active .AvroEnco mapping (e.g. a password-protected one persisted
   // from the previous session) is silently skipped at startup and ANSI
@@ -1284,22 +1295,55 @@ begin
       Application.ProcessMessages;
       Sleep(5);
     end;
-    // O(1): the worker parked every engine; restore the saved version.
-    if not AnsiEngineManager.SwitchEngine(AnsiVersion) then
-      AnsiEngineManager.SwitchEngine('Default');
-    // Warm every cached engine while hook is still removed. This pays all
-    // first-use allocations/page faults before the user can open the picker.
-    AnsiEngineManager.WarmAllEngines(AnsiVersion);
-  finally
     PreloadThread.Free;
+    PreloadThread := nil;
+
+    // O(1): the worker parked every engine; restore the saved version. If it
+    // is missing (its decrypt failed on the first pass), run ONE more
+    // background pass while the hook is still removed (typing can never read
+    // a half-built engine), then switch again - still without ever running
+    // the Argon2 KDF on this thread.
+    if not AnsiEngineManager.SwitchEngine(AnsiVersion, nil, False) then
+    begin
+      AnsiEngineManager.SwitchEngine('Default', nil, False);
+      if Length(AnsiEngineManager.CapturePreloadList) > 0 then
+      begin
+        PreloadThread := TAnsiPreloadThread.Create(
+          AnsiEngineManager.CapturePreloadList);
+        PreloadThread.Start;
+        while (not PreloadThread.Finished) and (not Application.Terminated) do
+        begin
+          Application.ProcessMessages;
+          Sleep(5);
+        end;
+        PreloadThread.Free;
+        PreloadThread := nil;
+        if not AnsiEngineManager.SwitchEngine(AnsiVersion, nil, False) then
+          AnsiEngineManager.SwitchEngine('Default', nil, False);
+      end;
+    end;
+    // (WarmAllEngines runs inside the preload thread after CommitPreload,
+    // while the hook is still removed - the UI thread never warms engines.)
+  finally
+    FreeAndNil(PreloadThread);
     Sethook;
     WindowCheck.Enabled := True;
+    AnsiEnginesReady := True;
   end;
+  if Assigned(frmSplash) then
+    frmSplash.Close;
   BuildAnsiVersionMenus;
 
   FDirectoryWatcher := TAvroDirectoryWatcher.Create(AnsiMappingDir);
   FDirectoryWatcher.OnChanged := HandleLayoutDirectoryChanged;
+  // Re-arm before activating: consume any signal already pending so the
+  // watcher cannot fire spuriously right after startup.
+  FDirectoryWatcher.ResetWatchHandle;
   FDirectoryWatcher.Active := True;
+  // Ignore watcher events for the first seconds after startup - the app's
+  // own first scan/poll already indexed the folder, and a spurious event
+  // would trigger a main-thread re-parse.
+  FWatcherGraceTicks := 30;
 
   // Snapshot the current mapping folder so the periodic poll below only reacts
   // to real changes (files copied/removed while Avro Keyboard is running).
@@ -1311,6 +1355,12 @@ procedure TAvroMainForm1.HandleLayoutDirectoryChanged(Sender: TObject);
 var
   TargetPath: string;
 begin
+  // Startup grace: the app's own first scan already indexed the folder, and
+  // a spurious watcher event right after startup would trigger a main-thread
+  // re-parse (Argon2 on a cache miss). The 1.5 s poll covers real changes.
+  if FWatcherGraceTicks > 0 then
+    Exit;
+
   ScanAvroEncoFiles(AnsiMappingDir);
 
   if (AnsiVersion <> 'Default') and (AnsiMappingDir <> '') then
@@ -1859,8 +1909,13 @@ begin
   // ANSI Mapping version (engines are already preloaded; this switch is O(1))
   AnsiMappingDir := GetAvroDataDir + 'AnsiMapping\';
   ForceDirectories(AnsiMappingDir);
-  if not AnsiEngineManager.SwitchEngine(AnsiVersion) then
-    AnsiEngineManager.SwitchEngine('Default');
+  // Never run the Argon2 KDF on this thread: an uncached engine (rare) is
+  // picked up by the background parse and auto-applied by the timer.
+  if not AnsiEngineManager.SwitchEngine(AnsiVersion, nil, False) then
+  begin
+    AnsiEngineManager.SwitchEngine('Default', nil, False);
+    AnsiEngineManager.SetPendingSwitch(AnsiVersion);
+  end;
   BuildAnsiVersionMenus;
   Popup_Tools.OnPopup := PopupToolsPopup;
   Popup_Tray.OnPopup := PopupTrayPopup;
@@ -2115,6 +2170,7 @@ end;
 
 procedure TAvroMainForm1.ToggleAnsiVersionPicker;
 begin
+  if not AnsiEnginesReady then Exit;
   ShowAnsiVersionPicker;
 end;
 
@@ -2293,7 +2349,30 @@ var
   hforewnd:     HWND;
   MapPath:      string;    // cached: this path used to be rebuilt 3x per tick
   MapWriteTime: TDateTime; // one disk stat per throttled tick
+  AppliedName:  string;
 begin
+  // Startup grace countdown (see FWatcherGraceTicks in LoadApp).
+  if FWatcherGraceTicks > 0 then
+    Dec(FWatcherGraceTicks);
+
+  // Commit engines the background worker decrypted (watcher re-loads,
+  // auto-refresh, on-demand loads). Runs on the main thread: the parser
+  // mutates the engine globals the keyboard hook reads. Committing is a
+  // cache-state build (fast); decrypt (Argon2) already happened off-thread.
+  AnsiEngineManager.DrainBackgroundResults;
+
+  // Auto-apply a version the user selected while its engine was still being
+  // prepared: the click already recorded the intent (SetPendingSwitch) and
+  // the background parse committed it; this tick performs the RAM-only
+  // switch and the normal post-switch bookkeeping - no second click needed.
+  if AnsiEngineManager.TryApplyPendingSwitch(AppliedName) then
+  begin
+    SaveAnsiVersionOnly;
+    UpdateAnsiVersionMenuChecks(AppliedName);
+    if ShowAnsiSwitchNotification = 'YES' then
+      ShowAnsiToastNotification('ANSI Encoding: ' + AppliedName);
+  end;
+
   if (AnsiVersion <> 'Default') and (AnsiMappingDir <> '') then
   begin
     Dec(FMappingCheckCountdown);
@@ -2368,6 +2447,7 @@ end;
 
 procedure TAvroMainForm1.WMShowAnsiPicker(var Msg: TMessage);
 begin
+  if not AnsiEnginesReady then Exit;
   ToggleAnsiVersionPicker;
 end;
 
@@ -2442,8 +2522,8 @@ var
   ClickedItem: TMenuItem;
   SelectedVersion, ErrorMsg, TargetPath: string;
   Password: AnsiString;
-  ErrorLog: TStringList;
 begin
+  if not AnsiEnginesReady then Exit;
   if not (Sender is TMenuItem) then Exit;
   ClickedItem := TMenuItem(Sender);
 
@@ -2494,7 +2574,14 @@ begin
 
   ErrorMsg := '';
   if not AnsiEngineManager.TrySwitchCached(SelectedVersion) then
+  begin
+    // The engine is not cached yet (rare: first unlock of a password
+    // mapping, or a file added while the app was running). Record the
+    // selection and let the background parse commit it - the timer then
+    // applies the switch automatically. Never make the user click twice.
     ErrorMsg := 'Encoding is still being prepared. Please select it again.';
+    AnsiEngineManager.SetPendingSwitch(SelectedVersion);
+  end;
   if ErrorMsg = '' then
   begin
     AnsiVersion := SelectedVersion;
@@ -2595,10 +2682,13 @@ begin
             else
             begin
               // Plain JSON mappings are unprotected: import activates them.
+              // InvalidateEngine + SetPendingSwitch are non-blocking; the
+              // background worker decrypts/parses and the timer auto-applies
+              // the switch once ready - no UI freeze, no second click.
               AnsiVersion := ChangeFileExt(ExtractFileName(OpenDialog.Files[I]), '');
               SaveSettings;
               AnsiEngineManager.InvalidateEngine(AnsiVersion);
-              AnsiEngineManager.SwitchEngine(AnsiVersion);
+              AnsiEngineManager.SetPendingSwitch(AnsiVersion);
               ShowAnsiToastNotification('Mapping imported: ' + AnsiVersion);
             end;
           end;
