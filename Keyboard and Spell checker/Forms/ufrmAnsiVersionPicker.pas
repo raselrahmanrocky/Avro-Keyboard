@@ -112,7 +112,6 @@ procedure ShowAnsiVersionPicker;
 var
   Picker: TfrmAnsiVersionPicker;
 begin
-  if not AnsiEnginesReady then Exit;
   if Assigned(CurrentPicker) then
   begin
     CurrentPicker.Close;
@@ -408,6 +407,7 @@ begin
   begin
     if AnsiEngineManager.TrySwitchCached('Default') then
     begin
+      AvroMainForm1.SyncActiveMappingTimestamp('Default');
       SaveAnsiVersionOnly;
       AvroMainForm1.UpdateAnsiVersionMenuChecks('Default');
       if ShowAnsiSwitchNotification = 'YES' then
@@ -452,17 +452,11 @@ begin
   // no parsing happens here.
   ErrorMsg := '';
   if not AnsiEngineManager.TrySwitchCached(SelectedVersion) then
-  begin
-    // The engine is not cached yet (rare: first unlock of a password
-    // mapping, or a file added while the app was running). Record the
-    // selection and let the background parse commit it - the main form's
-    // timer then applies the switch automatically. Never click twice.
     ErrorMsg := 'Encoding is still being prepared. Please select it again.';
-    AnsiEngineManager.SetPendingSwitch(SelectedVersion);
-  end;
   if ErrorMsg = '' then
   begin
     AnsiVersion := SelectedVersion;
+    AvroMainForm1.SyncActiveMappingTimestamp(SelectedVersion);
     SaveAnsiVersionOnly;
     AvroMainForm1.UpdateAnsiVersionMenuChecks(SelectedVersion);
     if ShowAnsiSwitchNotification = 'YES' then

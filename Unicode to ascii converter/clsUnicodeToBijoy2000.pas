@@ -203,10 +203,6 @@ type
 
 procedure CaptureEngineState(var AState: TAnsiEngineState);
 procedure RestoreEngineState(var AState: TAnsiEngineState);
-{ Non-owning activation used by the runtime engine manager. Cached slot keeps
-  ownership; globals only alias its immutable containers. }
-procedure ActivateEngineState(const AState: TAnsiEngineState);
-procedure DetachActiveEngineState;
 
 var
   CustomFullForms:          TArray<TReplacementPair>;
@@ -3120,66 +3116,6 @@ begin
           PString(Rec.Ptr)^ := Val;
       end;
   FreeAndNil(AState.ScalarValues);
-end;
-
-{ Clears non-owning runtime aliases without freeing cached slot objects. }
-procedure DetachActiveEngineState;
-begin
-  CustomFullForms := nil;
-  CustomPreReplacements := nil;
-  CustomPostReplacements := nil;
-  ActiveReplacements := nil;
-  KarInclusiveReplacements := nil;
-  VowelRules := nil;
-  RfolaRules := nil;
-  KarCorrections := nil;
-  GroupKarCorrections := nil;
-  AnsiRegistry := nil;
-  AnsiRegistryMap := nil;
-  AnsiOverrides := nil;
-  ConsonantGroupMap := nil;
-  AnsiGroupMap := nil;
-  AnsiGroupRawMap := nil;
-  ConsonantGroupRawMap := nil;
-  AnsiSequenceLookup := nil;
-  AnsiToUniMap := nil;
-end;
-
-{ Activates a cached immutable state by reference. No container is moved,
-  allocated or destroyed, so every switch has constant cost. }
-procedure ActivateEngineState(const AState: TAnsiEngineState);
-var
-  Rec: TAnsiVarRec;
-  Val: string;
-begin
-  CustomFullForms := AState.CustomFullForms;
-  CustomPreReplacements := AState.CustomPreReplacements;
-  CustomPostReplacements := AState.CustomPostReplacements;
-  ActiveReplacements := AState.ActiveReplacements;
-  KarInclusiveReplacements := AState.KarInclusiveReplacements;
-  VowelRules := AState.VowelRules;
-  RfolaRules := AState.RfolaRules;
-  KarCorrections := AState.KarCorrections;
-  GroupKarCorrections := AState.GroupKarCorrections;
-  AnsiRegistry := AState.AnsiRegistry;
-  AnsiRegistryMap := AState.AnsiRegistryMap;
-  AnsiOverrides := AState.AnsiOverrides;
-  ConsonantGroupMap := AState.ConsonantGroupMap;
-  AnsiGroupMap := AState.AnsiGroupMap;
-  AnsiGroupRawMap := AState.AnsiGroupRawMap;
-  ConsonantGroupRawMap := AState.ConsonantGroupRawMap;
-  AnsiSequenceLookup := AState.AnsiSequenceLookup;
-  AnsiToUniMap := AState.AnsiToUniMap;
-
-  if (AnsiRegistry <> nil) and (AState.ScalarValues <> nil) then
-    for Rec in AnsiRegistry do
-      if AState.ScalarValues.TryGetValue(Rec.Name, Val) then
-        if Rec.VarType = avChar then
-        begin
-          if Val <> '' then PChar(Rec.Ptr)^ := Val[1];
-        end
-        else
-          PString(Rec.Ptr)^ := Val;
 end;
 
 { =============================================================================== }
