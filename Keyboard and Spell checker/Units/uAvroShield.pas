@@ -24,6 +24,9 @@
   =============================================================================
 }
 
+{$OVERFLOWCHECKS OFF}
+{$RANGECHECKS OFF}
+
 unit uAvroShield;
 
 interface

@@ -34,11 +34,21 @@ uses
   System.Classes,
   System.Hash,
   System.IOUtils,
+  System.SyncObjs,
   uAvroCryptoUtils,
   uAvroEncoCrypto,
   uAvroEncoManager,
   uFileFolderHandling,
   DebugLog;
+
+var
+  { Serializes cache file writes. The startup preload decrypts engines in
+    parallel worker threads and every worker can create a cache file; without
+    this lock two workers writing different files would still be safe, but
+    DeleteFile+RenameFile pairs could interleave with a reader of the same
+    (digest-colliding) file, and force-closing the app mid-write could leave
+    partial files. With the lock, writes are atomic and ordered. }
+  CacheWriteLock: TCriticalSection;
 
 const
   CACHE_MAGIC: array[0..7] of AnsiChar = ('A','V','R','O','C','A','C','H');
@@ -98,8 +108,19 @@ end;
 
 function GetAnsiCacheDirectory: string;
 begin
-  Result := IncludeTrailingPathDelimiter(GetAvroDataDir) + 'Cache\';
+  // Per-user Roaming AppData: always writable without elevated rights, so
+  // the cache actually persists across runs (ProgramData required
+  // installer-created ACLs and could silently fall back to decrypting
+  // every startup). Format stays <SHA-256>.cache.
+  Result := IncludeTrailingPathDelimiter(
+    GetEnvironmentVariable('APPDATA')) + 'AvroKeyboard\Cache\';
   ForceDirectories(Result);
+end;
+
+function GetLegacyAnsiCacheDirectory: string;
+begin
+  // Cache location used by versions before the AppData move (ProgramData).
+  Result := IncludeTrailingPathDelimiter(GetAvroDataDir) + 'Cache\';
 end;
 
 function CachePathForDigest(const ADigest: TBytes): string;
@@ -215,18 +236,23 @@ begin
   AES256GCMEncrypt(Plain, Key, Nonce, AAD, Cipher);
 
   TempPath := ACachePath + '.tmp';
-  FS := TFileStream.Create(TempPath, fmCreate);
+  CacheWriteLock.Enter;
   try
-    FS.WriteBuffer(H, SizeOf(H));
-    if Length(Cipher) > 0 then
-      FS.WriteBuffer(Cipher[0], Length(Cipher));
+    FS := TFileStream.Create(TempPath, fmCreate);
+    try
+      FS.WriteBuffer(H, SizeOf(H));
+      if Length(Cipher) > 0 then
+        FS.WriteBuffer(Cipher[0], Length(Cipher));
+    finally
+      FS.Free;
+    end;
+    if FileExists(ACachePath) then
+      DeleteFile(ACachePath);
+    if not RenameFile(TempPath, ACachePath) then
+      DeleteFile(TempPath);
   finally
-    FS.Free;
+    CacheWriteLock.Leave;
   end;
-  if FileExists(ACachePath) then
-    DeleteFile(ACachePath);
-  if not RenameFile(TempPath, ACachePath) then
-    DeleteFile(TempPath);
 
   if Length(Plain) > 0 then FillChar(Plain[0], Length(Plain), 0);
   if Length(Key) > 0 then FillChar(Key[0], Length(Key), 0);
@@ -239,6 +265,7 @@ var
   SourceSize: Int64;
   SourceTime: TDateTime;
   CachePath: string;
+  LegacyPath: string;
 begin
   Result := False;
   AJSON := '';
@@ -252,6 +279,23 @@ begin
       APassword, AJSON) then
     begin
       Log('ANSI persistent cache HIT: ' + ExtractFileName(ASourcePath));
+      Exit(True);
+    end;
+
+    // Legacy location (ProgramData, versions before the AppData move):
+    // read-only fallback. On a valid hit the entry is migrated to AppData.
+    LegacyPath := GetLegacyAnsiCacheDirectory + BytesToHex(Digest) + '.cache';
+    if (LegacyPath <> CachePath) and
+      TryReadCache(LegacyPath, Digest, SourceSize, SourceTime,
+        APassword, AJSON) then
+    begin
+      Log('ANSI persistent cache LEGACY HIT (migrated): ' +
+        ExtractFileName(LegacyPath));
+      try
+        WriteCache(CachePath, Digest, SourceSize, SourceTime, APassword, AJSON);
+      except
+        // Migration write failure is non-fatal: the JSON is already loaded.
+      end;
       Exit(True);
     end;
 
@@ -280,13 +324,20 @@ procedure DeleteAnsiCache(const ASourcePath: string);
 var
   Digest: TBytes;
   N: Int64;
-  P: string;
+  P, LegacyP: string;
 begin
   if not FileExists(ASourcePath) then Exit;
   try
     Digest := HashFile(ASourcePath, N);
     P := CachePathForDigest(Digest);
-    if FileExists(P) then DeleteFile(P);
+    LegacyP := GetLegacyAnsiCacheDirectory + BytesToHex(Digest) + '.cache';
+    CacheWriteLock.Enter;
+    try
+      if FileExists(P) then DeleteFile(P);
+      if (LegacyP <> P) and FileExists(LegacyP) then DeleteFile(LegacyP);
+    finally
+      CacheWriteLock.Leave;
+    end;
   except
     // Cache maintenance must never affect normal application operation.
   end;
@@ -298,14 +349,25 @@ var
   Dir: string;
 begin
   Dir := GetAnsiCacheDirectory;
-  if FindFirst(Dir + '*.tmp', faAnyFile, SR) = 0 then
+  CacheWriteLock.Enter;
   try
-    repeat
-      DeleteFile(Dir + SR.Name);
-    until FindNext(SR) <> 0;
+    if FindFirst(Dir + '*.tmp', faAnyFile, SR) = 0 then
+      try
+        repeat
+          DeleteFile(Dir + SR.Name);
+        until FindNext(SR) <> 0;
+      finally
+        FindClose(SR);
+      end;
   finally
-    FindClose(SR);
+    CacheWriteLock.Leave;
   end;
 end;
+
+initialization
+  CacheWriteLock := TCriticalSection.Create;
+
+finalization
+  FreeAndNil(CacheWriteLock);
 
 end.

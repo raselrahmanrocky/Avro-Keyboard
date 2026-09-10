@@ -112,6 +112,7 @@ procedure ShowAnsiVersionPicker;
 var
   Picker: TfrmAnsiVersionPicker;
 begin
+  if not AnsiEnginesReady then Exit;
   if Assigned(CurrentPicker) then
   begin
     CurrentPicker.Close;
@@ -451,7 +452,14 @@ begin
   // no parsing happens here.
   ErrorMsg := '';
   if not AnsiEngineManager.TrySwitchCached(SelectedVersion) then
+  begin
+    // The engine is not cached yet (rare: first unlock of a password
+    // mapping, or a file added while the app was running). Record the
+    // selection and let the background parse commit it - the main form's
+    // timer then applies the switch automatically. Never click twice.
     ErrorMsg := 'Encoding is still being prepared. Please select it again.';
+    AnsiEngineManager.SetPendingSwitch(SelectedVersion);
+  end;
   if ErrorMsg = '' then
   begin
     AnsiVersion := SelectedVersion;

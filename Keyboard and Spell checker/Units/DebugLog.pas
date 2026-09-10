@@ -13,25 +13,60 @@ interface
 
 uses
   Windows,
-  System.SysUtils;
+  System.SysUtils,
+  System.SyncObjs;
 
 procedure Log(const Msg: string); overload;
 procedure Log(const Msg: string; i: LongInt); overload;
 
 implementation
 
+var
+  LogFileLock: TCriticalSection;
+
+function LogFilePath: string;
+begin
+  Result := IncludeTrailingPathDelimiter(GetEnvironmentVariable('TEMP')) +
+    'AvroKeyboard_debug.log';
+end;
+
 procedure Log(const Msg: string);
+var
+  F: TextFile;
+  Line: string;
 begin
   {$IFDEF DebugLog}
-  OutputDebugString(PChar(Msg));
+  Line := Format('[%d.%03d T%d] %s',
+    [GetTickCount div 1000, GetTickCount mod 1000,
+     GetCurrentThreadId, Msg]);
+  OutputDebugString(PChar(Line));
+  LogFileLock.Enter;
+  try
+    AssignFile(F, LogFilePath);
+    try
+      if FileExists(LogFilePath) then
+        Append(F)
+      else
+        Rewrite(F);
+      WriteLn(F, Line);
+    finally
+      CloseFile(F);
+    end;
+  finally
+    LogFileLock.Leave;
+  end;
   {$ENDIF}
 end;
 
 procedure Log(const Msg: string; i: LongInt);
 begin
-  {$IFDEF DebugLog}
-  OutputDebugString(PChar(Msg + IntToStr(i)));
-  {$ENDIF}
+  Log(Msg + IntToStr(i));
 end;
+
+initialization
+  LogFileLock := TCriticalSection.Create;
+
+finalization
+  FreeAndNil(LogFileLock);
 
 end.

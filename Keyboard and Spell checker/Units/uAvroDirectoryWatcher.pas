@@ -26,11 +26,14 @@ type
     FDebounceCountdown: Integer;
     FOnChanged: TLayoutChangeEvent;
     FActive: Boolean;
-    procedure ResetWatchHandle;
   public
     constructor Create(const ADirectory: string);
     destructor Destroy; override;
     procedure CheckForChanges;
+    { Re-arms the change notification, consuming any signal already pending.
+      Call before Active := True so a spurious event right after startup is
+      dropped instead of triggering a main-thread re-parse. }
+    procedure ResetWatchHandle;
     property OnChanged: TLayoutChangeEvent read FOnChanged write FOnChanged;
     property Active: Boolean read FActive write FActive;
   end;

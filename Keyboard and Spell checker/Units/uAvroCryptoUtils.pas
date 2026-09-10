@@ -6,6 +6,12 @@
   =============================================================================
 }
 
+{ Crypto/format arithmetic is ported from Python (modular, wrapping). The IDE
+  Debug configuration turns overflow/range checks on, which would raise on
+  the intentional wrap-arounds and break every container decrypt. }
+{$OVERFLOWCHECKS OFF}
+{$RANGECHECKS OFF}
+
 unit uAvroCryptoUtils;
 
 { =============================================================================

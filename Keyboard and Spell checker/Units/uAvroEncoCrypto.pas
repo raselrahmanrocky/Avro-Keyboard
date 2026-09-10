@@ -7,6 +7,15 @@
 }
 
 {$INCLUDE ../../ProjectDefines.inc}
+
+{ The AES/PKCS#7 and Shield-decryption arithmetic is ported from Python and
+  intentionally wraps (unbounded ints). With the IDE Debug configuration
+  (overflow/range checks ON) those wrap-arounds raise EIntOverflow and every
+  container fails to decrypt. Keep checks off here - the arithmetic is
+  deliberately modular. }
+{$OVERFLOWCHECKS OFF}
+{$RANGECHECKS OFF}
+
 unit uAvroEncoCrypto;
 
 { =============================================================================
@@ -388,11 +397,17 @@ begin
   begin
     try
       R := AvroShieldLoadFromFile(AFilePath, string(APassword), Result, True);
+      Log('AvroShieldLoadFromFile(' + ExtractFileName(AFilePath) +
+        ') -> asr=' + IntToStr(Ord(R)) + ' len=' + IntToStr(Length(Result)));
       if R <> asrOk then
         Result := '';
       Result := Trim(Result);
     except
-      Result := '';
+      on E: Exception do
+      begin
+        Log('AvroShieldLoadFromFile exception: ' + E.Message);
+        Result := '';
+      end;
     end;
     Exit;
   end;
