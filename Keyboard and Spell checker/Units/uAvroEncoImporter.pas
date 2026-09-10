@@ -220,7 +220,8 @@ function ImportEncoFile(
 var
   Password: AnsiString;
   ProtectionFlag: Byte;
-  TargetDir, TargetPath, DisplayName, ImportedName: string;
+  TargetDir, TargetPath, DisplayName, ImportedName, ErrMsg: string;
+  ErrorLog: TStringList;
 begin
   Result := False;
   AErrorMessage := '';
@@ -347,15 +348,22 @@ begin
   // freshly copied file must replace the stale parked engine.
   if Password <> '' then
   begin
-    // InvalidateEngine: when the imported name was already cached, the
-    // freshly copied file must replace the stale parked engine. Both calls
-    // are non-blocking: decrypt/parse happens on the background loader and
-    // the main form's timer auto-applies the switch the moment the engine
-    // is ready - no second click, no UI freeze.
     AnsiEngineManager.InvalidateEngine(ImportedName);
-    AnsiEngineManager.SetPendingSwitch(ImportedName);
-    SaveSettings; // persist the active AnsiVersion + CachedEncoPassword
-    Log('Activated imported mapping: ' + ImportedName);
+    ErrorLog := TStringList.Create;
+    try
+      if AnsiEngineManager.SwitchEngine(ImportedName, ErrorLog) then
+      begin
+        SaveSettings; // persist the active AnsiVersion + CachedEncoPassword
+        Log('Activated imported mapping: ' + ImportedName);
+      end
+      else
+      begin
+        ErrMsg := ErrorLog.Text;
+        Log('Imported but could not activate ' + ImportedName + ': ' + ErrMsg);
+      end;
+    finally
+      ErrorLog.Free;
+    end;
   end;
   except
     on E: Exception do
