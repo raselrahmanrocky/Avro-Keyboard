@@ -391,6 +391,7 @@ var
   SelectedVersion, ErrorMsg, TargetPath: string;
   Password: AnsiString;
   PreloadThread: TAnsiPreloadThread;
+  ErrList: TStringList;
 begin
   if not Assigned(CurrentPicker) then
     Exit;
@@ -450,9 +451,28 @@ begin
   // The engine cache makes this switch O(1) for every preloaded (default-key)
   // engine and for any engine unlocked before: no disk I/O, no decryption,
   // no parsing happens here.
+  //
+  // RAM-cache MISS fallback (cold-start repair): an engine can miss the
+  // startup preload - e.g. after wiping %AppData%\AvroKeyboard\Cache, one of
+  // the parallel decrypts can fail under memory pressure, and the largest
+  // mapping (Ansi V3) is the usual victim. Without a fallback the picker
+  // fails forever ("still being prepared") even though a single on-demand
+  // parse - usually a fast persistent-cache HIT - repairs it. So: instant
+  // path first, blocking repair parse second. The hourglass covers the
+  // repair (decrypt + heavy V3 parse can take a moment on cold start).
   ErrorMsg := '';
   if not AnsiEngineManager.TrySwitchCached(SelectedVersion) then
-    ErrorMsg := 'Encoding is still being prepared. Please select it again.';
+  begin
+    Screen.Cursor := crHourGlass;
+    ErrList := TStringList.Create;
+    try
+      if not AnsiEngineManager.SwitchEngine(SelectedVersion, ErrList) then
+        ErrorMsg := 'Encoding is still being prepared. Please select it again.';
+    finally
+      ErrList.Free;
+      Screen.Cursor := crDefault;
+    end;
+  end;
   if ErrorMsg = '' then
   begin
     AnsiVersion := SelectedVersion;
@@ -465,10 +485,12 @@ begin
     Exit;
   end;
 
-  // Never block the UI or discard a valid password merely because the
-  // cache/refresh lock was busy. The next click retries the RAM-only path.
-  if ShowAnsiSwitchNotification = 'YES' then
-    ShowAnsiToastNotification('ANSI encoding is preparing - try again');
+  // Both the instant path and the on-demand repair parse failed (corrupt
+  // file, wrong password or missing mapping). This is an error, so it is
+  // always shown - independent of the routine switch-notification setting -
+  // otherwise the picker just closes and the user believes V3 is active
+  // while typing still produces the previous engine's output.
+  ShowAnsiToastNotification('ANSI encoding failed to load - try again');
 end;
 procedure TfrmAnsiVersionPicker.ListBoxKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
 var

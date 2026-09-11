@@ -1145,6 +1145,7 @@ var
   tempLastUIMode: string;
   MappingPath: string;
   PreloadThread: TAnsiPreloadThread;
+  DesiredVersion: string;
 begin
   Set_Process_Priority(HIGH_PRIORITY_CLASS);
 
@@ -1268,9 +1269,11 @@ begin
       CachedEncoPassword := GetEncoCachedPassword(MappingPath);
   end;
   // Parse every engine that unlocks without user interaction on a
-  // BACKGROUND thread: the shipped Shield containers each run an Argon2 KDF
-  // (~1-2 s), and doing all of it on this thread would block the message
-  // loop - the splash would freeze instead of closing after its normal 2 s.
+  // BACKGROUND thread: cold decrypt + parse of the shipped Shield
+  // containers is the heaviest startup work, and doing all of it on this
+  // thread would block the message loop - the splash would freeze instead
+  // of closing after its normal 2 s. (v2 containers use an instant
+  // HKDF-based schedule - no slow KDF remains anywhere in the project.)
   // The keyboard hook is paused while the worker builds the engine globals
   // (typing must never read a half-built engine), and the pump below keeps
   // the splash painting and its 2 s timer running, so the splash behaves
@@ -1285,15 +1288,43 @@ begin
       Application.ProcessMessages;
       Sleep(5);
     end;
-    // O(1): the worker parked every engine; restore the saved version.
-    if not AnsiEngineManager.SwitchEngine(AnsiVersion) then
+    FreeAndNil(PreloadThread);
+    // O(1): the worker parked every engine; restore the saved version. If it
+    // is missing (its decrypt failed on the first pass - possible right
+    // after wiping %AppData%\AvroKeyboard\Cache, when every container
+    // decrypts at once and the largest mapping, Ansi V3, is most exposed),
+    // run ONE more
+    // background pass for just the missing engines while the hook is still
+    // removed (typing can never read a half-built engine), then switch again.
+    // DesiredVersion is captured BEFORE the Default fallback, because the
+    // fallback itself overwrites the AnsiVersion global.
+    DesiredVersion := AnsiVersion;
+    if (not Application.Terminated) and
+      (not AnsiEngineManager.SwitchEngine(DesiredVersion)) then
+    begin
       AnsiEngineManager.SwitchEngine('Default');
+      if (not Application.Terminated) and
+        (Length(AnsiEngineManager.CapturePreloadList) > 0) then
+      begin
+        PreloadThread := TAnsiPreloadThread.Create(
+          AnsiEngineManager.CapturePreloadList);
+        PreloadThread.Start;
+        while (not PreloadThread.Finished) and (not Application.Terminated) do
+        begin
+          Application.ProcessMessages;
+          Sleep(5);
+        end;
+        FreeAndNil(PreloadThread);
+        if not AnsiEngineManager.SwitchEngine(DesiredVersion) then
+          AnsiEngineManager.SwitchEngine('Default');
+      end;
+    end;
     // Warm every cached engine while hook is still removed. This pays all
     // first-use allocations/page faults before the user can open the picker.
     AnsiEngineManager.WarmAllEngines(AnsiVersion);
     SyncActiveMappingTimestamp(AnsiVersion);
   finally
-    PreloadThread.Free;
+    FreeAndNil(PreloadThread);
     Sethook;
     WindowCheck.Enabled := True;
   end;
@@ -2503,9 +2534,23 @@ begin
     SaveSettings;
   end;
 
+  // Instant path first; on a RAM-cache MISS fall back to a blocking
+  // on-demand repair parse (see the picker for why: an engine - usually the
+  // largest, Ansi V3 - can miss the startup preload after a full
+  // %AppData% cache wipe, and without this fallback the menu fails forever).
   ErrorMsg := '';
   if not AnsiEngineManager.TrySwitchCached(SelectedVersion) then
-    ErrorMsg := 'Encoding is still being prepared. Please select it again.';
+  begin
+    Screen.Cursor := crHourGlass;
+    ErrorLog := TStringList.Create;
+    try
+      if not AnsiEngineManager.SwitchEngine(SelectedVersion, ErrorLog) then
+        ErrorMsg := 'Encoding is still being prepared. Please select it again.';
+    finally
+      ErrorLog.Free;
+      Screen.Cursor := crDefault;
+    end;
+  end;
   if ErrorMsg = '' then
   begin
     AnsiVersion := SelectedVersion;
@@ -2517,10 +2562,10 @@ begin
     Exit;
   end;
 
-  // A UI click never waits for cache/parser work and never clears a valid
-  // password merely because the manager lock was momentarily busy.
-  if ShowAnsiSwitchNotification = 'YES' then
-    ShowAnsiToastNotification('ANSI encoding is preparing - try again');
+  // Both the instant path and the on-demand repair parse failed. Always
+  // shown (error, not a routine switch) so a failed V3 click can never look
+  // like a success while typing still produces the previous engine's output.
+  ShowAnsiToastNotification('ANSI encoding failed to load - try again');
 end;
 
 { =============================================================================== }

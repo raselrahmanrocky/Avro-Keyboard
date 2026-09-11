@@ -11,11 +11,20 @@
                 -> bytecode -> BytecodeParser -> deobfuscate
                 -> in-memory JSON text (returned to the caller)
 
-  Key derivation (matches avroenco/src/crypto.py):
+  Key derivation (container version 2; the v1 Argon2id schedule was removed
+  project-wide, including password files, by explicit owner decision):
 
-    master = Argon2id(password, salt, t=3, m=65536 KiB, p=4, len=32)
+    default-key containers (flag $10):
+      master = HKDF-SHA256(secret, salt, info, len=32)   // RFC 5869, ~us
+    password containers:
+      master = PBKDF2-HMAC-SHA256(password, salt, 100000, len=32)  // ~100 ms
     final  = SHA-512(master || machine_factor(16) || hardware_factor(16))
     enc_key = final[0..31], mac_key = final[32..63]
+
+  This Delphi unit is the authoritative spec for the v2 KDF. The former
+  'matches avroenco/src/crypto.py' claim no longer holds: that external
+  Python toolchain must be migrated separately if it is still in use.
+  (Bytecode / obfuscation / GCM / zlib stages are unchanged.)
 
   Machine factor: SHA-256(Windows MachineGuid UTF-8)[:16] (fallback: primary
   MAC as decimal string), identical to the Python side (D11). The hardware
@@ -104,6 +113,14 @@ function AvroShieldNodeToJSON(const ANode: TAvroNode): string;
   Shield containers and for non-Shield / unreadable files. }
 function AvroShieldContainerUsesDefaultKey(const AFilePath: string): Boolean;
 
+{ v2 KDF primitives (exposed for the kat_shieldkdf self-test vectors; the
+  container loader/writer use them through the unit-private
+  ShieldKdfDefaultKey / ShieldKdfPasswordKey wrappers). }
+function HkdfExtractSHA256(const ASalt, AIKM: TBytes): TBytes;
+function HkdfExpandSHA256(const APRK, AInfo: TBytes; ALen: Integer): TBytes;
+function Pbkdf2HMACSHA256(const APassword, ASalt: TBytes;
+  AIterations, ADkLen: Integer): TBytes;
+
 { Writer side: builds a Shield-format container from mapping JSON, the exact
   inverse of AvroShieldLoadFromBytes. The pipeline runs entirely in RAM:
     JSON -> obfuscated bytecode -> zlib -> AES-256-GCM -> HMAC-SHA512 trailer.
@@ -129,12 +146,15 @@ uses
   Winapi.Windows,
   Winapi.IpHlpApi,
   Winapi.IpTypes,
-  uAvroArgon2,
   uAvroCryptoUtils;
 
 const
   // ---- .AvroShield container ----
-  AS_VERSION = 1;
+  // v2: Argon2-free key schedule (HKDF-SHA256 / PBKDF2-HMAC-SHA256).
+  // v1 (Argon2id) containers are rejected cleanly as asrBadVersion and must
+  // be rebuilt with the current AvroEncoBuilder - there is intentionally no
+  // legacy Argon2 fallback path anywhere in the project.
+  AS_VERSION = 2;
   AS_HEADER_SIZE = 58;
   AS_TRAILER_SIZE = 80;   // auth_tag(16) + hmac(64)
   AS_HMAC_SIZE = 64;
@@ -150,11 +170,19 @@ const
   // external/user files keep FLAG_PASSWORD so they always prompt.
   AVROSHLD_FLAG_DEFAULT_KEY = $10;
 
-  // ---- Argon2id KDF (matches avroenco/src/constants.py) ----
-  ARGON_TIME_COST = 3;
-  ARGON_MEMORY_COST = 65536;   // 64 MB
-  ARGON_PARALLELISM = 4;
-  ARGON_HASH_LEN = 32;
+  // ---- Shield v2 KDF (NO Argon2: removed project-wide, password files
+  // included, by explicit owner decision for instant cold start) ----
+  // Default-key containers: HKDF-SHA256 (RFC 5869) over the embedded app
+  // secret + per-file salt - microseconds, the correct tool for an
+  // embedded high-entropy secret (KDF slowness never protected it).
+  // Password containers: PBKDF2-HMAC-SHA256 (RFC 2898) - a real
+  // password-stretching KDF at ~100 ms/unlock (once per session).
+  // Honest trade-off: PBKDF2 has no memory-hardness, so password files
+  // are weaker against GPU/ASIC brute force than under Argon2id;
+  // accepted explicitly, still safe against casual attack.
+  SHIELD_MASTER_LEN = 32;
+  SHIELD_HKDF_INFO_DEFAULT = 'AvroShield-v2/hkdf-sha256/default-key';
+  SHIELD_PBKDF2_ITERATIONS = 100000;
 
   // ---- bytecode ----
   BC_HEADER_SIZE = 23;
@@ -276,6 +304,129 @@ end;
 function HMACSHA512(const AKey, AMessage: TBytes): TBytes;
 begin
   Result := THashSHA2.GetHMACAsBytes(AMessage, AKey, THashSHA2.TSHA2Version.SHA512);
+end;
+
+{ HMAC-SHA256 (RFC 2104), same helper family. Basis for the v2 container
+  KDF (HKDF + PBKDF2); the v1 Argon2id path was removed entirely. }
+function HMACSHA256(const AKey, AMessage: TBytes): TBytes;
+begin
+  Result := THashSHA2.GetHMACAsBytes(AMessage, AKey, THashSHA2.TSHA2Version.SHA256);
+end;
+
+{ HKDF-Extract (RFC 5869 section 2.2): PRK = HMAC-SHA256(salt, IKM).
+  Empty salt becomes 32 zero bytes, exactly as the RFC mandates. }
+function HkdfExtractSHA256(const ASalt, AIKM: TBytes): TBytes;
+var
+  ZeroSalt: TBytes;
+begin
+  if Length(ASalt) = 0 then
+  begin
+    SetLength(ZeroSalt, 32);
+    FillChar(ZeroSalt[0], 32, 0);
+    Result := HMACSHA256(ZeroSalt, AIKM);
+    FillChar(ZeroSalt[0], 32, 0);
+  end
+  else
+    Result := HMACSHA256(ASalt, AIKM);
+end;
+
+{ HKDF-Expand (RFC 5869 section 2.3): OKM = first ALen bytes of
+  T(1) | T(2) | ... with T(n) = HMAC-SHA256(PRK, T(n-1) | info | n). }
+function HkdfExpandSHA256(const APRK, AInfo: TBytes; ALen: Integer): TBytes;
+var
+  T, Block: TBytes;
+  N, Pos, Take: Integer;
+begin
+  SetLength(Result, ALen);
+  SetLength(T, 0);
+  N := 1;
+  Pos := 0;
+  while Pos < ALen do
+  begin
+    if N > 255 then
+      Break; // RFC 5869: L must be <= 255 * HashLen; never hit (L = 32)
+    SetLength(Block, Length(T) + Length(AInfo) + 1);
+    if Length(T) > 0 then
+      Move(T[0], Block[0], Length(T));
+    if Length(AInfo) > 0 then
+      Move(AInfo[0], Block[Length(T)], Length(AInfo));
+    Block[Length(Block) - 1] := Byte(N);
+    T := HMACSHA256(APRK, Block);
+    if Length(Block) > 0 then
+      FillChar(Block[0], Length(Block), 0);
+    Take := ALen - Pos;
+    if Take > Length(T) then
+      Take := Length(T);
+    Move(T[0], Result[Pos], Take);
+    Inc(Pos, Take);
+    Inc(N);
+  end;
+  if Length(T) > 0 then
+    FillChar(T[0], Length(T), 0);
+end;
+
+{ PBKDF2-HMAC-SHA256 (RFC 2898 section 5.2) with AIterations rounds. }
+function Pbkdf2HMACSHA256(const APassword, ASalt: TBytes;
+  AIterations, ADkLen: Integer): TBytes;
+var
+  U, Acc, SaltBlock: TBytes;
+  BlockNo, I, J, Pos, Take: Integer;
+begin
+  SetLength(Result, ADkLen);
+  if ADkLen > 0 then
+    FillChar(Result[0], ADkLen, 0);
+  BlockNo := 1;
+  Pos := 0;
+  while Pos < ADkLen do
+  begin
+    SetLength(SaltBlock, Length(ASalt) + 4);
+    if Length(ASalt) > 0 then
+      Move(ASalt[0], SaltBlock[0], Length(ASalt));
+    SaltBlock[Length(SaltBlock) - 4] := Byte((Cardinal(BlockNo) shr 24) and $FF);
+    SaltBlock[Length(SaltBlock) - 3] := Byte((Cardinal(BlockNo) shr 16) and $FF);
+    SaltBlock[Length(SaltBlock) - 2] := Byte((Cardinal(BlockNo) shr 8) and $FF);
+    SaltBlock[Length(SaltBlock) - 1] := Byte(Cardinal(BlockNo) and $FF);
+    U := HMACSHA256(APassword, SaltBlock);
+    if Length(SaltBlock) > 0 then
+      FillChar(SaltBlock[0], Length(SaltBlock), 0);
+    Acc := Copy(U, 0, Length(U));
+    for I := 2 to AIterations do
+    begin
+      U := HMACSHA256(APassword, U);
+      for J := 0 to Length(Acc) - 1 do
+        Acc[J] := Acc[J] xor U[J];
+    end;
+    Take := ADkLen - Pos;
+    if Take > Length(Acc) then
+      Take := Length(Acc);
+    Move(Acc[0], Result[Pos], Take);
+    Inc(Pos, Take);
+    Inc(BlockNo);
+    if Length(U) > 0 then
+      FillChar(U[0], Length(U), 0);
+    if Length(Acc) > 0 then
+      FillChar(Acc[0], Length(Acc), 0);
+  end;
+end;
+
+{ v2 master-key schedule, default-key containers (flag $10):
+  HKDF-SHA256 over the embedded app secret + per-file salt. Microseconds. }
+function ShieldKdfDefaultKey(const ASecret, ASalt: TBytes): TBytes;
+begin
+  Result := HkdfExpandSHA256(
+    HkdfExtractSHA256(ASalt, ASecret),
+    TEncoding.UTF8.GetBytes(SHIELD_HKDF_INFO_DEFAULT),
+    SHIELD_MASTER_LEN);
+end;
+
+{ v2 master-key schedule, password containers: PBKDF2-HMAC-SHA256 at
+  SHIELD_PBKDF2_ITERATIONS rounds (~100 ms per unlock on a typical PC;
+  unlocks happen at most once per session, so there is no UI impact).
+  Deliberately NOT Argon2 (removed project-wide by owner decision). }
+function ShieldKdfPasswordKey(const APassword, ASalt: TBytes): TBytes;
+begin
+  Result := Pbkdf2HMACSHA256(APassword, ASalt,
+    SHIELD_PBKDF2_ITERATIONS, SHIELD_MASTER_LEN);
 end;
 
 { =============================================================================
@@ -880,8 +1031,13 @@ begin
   Secret := APassword;
   if (Flags and AVROSHLD_FLAG_DEFAULT_KEY) <> 0 then
     Secret := GetAvroEncoDefaultSecret;
-  Master := Argon2idHash(TEncoding.UTF8.GetBytes(Secret), Salt,
-    ARGON_TIME_COST, ARGON_MEMORY_COST, ARGON_PARALLELISM, ARGON_HASH_LEN);
+  // v2 schedule (no Argon2 anywhere): instant HKDF for embedded-secret
+  // containers, PBKDF2 for password containers. Same branch condition as
+  // the secret substitution above, so every flag combination behaves.
+  if (Flags and AVROSHLD_FLAG_DEFAULT_KEY) <> 0 then
+    Master := ShieldKdfDefaultKey(TEncoding.UTF8.GetBytes(Secret), Salt)
+  else
+    Master := ShieldKdfPasswordKey(TEncoding.UTF8.GetBytes(Secret), Salt);
   try
     SetLength(MachineF, 16);
     FillChar(MachineF[0], 16, 0);
@@ -1501,8 +1657,12 @@ begin
       Secret := GetAvroEncoDefaultSecret
     else
       Secret := APassword;
-    Master := Argon2idHash(TEncoding.UTF8.GetBytes(Secret), Salt,
-      ARGON_TIME_COST, ARGON_MEMORY_COST, ARGON_PARALLELISM, ARGON_HASH_LEN);
+    // v2 schedule, mirror of the loader: HKDF for default-key, PBKDF2 for
+    // password containers. No Argon2 anywhere in the project.
+    if ADefaultKey then
+      Master := ShieldKdfDefaultKey(TEncoding.UTF8.GetBytes(Secret), Salt)
+    else
+      Master := ShieldKdfPasswordKey(TEncoding.UTF8.GetBytes(Secret), Salt);
     try
       SetLength(MachineF, 16);
       FillChar(MachineF[0], 16, 0);

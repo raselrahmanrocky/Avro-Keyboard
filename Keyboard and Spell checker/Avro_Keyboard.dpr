@@ -76,7 +76,6 @@ uses
   uAvroEncoManager in 'Units\uAvroEncoManager.pas',
   uAvroEncoImporter in 'Units\uAvroEncoImporter.pas',
   uAvroShield in 'Units\uAvroShield.pas',
-  uAvroArgon2 in 'Units\uAvroArgon2.pas',
   uAnsiPersistentCache in 'Units\uAnsiPersistentCache.pas',
   uAnsiEngineManager in 'Units\uAnsiEngineManager.pas',
   uAvroDirectoryWatcher in 'Units\uAvroDirectoryWatcher.pas',
