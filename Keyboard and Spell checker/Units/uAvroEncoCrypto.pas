@@ -92,7 +92,7 @@ const
   AVROSHLD_MAGIC: array [0 .. 7] of Byte = (
     $41, $56, $52, $4F, $53, $48, $4C, $44
   );
-  AVROSHLD_VERSION = $01;
+  AVROSHLD_VERSION = $02;
   // Shield layout: header(58) + ciphertext + auth_tag(16) + hmac(64).
   AVROSHLD_HEADER_SIZE = 58;
   AVROSHLD_TRAILER_SIZE = 80; // auth_tag(16) + hmac(64)

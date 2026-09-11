@@ -29,8 +29,9 @@ unit uAnsiEngineManager;
   Threading model: all engine-state mutation (parse/capture/restore/drop)
   happens under FLock, so the startup preload thread can never interleave
   with a main-thread switch, the directory watcher or an import. The
-  decryption phase (Argon2 KDF) of the preload runs in parallel worker
-  threads; only the cheap parse + capture phase takes the lock.
+  decryption phase of the preload runs in parallel worker threads; only
+  the cheap parse + capture phase takes the lock. (Shield v2 decryption
+  is millisecond-level; no slow KDF remains in the project.)
 
   Memory: every parked state owns its containers; the manager frees them in
   Destroy (initialization/finalization of this unit), so FastMM reports no
@@ -69,12 +70,16 @@ type
     Password: AnsiString;
   end;
 
-  { Decrypted/read JSON for one preload item, produced off the UI thread. }
+  { Decrypted/read JSON for one preload item, produced off the UI thread.
+    ErrorMsg carries the decrypt failure reason (exception text) so a cold-
+    start miss - e.g. Ansi V3 after a full %AppData% cache wipe - is
+    diagnosable instead of a bare "decryption" line. }
   TPreloadResult = record
     DisplayName: string;
     FilePath: string;
     JSON: string;
     OK: Boolean;
+    ErrorMsg: string;
   end;
 
   TAnsiEngineManager = class
@@ -142,9 +147,9 @@ type
     procedure RemoveEngine(const AName: string);
   end;
 
-  { Startup preload worker. Decrypts every snapshot item in parallel (the
-    Argon2 KDF of the Shield containers dominates startup cost) and then
-    commits the parsed engines through TAnsiEngineManager.CommitPreload. The
+  { Startup preload worker. Decrypts every snapshot item in parallel and
+    then commits the parsed engines through
+    TAnsiEngineManager.CommitPreload. The
     splash screen keeps painting while this thread runs; nothing here touches
     the UI. }
   TAnsiPreloadThread = class(TThread)
@@ -427,7 +432,10 @@ begin
       begin
         if not R.OK then
         begin
-          Log('Engine preload failed: ' + R.DisplayName + ' - decryption');
+          if R.ErrorMsg <> '' then
+            Log('Engine preload failed: ' + R.DisplayName + ' - ' + R.ErrorMsg)
+          else
+            Log('Engine preload failed: ' + R.DisplayName + ' - decryption');
           Continue;
         end;
         if FCache.ContainsKey(SlotKey(R.DisplayName)) then
@@ -714,6 +722,7 @@ begin
   R.FilePath := Item.FilePath;
   R.JSON := '';
   R.OK := False;
+  R.ErrorMsg := '';
   try
     if IsEncoFile(Item.FilePath) then
     begin
@@ -728,8 +737,14 @@ begin
       R.OK := LoadAnsiJSONCached(Item.FilePath, '', R.JSON) and
         (Trim(R.JSON) <> '');
     end;
+    if (not R.OK) and (R.ErrorMsg = '') then
+      R.ErrorMsg := 'decrypt/cache load returned no usable JSON';
   except
-    R.OK := False;
+    on E: Exception do
+    begin
+      R.OK := False;
+      R.ErrorMsg := E.ClassName + ': ' + E.Message;
+    end;
   end;
   FResultLock.Enter;
   try
@@ -744,6 +759,9 @@ var
   WorkerCount, I, Next: Integer;
   Workers: TArray<TThread>;
 begin
+  // Shield v2 decryption is millisecond-level with small, short-lived
+  // buffers (the 64 MB Argon2 arenas are gone - Argon2 was removed
+  // project-wide), so plain CPU-count parallelism is safe again.
   WorkerCount := Min(Length(FItems), TThread.ProcessorCount);
   if WorkerCount < 2 then
   begin

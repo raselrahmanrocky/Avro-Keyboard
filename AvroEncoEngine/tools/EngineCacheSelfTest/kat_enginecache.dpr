@@ -62,6 +62,8 @@ var
   SW: TStopwatch;
   SwitchMs: Int64;
   Err: TStringList;
+  PreloadItems: TArray<TPreloadItem>;
+  PreloadThread: TAnsiPreloadThread;
 
 begin
   Fails := 0;
@@ -91,9 +93,22 @@ begin
     ScanAvroEncoFiles(MappingDir);
     WriteLn('engines found on disk: ' + IntToStr(AvroEncoFiles.Count));
 
-    // ---- 1. preload ------------------------------------------------------
+    // ---- 1. preload (HEAD API: snapshot + worker thread + commit) --------
     SW := TStopwatch.StartNew;
-    AnsiEngineManager.PreloadAllEngines;
+    PreloadItems := AnsiEngineManager.CapturePreloadList;
+    WriteLn('preload items: ' + IntToStr(Length(PreloadItems)));
+    PreloadThread := TAnsiPreloadThread.Create(PreloadItems);
+    try
+      PreloadThread.Start;
+      PreloadThread.WaitFor;
+      if PreloadThread.FatalException <> nil then
+        Check('preload thread raised no exception', False,
+          Exception(PreloadThread.FatalException).Message)
+      else
+        Check('preload thread raised no exception', True);
+    finally
+      PreloadThread.Free;
+    end;
     SW.Stop;
     WriteLn('preload took ' + IntToStr(SW.ElapsedMilliseconds) + ' ms');
     Check('preload ran', True);

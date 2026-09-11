@@ -937,11 +937,6 @@
     },
     "FullFormReplacements": [
         {
-            "Key": "",
-            "Value": "",
-            "Comment": "QuotedblLeft"
-        },
-        {
             "Key": "#$002F#$003E#$003E",
             "Value": "#$6E",
             "Comment": "QuotedblRight"
