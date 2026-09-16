@@ -37,6 +37,7 @@ var
   Tampered: TBytes;
   Dummy: string;
   Bc: TBytes;
+  Utf8: TBytes;
   Node, Deobf: TAvroNode;
   Json: string;
 
@@ -226,6 +227,92 @@ begin
   SetLength(Tampered, 40);
   Check('truncated file', AvroShieldLoadFromBytes(Tampered,
     DemoPassword, Dummy, False) = asrFileTooShort, 'expected asrFileTooShort');
+
+  WriteLn('=== byte-returning loader (AvroShieldLoadFromBytesUtf8) ===');
+  R := AvroShieldBuildFromJson(ExpectedJson, DemoPassword,
+    False, False, False, C);
+  Check('utf8 fixture build', R = asrOk, 'result=' + IntToStr(Ord(R)));
+  if R = asrOk then
+  begin
+    R := AvroShieldLoadFromBytesUtf8(C, DemoPassword, Utf8, False);
+    Check('utf8 load', R = asrOk, 'result=' + IntToStr(Ord(R)));
+    if R = asrOk then
+    begin
+      Check('utf8 JSON matches the input document',
+        StripWS(TEncoding.UTF8.GetString(Utf8)) = StripWS(ExpectedJson),
+        'json mismatch: ' + TEncoding.UTF8.GetString(Utf8));
+      { A failed load must not hand back a plaintext buffer. }
+      SetLength(Utf8, 0);
+      Check('utf8 load on a wrong password yields no plaintext',
+        (AvroShieldLoadFromBytesUtf8(C, 'wrong-password', Utf8, False) =
+          asrHmacFailed) and (Length(Utf8) = 0),
+        Format('result / length=%d', [Length(Utf8)]));
+    end;
+  end;
+
+  { The runtime entry point is the only one a shipped binary should call.
+    Whatever goes wrong, it reports exactly one code, so nothing observable
+    distinguishes "wrong password" from "tampered payload" from "truncated
+    file". These assertions are deterministic; the timing dimension of the
+    same property is asserted by construction in the loader (the GCM pass is
+    unconditional) rather than by a benchmark that would be flaky at these
+    payload sizes. }
+  WriteLn('=== runtime entry point: one failure code for every failure ===');
+  R := AvroShieldBuildFromJson(ExpectedJson, DemoPassword,
+    False, False, False, C);
+  Check('runtime fixture build', R = asrOk, 'result=' + IntToStr(Ord(R)));
+  if R = asrOk then
+  begin
+    Check('runtime: valid container loads',
+      AvroShieldLoadForRuntime(C, DemoPassword, Utf8, False) = asrOk,
+      'expected asrOk');
+    if Length(Utf8) > 0 then
+      Check('runtime: returned plaintext is the expected JSON',
+        StripWS(TEncoding.UTF8.GetString(Utf8)) = StripWS(ExpectedJson),
+        'json mismatch');
+    SetLength(Utf8, 0);
+
+    Check('runtime: wrong password -> asrHmacFailed only',
+      AvroShieldLoadForRuntime(C, 'wrong-password', Utf8, False) = asrHmacFailed,
+      'expected asrHmacFailed');
+    Check('runtime: wrong password leaks no plaintext', Length(Utf8) = 0);
+
+    Tampered := Copy(C, 0, Length(C));
+    Tampered[100] := Tampered[100] xor $FF;
+    Check('runtime: damaged ciphertext -> asrHmacFailed only',
+      AvroShieldLoadForRuntime(Tampered, DemoPassword, Utf8, False) =
+        asrHmacFailed, 'expected asrHmacFailed');
+
+    Tampered := Copy(C, 0, Length(C));
+    Tampered[Length(Tampered) - 80] :=
+      Tampered[Length(Tampered) - 80] xor $01; // first byte of the GCM tag
+    Check('runtime: damaged GCM tag -> asrHmacFailed only',
+      AvroShieldLoadForRuntime(Tampered, DemoPassword, Utf8, False) =
+        asrHmacFailed, 'expected asrHmacFailed');
+
+    Tampered := Copy(C, 0, Length(C));
+    Tampered[Length(Tampered) - 64] :=
+      Tampered[Length(Tampered) - 64] xor $01; // first byte of the HMAC
+    Check('runtime: damaged HMAC -> asrHmacFailed only',
+      AvroShieldLoadForRuntime(Tampered, DemoPassword, Utf8, False) =
+        asrHmacFailed, 'expected asrHmacFailed');
+
+    Check('runtime: truncated container -> asrHmacFailed only',
+      AvroShieldLoadForRuntime(Copy(C, 0, 40), DemoPassword, Utf8, False) =
+        asrHmacFailed, 'expected asrHmacFailed');
+
+    Tampered := Copy(C, 0, Length(C));
+    Tampered[8] := $7F; // bogus container version
+    Check('runtime: bad version -> asrHmacFailed only',
+      AvroShieldLoadForRuntime(Tampered, DemoPassword, Utf8, False) =
+        asrHmacFailed, 'expected asrHmacFailed');
+
+    SetLength(Tampered, 200);
+    FillChar(Tampered[0], 200, Ord('G'));
+    Check('runtime: bad magic -> asrHmacFailed only',
+      AvroShieldLoadForRuntime(Tampered, DemoPassword, Utf8, False) =
+        asrHmacFailed, 'expected asrHmacFailed');
+  end;
 
   if Fails = 0 then
     WriteLn('ALL AVROSHIELD KATs PASSED')

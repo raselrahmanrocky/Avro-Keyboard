@@ -17,8 +17,10 @@ program AvroEncoBuilder;
     shield (default):
       JSON -> obfuscated bytecode -> zlib -> AES-256-GCM -> HMAC-SHA512
       trailer. Protected either with a user password (-p, prompts once at
-      load time) or with the built-in default application secret
-      (--default-key, loads transparently - use for shipped built-ins).
+      load time) or with the default-key secret (--default-key, loads
+      transparently - use for shipped built-ins). Default-key builds must
+      pass --secret-file: this tool intentionally embeds no secret of its
+      own, so the only shipped artifact holding one is the runtime.
 
     v2:
       AES-256-CBC container (legacy runtime format). Empty password selects
@@ -33,7 +35,8 @@ program AvroEncoBuilder;
 
   Options:
     -p, --password <pw>   User password protection (prompts at load time).
-    --default-key         Shield: protect with the built-in default secret.
+    --default-key         Shield: protect with the default-key secret.
+    --secret-file <path>  Raw default-key IKM. Required with --default-key.
     --format <fmt>        shield (default) | v2
     --bind                Shield: bind the container to this machine.
     --hardware            Shield: add the hardware factor to the KDF.
@@ -41,8 +44,15 @@ program AvroEncoBuilder;
     --quiet               Only print errors.
 
   Exit codes: 0 OK, 1 usage, 2 input read failure, 3 invalid JSON,
-              4 build failure, 5 output write failure, 6 verification failure.
+              4 build failure, 5 output write failure, 6 verification failure,
+              7 secret file missing/empty.
   ============================================================================= }
+
+{ The builder is a local offline tool, so it keeps the descriptive parse
+  diagnostics that a Release runtime deliberately strips (see the error-text
+  policy in uAvroShield). Pass -B when building so this define is not masked
+  by a stale DCU of uAvroShield. }
+{$DEFINE AVROSHIELD_VERBOSE_ERRORS}
 
 {$APPTYPE CONSOLE}
 
@@ -52,6 +62,7 @@ uses
   System.JSON,
   System.IOUtils,
   uAvroEncoCrypto,
+  uAvroSecureMem,
   uAvroShield;
 
 const
@@ -62,14 +73,16 @@ const
   EXIT_BUILD    = 4;
   EXIT_WRITE    = 5;
   EXIT_VERIFY   = 6;
+  EXIT_KEYFILE  = 7;
 
   FORMAT_SHIELD = 1;
   FORMAT_V2     = 2;
 
 var
-  InputPath, OutputPath, Password, ErrMsg: string;
+  InputPath, OutputPath, Password, ErrMsg, SecretFilePath: string;
   ContainerFormat: Integer;
   UseDefaultKey, BindMachine, UseHardware, NoVerify, Quiet: Boolean;
+  KeyIKM: TBytes;
 
 procedure Usage;
 begin
@@ -78,8 +91,11 @@ begin
   WriteLn('Usage: AvroEncoBuilder <input.json> <output.avroenco> [options]');
   WriteLn;
   WriteLn('Options:');
-  WriteLn('  -p, --password <pw>   User password protection (prompts at load time).');
-  WriteLn('  --default-key         Shield: protect with the built-in default secret.');
+  WriteLn('  -p, --password <pw>   User password protection (prompts at load time).');  WriteLn('    --default-key         Shield: protect with the default-key secret.');
+  WriteLn('    --secret-file <path>  Raw default-key IKM file. REQUIRED with');
+  WriteLn('                          --default-key: the builder deliberately has no');
+  WriteLn('                          embedded secret, so building and running the');
+  WriteLn('                          tool never exposes one.');
   WriteLn('  --format <fmt>        shield (default) | v2');
   WriteLn('  --bind                Shield: bind the container to this machine.');
   WriteLn('  --hardware            Shield: add the hardware factor to the KDF.');
@@ -87,7 +103,8 @@ begin
   WriteLn('  --quiet               Only print errors.');
   WriteLn;
   WriteLn('Exit codes: 0 OK, 1 usage, 2 input read failure, 3 invalid JSON,');
-  WriteLn('            4 build failure, 5 output write failure, 6 verification failure.');
+  WriteLn('            4 build failure, 5 output write failure, 6 verification failure,');
+  WriteLn('            7 secret file missing/empty.');
 end;
 
 { Reads a UTF-8 text file, strips a leading BOM. }
@@ -224,6 +241,7 @@ begin
   NoVerify := False;
   Quiet := False;
   Password := '';
+  SecretFilePath := '';
 
   if ParamCount < 2 then
     Exit;
@@ -248,6 +266,13 @@ begin
       BindMachine := True
     else if Arg = '--hardware' then
       UseHardware := True
+    else if Arg = '--secret-file' then
+    begin
+      if I + 1 > ParamCount then
+        Exit;
+      Inc(I);
+      SecretFilePath := ParamStr(I);
+    end
     else if Arg = '--no-verify' then
       NoVerify := True
     else if Arg = '--quiet' then
@@ -277,6 +302,37 @@ begin
   if (ContainerFormat = FORMAT_V2) and UseDefaultKey then
     Exit; // v2 selects default-key automatically with an empty password
 
+  // Default-key Shield builds must be driven by an external key file. The
+  // builder is compiled from the same units as the runtime, so without this
+  // rule it would carry its own copy of the secret - a second place to
+  // extract it from, in a tool that is easy to overlook during a release.
+  if (ContainerFormat = FORMAT_SHIELD) and UseDefaultKey and
+    (SecretFilePath = '') then
+    Exit;
+
+  Result := True;
+end;
+
+{ Reads a raw key file (no BOM, no trailing newline) holding the default-key
+  IKM. The bytes go straight to HKDF-SHA256, matching what the runtime embeds.
+  Returns False when the file is missing or empty; the caller reports the
+  reason and exits with EXIT_KEYFILE. }
+function ReadKeyFile(const APath: string; out AIKM: TBytes): Boolean;
+var
+  Raw: TBytes;
+begin
+  AIKM := nil;
+  Result := False;
+  try
+    if not FileExists(APath) then
+      Exit;
+    Raw := TFile.ReadAllBytes(APath);
+  except
+    Exit;
+  end;
+  if Length(Raw) = 0 then
+    Exit;
+  AIKM := Raw;
   Result := True;
 end;
 
@@ -313,6 +369,16 @@ begin
     Usage;
     ExitCode := EXIT_USAGE;
   end
+  else if UseDefaultKey and (ContainerFormat = FORMAT_SHIELD) and
+    (not ReadKeyFile(SecretFilePath, KeyIKM)) then
+  begin
+    WriteLn('ERROR: cannot read secret file (missing or empty): ' +
+      SecretFilePath);
+    WriteLn('       Expected the raw default-key IKM bytes. Generate with:');
+    WriteLn('         python AvroEncoEngine\tools\AvroShieldSecretGen\' +
+      'gen_shield_secret.py --secret <phrase> --key-file keys\avroenco.key');
+    ExitCode := EXIT_KEYFILE;
+  end
   else if not ReadUtf8File(InputPath, JsonText) then
   begin
     WriteLn('ERROR: cannot read input file: ' + InputPath);
@@ -336,7 +402,7 @@ begin
       if ContainerFormat = FORMAT_SHIELD then
       begin
         var R: TAvroShieldResult := AvroShieldBuildFromJson(JsonText, Password,
-          UseDefaultKey, BindMachine, UseHardware, OutBytes);
+          UseDefaultKey, BindMachine, UseHardware, OutBytes, KeyIKM);
         if R <> asrOk then
         begin
           WriteLn('ERROR: shield build failed (code ' + IntToStr(Ord(R)) + ')');
@@ -355,6 +421,16 @@ begin
             if not VerifyRoundTrip(JsonText, Password, UseDefaultKey, OutBytes, ErrMsg) then
             begin
               WriteLn('ERROR: verification failed - ' + ErrMsg);
+              if UseDefaultKey then
+              begin
+                // The loader always uses the secret embedded in uAvroShield.
+                // A key file that differs from it produces a container that
+                // only loads once the runtime is rebuilt with the same secret.
+                WriteLn('       Hint: the load-back check uses the secret embedded');
+                WriteLn('       in uAvroShield. A --secret-file that does not match');
+                WriteLn('       it can never round-trip. Rotate with');
+                WriteLn('       gen_shield_secret.py --out-pas, then rebuild.');
+              end;
               ExitCode := EXIT_VERIFY;
             end
             else if not Quiet then
@@ -392,6 +468,9 @@ begin
       end;
     end;
   end;
+
+  // The key IKM is no longer needed once the container is built and verified.
+  AvroWipeAndRelease(KeyIKM);
 
   if not Quiet then
   begin
