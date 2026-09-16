@@ -94,6 +94,16 @@
     <DCC_DebugInformation>0</DCC_DebugInformation>
     <DCC_LocalDebugSymbols>false</DCC_LocalDebugSymbols>
     <DCC_SymbolReferenceInfo>0</DCC_SymbolReferenceInfo>
+    <!-- Asset-protection hardening. Previously the Release configuration
+         specified neither optimisation nor stack frames, so behaviour was
+         inherited from whatever the compiler defaulted to. Both are now
+         explicit: optimisation on for speed, stack frames OFF so no frame
+         chain or local-variable scaffolding survives around the VMProtect
+         regions. Inlining is deliberately NOT disabled project-wide - the
+         ANSI conversion path is hot - and is instead turned off per unit in
+         the two marker-bearing units (see the unit headers). -->
+    <DCC_Optimize>true</DCC_Optimize>
+    <DCC_GenerateStackFrames>false</DCC_GenerateStackFrames>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Cfg_1_Win32)'!=''">
     <BT_BuildType>Debug</BT_BuildType>
@@ -211,6 +221,9 @@
     <DCCReference Include="Units\Avro.Types.pas" />
     <DCCReference Include="..\Unicode to ascii converter\clsAnsiSequenceLookup.pas" />
     <DCCReference Include="Units\uAvroEncoCrypto.pas" />
+    <DCCReference Include="Units\uAvroSecureMem.pas" />
+    <DCCReference Include="Units\uAvroShieldSecret.pas" />
+    <DCCReference Include="Units\uAvroShieldVM.pas" />
     <DCCReference Include="Units\uAnsiPersistentCache.pas" />
     <DCCReference Include="Units\uAnsiEngineManager.pas" />
     <DCCReference Include="Units\uAvroEncoManager.pas" />

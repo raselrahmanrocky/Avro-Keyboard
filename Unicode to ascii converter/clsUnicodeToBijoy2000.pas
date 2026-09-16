@@ -252,7 +252,8 @@ uses
   BanglaChars,
   System.SysUtils,
   System.Generics.Defaults,
-  uAvroEncoManager;
+  uAvroEncoManager,
+  uAvroSecureMem;
 
 { Bijoy2000 Font Map Constants }
 var
@@ -3005,9 +3006,227 @@ end;
 
 { =============================================================================== }
 
+{ Releases the parked engine state AND wipes the mapping text it owned.
+
+  Why this is not just a set of nils and FreeAndNils: these containers hold the
+  fully deobfuscated mapping - replacement pairs, vowel and rfola rules, kar
+  corrections, the override and group dictionaries and the sequence lookup.
+  Releasing a Delphi string only returns its buffer to the allocator; the
+  characters stay readable in the freed block, which is the first thing a heap
+  walk or a crash dump recovers. Since a parked engine keeps a whole mapping
+  resident, and the cache parks every available version, that is by far the
+  largest plaintext exposure in the process.
+
+  THE ORDERING THAT MAKES THE WIPE REAL: a string copied out of a container
+  shares the container's buffer, and AvroWipeString deliberately calls
+  UniqueString first so it can never corrupt a sibling that still needs the
+  data. Applied to a copy, that would make the wipe a no-op on the copy that
+  matters. So each helper snapshots the keys and values, releases the
+  container first, and only then wipes: with the container's reference gone the
+  snapshots are sole owners, UniqueString is a no-op at refcount 1, and the
+  wipe lands on the real buffer. It also stays safe for literal-backed
+  strings, where writing would fault.
+
+  Runs on invalidation, refresh and cache drop, so it is on a user-visible
+  path; cost is proportional to mapping size and measures in low milliseconds. }
 procedure TAnsiEngineState.Clear;
+
+  procedure WipePairs(AArr: TArray<TReplacementPair>);
+  var
+    I: Integer;
+  begin
+    for I := 0 to Length(AArr) - 1 do
+    begin
+      AvroWipeString(AArr[I].Key);
+      AvroWipeString(AArr[I].Value);
+      AvroWipeString(AArr[I].Comment);
+    end;
+  end;
+
+  procedure WipeVowelRules(AArr: TArray<TVowelRule>);
+  var
+    I, J: Integer;
+  begin
+    for I := 0 to Length(AArr) - 1 do
+    begin
+      AvroWipeString(AArr[I].KarChar);
+      AvroWipeString(AArr[I].DefaultVal);
+      AvroWipeString(AArr[I].Toggle);
+      for J := 0 to Length(AArr[I].Mappings) - 1 do
+      begin
+        AvroWipeString(AArr[I].Mappings[J].Consonants);
+        AvroWipeString(AArr[I].Mappings[J].Value);
+        AvroWipeString(AArr[I].Mappings[J].Alt);
+        AvroWipeString(AArr[I].Mappings[J].ProcessPhase);
+      end;
+    end;
+  end;
+
+  procedure WipeRfolaRules(AArr: TArray<TRfolaRule>);
+  var
+    I: Integer;
+  begin
+    for I := 0 to Length(AArr) - 1 do
+    begin
+      AvroWipeString(AArr[I].Consonants);
+      AvroWipeString(AArr[I].Value);
+      AvroWipeString(AArr[I].HalfValue);
+      AvroWipeString(AArr[I].ContextGroup);
+      AvroWipeString(AArr[I].ContextValue);
+      AvroWipeString(AArr[I].RawValue);
+      AvroWipeString(AArr[I].RawHalfValue);
+      AvroWipeString(AArr[I].RawContextValue);
+      AvroWipeString(AArr[I].Comment);
+    end;
+  end;
+
+  procedure WipeKarCorrections(AArr: TArray<TKarCorrection>);
+  var
+    I: Integer;
+  begin
+    for I := 0 to Length(AArr) - 1 do
+    begin
+      AvroWipeString(AArr[I].RawCharStr);
+      AvroWipeString(AArr[I].CharStr);
+      AvroWipeString(AArr[I].RawFromKar);
+      AvroWipeString(AArr[I].FromKar);
+      AvroWipeString(AArr[I].RawToKar);
+      AvroWipeString(AArr[I].ToKar);
+      AvroWipeString(AArr[I].Comment);
+    end;
+  end;
+
+  procedure WipeGroupKar(AArr: TArray<TGroupKarCorrection>);
+  var
+    I: Integer;
+  begin
+    for I := 0 to Length(AArr) - 1 do
+    begin
+      AvroWipeString(AArr[I].Group);
+      AvroWipeString(AArr[I].From);
+      AvroWipeString(AArr[I].To_);
+    end;
+  end;
+
+  procedure WipeVarRec(const ARec: TAnsiVarRec);
+  var
+    CopyRec: TAnsiVarRec;
+  begin
+    // Copied so the string fields can be taken by reference.
+    CopyRec := ARec;
+    AvroWipeString(CopyRec.Name);
+    AvroWipeString(CopyRec.Category);
+    AvroWipeString(CopyRec.DefaultVal);
+    AvroWipeString(CopyRec.BengaliChar);
+    AvroWipeString(CopyRec.Comment);
+  end;
+
+  { Snapshots keys and values, releases the dictionary, then wipes. }
+  procedure WipeStringDict(ADict: TDictionary<string, string>);
+  var
+    Keys, Values: TArray<string>;
+    I: Integer;
+  begin
+    if ADict = nil then
+      Exit;
+    Keys := ADict.Keys.ToArray;
+    Values := ADict.Values.ToArray;
+    ADict.Clear;
+    for I := 0 to High(Keys) do
+      AvroWipeString(Keys[I]);
+    AvroWipeStringArray(Values);
+  end;
+
+  procedure WipeStrListDict(ADict: TDictionary<string, TArray<string>>);
+  var
+    Keys: TArray<string>;
+    Values: TArray<TArray<string>>;
+    I: Integer;
+  begin
+    if ADict = nil then
+      Exit;
+    Keys := ADict.Keys.ToArray;
+    Values := ADict.Values.ToArray;
+    ADict.Clear;
+    for I := 0 to High(Keys) do
+      AvroWipeString(Keys[I]);
+    for I := 0 to High(Values) do
+      AvroWipeStringArray(Values[I]);
+  end;
+
+  procedure WipeVarRecDict(ADict: TDictionary<string, TAnsiVarRec>);
+  var
+    Keys: TArray<string>;
+    Values: TArray<TAnsiVarRec>;
+    I: Integer;
+  begin
+    if ADict = nil then
+      Exit;
+    Keys := ADict.Keys.ToArray;
+    Values := ADict.Values.ToArray;
+    ADict.Clear;
+    for I := 0 to High(Keys) do
+      AvroWipeString(Keys[I]);
+    for I := 0 to High(Values) do
+      WipeVarRec(Values[I]);
+  end;
+
+  procedure WipeRegistryList(AList: TList<TAnsiVarRec>);
+  var
+    Values: TArray<TAnsiVarRec>;
+    I: Integer;
+  begin
+    if AList = nil then
+      Exit;
+    Values := AList.ToArray;
+    AList.Clear;
+    for I := 0 to High(Values) do
+      WipeVarRec(Values[I]);
+  end;
+
+  procedure WipeSequenceMap(AMap: TAnsiSequenceMap);
+  var
+    Keys: TArray<string>;
+    Values: TArray<TAnsiSequenceEntry>;
+    I: Integer;
+  begin
+    if AMap = nil then
+      Exit;
+    Keys := AMap.Keys.ToArray;
+    Values := AMap.Values.ToArray;
+    AMap.Clear;
+    for I := 0 to High(Keys) do
+      AvroWipeString(Keys[I]);
+    for I := 0 to High(Values) do
+    begin
+      AvroWipeString(Values[I].AnsiOutput);
+      AvroWipeString(Values[I].AltAnsiOutput);
+    end;
+  end;
+
 begin
   DisplayName := '';
+
+  WipeStringDict(ScalarValues);
+  WipePairs(CustomFullForms);
+  WipePairs(CustomPreReplacements);
+  WipePairs(CustomPostReplacements);
+  WipePairs(ActiveReplacements);
+  WipePairs(KarInclusiveReplacements);
+  WipeVowelRules(VowelRules);
+  WipeRfolaRules(RfolaRules);
+  WipeKarCorrections(KarCorrections);
+  WipeGroupKar(GroupKarCorrections);
+  WipeRegistryList(AnsiRegistry);
+  WipeVarRecDict(AnsiRegistryMap);
+  WipeStringDict(AnsiOverrides);
+  WipeStrListDict(ConsonantGroupMap);
+  WipeStrListDict(AnsiGroupMap);
+  WipeStrListDict(AnsiGroupRawMap);
+  WipeStrListDict(ConsonantGroupRawMap);
+  WipeSequenceMap(AnsiSequenceLookup);
+  WipeStrListDict(AnsiToUniMap);
+
   FreeAndNil(ScalarValues);
   CustomFullForms := nil;
   CustomPreReplacements := nil;

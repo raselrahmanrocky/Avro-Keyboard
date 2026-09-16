@@ -36,6 +36,12 @@
 {$OVERFLOWCHECKS OFF}
 {$RANGECHECKS OFF}
 
+{ Inlining OFF because this unit contains VMProtect marker regions. An inlined
+  marked routine leaves an unprotected copy of the same logic in its caller,
+  which defeats the marker. Only marker-bearing units disable inlining;
+  uAvroCryptoUtils (the AES/GCM hot path) deliberately keeps it. }
+{$INLINE OFF}
+
 unit uAvroShield;
 
 interface
@@ -90,9 +96,25 @@ type
 function AvroShieldLoadFromFile(const AFileName, APassword: string;
   out AJSONText: string; AUseMachineBind: Boolean = True): TAvroShieldResult;
 
-{ Same, from raw file bytes (used by tests and in-memory callers). }
+{ Same, from raw file bytes (used by tests and in-memory callers). The JSON
+  is returned as a string, which the caller cannot reliably wipe - prefer
+  AvroShieldLoadFromBytesUtf8 or AvroShieldLoadForRuntime on any load path. }
 function AvroShieldLoadFromBytes(const AData: TBytes; const APassword: string;
   out AJSONText: string; AUseMachineBind: Boolean = True): TAvroShieldResult;
+
+{ Core loader. Returns the deobfuscated mapping as UTF-8 bytes so the caller
+  owns the plaintext buffer and can wipe it deterministically. All derived key
+  material and intermediates are wiped before return. }
+function AvroShieldLoadFromBytesUtf8(const AData: TBytes; const APassword: string;
+  out AJsonUtf8: TBytes; AUseMachineBind: Boolean = True): TAvroShieldResult;
+
+{ Runtime entry point: same as AvroShieldLoadFromBytesUtf8 except that every
+  failure is collapsed to a single externally visible result code, so a caller
+  that can be observed cannot learn which stage rejected the container. The
+  detailed codes remain available through the non-runtime entry points for the
+  builder, the KATs and support builds. }
+function AvroShieldLoadForRuntime(const AData: TBytes; const APassword: string;
+  out AJsonUtf8: TBytes; AUseMachineBind: Boolean = True): TAvroShieldResult;
 
 { 16-byte machine identifier: SHA-256(MachineGuid UTF-8)[:16], MAC fallback. }
 function AvroShieldMachineId: TBytes;
@@ -124,16 +146,24 @@ function Pbkdf2HMACSHA256(const APassword, ASalt: TBytes;
 { Writer side: builds a Shield-format container from mapping JSON, the exact
   inverse of AvroShieldLoadFromBytes. The pipeline runs entirely in RAM:
     JSON -> obfuscated bytecode -> zlib -> AES-256-GCM -> HMAC-SHA512 trailer.
-  ADefaultKey=True protects the container with the built-in obfuscated
-  default secret (no password prompt ever); ADefaultKey=False requires a
-  non-empty APassword. ABindToMachine / AUseHardwareFactor set the matching
-  header flags (shipped files must stay portable: no bind).
+  ADefaultKey=True protects the container with the built-in default secret
+  (no password prompt ever); ADefaultKey=False requires a non-empty
+  APassword. ABindToMachine / AUseHardwareFactor set the matching header
+  flags (shipped files must stay portable: no bind).
+
+  ADefaultSecretIKM supplies the default-key IKM from outside the process.
+  AvroEncoBuilder uses it to drive builds from a key file so the build tool
+  binary embeds no secret; leave it empty to use the embedded secret, which
+  is what the self-tests and a load-back verification do. Because the loader
+  always uses the embedded secret, a key file that does not match it is
+  caught by the builder's round-trip verification instead of shipping.
+
   On asrOk, AOutBytes holds the complete container and can be written to a
   .AvroEnco file. All intermediate key material and plaintext buffers are
   wiped before the function returns. }
 function AvroShieldBuildFromJson(const AJsonText, APassword: string;
   const ADefaultKey, ABindToMachine, AUseHardwareFactor: Boolean;
-  out AOutBytes: TBytes): TAvroShieldResult;
+  out AOutBytes: TBytes; const ADefaultSecretIKM: TBytes = nil): TAvroShieldResult;
 
 implementation
 
@@ -146,7 +176,45 @@ uses
   Winapi.Windows,
   Winapi.IpHlpApi,
   Winapi.IpTypes,
-  uAvroCryptoUtils;
+  uAvroCryptoUtils,
+  uAvroSecureMem,
+  uAvroShieldVM;
+
+{ Error-text policy for the parse path.
+
+  These messages name the internal structure and the exact check that failed
+  ('Truncated entry node', 'Entry checksum mismatch', 'Trailing garbage after
+  entries'). Two problems with shipping them: they are a static description of
+  the format readable in a 'strings' dump, and any path where they do escape
+  hands an attacker a free oracle for iterating on a malformed container and
+  for locating fault-injection targets.
+
+  In a Release runtime build the description is therefore gone while the
+  result code still reaches the caller. Builds that legitimately need the text
+  - the offline builder and support builds - define AVROSHIELD_VERBOSE_ERRORS.
+
+  Note the parse entry point swallows these exceptions internally and reports
+  False, so the practical effect of this policy is on the static strings and
+  on the paths that do propagate. }
+
+const
+  SHIELD_OPAQUE_ERROR_TEXT = 'AvroShield: invalid container';
+
+function ShieldOpaqueError(const AMessage: string): EAvroShieldError;
+begin
+{$IFDEF AVROSHIELD_VERBOSE_ERRORS}
+  Result := EAvroShieldError.Create(AMessage);
+{$ELSE}
+  Result := EAvroShieldError.Create(SHIELD_OPAQUE_ERROR_TEXT);
+{$ENDIF}
+end;
+
+{ Writer-side errors are never attacker-facing: the builder is a local offline
+  tool, so its diagnostics stay fully descriptive in every build. }
+function ShieldWriterError(const AMessage: string): EAvroShieldError;
+begin
+  Result := EAvroShieldError.Create(AMessage);
+end;
 
 const
   // ---- .AvroShield container ----
@@ -248,7 +316,7 @@ end;
 function BcRead(const AData: TBytes; var AOff: Integer; ACount: Integer): TBytes;
 begin
   if (AOff < 0) or (ACount < 0) or (AOff + ACount > Length(AData)) then
-    raise EAvroShieldError.Create('Truncated bytecode');
+    raise ShieldOpaqueError('Truncated bytecode');
   SetLength(Result, ACount);
   if ACount > 0 then
     Move(AData[AOff], Result[0], ACount);
@@ -272,10 +340,16 @@ function ConstTimeEqual(const A, B: TBytes): Boolean;
 var
   I, D: Integer;
 begin
+  { Virtualised: this is the single comparison that decides whether the HMAC
+    matched, the machine binding matched and the GCM tag matched. Its control
+    flow is the most valuable thing in the unit to an attacker, and it is a
+    leaf with no SEH, so it virtualises cleanly. }
+  VMBeginVirtualization('cte');
   D := Length(A) xor Length(B);
   for I := 0 to Min(Length(A), Length(B)) - 1 do
     D := D or (Integer(A[I]) xor Integer(B[I]));
   Result := D = 0;
+  VMEnd;
 end;
 
 { =============================================================================
@@ -413,10 +487,12 @@ end;
   HKDF-SHA256 over the embedded app secret + per-file salt. Microseconds. }
 function ShieldKdfDefaultKey(const ASecret, ASalt: TBytes): TBytes;
 begin
+  VMBeginVirtualization('kdfd');
   Result := HkdfExpandSHA256(
     HkdfExtractSHA256(ASalt, ASecret),
     TEncoding.UTF8.GetBytes(SHIELD_HKDF_INFO_DEFAULT),
     SHIELD_MASTER_LEN);
+  VMEnd;
 end;
 
 { v2 master-key schedule, password containers: PBKDF2-HMAC-SHA256 at
@@ -425,8 +501,10 @@ end;
   Deliberately NOT Argon2 (removed project-wide by owner decision). }
 function ShieldKdfPasswordKey(const APassword, ASalt: TBytes): TBytes;
 begin
+  VMBeginVirtualization('kdfp');
   Result := Pbkdf2HMACSHA256(APassword, ASalt,
     SHIELD_PBKDF2_ITERATIONS, SHIELD_MASTER_LEN);
+  VMEnd;
 end;
 
 { =============================================================================
@@ -553,7 +631,7 @@ var
   Masked: TBytes;
 begin
   if AOff >= Length(AData) then
-    raise EAvroShieldError.Create('Truncated node');
+    raise ShieldOpaqueError('Truncated node');
   Typ := AData[AOff];
   Inc(AOff);
 
@@ -566,7 +644,7 @@ begin
       TYPE_BOOLEAN:
         begin
           if AOff >= Length(AData) then
-            raise EAvroShieldError.Create('Truncated boolean');
+            raise ShieldOpaqueError('Truncated boolean');
           Result.Kind := nkBool;
           Result.BoolVal := AData[AOff] = $01;
           Inc(AOff);
@@ -575,7 +653,7 @@ begin
       TYPE_NUMBER:
         begin
           if AOff + 9 > Length(AData) then
-            raise EAvroShieldError.Create('Truncated number');
+            raise ShieldOpaqueError('Truncated number');
           if AData[AOff] = 1 then
           begin
             Result.Kind := nkInt;
@@ -592,7 +670,7 @@ begin
       TYPE_STRING:
         begin
           if AOff + 4 > Length(AData) then
-            raise EAvroShieldError.Create('Truncated string');
+            raise ShieldOpaqueError('Truncated string');
           Len := Integer(BE32(AData, AOff));
           Inc(AOff, 4);
           Masked := BcRead(AData, AOff, Len);
@@ -603,7 +681,7 @@ begin
       TYPE_ARRAY:
         begin
           if AOff + 4 > Length(AData) then
-            raise EAvroShieldError.Create('Truncated array');
+            raise ShieldOpaqueError('Truncated array');
           Result.Kind := nkArray;
           Cnt := Integer(BE32(AData, AOff));
           Inc(AOff, 4);
@@ -614,14 +692,14 @@ begin
       TYPE_OBJECT:
         begin
           if AOff + 4 > Length(AData) then
-            raise EAvroShieldError.Create('Truncated object');
+            raise ShieldOpaqueError('Truncated object');
           Result.Kind := nkObject;
           Cnt := Integer(BE32(AData, AOff));
           Inc(AOff, 4);
           for I := 0 to Cnt - 1 do
           begin
             if AOff + 2 > Length(AData) then
-              raise EAvroShieldError.Create('Truncated object key');
+              raise ShieldOpaqueError('Truncated object key');
             KLen := Integer(BE16(AData, AOff));
             Inc(AOff, 2);
             Result.Keys.Add(TEncoding.UTF8.GetString(BcRead(AData, AOff, KLen)));
@@ -630,7 +708,7 @@ begin
         end;
 
     else
-      raise EAvroShieldError.CreateFmt('Unsupported bytecode node type: %d', [Typ]);
+      raise ShieldOpaqueError(Format('Unsupported bytecode node type: %d', [Typ]));
     end;
   except
     Result.Free;
@@ -681,23 +759,23 @@ begin
     begin
       EntryStart := Off;
       if Off + 2 > Length(ABytecode) then
-        raise EAvroShieldError.Create('Truncated entry key');
+        raise ShieldOpaqueError('Truncated entry key');
       KLen := Integer(BE16(ABytecode, Off));
       Inc(Off, 2);
       KeyBytes := BcRead(ABytecode, Off, KLen);
       if Off + 4 > Length(ABytecode) then
-        raise EAvroShieldError.Create('Truncated entry node');
+        raise ShieldOpaqueError('Truncated entry node');
       NodeLen := Integer(BE32(ABytecode, Off));
       Inc(Off, 4);
       NodeBytes := BcRead(ABytecode, Off, NodeLen);
       if Off + 4 > Length(ABytecode) then
-        raise EAvroShieldError.Create('Truncated entry crc');
+        raise ShieldOpaqueError('Truncated entry crc');
       StoredCrc := BE32(ABytecode, Off);
       Inc(Off, 4);
 
       Entry := Copy(ABytecode, EntryStart, Off - 4 - EntryStart);
       if crc32(0, @Entry[0], Length(Entry)) <> StoredCrc then
-        raise EAvroShieldError.Create('Entry checksum mismatch');
+        raise ShieldOpaqueError('Entry checksum mismatch');
 
       NZero := 0;
       Root.Keys.Add(TEncoding.UTF8.GetString(KeyBytes));
@@ -705,7 +783,7 @@ begin
     end;
 
     if Off <> Length(ABytecode) - 32 then
-      raise EAvroShieldError.Create('Trailing garbage after entries');
+      raise ShieldOpaqueError('Trailing garbage after entries');
 
     AValue := Root;
     Root := nil;
@@ -991,17 +1069,29 @@ end;
   Container reader
   ============================================================================= }
 
-function AvroShieldLoadFromBytes(const AData: TBytes; const APassword: string;
-  out AJSONText: string; AUseMachineBind: Boolean): TAvroShieldResult;
+{ Core loader. Delivers the deobfuscated mapping as UTF-8 bytes rather than a
+  Delphi string: a string is reference-counted and may be shared with other
+  holders, so the caller cannot reliably wipe the last copy. The byte buffer
+  that leaves this function belongs to the caller, which must wipe it with
+  AvroWipeAndRelease once the mapping has been parsed into runtime tables.
+
+  Every intermediate - derived keys, the GCM tag, the HMAC input, the
+  decompressed bytecode - is wiped before return. }
+function AvroShieldLoadFromBytesUtf8(const AData: TBytes; const APassword: string;
+  out AJsonUtf8: TBytes; AUseMachineBind: Boolean): TAvroShieldResult;
 var
   Flags: Byte;
   Salt, IV, StoredMachine, Master: TBytes;
   MachineF, HardwareF, FinalKey, EncKey, MacKey: TBytes;
+  DefaultIKM, PasswordIKM: TBytes;
   Cipher, Tag, ExpectedMac, HmacData, Compressed, Bytecode: TBytes;
   Root, Deobf: TAvroNode;
-  Secret: string;
+  JsonText: string;
+  MacOk, CryptoOk: Boolean;
 begin
-  AJSONText := '';
+  AJsonUtf8 := nil;
+  Root := nil;
+  Deobf := nil;
   Result := asrUnknown;
 
   if Length(AData) < AS_HEADER_SIZE + AS_TRAILER_SIZE + 1 then
@@ -1024,21 +1114,31 @@ begin
       Exit(asrMachineMismatch);
   end;
 
-  // Default-key containers (flag AVROSHLD_FLAG_DEFAULT_KEY) unlock with the
-  // built-in obfuscated application secret instead of a user password - the
-  // caller passes '' and the substitution happens here, so no caller ever
-  // needs to know the secret.
-  Secret := APassword;
-  if (Flags and AVROSHLD_FLAG_DEFAULT_KEY) <> 0 then
-    Secret := GetAvroEncoDefaultSecret;
-  // v2 schedule (no Argon2 anywhere): instant HKDF for embedded-secret
-  // containers, PBKDF2 for password containers. Same branch condition as
-  // the secret substitution above, so every flag combination behaves.
-  if (Flags and AVROSHLD_FLAG_DEFAULT_KEY) <> 0 then
-    Master := ShieldKdfDefaultKey(TEncoding.UTF8.GetBytes(Secret), Salt)
-  else
-    Master := ShieldKdfPasswordKey(TEncoding.UTF8.GetBytes(Secret), Salt);
   try
+    // Default-key containers (flag AVROSHLD_FLAG_DEFAULT_KEY) unlock with the
+    // built-in application secret instead of a user password - the caller
+    // passes '' and the substitution happens here, so no caller ever needs to
+    // know the secret.
+    //
+    // GetAvroEncoSecretIKM (raw bytes) rather than GetAvroEncoDefaultSecret
+    // (string): bytes are what HKDF-SHA256 consumes anyway, so taking the byte
+    // form avoids materialising a UTF-16 copy of the secret on the heap for
+    // the lifetime of the unlock. The password path converts the caller's
+    // password once and wipes that buffer immediately after derivation.
+    //
+    // v2 schedule (no Argon2 anywhere): instant HKDF for embedded-secret
+    // containers, PBKDF2 for password containers.
+    if (Flags and AVROSHLD_FLAG_DEFAULT_KEY) <> 0 then
+    begin
+      DefaultIKM := GetAvroEncoSecretIKM;
+      Master := ShieldKdfDefaultKey(DefaultIKM, Salt);
+    end
+    else
+    begin
+      PasswordIKM := TEncoding.UTF8.GetBytes(APassword);
+      Master := ShieldKdfPasswordKey(PasswordIKM, Salt);
+      AvroWipeAndRelease(PasswordIKM);
+    end;
     SetLength(MachineF, 16);
     FillChar(MachineF[0], 16, 0);
     if (Flags and FLAG_MACHINE_BIND) <> 0 then
@@ -1058,11 +1158,33 @@ begin
     ExpectedMac := Copy(AData, Length(AData) - AS_HMAC_SIZE, AS_HMAC_SIZE);
 
     HmacData := Copy(AData, 0, AS_HEADER_SIZE) + Cipher + Tag;
-    if not ConstTimeEqual(HMACSHA512(MacKey, HmacData), ExpectedMac) then
-      Exit(asrHmacFailed);
 
-    if not AES256GCMDecrypt(Cipher + Tag, EncKey, IV, nil, Compressed) then
+    // Two independent authenticators, both evaluated on every load:
+    //   * the outer HMAC-SHA512 binds the 58-byte header, the ciphertext and
+    //     the GCM tag under MacKey;
+    //   * the AES-GCM tag binds the ciphertext under EncKey.
+    // A fault that suppresses the HMAC verdict therefore does not by itself
+    // make the GCM tag validate - the redundancy here is cryptographic rather
+    // than a repeated branch on the same value.
+    MacOk := ConstTimeEqual(HMACSHA512(MacKey, HmacData), ExpectedMac);
+    CryptoOk := AES256GCMDecrypt(Cipher + Tag, EncKey, IV, nil, Compressed);
+
+    // The GCM pass runs unconditionally, including when the HMAC already
+    // failed. That costs one AES pass on a wrong password and removes the
+    // timing oracle that previously let an observer distinguish "wrong
+    // password" from "authentic MAC over a damaged payload" by measuring how
+    // far the loader got. (A *successful* load is still slower than a failed
+    // one - that is inherent to doing the work, and an attacker who can
+    // observe success already knows the load succeeded.)
+    //
+    // The combined verdict is judged through the fused gate, so the policy
+    // does not hinge on one short-circuiting branch.
+    if not AvroFuseOk(AvroFuse(MacOk and CryptoOk)) then
+    begin
+      if not MacOk then
+        Exit(asrHmacFailed);
       Exit(asrDecryptFailed);
+    end;
 
     Bytecode := ZlibDecompressBytes(Compressed);
     if Length(Bytecode) = 0 then
@@ -1077,24 +1199,83 @@ begin
       if not AvroShieldDeobfuscate(Root, Deobf) then
         Exit(asrCorruptPayload);
       try
-        AJSONText := AvroShieldNodeToJSON(Deobf);
-        Result := asrOk;
+        JsonText := AvroShieldNodeToJSON(Deobf);
+        try
+          AJsonUtf8 := TEncoding.UTF8.GetBytes(JsonText);
+          Result := asrOk;
+        finally
+          // The serializer necessarily builds a UTF-16 string first, so wipe
+          // that interim copy here and leave only the caller-owned UTF-8
+          // buffer behind. Removing the interim string altogether is the job
+          // of the v3 pooled-table loader.
+          AvroWipeString(JsonText);
+        end;
       finally
         Deobf.Free;
+        Deobf := nil;
       end;
     finally
       Root.Free;
+      Root := nil;
     end;
   finally
-    if Length(Master) > 0 then
-      FillChar(Master[0], Length(Master), 0);
-    SetLength(Master, 0);
-    if Length(FinalKey) > 0 then
-      FillChar(FinalKey[0], Length(FinalKey), 0);
-    SetLength(FinalKey, 0);
-    if Length(Compressed) > 0 then
-      FillChar(Compressed[0], Length(Compressed), 0);
-    SetLength(Compressed, 0);
+    // Every intermediate that held key material or plaintext mapping data is
+    // wiped here. The previous version wiped only Master, FinalKey and
+    // Compressed, leaving EncKey, MacKey, the GCM tag, the HMAC input and the
+    // decompressed bytecode readable in freed heap blocks - which is what a
+    // heap-walk pass recovers first.
+    AvroWipeAndRelease(PasswordIKM);
+    AvroWipeAndRelease(DefaultIKM);
+    AvroWipeAndRelease(Master);
+    AvroWipeAndRelease(MachineF);
+    AvroWipeAndRelease(HardwareF);
+    AvroWipeAndRelease(FinalKey);
+    AvroWipeAndRelease(EncKey);
+    AvroWipeAndRelease(MacKey);
+    AvroWipeAndRelease(Salt);
+    AvroWipeAndRelease(IV);
+    AvroWipeAndRelease(StoredMachine);
+    AvroWipeAndRelease(Cipher);
+    AvroWipeAndRelease(Tag);
+    AvroWipeAndRelease(ExpectedMac);
+    AvroWipeAndRelease(HmacData);
+    AvroWipeAndRelease(Compressed);
+    AvroWipeAndRelease(Bytecode);
+  end;
+end;
+
+{ String-returning wrapper, kept so the builder, the KATs and support tooling
+  do not all have to change. The string it returns cannot be reliably wiped by
+  the caller (reference-counted, possibly shared), which is exactly why the
+  runtime path uses AvroShieldLoadFromBytesUtf8 instead. }
+function AvroShieldLoadFromBytes(const AData: TBytes; const APassword: string;
+  out AJSONText: string; AUseMachineBind: Boolean): TAvroShieldResult;
+var
+  Utf8: TBytes;
+begin
+  AJSONText := '';
+  Result := AvroShieldLoadFromBytesUtf8(AData, APassword, Utf8, AUseMachineBind);
+  if Result = asrOk then
+  begin
+    AJSONText := TEncoding.UTF8.GetString(Utf8);
+    AvroWipeAndRelease(Utf8);
+  end;
+end;
+
+{ Runtime entry point: one externally visible failure code. }
+function AvroShieldLoadForRuntime(const AData: TBytes; const APassword: string;
+  out AJsonUtf8: TBytes; AUseMachineBind: Boolean): TAvroShieldResult;
+var
+  Raw: TAvroShieldResult;
+begin
+  Raw := AvroShieldLoadFromBytesUtf8(AData, APassword, AJsonUtf8,
+    AUseMachineBind);
+  if AvroFuseOk(AvroFuse(Raw = asrOk)) then
+    Result := asrOk
+  else
+  begin
+    AvroWipeAndRelease(AJsonUtf8);
+    Result := asrHmacFailed;
   end;
 end;
 
@@ -1377,7 +1558,7 @@ begin
     nkArray:  Typ := TYPE_ARRAY;
     nkObject: Typ := TYPE_OBJECT;
   else
-    raise EAvroShieldError.Create('Cannot serialize node kind');
+    raise ShieldWriterError('Cannot serialize node kind');
   end;
   AStrm.WriteBuffer(Typ, 1);
 
@@ -1559,7 +1740,7 @@ end;
 
 function AvroShieldBuildFromJson(const AJsonText, APassword: string;
   const ADefaultKey, ABindToMachine, AUseHardwareFactor: Boolean;
-  out AOutBytes: TBytes): TAvroShieldResult;
+  out AOutBytes: TBytes; const ADefaultSecretIKM: TBytes): TAvroShieldResult;
 var
   Json:      TJSONValue;
   Root, Obf, MetaNode: TAvroNode;
@@ -1568,9 +1749,10 @@ var
   Dummies:   TStringList;
   Seed, Salt, IV, Machine, Master, FinalKey, EncKey, MacKey: TBytes;
   MachineF, HardwareF: TBytes;
+  DefaultIKM, PasswordIKM: TBytes;
   Flags, B:  Byte;
   Compressed, Bytecode, CipherTag, HmacData, Hmac, HeaderSrc: TBytes;
-  MetaJson, Secret: string;
+  MetaJson: string;
   AStrm:     TMemoryStream;
 begin
   Result := asrUnknown;
@@ -1653,16 +1835,30 @@ begin
       FillChar(Machine[0], 16, 0);
     end;
 
-    if ADefaultKey then
-      Secret := GetAvroEncoDefaultSecret
-    else
-      Secret := APassword;
     // v2 schedule, mirror of the loader: HKDF for default-key, PBKDF2 for
     // password containers. No Argon2 anywhere in the project.
+    //
+    // ADefaultSecretIKM lets the offline builder be driven by a key file
+    // rather than the embedded secret, so the build tool binary carries no
+    // secret at all (AvroEncoBuilder --secret-file). An empty value means
+    // "use the embedded secret", which is what the self-tests do and what a
+    // verify-only load-back needs. Both sides derive from the same IKM bytes,
+    // so a key file that does not match the embedded secret is caught by the
+    // builder's load-back verification rather than shipping silently.
     if ADefaultKey then
-      Master := ShieldKdfDefaultKey(TEncoding.UTF8.GetBytes(Secret), Salt)
+    begin
+      if Length(ADefaultSecretIKM) > 0 then
+        DefaultIKM := Copy(ADefaultSecretIKM, 0, Length(ADefaultSecretIKM))
+      else
+        DefaultIKM := GetAvroEncoSecretIKM;
+      Master := ShieldKdfDefaultKey(DefaultIKM, Salt);
+    end
     else
-      Master := ShieldKdfPasswordKey(TEncoding.UTF8.GetBytes(Secret), Salt);
+    begin
+      PasswordIKM := TEncoding.UTF8.GetBytes(APassword);
+      Master := ShieldKdfPasswordKey(PasswordIKM, Salt);
+      AvroWipeAndRelease(PasswordIKM);
+    end;
     try
       SetLength(MachineF, 16);
       FillChar(MachineF[0], 16, 0);
@@ -1718,12 +1914,28 @@ begin
         AStrm.Free;
       end;
     finally
-      if Length(Master) > 0 then
-        FillChar(Master[0], Length(Master), 0);
-      SetLength(Master, 0);
-      if Length(FinalKey) > 0 then
-        FillChar(FinalKey[0], Length(FinalKey), 0);
-      SetLength(FinalKey, 0);
+      // Mirror of the loader's hygiene: the writer derives the same key
+      // material, so it must wipe the same set. Previously only Master and
+      // FinalKey were wiped here, leaving EncKey, MacKey and the HMAC input
+      // readable in freed heap memory.
+      AvroWipeAndRelease(PasswordIKM);
+      AvroWipeAndRelease(DefaultIKM);
+      AvroWipeAndRelease(Master);
+      AvroWipeAndRelease(MachineF);
+      AvroWipeAndRelease(HardwareF);
+      AvroWipeAndRelease(FinalKey);
+      AvroWipeAndRelease(EncKey);
+      AvroWipeAndRelease(MacKey);
+      AvroWipeAndRelease(Salt);
+      AvroWipeAndRelease(IV);
+      AvroWipeAndRelease(Machine);
+      AvroWipeAndRelease(CipherTag);
+      AvroWipeAndRelease(HmacData);
+      AvroWipeAndRelease(Hmac);
+      AvroWipeAndRelease(HeaderSrc);
+      AvroWipeAndRelease(Compressed);
+      AvroWipeAndRelease(Bytecode);
+      AvroWipeAndRelease(Seed);
     end;
   finally
     Root.Free;

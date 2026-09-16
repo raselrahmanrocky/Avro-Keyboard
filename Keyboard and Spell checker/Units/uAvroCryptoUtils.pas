@@ -82,11 +82,15 @@ function DeriveKeySHA256FromString(const ASecretString: string; const ASalt: TBy
       key := SHA-256( ARawSecret + ASalt ) }
 function DeriveKeySHA256FromRawBytes(const ARawSecret: TBytes; const ASalt: TBytes): TBytes;
 
-{ Reconstructs the built-in default application secret at runtime from two
-  XOR-masked 64-byte arrays (AVROENCO_KEY_MASK / AVROENCO_KEY_XOR below), so a
-  plain 'strings' dump of the binary reveals only two random-looking tables.
-  The 44-byte secret is zero-padded to 64 bytes; reconstruction stops at the
-  first NUL. The temporary buffer is wiped before release. }
+{ Raw default-key secret IKM: exactly the bytes HKDF-SHA256 consumes for
+  default-key Shield containers. Preferred over the string accessor on the
+  load path because it never materialises a UTF-16 copy of the secret.
+  The returned array belongs to the caller; wipe it with AvroWipeAndRelease. }
+function GetAvroEncoSecretIKM: TBytes;
+
+{ Legacy ASCII accessor for the same secret. DEPRECATED - retained only for
+  uAnsiPersistentCache's cache key and the v1/v2 CBC reader. Do not use on the
+  Shield load path. }
 function GetAvroEncoDefaultSecret: string;
 
 { Fills ABuf (resized to ACount) with cryptographically strong random bytes
@@ -98,6 +102,9 @@ function GetAvroEncoDefaultSecret: string;
 procedure FillRandomBytes(var ABuf: TBytes; const ACount: Integer);
 
 implementation
+
+uses
+  uAvroShieldSecret;
 
 type
   TBlock         = array [0 .. 15] of Byte;
@@ -815,42 +822,32 @@ begin
 end;
 
 { =============================================================================
-  Default application secret (obfuscated) + CSPRNG entropy source
+  Default application secret + CSPRNG entropy source
+
+  The secret no longer lives in this unit. It is decoded by uAvroShieldSecret
+  from a single keystream-masked blob (xorshift32 keystream, rotl-indexed), and
+  the two accessors below are thin re-exports so existing callers keep working:
+
+    uAvroShield (Shield v2 KDF)  - GetAvroEncoSecretIKM     (raw bytes)
+    uAnsiPersistentCache         - GetAvroEncoDefaultSecret (cache key)
+    uAvroEncoCrypto (v1/v2 CBC)  - GetAvroEncoDefaultSecret (deprecated)
+
+  What was removed and why: the secret used to be stored as two adjacent
+  64-byte arrays whose XOR is the plaintext, and the plaintext was ALSO written
+  out in a source comment next to them. That made recovery a five-line script
+  for anyone reading the file. Recovering it now means reproducing the
+  keystream generator in uAvroShieldSecret, which protected builds wrap in
+  VMProtectBeginUltra.
   ============================================================================= }
 
-const
-  // 64-byte XOR key. Derived offline; never store the plain secret itself.
-  AVROENCO_KEY_XOR: array [0 .. 63] of Byte = (
-    $74, $07, $B6, $16, $6B, $42, $26, $37, $F6, $BE, $BB, $34, $10, $1D, $F9, $3A,
-    $09, $F9, $EE, $F1, $9C, $15, $D8, $4A, $B8, $AF, $F1, $B7, $A5, $2B, $88, $AE,
-    $52, $AC, $2E, $98, $81, $62, $85, $F4, $51, $8A, $83, $86, $A5, $50, $5F, $86,
-    $A3, $40, $D0, $4D, $E6, $F9, $3E, $98, $1F, $99, $B4, $09, $18, $0D, $E7, $21
-  );
-
-  // XOR-masked secret: AVROENCO_KEY_MASK[i] XOR AVROENCO_KEY_XOR[i] ==
-  // 'AvroEncoV2::d528c276cb5b80e16206151ba69bc74f' + NUL padding to 64 bytes.
-  AVROENCO_KEY_MASK: array [0 .. 63] of Byte = (
-    $35, $71, $C4, $79, $2E, $2C, $45, $58, $A0, $8C, $81, $0E, $74, $28, $CB, $02,
-    $6A, $CB, $D9, $C7, $FF, $77, $ED, $28, $80, $9F, $94, $86, $93, $19, $B8, $98,
-    $63, $99, $1F, $FA, $E0, $54, $BC, $96, $32, $BD, $B7, $E0, $A5, $50, $5F, $86,
-    $A3, $40, $D0, $4D, $E6, $F9, $3E, $98, $1F, $99, $B4, $09, $18, $0D, $E7, $21
-  );
+function GetAvroEncoSecretIKM: TBytes;
+begin
+  Result := AvroShieldSecretIKM;
+end;
 
 function GetAvroEncoDefaultSecret: string;
-var
-  Tmp: TBytes;
-  I:   Integer;
 begin
-  Result := '';
-  SetLength(Tmp, 64);
-  for I := 0 to 63 do
-    Tmp[I] := AVROENCO_KEY_MASK[I] xor AVROENCO_KEY_XOR[I];
-  I := 0;
-  while (I < 64) and (Tmp[I] <> 0) do
-    Inc(I);
-  Result := TEncoding.ASCII.GetString(Tmp, 0, I);
-  FillChar(Tmp[0], Length(Tmp), 0);
-  SetLength(Tmp, 0);
+  Result := AvroShieldSecretString;
 end;
 
 { RtlGenRandom is undocumented but stable since Windows 2000 and present in
