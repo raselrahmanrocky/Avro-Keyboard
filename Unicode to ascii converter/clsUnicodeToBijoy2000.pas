@@ -204,6 +204,24 @@ type
 procedure CaptureEngineState(var AState: TAnsiEngineState);
 procedure RestoreEngineState(var AState: TAnsiEngineState);
 
+{ True when a parked state cannot render anything: no registry means the A_*
+  glyph table is gone (every rule container is nil too). That is exactly what
+  a state captured while the globals were empty looks like - e.g. the engine
+  was ACTIVE when something re-parsed the globals, so CaptureEngineState had
+  nothing to take. Switching to such a slot silently strips every rule and
+  every lookup table: the UI then shows the version as selected while kars
+  (া ি ী ু ূ ৃ ে ৈ ো ৌ) emit nothing and consonants fall back to the compiled-in
+  default glyph scheme. The engine cache must treat a hollow slot as a cache
+  MISS and repair it from disk instead of switching to it. }
+function IsEngineStateHollow(const AState: TAnsiEngineState): Boolean;
+
+{ Zeroes a state record without touching the unit globals. TAnsiEngineState
+  owns class references (TList, TDictionary, ...), which are NOT managed types:
+  a freshly declared local record can contain garbage, so Clear /
+  CaptureEngineState would free or leak through it. Callers that need a scratch
+  state must start here. }
+procedure InitEngineState(out AState: TAnsiEngineState);
+
 var
   CustomFullForms:          TArray<TReplacementPair>;
   CustomPreReplacements:    TArray<TReplacementPair>;
@@ -3246,6 +3264,35 @@ begin
   FreeAndNil(ConsonantGroupRawMap);
   FreeAndNil(AnsiSequenceLookup);
   FreeAndNil(AnsiToUniMap);
+end;
+
+function IsEngineStateHollow(const AState: TAnsiEngineState): Boolean;
+begin
+  Result := (AState.AnsiRegistry = nil) or (AState.AnsiRegistry.Count = 0);
+end;
+
+procedure InitEngineState(out AState: TAnsiEngineState);
+begin
+  AState.DisplayName := '';
+  AState.ScalarValues := nil;
+  AState.CustomFullForms := nil;
+  AState.CustomPreReplacements := nil;
+  AState.CustomPostReplacements := nil;
+  AState.ActiveReplacements := nil;
+  AState.KarInclusiveReplacements := nil;
+  AState.VowelRules := nil;
+  AState.RfolaRules := nil;
+  AState.KarCorrections := nil;
+  AState.GroupKarCorrections := nil;
+  AState.AnsiRegistry := nil;
+  AState.AnsiRegistryMap := nil;
+  AState.AnsiOverrides := nil;
+  AState.ConsonantGroupMap := nil;
+  AState.AnsiGroupMap := nil;
+  AState.AnsiGroupRawMap := nil;
+  AState.ConsonantGroupRawMap := nil;
+  AState.AnsiSequenceLookup := nil;
+  AState.AnsiToUniMap := nil;
 end;
 
 { Moves the engine's global containers (and the A_* scalar values, captured

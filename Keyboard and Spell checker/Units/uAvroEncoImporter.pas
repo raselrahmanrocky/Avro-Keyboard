@@ -12,23 +12,32 @@ unit uAvroEncoImporter;
 { =============================================================================
   uAvroEncoImporter - smart conditional import of ".AvroEnco" mapping files.
 
-  Imports branch on the cryptographic container header (see uAvroEncoCrypto):
+  Imports branch on the protection flag of the cryptographic container header.
+  The flag is read through the canonical uAvroEncoCrypto.GetAvroEncoProtectionFlag
+  helper - the single source of truth shared with the engine loader, the folder
+  watcher and the version picker - so every code path agrees on whether a file
+  needs a password. It covers BOTH container formats that share the .AvroEnco
+  extension:
 
-      [0..8]   9 bytes  magic 'AVROENCO' + version byte ($02 = current)
-      [9]      1 byte   protection flag:
-                          $00 = password-less / Default Application Key
-                          $01 = user password
+    * v2 CBC containers (magic 'AVROENCO' + $02):
+          byte 9 = protection flag: $00 = Default Application Key,
+                                     $01 = user password
+    * Shield containers (magic 'AVROSHLD' + $02, AES-GCM + HMAC trailer):
+          byte 9 carries AVROSHLD_FLAG_DEFAULT_KEY ($10). A file WITH that bit
+          unlocks with the built-in application secret exactly like a v2 flag
+          $00 file; a file WITHOUT it is password protected.
 
-  * Flag $00 (password-less): NEVER shows uAvroPasswordDlg. The payload is
-    test-decrypted in memory with the internal default application master
-    key (pure Pascal AES-256-CBC); a valid JSON result (starts with '{')
+  * Default-key containers (v2 flag $00, or Shield with the default-key bit):
+    NEVER show uAvroPasswordDlg. The payload is test-decrypted in memory with
+    the built-in application secret; a valid JSON result (starts with '{')
     allows the import, otherwise an error is reported without a password
     prompt. Default-key imports are silent: the active mapping is not
     changed.
-  * Flag $01 (password protected): shows uAvroPasswordDlg via
-    PromptForPasswordAndValidate with up to 3 attempts, validates the
-    password against the file's salt/payload, then copies the file, caches
-    the password and ACTIVATES the imported mapping.
+  * Password-protected containers (v2 flag $01, Shield without the default-key
+    bit, legacy v1): show uAvroPasswordDlg via PromptForPasswordAndValidate
+    with up to 3 attempts, validate the password against the file's
+    salt/payload, then copy the file, cache the password and ACTIVATE the
+    imported mapping.
   * Legacy v1 containers ('AVROENCO' + $01, no flag byte) are treated as
     password protected so previously exported files keep importing.
   * Cancel / 3 failed attempts abort cleanly: no file is ever created or
@@ -43,7 +52,10 @@ uses
   Classes,
   Dialogs;
 
-// Imports a single .AvroEnco file, branching on its protection flag.
+// Imports a single .AvroEnco file, branching on its protection flag
+// (uAvroEncoCrypto.GetAvroEncoProtectionFlag). Default-key containers - v2
+// flag $00, or a Shield container carrying the default-key bit - are copied
+// silently, without any password dialog.
 // Returns True on success (file copied, menus rescanned, toast shown;
 // password-protected imports also get activated). AErrorMessage is empty
 // when the user cancelled a password prompt (not an error condition).
@@ -78,68 +90,6 @@ uses
 
 const
   MAX_PASSWORD_ATTEMPTS = 3;
-
-{ =============================================================================
-  Pure Pascal header pre-inspection (zero external DLL calls, reads only the
-  first 10 bytes of the file):
-
-      [0..8]  'AVROENCO' + $02        (validated)
-      [9]     protection flag        (returned)
-
-  Returns:
-      AVROENCO_FLAG_DEFAULT_KEY     ($00, password-less/default key)
-      AVROENCO_FLAG_USER_PASSWORD   ($01, password protected; also legacy v1
-                                     and any Shield-format container)
-      AVROENCO_FLAG_INVALID         (unreadable / bad magic / bad flag)
-  ============================================================================= }
-function InspectEncoProtectionFlag(const AFilePath: string): Byte;
-var
-  FS: TFileStream;
-  Header: array [0 .. 9] of Byte;
-begin
-  Result := AVROENCO_FLAG_INVALID;
-
-  if not FileExists(AFilePath) then
-    Exit;
-
-  // Shield-format containers (magic 'AVROSHLD') share the .AvroEnco
-  // extension and are always password protected (no default-key mode).
-  if IsAvroShieldContainer(AFilePath) then
-    Exit(AVROENCO_FLAG_USER_PASSWORD);
-
-  try
-    FS := TFileStream.Create(AFilePath, fmOpenRead or fmShareDenyNone);
-  except
-    Exit;
-  end;
-
-  try
-    if FS.Size < 10 then
-      Exit;
-    if FS.Read(Header[0], 10) <> 10 then
-      Exit;
-  finally
-    FS.Free;
-  end;
-
-  // Bytes 0..7 must be 'AVROENCO'.
-  if not CompareMem(@Header[0], @AVROENCO_MAGIC_BASE[0], 8) then
-    Exit;
-
-  case Header[8] of
-    AVROENCO_MAGIC_TAIL_V2:
-      begin
-        // Current container: byte 9 is the protection flag ($00 / $01).
-        if (Header[9] = AVROENCO_FLAG_DEFAULT_KEY) or
-          (Header[9] = AVROENCO_FLAG_USER_PASSWORD) then
-          Result := Header[9];
-      end;
-    AVROENCO_MAGIC_TAIL_V1:
-      // Legacy containers predate the flag byte and are always password
-      // protected (kept so previously exported files still import).
-      Result := AVROENCO_FLAG_USER_PASSWORD;
-  end;
-end;
 
 { ============================================================================= }
 function GenerateUniqueFileName(const ATargetDir, AFileName: string): string;
@@ -248,10 +198,20 @@ begin
   end;
 
   // --- 2. Pre-inspection of the protection flag (no prompt yet) -------------
-  // Pure Pascal header check: bytes 0..8 magic ('AVROENCO' + $02) + byte 9
-  // protection flag. No crypto DLLs are involved at this stage.
-  ProtectionFlag := InspectEncoProtectionFlag(ASourcePath);
-  if ProtectionFlag = AVROENCO_FLAG_INVALID then
+  // Canonical inspector (uAvroEncoCrypto): the same helper the engine loader,
+  // folder watcher and version picker use. Shield containers carrying the
+  // AVROSHLD_FLAG_DEFAULT_KEY bit report DEFAULT_KEY - exactly like v2 flag
+  // $00 - so they import silently instead of prompting. Only v2 flag $01,
+  // legacy v1 and Shield containers without the default-key bit are treated
+  // as password protected.
+  ProtectionFlag := GetAvroEncoProtectionFlag(ASourcePath);
+
+  // Fail closed on anything the inspector could not classify (unreadable file,
+  // bad magic, corrupt v2 flag byte). GetAvroEncoProtectionFlag returns the raw
+  // v2 flag byte, so this guard is what keeps a malformed flag from being
+  // silently routed into the default-key branch.
+  if (ProtectionFlag <> AVROENCO_FLAG_DEFAULT_KEY) and
+    (ProtectionFlag <> AVROENCO_FLAG_USER_PASSWORD) then
   begin
     AErrorMessage := 'Invalid .AvroEnco file header.';
     Exit;
