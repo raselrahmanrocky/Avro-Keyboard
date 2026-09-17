@@ -43,12 +43,19 @@ function GetJSONString(const AObj: TJSONValue; const AKey: string): string;
 function FindMetadataJsonPath(const ADisplayName: string; const ADirectory: string): string;
 function GetActiveEncoFilePath(const ADisplayName: string; const ADirectory: string): string;
 
+{ True when a font family with this name is registered on this computer.
+  Matching is intentionally loose (case, spaces and punctuation ignored, with
+  either name allowed to be a prefix of the other) so that "Adarsh aLipi" finds
+  "AdarshaLipiNormal" and "SutonnyMJ" finds "Sutonny MJ". }
+function IsFontFamilyInstalled(const AFontName: string): Boolean;
+
 implementation
 
 uses
   uAvroEncoCrypto,
   clsUnicodeToBijoy2000,
   uFileFolderHandling,
+  System.Win.Registry,
   DebugLog;
 
 procedure InitializeEncoManager;
@@ -287,7 +294,88 @@ begin
   if LModifiedBy <> '' then
     Result := Result + 'Modified By: ' + LModifiedBy + sLineBreak;
   if LFont <> '' then
+  begin
     Result := Result + sLineBreak + 'Suggested Font: ' + LFont + sLineBreak;
+    // The engine emits exactly the byte values the mapping asks for. Only this
+    // font renders those bytes as the intended Bangla; with any other ANSI font
+    // active the text looks jumbled - which is easily mistaken for a corrupt
+    // .AvroEnco file. Say so in the card instead of letting the file take the
+    // blame.
+    if not IsFontFamilyInstalled(LFont) then
+      Result := Result + 'Note: this font was not found on this computer - ' +
+        'text encoded with this mapping reads correctly only in ' + LFont + '.' +
+        sLineBreak;
+  end;
+end;
+
+function NormalizeFontName(const S: string): string;
+var
+  I: Integer;
+  C: Char;
+begin
+  Result := '';
+  for I := 1 to Length(S) do
+  begin
+    C := S[I];
+    if CharInSet(C, ['A'..'Z', 'a'..'z', '0'..'9']) then
+      Result := Result + LowerCase(C);
+  end;
+end;
+
+function FontNameMatches(const ARegistered, AWanted: string): Boolean;
+var
+  LRegistered, LWanted: string;
+begin
+  LRegistered := NormalizeFontName(ARegistered);
+  LWanted := NormalizeFontName(AWanted);
+  Result := (LRegistered <> '') and (LWanted <> '') and
+    ((LRegistered = LWanted) or (Pos(LWanted, LRegistered) = 1) or
+     (Pos(LRegistered, LWanted) = 1));
+end;
+
+const
+  FONT_REGISTRY_KEY = 'SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts';
+
+// Windows registers every installed face as a value whose name is the font's
+// display name ("Family (TrueType)" or "Family Style (TrueType)").
+function FontKeyHasFamily(ARoot: HKEY; const AWanted: string): Boolean;
+var
+  Reg: TRegistry;
+  Names: TStringList;
+  I, Cut: Integer;
+  RegName: string;
+begin
+  Result := False;
+  Reg := TRegistry.Create(KEY_READ);
+  try
+    Reg.RootKey := ARoot;
+    if not Reg.OpenKeyReadOnly(FONT_REGISTRY_KEY) then
+      Exit;
+    Names := TStringList.Create;
+    try
+      Reg.GetValueNames(Names);
+      for I := 0 to Names.Count - 1 do
+      begin
+        RegName := Names[I];
+        Cut := Pos('(', RegName);
+        if Cut > 0 then
+          RegName := Trim(Copy(RegName, 1, Cut - 1));
+        if FontNameMatches(RegName, AWanted) then
+          Exit(True);
+      end;
+    finally
+      Names.Free;
+    end;
+  finally
+    Reg.Free;
+  end;
+end;
+
+function IsFontFamilyInstalled(const AFontName: string): Boolean;
+begin
+  Result := (Trim(AFontName) <> '') and
+    (FontKeyHasFamily(HKEY_CURRENT_USER, AFontName) or
+     FontKeyHasFamily(HKEY_LOCAL_MACHINE, AFontName));
 end;
 
 function GetJSONString(const AObj: TJSONValue; const AKey: string): string;

@@ -33,6 +33,19 @@ unit uAnsiEngineManager;
   the cheap parse + capture phase takes the lock. (Shield v2 decryption
   is millisecond-level; no slow KDF remains in the project.)
 
+  Ownership invariant (every path in this unit depends on it): either the unit
+  globals own the ACTIVE engine's containers - FCurrentKey names its slot and
+  that slot is empty - or the globals are empty and every engine sits in its
+  slot. A parse must therefore never run on top of a live engine:
+  LoadAnsiMappingFromJSON starts with ResetAnsiToDefaults, which frees the
+  globals' containers, so parsing while an engine is active used to destroy
+  the running engine and leave its slot hollow (an engine with no registry and
+  no rule tables: the version looked selected while every kar emitted nothing
+  and consonants fell back to the compiled-in default glyph scheme).
+  ParkLive enforces the invariant before every parse, EnsureLiveEngine keeps
+  the app from ever running without an engine, and a hollow slot is treated as
+  a cache MISS (rebuilt from its file) instead of being served.
+
   Memory: every parked state owns its containers; the manager frees them in
   Destroy (initialization/finalization of this unit), so FastMM reports no
   leaks on application shutdown.
@@ -88,6 +101,34 @@ type
     FCurrentKey: string;
     FLock: TCriticalSection; // serializes every engine-state mutation
     function SlotKey(const AName: string): string;
+    { True while the unit globals actually hold a parsed engine. Invariant the
+      whole cache rests on: either the globals own the active engine's
+      containers (FCurrentKey names its slot, which is empty), or the globals
+      are empty and every engine sits in its slot. Every parse runs with empty
+      globals so it can never destroy the engine that is currently live. }
+    function GlobalsHoldEngine: Boolean;
+    { Moves the live engine's containers back into its own slot, leaving the
+      globals empty (the precondition of every parse). Never hollows a slot:
+      with empty globals this is a no-op. Returns True when it parked
+      something. Caller must hold FLock. }
+    function ParkLive: Boolean;
+    { Restores AKey's parked state into the globals. False for a missing or
+      hollow slot - the caller then treats it as a cache MISS instead of
+      serving an engine that cannot render. Publishes no version name. }
+    function RestoreSlotState(const AKey: string): Boolean;
+    { RestoreSlotState + publishes AName as the active display name; False when
+      the slot is hollow. }
+    function TryRestoreSlot(const AKey, AName: string): Boolean;
+    { True when AName's parked state is missing or hollow. }
+    function IsSlotHollow(const AKey: string): Boolean;
+    { Fail-closed safety net: when the globals hold no engine, put the active
+      slot back (or Default) so the app is never left engine-less. Never
+      changes AnsiVersion - callers that genuinely switch publish the name
+      themselves, and the startup restore path reads that global. }
+    procedure EnsureLiveEngine;
+    { Puts a live engine the caller just parked by hand back in place after a
+      failed parse. }
+    procedure RestoreParkedEngine(const AParked: Boolean);
     { Parses AJSON into the globals and parks the result in a new slot added
       to FCache. AFilePath is stored on the slot for the directory watcher.
       Password-protected containers are decrypted by the CALLER (version
@@ -112,6 +153,11 @@ type
     constructor Create;
     destructor Destroy; override;
     property CurrentEngineName: string read FCurrentKey;
+    { True while the active engine is really usable - the UI/tests can use this
+      instead of trusting CurrentEngineName alone. }
+    function LiveEngineReady: Boolean;
+    { True when AName's parked engine is complete (cached and not hollow). }
+    function CachedEngineReady(const AName: string): Boolean;
     { Snapshots the engines that can unlock without user interaction
       (built-in Default, default-key containers, plain .json mappings and
       password-protected containers with a persisted password). Call on the
@@ -167,6 +213,11 @@ type
     destructor Destroy; override;
   end;
 
+const
+  { Slot key of the compiled-in default engine (FCurrentKey / AddOrSetValue
+    compare against this lowercase form). }
+  DefaultEngineSlotKey = 'default';
+
 var
   AnsiEngineManager: TAnsiEngineManager;
 
@@ -217,14 +268,139 @@ begin
   Result := Lowercase(Trim(AName));
 end;
 
+function TAnsiEngineManager.GlobalsHoldEngine: Boolean;
+begin
+  Result := (AnsiRegistry <> nil) and (AnsiRegistry.Count > 0);
+end;
+
+function TAnsiEngineManager.LiveEngineReady: Boolean;
+begin
+  Result := GlobalsHoldEngine;
+end;
+
+function TAnsiEngineManager.IsSlotHollow(const AKey: string): Boolean;
+var
+  Slot: TEngineSlot;
+begin
+  Result := True; // missing counts as unusable
+  if FCache.TryGetValue(AKey, Slot) then
+    Result := IsEngineStateHollow(Slot.State);
+end;
+
+function TAnsiEngineManager.CachedEngineReady(const AName: string): Boolean;
+begin
+  Result := not IsSlotHollow(SlotKey(AName));
+end;
+
+function TAnsiEngineManager.ParkLive: Boolean;
+var
+  Slot: TEngineSlot;
+  Orphan: TAnsiEngineState; // owns, then discards, a live engine no slot claims
+begin
+  Result := False;
+  if not GlobalsHoldEngine then
+    Exit;
+
+  // A scratch state must be zeroed explicitly: TAnsiEngineState holds class
+  // references, which are not managed types and would otherwise be garbage.
+  InitEngineState(Orphan);
+
+  if (FCurrentKey <> '') and FCache.TryGetValue(FCurrentKey, Slot) then
+  begin
+    CaptureEngineState(Slot.State); // globals -> slot; globals become empty
+    Result := True;
+    Exit;
+  end;
+
+  // Live globals that no slot owns: the engine the active-mapping refresh
+  // parsed before CommitPreload ran, or a slot dropped underneath the active
+  // engine. Ownership must not leak into the next parse, so take it over and
+  // discard it - the owning slot is rebuilt from its file on demand.
+  CaptureEngineState(Orphan);
+  Orphan.Clear;
+  Log('Engine state: discarded un-owned live engine (active slot "' +
+    FCurrentKey + '")');
+  Result := True;
+end;
+
+function TAnsiEngineManager.RestoreSlotState(const AKey: string): Boolean;
+var
+  Slot: TEngineSlot;
+begin
+  Result := False;
+  if not FCache.TryGetValue(AKey, Slot) then
+    Exit;
+  if IsEngineStateHollow(Slot.State) then
+    Exit;
+  RestoreEngineState(Slot.State);
+  FCurrentKey := AKey;
+  Result := True;
+end;
+
+function TAnsiEngineManager.TryRestoreSlot(const AKey, AName: string): Boolean;
+begin
+  Result := RestoreSlotState(AKey);
+  if not Result then
+    Exit;
+  if AName <> '' then
+    AnsiVersion := AName;
+end;
+
+procedure TAnsiEngineManager.RestoreParkedEngine(const AParked: Boolean);
+begin
+  if not AParked then
+    Exit;
+  if (FCurrentKey = '') or (not RestoreSlotState(FCurrentKey)) then
+    Exit;
+  Log('Engine state: parse failed - kept active engine "' + FCurrentKey + '"');
+end;
+
+procedure TAnsiEngineManager.EnsureLiveEngine;
+var
+  PrevKey: string;
+begin
+  if GlobalsHoldEngine then
+    Exit;
+
+  PrevKey := FCurrentKey;
+  if (PrevKey <> '') and (PrevKey <> DefaultEngineSlotKey) and
+    RestoreSlotState(PrevKey) then
+  begin
+    Log('Engine state repaired: restored active engine "' + PrevKey + '"');
+    Exit;
+  end;
+
+  // Nothing usable to restore: Default always exists and always renders, so
+  // the app can never be left with no engine at all.
+  if RestoreSlotState(DefaultEngineSlotKey) then
+  begin
+    if PrevKey <> '' then
+      Log('WARNING: live engine "' + PrevKey +
+        '" was empty - fell back to Default (repair pending)')
+    else
+      Log('Engine state: no engine active - Default activated');
+    Exit;
+  end;
+
+  Log('WARNING: no usable ANSI engine available');
+end;
+
 function TAnsiEngineManager.ParseJSONIntoSlot(const AName, AFilePath, AJSON: string;
   ErrorLog: TStringList = nil): Boolean;
 var
   JSON: string;
   Slot: TEngineSlot;
+  LiveParked: Boolean;
 begin
   Result := False;
   JSON := AJSON;
+
+  // LoadAnsiMappingFromJSON starts with ResetAnsiToDefaults, which frees the
+  // globals' containers. While an engine is ACTIVE those containers belong to
+  // it (its slot is empty), so parsing on top of it would destroy the running
+  // engine and leave a hollow slot behind. Park it first; every failure path
+  // below puts it back, so a failed load never costs the app its engine.
+  LiveParked := ParkLive;
 
   // Strip a leading UTF-8 BOM if one survived.
   if (Length(JSON) >= 3) and (JSON[1] = #$EF) and (JSON[2] = #$BB) and
@@ -234,6 +410,7 @@ begin
   begin
     if Assigned(ErrorLog) then
       ErrorLog.Add('Error: Mapping file is empty: ' + AName);
+    RestoreParkedEngine(LiveParked);
     Exit;
   end;
 
@@ -244,6 +421,7 @@ begin
     begin
       if Assigned(ErrorLog) then
         ErrorLog.Add('Error: Mapping parse exception: ' + E.Message);
+      RestoreParkedEngine(LiveParked);
       Exit;
     end;
   end;
@@ -255,6 +433,7 @@ begin
   begin
     if Assigned(ErrorLog) then
       ErrorLog.Add('Error: mapping parse produced no engine for ' + AName);
+    RestoreParkedEngine(LiveParked);
     Exit;
   end;
   if (Length(CustomFullForms) = 0) and (Length(CustomPreReplacements) = 0) and
@@ -265,6 +444,7 @@ begin
   begin
     if Assigned(ErrorLog) then
       ErrorLog.Add('Error: mapping contains no usable rules for ' + AName);
+    RestoreParkedEngine(LiveParked);
     Exit;
   end;
 
@@ -279,7 +459,15 @@ begin
       Slot.LastWriteTime := 0;
     end;
   CaptureEngineState(Slot.State);
-  FCache.AddOrSetValue(SlotKey(AName), Slot);
+  // CaptureEngineState stamps the CURRENT AnsiVersion, which is the name of the
+  // engine we just parked (or the one still being requested). The parsed file's
+  // own name is authoritative for the slot and for every later restore.
+  Slot.State.DisplayName := AName;
+  // Never replace a slot that still owns containers: dropping first keeps the
+  // one-owner rule (a blind AddOrSetValue would leak the old engine).
+  if FCache.ContainsKey(SlotKey(AName)) then
+    DropSlot(SlotKey(AName));
+  FCache.Add(SlotKey(AName), Slot);
   Result := True;
 end;
 
@@ -297,9 +485,13 @@ begin
   begin
     Slot := TEngineSlot.Create;
     Slot.DisplayName := AName;
+    ParkLive; // same quarantine as the JSON path: never reset over a live engine
     ResetAnsiToDefaults;
     CaptureEngineState(Slot.State);
-    FCache.AddOrSetValue(SlotKey(AName), Slot);
+    Slot.State.DisplayName := AName;
+    if FCache.ContainsKey(SlotKey(AName)) then
+      DropSlot(SlotKey(AName));
+    FCache.Add(SlotKey(AName), Slot);
     Result := True;
     Exit;
   end;
@@ -348,13 +540,10 @@ begin
 end;
 
 procedure TAnsiEngineManager.ParkCurrent;
-var
-  Slot: TEngineSlot;
 begin
-  if FCurrentKey = '' then
-    Exit;
-  if FCache.TryGetValue(FCurrentKey, Slot) then
-    CaptureEngineState(Slot.State);
+  // Guarded on purpose: capturing EMPTY globals into a slot would wipe a good
+  // parked engine (exactly how a valid slot used to become hollow).
+  ParkLive;
 end;
 
 procedure TAnsiEngineManager.DropSlot(const AKey: string);
@@ -422,12 +611,14 @@ begin
     Err := TStringList.Create;
     try
       // 1. Built-in Default engine - always available, switchable in O(1).
-      if not FCache.ContainsKey('default') then
+      if not FCache.ContainsKey(DefaultEngineSlotKey) then
       begin
         Err.Clear;
         ParseIntoSlot('Default', '', Err);
       end;
-      // 2. Every decrypted snapshot engine.
+      // 2. Every decrypted snapshot engine. Each parse parks the engine that
+      //    is live (mid-session preload) and leaves it parked on success, so
+      //    EnsureLiveEngine puts it back once the batch is done.
       for R in AResults do
       begin
         if not R.OK then
@@ -442,10 +633,14 @@ begin
           Continue;
         Err.Clear;
         if ParseJSONIntoSlot(R.DisplayName, R.FilePath, R.JSON, Err) then
-          Inc(Result)
+        begin
+          Inc(Result);
+          Log('Engine preloaded: ' + R.DisplayName);
+        end
         else
           Log('Engine preload failed: ' + R.DisplayName + ' - ' + Err.Text);
       end;
+      EnsureLiveEngine;
     finally
       Err.Free;
     end;
@@ -457,7 +652,7 @@ end;
 function TAnsiEngineManager.SwitchEngine(const AName: string;
   ErrorLog: TStringList = nil): Boolean;
 var
-  Key, Path: string;
+  Key, Path, PrevKey: string;
   OwnErr: Boolean;
 begin
   Result := False;
@@ -470,32 +665,62 @@ begin
     ErrorLog := TStringList.Create;
   FLock.Enter;
   try
-    // Idempotent: already active and cached.
-    if (Key = FCurrentKey) and FCache.ContainsKey(Key) then
-      Exit(True);
+    PrevKey := FCurrentKey;
 
-    // Load on demand (password-protected engine or file added at runtime).
-    if not FCache.ContainsKey(Key) then
+    // Idempotent: already active AND the globals really hold its state. The
+    // ContainsKey check alone used to be a lie: when something had parsed over
+    // the live engine the slot stayed in place but empty, so every later click
+    // on the same version returned True while typing stayed broken.
+    if (Key = FCurrentKey) and FCache.ContainsKey(Key) then
     begin
-      if Key = 'default' then
+      if GlobalsHoldEngine then
+        Exit(True);
+      if RestoreSlotState(Key) then
+      begin
+        AnsiVersion := AName;
+        Log('Engine switch: repaired active engine "' + AName + '"');
+        Exit(True);
+      end;
+      DropSlot(Key); // hollow: rebuild it from disk below
+      Log('Engine switch: hollow state for "' + AName +
+        '" - re-parsing from disk');
+    end;
+
+    // Load on demand (password-protected engine, file added at runtime, or the
+    // hollow-repair case above). ParseIntoSlot parks the live engine first and
+    // puts it back when the parse fails, so the active engine survives either
+    // way (fail-closed).
+    if (not FCache.ContainsKey(Key)) or IsSlotHollow(Key) then
+    begin
+      if Key = DefaultEngineSlotKey then
         Path := ''
       else
         Path := GetActiveEncoFilePath(AName, AnsiMappingDir);
-      if (Path = '') and (Key <> 'default') then
+      if (Path = '') and (Key <> DefaultEngineSlotKey) then
       begin
         if Assigned(ErrorLog) then
           ErrorLog.Add('Mapping file not found: ' + AName);
+        EnsureLiveEngine;
         Exit;
       end;
+      DropSlot(Key);
       if not ParseIntoSlot(AName, Path, ErrorLog) then
+      begin
+        EnsureLiveEngine;
         Exit;
+      end;
     end;
 
-    // O(1) engine swap: park current, restore target.
+    // O(1) engine swap: park current (a no-op right after a parse, which
+    // already parked it), then restore the target - never a hollow state.
     ParkCurrent;
-    RestoreEngineState(FCache[Key].State);
-    FCurrentKey := Key;
-    AnsiVersion := AName;
+    if not TryRestoreSlot(Key, AName) then
+    begin
+      Log('Engine switch failed: "' + AName + '" state is hollow');
+      EnsureLiveEngine;
+      Exit;
+    end;
+    Log('Engine switch: "' + PrevKey + '" -> "' + Key + '"');
     Result := True;
   finally
     FLock.Leave;
@@ -506,7 +731,7 @@ end;
 
 function TAnsiEngineManager.TrySwitchCached(const AName: string): Boolean;
 var
-  Key: string;
+  Key, PrevKey: string;
 begin
   Result := False;
   Key := SlotKey(AName);
@@ -515,12 +740,46 @@ begin
   // A picker/menu click must never wait behind parser/refresh work.
   if not FLock.TryEnter then Exit;
   try
-    if (Key = FCurrentKey) and FCache.ContainsKey(Key) then Exit(True);
-    if not FCache.ContainsKey(Key) then Exit;
+    if not FCache.ContainsKey(Key) then Exit; // never cached: caller repairs
+
+    // Already active AND really live: O(1) no-op. This must come before the
+    // hollow test - the active engine's slot is empty BY DESIGN (the globals
+    // own its containers while it runs), so IsSlotHollow is true here even in
+    // the healthy case.
+    if (Key = FCurrentKey) and GlobalsHoldEngine then Exit(True);
+
+    PrevKey := FCurrentKey;
+    if Key = FCurrentKey then
+    begin
+      // Active name but empty globals: the slot may still be valid (restore
+      // it in place) or hollow (caller must repair from disk).
+      if RestoreSlotState(Key) then
+      begin
+        AnsiVersion := AName;
+        Log('Engine switch (fast path): repaired active engine "' + AName + '"');
+        Exit(True);
+      end;
+      Log('Engine switch (fast path): active engine "' + AName +
+        '" is hollow - repair required');
+      Exit;
+    end;
+
+    // A hollow slot is a cache MISS, not a switch: serving it would strip
+    // every rule/lookup table and silently leave typing broken.
+    if IsSlotHollow(Key) then
+    begin
+      Log('Engine switch (fast path): "' + AName +
+        '" is hollow - repair required');
+      Exit;
+    end;
+
     ParkCurrent;
-    RestoreEngineState(FCache[Key].State);
-    FCurrentKey := Key;
-    AnsiVersion := AName;
+    if not TryRestoreSlot(Key, AName) then
+    begin
+      Log('Engine switch (fast path) failed: "' + AName + '"');
+      Exit;
+    end;
+    Log('Engine switch: "' + PrevKey + '" -> "' + Key + '" (fast path)');
     Result := True;
   finally
     FLock.Leave;
@@ -531,6 +790,7 @@ procedure TAnsiEngineManager.WarmAllEngines(const AReturnTo: string);
 var
   Keys: TList<string>;
   Key, ReturnKey: string;
+  Warmed: Integer;
 begin
   ReturnKey := SlotKey(AReturnTo);
   FLock.Enter;
@@ -538,21 +798,36 @@ begin
     Keys := TList<string>.Create;
     try
       for Key in FCache.Keys do Keys.Add(Key);
+      Warmed := 0;
       // Exercise every park/restore path before the keyboard hook starts.
+      // Hollow slots are skipped: they cannot be restored and would only
+      // waste the warm pass (and make it end on a broken engine).
       for Key in Keys do
-        if (Key <> FCurrentKey) and FCache.ContainsKey(Key) then
+        if (Key <> FCurrentKey) and (not IsSlotHollow(Key)) then
         begin
           ParkCurrent;
-          RestoreEngineState(FCache[Key].State);
-          FCurrentKey := Key;
+          if RestoreSlotState(Key) then
+            Inc(Warmed);
         end;
-      if (ReturnKey <> FCurrentKey) and FCache.ContainsKey(ReturnKey) then
+      if (ReturnKey <> FCurrentKey) and (not IsSlotHollow(ReturnKey)) then
       begin
         ParkCurrent;
-        RestoreEngineState(FCache[ReturnKey].State);
-        FCurrentKey := ReturnKey;
+        RestoreSlotState(ReturnKey);
       end;
-      AnsiVersion := AReturnTo;
+
+      if GlobalsHoldEngine and (FCurrentKey = ReturnKey) then
+        AnsiVersion := AReturnTo
+      else
+      begin
+        // The requested engine could not be restored (hollow or missing).
+        // Never advertise it while another engine is live - the next switch
+        // repairs it from disk.
+        EnsureLiveEngine;
+        Log('WARNING: warm pass could not activate "' + AReturnTo +
+          '" - active engine is "' + FCurrentKey + '"');
+      end;
+      Log('Engine cache warmed: ' + IntToStr(Warmed) + ' engine(s), active="' +
+        FCurrentKey + '"');
     finally
       Keys.Free;
     end;
@@ -587,19 +862,31 @@ begin
       if WasActive then
       begin
         // Never leave the app without a working engine: fall back to Default.
-        if FCache.ContainsKey('default') then
-        begin
-          RestoreEngineState(FCache['default'].State);
-          FCurrentKey := 'default';
-          AnsiVersion := 'Default';
-        end;
-      end;
+        if TryRestoreSlot(DefaultEngineSlotKey, 'Default') then
+          Log('WARNING: active engine "' + AName +
+            '" could not be reparsed - fell back to Default')
+        else
+          EnsureLiveEngine;
+      end
+      else
+        // The failed parse parked the still-live engine; put it back.
+        EnsureLiveEngine;
       Exit;
     end;
+
     if WasActive then
     begin
-      RestoreEngineState(FCache[Key].State);
-      AnsiVersion := AName;
+      if not TryRestoreSlot(Key, AName) then
+        EnsureLiveEngine;
+      Log('Engine invalidated (active): ' + AName);
+    end
+    else
+    begin
+      // A background file change for a NON-active mapping used to parse on top
+      // of the live engine and destroy it. The parse is quarantined now, so
+      // the running engine only has to be put back to work.
+      EnsureLiveEngine;
+      Log('Engine invalidated (background): ' + AName);
     end;
   finally
     Err.Free;
@@ -669,8 +956,14 @@ begin
             DoInvalidateEngine(Name);
         end
         else
+        begin
+          Log('Engine added while running: ' + Name);
           ParseIntoSlot(Name, Info.FilePath, nil);
+        end;
       end;
+
+    // A newly parsed engine parks the live one; put the running engine back.
+    EnsureLiveEngine;
   finally
     FLock.Leave;
   end;
