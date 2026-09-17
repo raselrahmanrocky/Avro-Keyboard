@@ -35,6 +35,8 @@ type
     ListBox: TListBox;
     procedure FormShow(Sender: TObject);
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
+    procedure FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
+    procedure FormKeyPress(Sender: TObject; var Key: Char);
     procedure ListBoxKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
     procedure ListBoxClick(Sender: TObject);
     procedure ListBoxDrawItem(Control: TWinControl; Index: Integer; Rect: TRect; State: TOwnerDrawState);
@@ -54,6 +56,10 @@ type
       function GetSelectedVersion: string;
       procedure AutoSizeForm;
       procedure CloseAndRestoreTarget;
+      function HandlePickerKey(var AKey: Word): Boolean;
+      function HandlePickerChar(var AChar: Char): Boolean;
+      procedure MoveSelection(ADelta: Integer);
+      procedure ActivateIndex(AIndex: Integer);
       procedure WMNCActivate(var Msg: TWMNCActivate); message WM_NCACTIVATE;
       procedure WMFocusPicker(var Msg: TMessage); message WM_FOCUS_PICKER;
       procedure WMTimer(var Msg: TMessage); message WM_TIMER;
@@ -179,6 +185,20 @@ begin
   FPopup := TPopupMenu.Create(Self);
   ListBox.PopupMenu := FPopup;
 
+  // KeyPreview routes every key through the form before the focused control
+  // sees it, so the type/number shortcuts work even when the list box never
+  // gets real input focus. VCL stops the chain as soon as the form zeroes Key
+  // (Vcl.Controls.DoKeyDown/DoKeyPress return True), so a key that the form
+  // handles can never reach the list box handlers as well.
+  //
+  // ActiveControl is deliberately NOT set here: the form is still invisible in
+  // Setup, so TWinControl.CanFocus is False and TCustomForm.SetActiveControl
+  // would raise EInvalidOperation (SCannotFocus). Focus is established after
+  // Show, in WMFocusPicker below.
+  KeyPreview := True;
+  OnKeyDown := FormKeyDown;
+  OnKeyPress := FormKeyPress;
+
   OnShow := FormShow;
   OnClose := FormClose;
   PopulateVersions;
@@ -193,24 +213,42 @@ end;
 
 procedure TfrmAnsiVersionPicker.WMFocusPicker(var Msg: TMessage);
 begin
-  if IsWindow(Handle) then
-  begin
-    ForceForegroundWindow(Handle);
-    if ListBox.CanFocus then
-      ListBox.SetFocus;
-  end;
+  if not IsWindow(Handle) then
+    Exit;
+  ForceForegroundWindow(Handle);
+  // CanFocus only walks the visible/enabled chain - it says nothing about who
+  // really owns the input focus, which is why this check made the shortcuts go
+  // dead while mouse clicks kept working. Move the focus, then verify.
+  if ListBox.CanFocus then
+    ListBox.SetFocus;
+  if GetFocus <> ListBox.Handle then
+    // The pre-08d48cd build handed the list box this message directly and its
+    // keyboard shortcuts worked. Kept as the fallback for when
+    // SetForegroundWindow loses the activation race with the menu/popup the
+    // picker was opened from.
+    PostMessage(ListBox.Handle, WM_SETFOCUS, 0, 0);
 end;
 
 procedure TfrmAnsiVersionPicker.WMTimer(var Msg: TMessage);
 begin
   // Never close the picker while an app-modal dialog (e.g. the password
-  // prompt) is up: closing+feeing the picker from the timer during
+  // prompt) is up: closing+freeing the picker from the timer during
   // ListBoxClick's ShowModal would continue executing on a freed form.
-  if (Application.ModalLevel = 0) and (GetForegroundWindow <> Handle) then
+  if Application.ModalLevel <> 0 then
+    Exit;
+
+  if GetForegroundWindow <> Handle then
   begin
     KillTimer(Handle, 1);
     Close;
+    Exit;
   end;
+
+  // Foreground, but the focus went elsewhere (activation raced with the menu
+  // that opened the picker): the window looks alive and simply ignores the
+  // keyboard. Re-assert the focus; SetFocus is idempotent once it holds.
+  if (GetFocus <> ListBox.Handle) and ListBox.CanFocus then
+    ListBox.SetFocus;
 end;
 
 procedure TfrmAnsiVersionPicker.FormClose(Sender: TObject; var Action: TCloseAction);
@@ -492,49 +530,100 @@ begin
   // while typing still produces the previous engine's output.
   ShowAnsiToastNotification('ANSI encoding failed to load - try again');
 end;
-procedure TfrmAnsiVersionPicker.ListBoxKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
+{ =============================================================================== }
+{ Keyboard shortcuts }
+{ =============================================================================== }
+
+{ Confirms AIndex exactly like a mouse click does: select the row, switch the
+  engine, persist the setting and close the picker. }
+procedure TfrmAnsiVersionPicker.ActivateIndex(AIndex: Integer);
+begin
+  if (AIndex < 0) or (AIndex >= ListBox.Items.Count) then
+    Exit;
+  ListBox.ItemIndex := AIndex;
+  ListBoxClick(nil);
+end;
+
+{ Wrapping selection move. Needed at form level too: when the form window holds
+  the focus, the list box never sees VK_UP / VK_DOWN at all. }
+procedure TfrmAnsiVersionPicker.MoveSelection(ADelta: Integer);
+begin
+  if ListBox.Items.Count = 0 then
+    Exit;
+  if ListBox.ItemIndex < 0 then
+    ListBox.ItemIndex := 0
+  else
+    ListBox.ItemIndex := (ListBox.ItemIndex + ADelta + ListBox.Items.Count)
+      mod ListBox.Items.Count;
+end;
+
+{ The single key implementation. Returns True when the key was consumed, and the
+  caller is expected to zero it - which is also what makes VCL skip the other
+  handler for the same key, so a shortcut can never be handled twice. }
+function TfrmAnsiVersionPicker.HandlePickerKey(var AKey: Word): Boolean;
 var
   TargetIdx: Integer;
 begin
-  TargetIdx := -1;
-
-  case Key of
+  Result := True;
+  case AKey of
     VK_ESCAPE:
-      begin
-        if Assigned(CurrentPicker) then
-          Close;
-      end;
+      if Assigned(CurrentPicker) then
+        Close;
     VK_RETURN:
       if ListBox.ItemIndex >= 0 then
         ListBoxClick(nil);
     VK_UP:
-      begin
-        if ListBox.ItemIndex <= 0 then
-          ListBox.ItemIndex := ListBox.Items.Count - 1
-        else
-          ListBox.ItemIndex := ListBox.ItemIndex - 1;
-        Key := 0;
-      end;
+      MoveSelection(-1);
     VK_DOWN:
-      begin
-        if ListBox.ItemIndex >= ListBox.Items.Count - 1 then
-          ListBox.ItemIndex := 0
-        else
-          ListBox.ItemIndex := ListBox.ItemIndex + 1;
-        Key := 0;
-      end;
-    Ord('1') .. Ord('9'):
-      TargetIdx := Key - Ord('1');
-    VK_NUMPAD1 .. VK_NUMPAD9:
-      TargetIdx := Key - VK_NUMPAD1;
+      MoveSelection(1);
+  else
+    begin
+      // Number row (VK_1..VK_9) and numpad (VK_NUMPAD1..VK_NUMPAD9), mapping
+      // to the very numbers the list draws next to the rows.
+      TargetIdx := MappingIndexForKey(ListBox.Items, AKey);
+      if TargetIdx < 0 then
+        Result := False
+      else
+        ActivateIndex(TargetIdx);
+    end;
   end;
+  if Result then
+    AKey := 0;
+end;
 
-  if (TargetIdx >= 0) and (TargetIdx < ListBox.Items.Count) then
-  begin
-    ListBox.ItemIndex := TargetIdx;
-    ListBoxClick(nil);
-    Key := 0;
-  end;
+{ First-letter navigation. Zeroing AChar also suppresses the list box's own
+  type-ahead for the same letter, so the selection happens exactly once. }
+function TfrmAnsiVersionPicker.HandlePickerChar(var AChar: Char): Boolean;
+var
+  TargetIdx: Integer;
+begin
+  Result := False;
+  if AChar < ' ' then
+    Exit;
+  TargetIdx := MappingIndexForChar(ListBox.Items, AChar);
+  if TargetIdx < 0 then
+    Exit;
+  AChar := #0;
+  Result := True;
+  ActivateIndex(TargetIdx);
+end;
+
+procedure TfrmAnsiVersionPicker.FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
+begin
+  HandlePickerKey(Key);
+end;
+
+procedure TfrmAnsiVersionPicker.FormKeyPress(Sender: TObject; var Key: Char);
+begin
+  HandlePickerChar(Key);
+end;
+
+procedure TfrmAnsiVersionPicker.ListBoxKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
+begin
+  // Kept for the case where the list box owns the focus and the form-level
+  // handler declined the key. Both handlers share one implementation, and VCL
+  // only ever calls one of them per key.
+  HandlePickerKey(Key);
 end;
 
 procedure TfrmAnsiVersionPicker.BuildPopupMenu(const MappingName: string);
