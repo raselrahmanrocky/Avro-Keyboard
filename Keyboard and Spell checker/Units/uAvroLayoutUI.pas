@@ -168,6 +168,11 @@ begin
     BuildSingleMenu(AvroMainForm1.AnsiVersionSubmenu1, AnsiDir);
   if Assigned(AvroMainForm1.AnsiVersionSubmenu2) then
     BuildSingleMenu(AvroMainForm1.AnsiVersionSubmenu2, AnsiDir);
+  // Third copy: the tray menu item that sits directly under "Select keyboard
+  // layout". Rebuilt here too so this path can never leave one of the three
+  // ANSI menus stale.
+  if Assigned(AvroMainForm1.mnuTraySelectAnsiEncoding) then
+    BuildSingleMenu(AvroMainForm1.mnuTraySelectAnsiEncoding, AnsiDir);
 end;
 
 { =============================================================================== }

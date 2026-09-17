@@ -1824,6 +1824,9 @@ object AvroMainForm1: TAvroMainForm1
         OnClick = Showactivekeyboardlayout1Click
       end
     end
+    object mnuTraySelectAnsiEncoding: TMenuItem
+      Caption = 'Select ANSI Encoding'
+    end
     object AvroMouseClicknType4: TMenuItem
       Caption = 'Avro Mouse - Click '#39'n Type!'
       ImageIndex = 9

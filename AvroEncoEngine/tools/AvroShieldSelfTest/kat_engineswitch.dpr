@@ -32,7 +32,11 @@
        picker's number (row + numpad) and first-letter shortcut resolution,
    10. the application theme contract: how SYSTEM / LIGHT / DARK resolve against
        Windows' AppsUseLightTheme, the stored-setting round trip and the
-       documented dark/light palettes.
+       documented dark/light palettes,
+   11. the tray "Select ANSI Encoding" menu item: that it exists in the DFM
+       directly beneath "Select keyboard layout", that the DFM holds no second
+       copy of the list, and that the unit wires it into the same build and
+       checkmark-sync routines as the other two ANSI menus.
 
   After every step it fingerprints the LIVE engine - a corpus of kars, clusters
   and conjuncts converted through whatever engine is actually installed - and
@@ -42,6 +46,12 @@
   Side effects: a scratch directory under %TEMP% and the app's own persistent
   JSON cache under %APPDATA% (content-addressed, same as running the app).
 
+  Section 11 does not run the GUI. It cannot: the main form's text DFM carries
+  the image list bitmap in the legacy bare-hex form that TReader's text reader
+  rejects ("Invalid stream format") - the shipped app never sees this, because
+  the IDE links a compiled binary DFM. So the tray menu structure that the
+  runtime builds on top of is pinned by reading the DFM and the unit that owns
+  it, and the visual result is verified by clicking through the rebuilt app.
   Usage: kat_engineswitch <mapping-dir> [quiet]
   Exit code: 0 all scenarios pass, 1 otherwise.
 }
@@ -284,6 +294,68 @@ begin
   Say('  golden ' + AName + ' -> ' + IntToStr(Length(GoldenOf(AName))) + ' chars');
 end;
 
+// ---------------------------------------------------------------------------
+// Section 11 helpers: text-level structure checks. The KAT cannot instantiate
+// the main form (see the header note), so the DFM and the unit that builds the
+// menus are read as text instead.
+// ---------------------------------------------------------------------------
+
+// Leading spaces of an indentation-structured line (the DFM uses two spaces
+// per nesting level); -1 for a blank line.
+function LeadingSpaces(const ALine: string): Integer;
+var
+  I: Integer;
+begin
+  for I := 1 to Length(ALine) do
+    if ALine[I] <> ' ' then
+      Exit(I - 1);
+  Result := -1;
+end;
+
+// Name of an 'object X: TY' line, or '' when the line declares nothing.
+function DfmObjectName(const ALine: string): string;
+var
+  S: string;
+  P: Integer;
+begin
+  Result := '';
+  S := Trim(ALine);
+  if not SameText(Copy(S, 1, 7), 'object ') then
+    Exit;
+  S := Trim(Copy(S, 8, MaxInt));
+  P := Pos(':', S);
+  if P > 0 then
+    S := Copy(S, 1, P - 1);
+  Result := Trim(S);
+end;
+
+// Locates a repository file from the gate's own location; '' when the file is
+// not reachable (a relocated copy reports SKIP instead of a false failure).
+function RepoFile(const ARelPath: string): string;
+var
+  Candidates: array[0..1] of string;
+  I: Integer;
+begin
+  // Normally <repo>\AvroEncoEngine\tools\AvroShieldSelfTest\; the mapping dir
+  // handed in on the command line (<repo>\assets) is the fallback.
+  Candidates[0] := ExtractFilePath(ParamStr(0)) + '..\..\..\' + ARelPath;
+  Candidates[1] := ExtractFilePath(ParamStr(1)) + '..\' + ARelPath;
+  for I := Low(Candidates) to High(Candidates) do
+    if TFile.Exists(ExpandFileName(Candidates[I])) then
+      Exit(ExpandFileName(Candidates[I]));
+  Result := '';
+end;
+
+function LinesContain(ALines: TStrings; const ANeedle: string): Boolean;
+var
+  I: Integer;
+begin
+  for I := 0 to ALines.Count - 1 do
+    if Pos(ANeedle, ALines[I]) > 0 then
+      Exit(True);
+  Result := False;
+end;
+
 // Builds every golden with the live globals parked, so that "nothing is live"
 // (a cold start) is still reachable for the manager scenarios below.
 procedure BuildGoldens(const ADir: string; ANames: TStringList);
@@ -412,6 +484,11 @@ var
   I: Integer;
   SortedOk, HasDefault: Boolean;
   PaletteDark, PaletteLight: TAppThemePalette;
+  DfmText, PasText, TrayChildren: TStringList;
+  DfmPath, PasPath, CaptionLine: string;
+  TrayIdx, ItemIdx, AnsiIdx, LayoutIdx: Integer;
+  Indent: Integer;
+  HasNestedObject: Boolean;
 begin
   Fails := 0;
   FQuiet := False;
@@ -688,6 +765,112 @@ begin
       '10: the row hover tint differs per theme');
     Check(not GetAppThemePalette(atmSystemDefault).IsDark,
       '10: an unresolved mode paints light, never an unstyled window');
+
+    // ---- 11. tray ANSI menu wiring ---------------------------------------
+    // The tray item under "Select keyboard layout" is a DFM object whose items
+    // are built at runtime, so what can silently break is its STRUCTURE: the
+    // item disappearing, moving under a different parent, or someone pasting a
+    // second copy of the list into the DFM (which would then drift from the
+    // sorted runtime list). The unit that owns the menu is checked for the same
+    // reason: a new menu that is not wired into all three shared routines shows
+    // the wrong checkmark or a stale list while looking fully installed.
+    Say('--- 11. tray "Select ANSI Encoding" menu wiring ---');
+    DfmPath := RepoFile('Keyboard and Spell checker\Forms\uForm1.dfm');
+    PasPath := RepoFile('Keyboard and Spell checker\Forms\uForm1.pas');
+    if (DfmPath = '') or (PasPath = '') then
+      Say('SKIP: uForm1.dfm / uForm1.pas not reachable from ' +
+        ExtractFilePath(ParamStr(0)))
+    else
+    begin
+      DfmText := TStringList.Create;
+      PasText := TStringList.Create;
+      TrayChildren := TStringList.Create;
+      try
+        DfmText.LoadFromFile(DfmPath);
+        PasText.LoadFromFile(PasPath);
+
+        // Direct children of Popup_Tray, in file order: 4 spaces of indent
+        // under a 2-space declaration, stopping at its own 'end'.
+        TrayIdx := -1;
+        for I := 0 to DfmText.Count - 1 do
+          if (LeadingSpaces(DfmText[I]) = 2) and
+            SameText(DfmObjectName(DfmText[I]), 'Popup_Tray') then
+          begin
+            TrayIdx := I;
+            Break;
+          end;
+        Check(TrayIdx >= 0, '11: the tray popup Popup_Tray is declared in the DFM');
+
+        if TrayIdx >= 0 then
+        begin
+          for I := TrayIdx + 1 to DfmText.Count - 1 do
+          begin
+            Indent := LeadingSpaces(DfmText[I]);
+            if Indent <= 2 then
+              Break; // Popup_Tray's own 'end'
+            if (Indent = 4) and (DfmObjectName(DfmText[I]) <> '') then
+              TrayChildren.Add(DfmObjectName(DfmText[I]));
+          end;
+
+          LayoutIdx := TrayChildren.IndexOf('Selectkeyboardlayout2');
+          AnsiIdx := TrayChildren.IndexOf('mnuTraySelectAnsiEncoding');
+          Check(AnsiIdx >= 0,
+            '11: mnuTraySelectAnsiEncoding is a direct child of Popup_Tray');
+          Check((LayoutIdx >= 0) and (AnsiIdx = LayoutIdx + 1),
+            '11: it sits directly beneath "Select keyboard layout" (index ' +
+            IntToStr(LayoutIdx) + ' -> ' + IntToStr(AnsiIdx) + ')');
+
+          // Its own block: exactly the caption, then 'end'. The versions are
+          // built at runtime, so the DFM must stay an empty shell.
+          ItemIdx := -1;
+          for I := TrayIdx + 1 to DfmText.Count - 1 do
+            if (LeadingSpaces(DfmText[I]) = 4) and
+              SameText(DfmObjectName(DfmText[I]), 'mnuTraySelectAnsiEncoding') then
+            begin
+              ItemIdx := I;
+              Break;
+            end;
+
+          CaptionLine := '';
+          HasNestedObject := False;
+          if ItemIdx >= 0 then
+            for I := ItemIdx + 1 to DfmText.Count - 1 do
+            begin
+              Indent := LeadingSpaces(DfmText[I]);
+              if Indent <= 4 then
+                Break; // the item's own 'end'
+              if DfmObjectName(DfmText[I]) <> '' then
+                HasNestedObject := True;
+              if SameText(Copy(Trim(DfmText[I]), 1, 7), 'Caption') then
+                CaptionLine := Trim(DfmText[I]);
+            end;
+          Check(CaptionLine = 'Caption = ' + QuotedStr('Select ANSI Encoding'),
+            '11: its caption is exactly "Select ANSI Encoding" (found "' +
+            CaptionLine + '")');
+          Check(not HasNestedObject,
+            '11: the DFM holds no second copy of the version list - no child items');
+
+          // A DFM object without a matching published field kills the form at
+          // load time ("Error reading..."), so the field has to exist too -
+          // this is the one failure a plain compile cannot see.
+          Check(LinesContain(PasText, 'mnuTraySelectAnsiEncoding: TMenuItem;'),
+            '11: the DFM object has a matching published field');
+        end;
+
+        // The three shared routines the two existing ANSI menus already go
+        // through; the tray item has to be in all of them.
+        Check(LinesContain(PasText, 'BuildSingleMenu(mnuTraySelectAnsiEncoding)'),
+          '11: BuildAnsiVersionMenus populates it with the sorted list');
+        Check(LinesContain(PasText, 'UpdateOne(mnuTraySelectAnsiEncoding)'),
+          '11: UpdateAnsiVersionMenuChecks marks the active version in it');
+        Check(LinesContain(PasText, 'SyncAnsiVersionChecks(mnuTraySelectAnsiEncoding)'),
+          '11: PopupTrayPopup re-syncs its checkmark on every popup');
+      finally
+        TrayChildren.Free;
+        PasText.Free;
+        DfmText.Free;
+      end;
+    end;
   finally
     Goldens.Free;
     TagGolden.Free;

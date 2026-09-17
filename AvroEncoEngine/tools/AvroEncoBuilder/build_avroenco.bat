@@ -135,9 +135,12 @@ rem  Drives the real engine cache: preload, switching, background re-parse and a
 rem  deliberately hollowed live engine. Every step must leave the requested
 rem  mapping installed and behaving exactly like its fresh-loaded reference.
 rem  It also pins the encoding-list order the menus and picker share, the
-rem  picker's number (row + numpad) and first-letter shortcut resolution, and the
+rem  picker's number (row + numpad) and first-letter shortcut resolution, the
 rem  application theme contract (SYSTEM / LIGHT / DARK resolution against
-rem  Windows' AppsUseLightTheme plus the dark and light palettes).
+rem  Windows' AppsUseLightTheme plus the dark and light palettes), and the tray
+rem  "Select ANSI Encoding" item: present in the DFM directly under "Select
+rem  keyboard layout", an empty shell there, and wired into the same build and
+rem  checkmark-sync routines as the other two ANSI menus.
 "%GATEDIR%\kat_engineswitch.exe" "%ROOT%\assets" quiet
 if errorlevel 1 goto switchgatefailed
 
