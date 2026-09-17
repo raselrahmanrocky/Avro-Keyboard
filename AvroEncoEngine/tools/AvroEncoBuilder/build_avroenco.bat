@@ -134,8 +134,10 @@ echo [7/8] Engine-cache gate over the generated containers ...
 rem  Drives the real engine cache: preload, switching, background re-parse and a
 rem  deliberately hollowed live engine. Every step must leave the requested
 rem  mapping installed and behaving exactly like its fresh-loaded reference.
-rem  It also pins the encoding-list order the menus and picker share, plus the
-rem  picker's number (row + numpad) and first-letter shortcut resolution.
+rem  It also pins the encoding-list order the menus and picker share, the
+rem  picker's number (row + numpad) and first-letter shortcut resolution, and the
+rem  application theme contract (SYSTEM / LIGHT / DARK resolution against
+rem  Windows' AppsUseLightTheme plus the dark and light palettes).
 "%GATEDIR%\kat_engineswitch.exe" "%ROOT%\assets" quiet
 if errorlevel 1 goto switchgatefailed
 

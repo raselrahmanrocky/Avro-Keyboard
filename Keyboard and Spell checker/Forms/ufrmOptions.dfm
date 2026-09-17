@@ -1207,6 +1207,35 @@ object frmOptions: TfrmOptions
           TabOrder = 2
           OnClick = ccmdAboutSkinClick
         end
+        object Label_AppTheme: TLabel
+          Left = 24
+          Top = 258
+          Width = 62
+          Height = 21
+          Margins.Left = 5
+          Margins.Top = 5
+          Margins.Right = 5
+          Margins.Bottom = 5
+          Caption = 'Theme:'
+          Font.Charset = DEFAULT_CHARSET
+          Font.Color = clWindowText
+          Font.Height = -17
+          Font.Name = 'Tahoma'
+          Font.Style = []
+          ParentFont = False
+        end
+        object cboAppTheme: TComboBox
+          Left = 134
+          Top = 251
+          Width = 220
+          Height = 29
+          Margins.Left = 5
+          Margins.Top = 5
+          Margins.Right = 5
+          Margins.Bottom = 5
+          Style = csDropDownList
+          TabOrder = 3
+        end
       end
     end
     object General_Panel: TPanel

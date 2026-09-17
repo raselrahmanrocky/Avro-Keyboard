@@ -124,7 +124,9 @@ begin
 end;
 
 { Bengali (U+0980-U+09FF) encodes in UTF-8 as E0 A6 xx or E0 A7 xx, so a
-  legibility scan needs no decoder. }
+  legibility scan needs no decoder. Use this on TEXT-shaped input (the parsed
+  opaque JSON, whose tokens are Base64/hex, so a match can only mean a real
+  leak); on a masked byte stream use HasBengaliRun below instead. }
 function HasBengali(const AData: TBytes): Boolean;
 var
   I: Integer;
@@ -132,6 +134,30 @@ begin
   Result := False;
   for I := 0 to Length(AData) - 3 do
     if (AData[I] = $E0) and ((AData[I + 1] = $A6) or (AData[I + 1] = $A7)) then
+      Exit(True);
+end;
+
+{ Two consecutive Bengali code points. One byte pair cannot be used as a
+  legibility test on the MASKED bytecode: at a few tens of kilobytes an
+  $E0 $A6/$A7 pair turns up by chance in a significant fraction of builds
+  (measured: 3 of 20 runs), which made this gate fail for no reason. Two code
+  points in a row have a chance of ~1e-6 per run, so a match means real
+  Bengali text leaked into the payload. }
+function HasBengaliRun(const AData: TBytes): Boolean;
+var
+  I: Integer;
+
+  function IsBengaliStart(AIndex: Integer): Boolean;
+  begin
+    Result := (AData[AIndex] = $E0) and
+      ((AData[AIndex + 1] = $A6) or (AData[AIndex + 1] = $A7)) and
+      (AData[AIndex + 2] >= $80) and (AData[AIndex + 2] <= $BF);
+  end;
+
+begin
+  Result := False;
+  for I := 0 to Length(AData) - 6 do
+    if IsBengaliStart(I) and IsBengaliStart(I + 3) then
       Exit(True);
 end;
 
@@ -411,7 +437,23 @@ begin
   Check('opaque view available', OpaqueView(Data, Bytecode, Opaque));
   Check('opaque view still carries the metadata blob',
     Pos('"' + META_KEY + '"', Opaque) > 0, Opaque);
-  Check('opaque view exposes no Bengali', not HasBengali(Bytecode), Opaque);
+  // The masked bytecode is not text, so "does it contain a Bengali byte pair"
+  // would be a chance-match lottery; see HasBengaliRun. These three checks are
+  // deterministic and still catch a payload that stopped being obfuscated:
+  // a real Bengali comment carries a run, and the authored strings below are
+  // single-character and matched exactly.
+  Check('opaque view exposes no Bengali run', not HasBengaliRun(Bytecode), Opaque);
+  Check('opaque view exposes no authored comment literal',
+    not HasText(Bytecode, '"' + #$09E6 + '"'), Opaque);
+  Check('opaque view exposes no authored hex literals',
+    (not HasText(Bytecode, '#$09E6')) and (not HasText(Bytecode, '#$0030')), Opaque);
+  // Teeth: both detectors must fire on the authored plaintext, otherwise the
+  // three assertions above would hold even for a payload that leaked every
+  // string in the clear.
+  Check('Bengali run detector fires on real Bengali text',
+    HasBengaliRun(Utf8Of(#$0985 + #$0986)));
+  Check('authored-literal detector fires on the authored JSON',
+    HasText(Utf8Of(GOLDEN_JSON), '"' + #$09E6 + '"'));
   Check('opaque view exposes no hex key literal',
     (Pos('"#$09E6"', Opaque) = 0) and (Pos('"#$0030"', Opaque) = 0), Opaque);
   Check('opaque view exposes no field name',

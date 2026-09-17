@@ -29,7 +29,10 @@
     7. a deliberately hollowed live engine (must be detected and repaired),
     8. the warm pass,
     9. the encoding-list order the two menus and the picker must share, and the
-       picker's number (row + numpad) and first-letter shortcut resolution.
+       picker's number (row + numpad) and first-letter shortcut resolution,
+   10. the application theme contract: how SYSTEM / LIGHT / DARK resolve against
+       Windows' AppsUseLightTheme, the stored-setting round trip and the
+       documented dark/light palettes.
 
   After every step it fingerprints the LIVE engine - a corpus of kars, clusters
   and conjuncts converted through whatever engine is actually installed - and
@@ -57,6 +60,7 @@ uses
   uAvroEncoManager,
   uAnsiPersistentCache,
   uAnsiEngineManager,
+  uThemeManager,
   clsUnicodeToBijoy2000;
 
 const
@@ -407,6 +411,7 @@ var
   Shortcuts: TStringList;
   I: Integer;
   SortedOk, HasDefault: Boolean;
+  PaletteDark, PaletteLight: TAppThemePalette;
 begin
   Fails := 0;
   FQuiet := False;
@@ -625,6 +630,64 @@ begin
     finally
       Shortcuts.Free;
     end;
+
+    // ---- 10. application theme ------------------------------------------
+    // The theme contract: the stored mode (SYSTEM / LIGHT / DARK) together with
+    // Windows' AppsUseLightTheme decides which theme is in force, and that one
+    // decision drives both the VCL style (top bar menus, every dialog) and the
+    // palette the hand-painted flyouts use. The palettes are asserted literally,
+    // so the documented colours live in the test and not in a screenshot.
+    Say('--- 10. application theme (mode resolution + palettes) ---');
+    Check(ResolveAppTheme(atmSystemDefault, True) = atmLight,
+      '10: SYSTEM follows Windows when Windows uses light mode');
+    Check(ResolveAppTheme(atmSystemDefault, False) = atmDark,
+      '10: SYSTEM follows Windows when Windows uses dark mode');
+    Check(ResolveAppTheme(atmLight, False) = atmLight,
+      '10: forced LIGHT wins over a dark Windows');
+    Check(ResolveAppTheme(atmDark, True) = atmDark,
+      '10: forced DARK wins over a light Windows');
+    Check(ResolveAppTheme(atmLight, True) = atmLight, '10: forced LIGHT stays light');
+    Check(ResolveAppTheme(atmDark, False) = atmDark, '10: forced DARK stays dark');
+
+    Check(AppThemeModeFromSetting('SYSTEM') = atmSystemDefault, '10: SYSTEM setting');
+    Check(AppThemeModeFromSetting('LIGHT') = atmLight, '10: LIGHT setting');
+    Check(AppThemeModeFromSetting('DARK') = atmDark, '10: DARK setting');
+    Check(AppThemeModeFromSetting('dark') = atmDark,
+      '10: the stored setting is case-insensitive');
+    Check(AppThemeModeFromSetting('') = atmSystemDefault, '10: empty setting means SYSTEM');
+    Check(AppThemeModeFromSetting('TWILIGHT') = atmSystemDefault,
+      '10: an unknown setting falls back to SYSTEM');
+    Check(AppThemeModeToSetting(atmSystemDefault) = APP_THEME_SETTING_SYSTEM,
+      '10: SYSTEM setting round trip');
+    Check(AppThemeModeToSetting(atmLight) = APP_THEME_SETTING_LIGHT,
+      '10: LIGHT setting round trip');
+    Check(AppThemeModeToSetting(atmDark) = APP_THEME_SETTING_DARK,
+      '10: DARK setting round trip');
+    for I := Ord(Low(TAppThemeMode)) to Ord(High(TAppThemeMode)) do
+      Check(AppThemeModeFromSetting(AppThemeModeToSetting(TAppThemeMode(I))) = TAppThemeMode(I),
+        '10: setting round trip for ' + AppThemeModeCaption(TAppThemeMode(I)));
+    Check(AppThemeModeCaption(atmSystemDefault) = 'System Default', '10: SYSTEM caption');
+    Check(AppThemeModeCaption(atmLight) = 'Light Theme', '10: LIGHT caption');
+    Check(AppThemeModeCaption(atmDark) = 'Dark Theme', '10: DARK caption');
+
+    PaletteDark := GetAppThemePalette(atmDark);
+    PaletteLight := GetAppThemePalette(atmLight);
+    Check(PaletteDark.IsDark and (not PaletteLight.IsDark),
+      '10: each palette reports its own brightness');
+    Check((PaletteDark.Background = RGB(32, 32, 32)) and (PaletteDark.Text = RGB(240, 240, 240)) and
+      (PaletteDark.SelectionFill = RGB(0, 120, 215)) and
+      (PaletteDark.SelectionText = RGB(255, 255, 255)) and
+      (PaletteDark.Border = RGB(60, 60, 60)),
+      '10: dark palette matches the documented colours');
+    Check((PaletteLight.Background = RGB(255, 255, 255)) and (PaletteLight.Text = RGB(0, 0, 0)) and
+      (PaletteLight.SelectionFill = RGB(0, 120, 215)) and
+      (PaletteLight.SelectionText = RGB(255, 255, 255)) and
+      (PaletteLight.Border = RGB(200, 200, 200)),
+      '10: light palette matches the documented colours');
+    Check(PaletteDark.HoverFill <> PaletteLight.HoverFill,
+      '10: the row hover tint differs per theme');
+    Check(not GetAppThemePalette(atmSystemDefault).IsDark,
+      '10: an unresolved mode paints light, never an unstyled window');
   finally
     Goldens.Free;
     TagGolden.Free;
