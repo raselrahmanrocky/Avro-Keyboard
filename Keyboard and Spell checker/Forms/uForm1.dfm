@@ -1836,9 +1836,13 @@ object AvroMainForm1: TAvroMainForm1
       Caption = '-'
     end
     object Spellcheck3: TMenuItem
+      Caption = 'Avro Text Converter'
+      ImageIndex = 25
+      OnClick = UnicodetoBijoytextconverter1Click
+    end
+    object Spellcheck4: TMenuItem
       Caption = 'Spell checker...'
       ImageIndex = 24
-      ShortCut = 16502
       OnClick = Spellcheck1Click
     end
     object N43: TMenuItem
@@ -1880,18 +1884,96 @@ object AvroMainForm1: TAvroMainForm1
         ImageIndex = 22
         OnClick = Showactivekeyboardlayout1Click
       end
-      object AvroMouseClicknType5: TMenuItem
-        Caption = 'Avro Mouse : Click '#39'n Type!'
-        ImageIndex = 9
-        OnClick = AvroMouseClicknType2Click
-      end
-      object FontFixerSetdefaultBanglafont2: TMenuItem
-        Caption = 'Font Fixer: Set default Bangla font'
-        ImageIndex = 27
-      end
-      object iComplexInstallcomplexscriptsupportinWindows2: TMenuItem
-        Caption = 'iComplex: Install complex script support in Windows'
-        ImageIndex = 26
+      object Helpfiles2: TMenuItem
+        Caption = 'Help files'
+        ImageIndex = 18
+        object Configuringyoursystem3: TMenuItem
+          Caption = 'Configuring your system'
+          ImageIndex = 16
+          OnClick = Configuringyoursystem1Click
+        end
+        object OTFBanglaFontscamewithAvroKeyboard3: TMenuItem
+          Caption = 'Bangla Fonts came with Avro Keyboard'
+          ImageIndex = 16
+          OnClick = OTFBanglaFontscamewithAvroKeyboard1Click
+        end
+        object Helponhelp3: TMenuItem
+          Caption = 'Help on help...'
+          ImageIndex = 16
+          OnClick = Helponhelp1Click
+        end
+        object N35: TMenuItem
+          Caption = '-'
+        end
+        object BeforeYouStart3: TMenuItem
+          Caption = 'Before You Start'
+          ImageIndex = 7
+          OnClick = BeforeYouStart1Click
+        end
+        object Overview3: TMenuItem
+          Caption = 'Overview'
+          ImageIndex = 7
+          OnClick = Overview1Click
+        end
+        object CustomizingAvroKeyboard3: TMenuItem
+          Caption = 'Customizing Avro Keyboard'
+          ImageIndex = 7
+          OnClick = CustomizingAvroKeyboard1Click
+        end
+        object BanglaTypingwithAvroPhonetic3: TMenuItem
+          Caption = 'Bangla Typing with Avro Phonetic'
+          ImageIndex = 7
+          OnClick = BanglaTypingwithAvroPhonetic1Click
+        end
+        object BanglaTypingwithFixedKeyboardLayouts3: TMenuItem
+          Caption = 'Bangla Typing with Fixed Keyboard Layouts'
+          ImageIndex = 7
+          OnClick = BanglaTypingwithFixedKeyboardLayouts1Click
+        end
+        object BanglaTypingwithAvroMouse3: TMenuItem
+          Caption = 'Bangla Typing with Avro Mouse'
+          ImageIndex = 7
+          OnClick = BanglaTypingwithAvroMouse1Click
+        end
+        object N36: TMenuItem
+          Caption = '-'
+        end
+        object CreatingEditingFixedKeyboardLayouts3: TMenuItem
+          Caption = 'Creating/Editing Fixed Keyboard Layouts'
+          ImageIndex = 7
+          OnClick = CreatingEditingFixedKeyboardLayouts1Click
+        end
+        object N39: TMenuItem
+          Caption = '-'
+        end
+        object Moredocumentsontheweb3: TMenuItem
+          Caption = 'More documents on the web...'
+          ImageIndex = 17
+          OnClick = Moredocumentsontheweb1Click
+        end
+        object FreeOnlineSupport3: TMenuItem
+          Caption = 'Report an issue'
+          ImageIndex = 10
+          OnClick = UserForum1Click
+        end
+        object N40: TMenuItem
+          Caption = '-'
+        end
+        object GetAcrobatReader3: TMenuItem
+          Caption = 'Get Acrobat Reader...'
+          OnClick = GetAcrobatReader1Click
+        end
+        object N2: TMenuItem
+          Caption = '-'
+        end
+        object Aboutcurrentkeyboardlayout2: TMenuItem
+          Caption = 'About current keyboard layout...'
+          OnClick = Aboutcurrentkeyboardlayout1Click
+        end
+        object Aboutcurrentskin2: TMenuItem
+          Caption = 'About current skin...'
+          OnClick = AboutCurrentskin1Click
+        end
       end
       object N48: TMenuItem
         Caption = '-'
@@ -1992,207 +2074,6 @@ object AvroMainForm1: TAvroMainForm1
         ImageIndex = 11
         OnClick = Options1Click
       end
-    end
-    object N30: TMenuItem
-      Caption = '-'
-    end
-    object Ontheweb2: TMenuItem
-      Caption = 'On the web'
-      ImageIndex = 23
-      object CheckupdateforAvroKeyboard3: TMenuItem
-        Caption = 'Check update for Avro Keyboard'
-        ImageIndex = 1
-        OnClick = CheckupdateforAvroKeyboard1Click
-      end
-      object N33: TMenuItem
-        Caption = '-'
-      end
-      object MoreFreeDownloads3: TMenuItem
-        Caption = 'More Free Downloads'
-        object FreeBanglaFonts3: TMenuItem
-          Caption = 'Free Bangla Fonts...'
-          ImageIndex = 0
-          OnClick = FreeBanglaFonts1Click
-        end
-        object UsefultoolsforBangla3: TMenuItem
-          Caption = 'Useful tools for Bangla...'
-          OnClick = UsefultoolsforBangla1Click
-        end
-      end
-      object AvroKeyboardontheweb3: TMenuItem
-        Caption = 'Avro Keyboard on the web'
-        ImageIndex = 15
-        OnClick = AvroKeyboardontheweb1Click
-      end
-      object PortableAvroKeyboardontheweb3: TMenuItem
-        Caption = 'Portable Avro Keyboard on the web'
-        ImageIndex = 15
-        OnClick = PortableAvroKeyboardontheweb1Click
-      end
-      object wwwOmicronLabcom3: TMenuItem
-        Caption = 'www.OmicronLab.com'
-        ImageIndex = 15
-        OnClick = wwwOmicronLabcom1Click
-      end
-      object UserForum3: TMenuItem
-        Caption = 'Report an issue'
-        ImageIndex = 10
-        OnClick = UserForum1Click
-      end
-      object N53: TMenuItem
-        Caption = '-'
-      end
-      object AvroKeyboardonFacebook2: TMenuItem
-        Caption = 'Avro Keyboard on Facebook'
-        ImageIndex = 29
-        OnClick = AvroKeyboardonFacebook1Click
-      end
-      object OmicronLabonTwitter2: TMenuItem
-        Caption = 'OmicronLab on Twitter'
-        ImageIndex = 28
-        OnClick = OmicronLabonTwitter1Click
-      end
-    end
-    object MenuItem26: TMenuItem
-      Caption = '-'
-    end
-    object Helpfiles2: TMenuItem
-      Caption = 'Help files'
-      ImageIndex = 18
-      object Configuringyoursystem3: TMenuItem
-        Caption = 'Configuring your system'
-        ImageIndex = 16
-        OnClick = Configuringyoursystem1Click
-      end
-      object OTFBanglaFontscamewithAvroKeyboard3: TMenuItem
-        Caption = 'Bangla Fonts came with Avro Keyboard'
-        ImageIndex = 16
-        OnClick = OTFBanglaFontscamewithAvroKeyboard1Click
-      end
-      object Helponhelp3: TMenuItem
-        Caption = 'Help on help...'
-        ImageIndex = 16
-        OnClick = Helponhelp1Click
-      end
-      object N35: TMenuItem
-        Caption = '-'
-      end
-      object BeforeYouStart3: TMenuItem
-        Caption = 'Before You Start'
-        ImageIndex = 7
-        OnClick = BeforeYouStart1Click
-      end
-      object Overview3: TMenuItem
-        Caption = 'Overview'
-        ImageIndex = 7
-        OnClick = Overview1Click
-      end
-      object CustomizingAvroKeyboard3: TMenuItem
-        Caption = 'Customizing Avro Keyboard'
-        ImageIndex = 7
-        OnClick = CustomizingAvroKeyboard1Click
-      end
-      object BanglaTypingwithAvroPhonetic3: TMenuItem
-        Caption = 'Bangla Typing with Avro Phonetic'
-        ImageIndex = 7
-        OnClick = BanglaTypingwithAvroPhonetic1Click
-      end
-      object BanglaTypingwithFixedKeyboardLayouts3: TMenuItem
-        Caption = 'Bangla Typing with Fixed Keyboard Layouts'
-        ImageIndex = 7
-        OnClick = BanglaTypingwithFixedKeyboardLayouts1Click
-      end
-      object BanglaTypingwithAvroMouse3: TMenuItem
-        Caption = 'Bangla Typing with Avro Mouse'
-        ImageIndex = 7
-        OnClick = BanglaTypingwithAvroMouse1Click
-      end
-      object FrequentlyAskedQuestionsFAQ3: TMenuItem
-        Caption = 'Frequently Asked Questions (FAQ)'
-        ImageIndex = 7
-        Visible = False
-        OnClick = FrequentlyAskedQuestionsFAQ1Click
-      end
-      object N36: TMenuItem
-        Caption = '-'
-      end
-      object CreatingEditingFixedKeyboardLayouts3: TMenuItem
-        Caption = 'Creating/Editing Fixed Keyboard Layouts'
-        ImageIndex = 7
-        OnClick = CreatingEditingFixedKeyboardLayouts1Click
-      end
-      object N37: TMenuItem
-        Caption = '-'
-        Visible = False
-      end
-      object HowtoBanglaFileFolderName3: TMenuItem
-        Caption = 'How to: Bangla File/Folder Name'
-        ImageIndex = 7
-        Visible = False
-      end
-      object HowtoBanglaChat3: TMenuItem
-        Caption = 'How to: Bangla Chat!'
-        ImageIndex = 7
-        Visible = False
-      end
-      object HowtoSearchingwebinBangla3: TMenuItem
-        Caption = 'How to: Searching web in Bangla!'
-        ImageIndex = 7
-        Visible = False
-      end
-      object N38: TMenuItem
-        Caption = '-'
-        Visible = False
-      end
-      object HowtoDevelopBanglaWebPage3: TMenuItem
-        Caption = 'How to: Develop Bangla Web Page'
-        ImageIndex = 7
-        Visible = False
-      end
-      object HowtoEmbedBanglaFontinWebPages3: TMenuItem
-        Caption = 'How to: Embed Bangla Font in Web Pages'
-        ImageIndex = 7
-        Visible = False
-      end
-      object N39: TMenuItem
-        Caption = '-'
-      end
-      object Moredocumentsontheweb3: TMenuItem
-        Caption = 'More documents on the web...'
-        ImageIndex = 17
-        OnClick = Moredocumentsontheweb1Click
-      end
-      object FreeOnlineSupport3: TMenuItem
-        Caption = 'Report an issue'
-        ImageIndex = 10
-        OnClick = UserForum1Click
-      end
-      object N40: TMenuItem
-        Caption = '-'
-      end
-      object GetAcrobatReader3: TMenuItem
-        Caption = 'Get Acrobat Reader...'
-        OnClick = GetAcrobatReader1Click
-      end
-      object N2: TMenuItem
-        Caption = '-'
-      end
-      object Aboutcurrentkeyboardlayout2: TMenuItem
-        Caption = 'About current keyboard layout...'
-        OnClick = Aboutcurrentkeyboardlayout1Click
-      end
-      object Aboutcurrentskin2: TMenuItem
-        Caption = 'About current skin...'
-        OnClick = AboutCurrentskin1Click
-      end
-    end
-    object AboutAvroKeyboard3: TMenuItem
-      Caption = 'About Avro Keyboard...'
-      ImageIndex = 20
-      OnClick = AboutAvroKeyboard1Click
-    end
-    object N32: TMenuItem
-      Caption = '-'
     end
     object Exit3: TMenuItem
       Caption = 'Exit'
