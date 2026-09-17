@@ -161,6 +161,9 @@ type
     RestoreAvroTopBar1: TMenuItem;
     N29: TMenuItem;
     Selectkeyboardlayout2: TMenuItem;
+    // Tray copy of the ANSI encoding menu, designed in the DFM directly under
+    // "Select keyboard layout"; its items are built by BuildAnsiVersionMenus.
+    mnuTraySelectAnsiEncoding: TMenuItem;
     AvroMouseClicknType4: TMenuItem;
     Ontheweb2: TMenuItem;
     N30: TMenuItem;
@@ -413,6 +416,7 @@ type
 
       procedure BuildAnsiVersionMenus;
       procedure UpdateAnsiVersionMenuChecks(const AName: string);
+      procedure SyncAnsiVersionChecks(AMenu: TMenuItem);
       procedure SyncActiveMappingTimestamp(const AName: string);
       function GetMyCurrentKeyboardMode: enumMode;
       procedure ExitApp;
@@ -1960,33 +1964,37 @@ begin
   LayoutViewer.Show;
 end;
 
-procedure TAvroMainForm1.PopupToolsPopup(Sender: TObject);
+{ Marks the version item of AMenu that is currently in force. Only the items
+  BuildAnsiVersionMenus tagged with GroupIndex = 10 are considered, so the
+  separator and the "More Options" submenu are never touched; nothing is
+  cleared or rebuilt here - this runs inside OnPopup. }
+procedure TAvroMainForm1.SyncAnsiVersionChecks(AMenu: TMenuItem);
 var
   I: Integer;
+  M: TMenuItem;
 begin
-  // Only update checkmarks on existing items -- do NOT Clear/rebuild during popup
-  if Assigned(AnsiVersionSubmenu1) then
+  if not Assigned(AMenu) then
+    Exit;
+  for I := 0 to AMenu.Count - 1 do
   begin
-    for I := 0 to AnsiVersionSubmenu1.Count - 1 do
-    begin
-      if AnsiVersionSubmenu1.Items[I].GroupIndex = 10 then
-        AnsiVersionSubmenu1.Items[I].Checked := SameText(AnsiVersionSubmenu1.Items[I].Hint, AnsiVersion);
-    end;
+    M := AMenu.Items[I];
+    if M.GroupIndex = 10 then
+      M.Checked := SameText(M.Hint, AnsiVersion);
   end;
 end;
 
-procedure TAvroMainForm1.PopupTrayPopup(Sender: TObject);
-var
-  I: Integer;
+procedure TAvroMainForm1.PopupToolsPopup(Sender: TObject);
 begin
-  if Assigned(AnsiVersionSubmenu2) then
-  begin
-    for I := 0 to AnsiVersionSubmenu2.Count - 1 do
-    begin
-      if AnsiVersionSubmenu2.Items[I].GroupIndex = 10 then
-        AnsiVersionSubmenu2.Items[I].Checked := SameText(AnsiVersionSubmenu2.Items[I].Hint, AnsiVersion);
-    end;
-  end;
+  // Only update checkmarks on existing items -- do NOT Clear/rebuild during popup
+  SyncAnsiVersionChecks(AnsiVersionSubmenu1);
+end;
+
+procedure TAvroMainForm1.PopupTrayPopup(Sender: TObject);
+begin
+  // Both tray copies of the ANSI menu: the one under "Select keyboard layout"
+  // and the older one inside the Tools submenu.
+  SyncAnsiVersionChecks(mnuTraySelectAnsiEncoding);
+  SyncAnsiVersionChecks(AnsiVersionSubmenu2);
 end;
 
 procedure TAvroMainForm1.UpdateTrayIcon;
@@ -2784,8 +2792,12 @@ procedure TAvroMainForm1.UpdateAnsiVersionMenuChecks(const AName: string);
     end;
   end;
 begin
+  // Every ANSI menu in the application: Top Bar (1), tray Tools (2) and the
+  // tray "Select ANSI Encoding" under "Select keyboard layout" (3). All three
+  // are built by BuildSingleMenu, so they can never show different state.
   UpdateOne(AnsiVersionSubmenu1);
   UpdateOne(AnsiVersionSubmenu2);
+  UpdateOne(mnuTraySelectAnsiEncoding);
 end;
 
 { =============================================================================== }
@@ -2919,6 +2931,7 @@ begin
   RefreshAnsiMappingNames;
   BuildSingleMenu(AnsiVersionSubmenu1);
   BuildSingleMenu(AnsiVersionSubmenu2);
+  BuildSingleMenu(mnuTraySelectAnsiEncoding);
 end;
 
 end.
