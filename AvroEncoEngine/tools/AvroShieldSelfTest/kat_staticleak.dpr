@@ -15,11 +15,19 @@
   It links the runtime, so it knows the root secret without needing any
   external key file - the check is authoritative rather than best-effort.
 
+  Every container is checked twice: once as raw bytes (is it actually
+  encrypted, and does it avoid carrying the secret), and once unwrapped to the
+  still-obfuscated payload, which is the view an attacker has after recovering
+  the key from the binary. The second pass is what proves the obfuscation and
+  the developer comment domain are doing their job - see CheckObfuscatedPayload.
+
   Hard failures (exit 1):
     * the root secret IKM appears in the executable, or in any container;
     * any source-mapping JSON string (field name or value) appears in the
       matching compiled container, which would mean the payload is not
-      actually encrypted.
+      actually encrypted;
+    * any authored mapping text, Bengali codepoint, '#$' literal or comment
+      field name is legible in the unwrapped payload.
 
   Warnings (reported, do not fail): legacy v2 format internals that remain in
   the binary because the v2 reader needs them. They disappear with the v3
@@ -116,6 +124,29 @@ begin
     Result[(I - 1) * 2] := Byte(W and $FF);
     Result[(I - 1) * 2 + 1] := Byte((W shr 8) and $FF);
   end;
+end;
+
+{ ASCII/UTF-8 bytes of a string. Mapping text is ASCII outside the Bengali
+  comments, so a byte-per-char copy is exact for the literals searched here. }
+function AsciiBytes(const AText: string): TBytes;
+var
+  I: Integer;
+begin
+  SetLength(Result, Length(AText));
+  for I := 1 to Length(AText) do
+    Result[I - 1] := Byte(Ord(AText[I]) and $FF);
+end;
+
+{ Bengali U+0980-U+09FF is E0 A6 xx or E0 A7 xx in UTF-8, so a legibility scan
+  of a payload needs no decoder. }
+function HasBengaliBytes(const AData: TBytes): Boolean;
+var
+  I: Integer;
+begin
+  Result := False;
+  for I := 0 to Length(AData) - 3 do
+    if (AData[I] = $E0) and ((AData[I + 1] = $A6) or (AData[I + 1] = $A7)) then
+      Exit(True);
 end;
 
 { Finds AText in AHay as UTF-8/ASCII bytes or as UTF-16LE literals. }
@@ -350,6 +381,108 @@ begin
   end;
 end;
 
+{ The payload-level half of the gate.
+
+  CheckContainer above scans the container bytes, which an encrypted container
+  passes no matter what its plaintext looks like - necessary, but weak. This
+  unwraps the container down to the decrypted and still OBFUSCATED bytecode,
+  which is exactly what an attacker holds after recovering the container key
+  from the binary, and asserts that nothing legible survives there:
+
+    * no Bengali codepoints and no '#$' literal in the parsed payload;
+    * none of the authored strings of the matching source document (>= 10
+      chars, the same canary set used for the raw scan);
+    * no comment field name and no mapping section name.
+
+  The pattern scans run over the parsed payload rather than the raw bytecode.
+  Values are XOR-masked there, so a generic '#$' or Bengali search over tens of
+  kilobytes of masked bytes reports chance matches - the checks would fail at
+  random. The parsed view is ASCII by construction (values are Base64 tokens),
+  which makes a hit meaningful; the raw bytes are still checked, with the
+  authored canaries, where a hit is meaningful too.
+
+  This is the check that fails when the obfuscation is skipped, when its
+  metadata mask goes back to being a compiled-in constant, or when the comment
+  domain silently regresses into the value domain. }
+procedure CheckObfuscatedPayload(const AContainerPath, ASourceJsonPath: string);
+var
+  Data, Bytecode, OpaqueBytes: TBytes;
+  Canaries: TStringList;
+  Root: TAvroNode;
+  Opaque, Name: string;
+  I, LeakedRaw, LeakedText: Integer;
+  OffenderRaw, OffenderText: string;
+begin
+  Name := ExtractFileName(AContainerPath);
+  Data := TFile.ReadAllBytes(AContainerPath);
+  if AvroShieldExtractObfuscatedBytecode(Data, '', nil, True, Bytecode) <> asrOk
+  then
+  begin
+    Check(Name + ': payload unwrappable for inspection', False,
+      'cannot unwrap with the embedded secret - wrong key or damaged file');
+    Exit;
+  end;
+
+  Root := nil;
+  Opaque := '';
+  Canaries := nil;
+  try
+    if not AvroShieldParseBytecode(Bytecode, Root) then
+    begin
+      Check(Name + ': payload parses as bytecode', False, '');
+      Exit;
+    end;
+    Opaque := AvroShieldNodeToJSON(Root);
+    OpaqueBytes := TEncoding.UTF8.GetBytes(Opaque);
+
+    Check(Name + ': payload carries the metadata blob',
+      Pos('_obf_meta', Opaque) > 0,
+      'the payload does not look obfuscated at all');
+    Check(Name + ': payload exposes no Bengali text',
+      not HasBengaliBytes(OpaqueBytes));
+    Check(Name + ': payload exposes no hex key literal',
+      IndexBytes(OpaqueBytes, AsciiBytes('#$')) < 0);
+    Check(Name + ': payload exposes no comment field name',
+      Pos('"Comment"', Opaque) = 0);
+
+    Canaries := TStringList.Create;
+    LeakedRaw := 0;
+    LeakedText := 0;
+    OffenderRaw := '';
+    OffenderText := '';
+    if BuildCanaries(ASourceJsonPath, Canaries) then
+      for I := 0 to Canaries.Count - 1 do
+      begin
+        if IndexBytes(Bytecode, AsciiBytes(Canaries[I])) >= 0 then
+        begin
+          Inc(LeakedRaw);
+          if OffenderRaw = '' then
+            OffenderRaw := Canaries[I];
+        end;
+        if IndexBytes(OpaqueBytes, AsciiBytes(Canaries[I])) >= 0 then
+        begin
+          Inc(LeakedText);
+          if OffenderText = '' then
+            OffenderText := Canaries[I];
+        end;
+      end;
+    Check(Name + ': masked bytes expose no authored mapping text',
+      LeakedRaw = 0, IntToStr(LeakedRaw) + ' canary/ies legible, first: ' +
+      OffenderRaw);
+    Check(Name + ': parsed payload exposes no authored mapping text',
+      LeakedText = 0, IntToStr(LeakedText) + ' canary/ies legible, first: ' +
+      OffenderText);
+  finally
+    if Canaries <> nil then
+      Canaries.Free;
+    if Root <> nil then
+      Root.Free;
+    AvroWipeString(Opaque);
+    AvroWipeAndRelease(OpaqueBytes);
+    AvroWipeAndRelease(Bytecode);
+  end;
+end;
+
 procedure Usage;
 begin
   WriteLn('kat_staticleak - release gate for the asset-protection pipeline');
@@ -415,6 +548,7 @@ begin
   begin
     Inc(Containers);
     CheckContainer(F, SourceDir + ChangeFileExt(ExtractFileName(F), '.json'));
+    CheckObfuscatedPayload(F, SourceDir + ChangeFileExt(ExtractFileName(F), '.json'));
   end;
 
   Check('at least one container was present to check', Containers > 0,

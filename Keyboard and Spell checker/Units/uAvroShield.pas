@@ -11,6 +11,29 @@
                 -> bytecode -> BytecodeParser -> deobfuscate
                 -> in-memory JSON text (returned to the caller)
 
+  Obfuscation (container format v3) and the developer comment domain:
+
+    values         Base64(plain XOR SHA-256-CTR keystream keyed by the value
+                   seed and the value's context path), so identical plaintext
+                   at different positions encrypts differently.
+    metadata blob  masked with HKDF-SHA256(container master key) instead of a
+                   constant compiled into this unit - which is what makes the
+                   obfuscation keyed: without the container key the value seed
+                   and the key map stay unreachable.
+    comments       obfuscated in a second domain keyed by
+                   HKDF-SHA256(developer IKM, salt = value seed). The runtime
+                   never derives that key and never links the IKM, so comment
+                   text survives in the container without being readable to
+                   anyone who merely opens it (see
+                   AvroEncoEngine\docs\obfuscation-codec.md).
+    runtime cost   IncludeComments = False drops every comment field before the
+                   Base64 decode: no decode, no keystream, no allocation, and
+                   the mapping parser never sees the field.
+
+    Format v2 containers keep loading through the legacy path (constant
+    metadata mask, comments in the value domain), so the switch is not a
+    re-release of every existing file.
+
   Key derivation (container version 2; the v1 Argon2id schedule was removed
   project-wide, including password files, by explicit owner decision):
 
@@ -23,8 +46,10 @@
 
   This Delphi unit is the authoritative spec for the v2 KDF. The former
   'matches avroenco/src/crypto.py' claim no longer holds: that external
-  Python toolchain must be migrated separately if it is still in use.
-  (Bytecode / obfuscation / GCM / zlib stages are unchanged.)
+  Python toolchain must be migrated separately if it is still in use, and the
+  same now applies to the obfuscation stage - format v3 keys the metadata mask
+  from the container key, which an obfuscator.py that assumes the old constant
+  mask cannot reproduce. (GCM and zlib stages are unchanged.)
 
   Machine factor: SHA-256(Windows MachineGuid UTF-8)[:16] (fallback: primary
   MAC as decimal string), identical to the Python side (D11). The hardware
@@ -71,6 +96,25 @@ type
     asrUnknown
   );
 
+  { Options for AvroShieldLoadFromBytesUtf8Ex. The runtime never uses this
+    record: it calls AvroShieldLoadForRuntime, which pins IncludeComments to
+    False and DefaultSecretIKM to the embedded secret, so the shipped path
+    cannot be talked into disclosing comment text or accepting a foreign key. }
+  TAvroShieldLoadOptions = record
+    UseMachineBind: Boolean;
+    { True only for developer tooling (AvroEncoBuilder --unpack): decode the
+      comment domain and keep the fields. False drops every comment field
+      before it is decoded, allocated or parsed. }
+    IncludeComments: Boolean;
+    { Default-key IKM from outside the process (builder key file). Empty = the
+      secret embedded in this unit. }
+    DefaultSecretIKM: TBytes;
+    { Developer comment key. The comment obfuscation domain is keyed by this
+      IKM, which is never derived from the container key and is never linked
+      into the runtime build. Empty = comments cannot be decoded. }
+    CommentsIKM: TBytes;
+  end;
+
   { In-memory JSON value model shared by the bytecode parser and the
     deobfuscator. Objects keep Keys parallel to Items so key order is
     preserved exactly like Python's dicts. }
@@ -91,6 +135,10 @@ type
 
   EAvroShieldError = class(Exception);
 
+{ Fills in the runtime defaults: machine bind on, comments dropped, both IKM
+  overrides empty. }
+function AvroShieldDefaultLoadOptions: TAvroShieldLoadOptions;
+
 { Loads, verifies, decrypts, parses and deobfuscates an .AvroShield file.
   On asrOk, AJSONText holds the deobfuscated mapping JSON (in memory only). }
 function AvroShieldLoadFromFile(const AFileName, APassword: string;
@@ -108,6 +156,48 @@ function AvroShieldLoadFromBytes(const AData: TBytes; const APassword: string;
 function AvroShieldLoadFromBytesUtf8(const AData: TBytes; const APassword: string;
   out AJsonUtf8: TBytes; AUseMachineBind: Boolean = True): TAvroShieldResult;
 
+{ Same pipeline with the developer knobs (see TAvroShieldLoadOptions). Used by
+  AvroEncoBuilder for the pack/unpack round trip; never by the runtime. }
+function AvroShieldLoadFromBytesUtf8Ex(const AData: TBytes; const APassword: string;
+  const AOptions: TAvroShieldLoadOptions; out AJsonUtf8: TBytes): TAvroShieldResult;
+
+{ Tooling entry: unwraps a container down to the decrypted but still
+  OBFUSCATED bytecode - no parse, no deobfuscation. That is exactly the view an
+  attacker has after extracting the container key from the binary, so the
+  static-leak gate scans this buffer for legible mapping text (Bengali
+  codepoints, '#$' literals, comment words). Never call it at runtime. }
+function AvroShieldExtractObfuscatedBytecode(const AData: TBytes;
+  const APassword: string; const ADefaultSecretIKM: TBytes;
+  AUseMachineBind: Boolean; out ABytecode: TBytes): TAvroShieldResult;
+
+{ True for every container version this build can read. Single source of truth
+  for "is this a Shield container we understand": uAvroEncoCrypto used to keep
+  its own copy of the version constant, which is how the two could drift. }
+function AvroShieldSupportedVersion(AVer: Byte): Boolean;
+
+{ The version written into new containers. Kept public so tooling and the
+  header writers cannot hardcode a stale number. }
+function AvroShieldCurrentVersion: Byte;
+
+{ The comment domain marker used by the codec: comment fields are addressed
+  under a distinct context prefix and encoded with the developer comment key,
+  so a comment token can never be mistaken for (or replayed as) a value token.
+  Public because the self-test asserts the domain separation directly. }
+function AvroShieldIsCommentField(const AName: string): Boolean;
+function AvroShieldCommentCtx(const ACtx, AName: string): string;
+
+{ Metadata mask for a container the caller has already opened, derived from
+  the container master key. This is what makes the obfuscation keyed: the
+  metadata blob carries the value seed and the key map, and it can no longer be
+  unmasked without the container key. }
+function AvroShieldMetaMask(const AMaster: TBytes): TBytes;
+
+{ Comment domain key: HKDF-SHA256(comment IKM, salt = value seed). Derived per
+  container, and layered underneath the metadata mask - the seed it needs is
+  only reachable through the keyed blob. Exposed so the self-test can show the
+  two domains are independent rather than assuming it. }
+function AvroShieldCommentKey(const ACommentsIKM, ASeed: TBytes): TBytes;
+
 { Runtime entry point: same as AvroShieldLoadFromBytesUtf8 except that every
   failure is collapsed to a single externally visible result code, so a caller
   that can be observed cannot learn which stage rejected the container. The
@@ -123,8 +213,20 @@ function AvroShieldMachineId: TBytes;
 function AvroShieldParseBytecode(const ABytecode: TBytes; out AValue: TAvroNode): Boolean;
 
 { Inverts the obfuscation pipeline on a node tree (exposed for the self-test).
-  AValue must be freed by the caller. }
+  AValue must be freed by the caller. This is the format-v2 entry point: it
+  unmasks the metadata with the fixed legacy seed and decodes comments with the
+  value seed, which is exactly how v2 containers were written. Format-v3
+  containers must go through AvroShieldDeobfuscateEx with their derived keys. }
 function AvroShieldDeobfuscate(const AObfuscated: TAvroNode; out AValue: TAvroNode): Boolean;
+
+{ Format-v3 deobfuscation. AKeyMeta is the keyed metadata mask (see
+  AvroShieldMetaMask); ACommentsIKM is the developer comment IKM, which the
+  core turns into the comment key once the value seed is available.
+  AIncludeComments=False drops every comment field without decoding it: no
+  Base64 decode, no XOR keystream, no UTF-16 allocation. }
+function AvroShieldDeobfuscateEx(const AObfuscated: TAvroNode;
+  const AKeyMeta, ACommentsIKM: TBytes; AIncludeComments: Boolean;
+  out AValue: TAvroNode): Boolean;
 
 { Serializes a node tree to compact JSON text (loader/tests). }
 function AvroShieldNodeToJSON(const ANode: TAvroNode): string;
@@ -158,12 +260,20 @@ function Pbkdf2HMACSHA256(const APassword, ASalt: TBytes;
   always uses the embedded secret, a key file that does not match it is
   caught by the builder's round-trip verification instead of shipping.
 
+  ACommentsIKM is the developer comment key. When supplied, every comment
+  field is encoded in a separate obfuscation domain keyed by it; when empty,
+  comments fall back to the value domain (self-tests only). The comment key is
+  deliberately NOT derived from any container key, because that is what makes
+  comment text unrecoverable from a shipped container while the runtime keeps
+  skipping those fields entirely (see the obfuscation codec doc).
+
   On asrOk, AOutBytes holds the complete container and can be written to a
   .AvroEnco file. All intermediate key material and plaintext buffers are
   wiped before the function returns. }
 function AvroShieldBuildFromJson(const AJsonText, APassword: string;
   const ADefaultKey, ABindToMachine, AUseHardwareFactor: Boolean;
-  out AOutBytes: TBytes; const ADefaultSecretIKM: TBytes = nil): TAvroShieldResult;
+  out AOutBytes: TBytes; const ADefaultSecretIKM: TBytes = nil;
+  const ACommentsIKM: TBytes = nil): TAvroShieldResult;
 
 implementation
 
@@ -222,7 +332,14 @@ const
   // v1 (Argon2id) containers are rejected cleanly as asrBadVersion and must
   // be rebuilt with the current AvroEncoBuilder - there is intentionally no
   // legacy Argon2 fallback path anywhere in the project.
-  AS_VERSION = 2;
+  // v3: same key schedule as v2, but the obfuscation layer is keyed. The
+  // metadata blob that carries the value seed and the key map is no longer
+  // masked with a constant that ships in this unit; it is masked with a key
+  // derived from the container master key, so the obfuscation cannot be
+  // inverted without the container key. v2 containers keep loading through the
+  // legacy path (constant mask, comments in the value domain).
+  AS_VERSION = 3;
+  AS_VERSION_LEGACY = 2;
   AS_HEADER_SIZE = 58;
   AS_TRAILER_SIZE = 80;   // auth_tag(16) + hmac(64)
   AS_HMAC_SIZE = 64;
@@ -267,6 +384,19 @@ const
 
   // ---- obfuscation ----
   META_KEY = '_obf_meta';
+
+  // HKDF info labels for the two obfuscation domains. Changing either one is a
+  // format break for v3 containers, so they are written down here rather than
+  // inline at the call sites.
+  OBF_INFO_META = 'AvroShield-v3/obf-meta';
+  OBF_INFO_COMMENTS = 'AvroShield-v3/comments';
+
+  // Fields that carry developer documentation. They are obfuscated in their
+  // own domain (see OBF_INFO_COMMENTS) and are dropped by the runtime before
+  // any decoding happens. The list is narrow on purpose: it is the set the
+  // mapping schema actually uses, and every name in it is a claim that the
+  // runtime will never need the value.
+  OBF_COMMENT_FIELDS: array [0 .. 2] of string = ('Comment', 'comment', '_comment');
 
 { =============================================================================
   Byte helpers
@@ -851,14 +981,130 @@ begin
   Result := ACtx + '#' + IntToStr(AIndex);
 end;
 
-function DeobfValue(ANode: TAvroNode; const ACtx: string; const ASeed: TBytes;
+{ =============================================================================
+  Obfuscation key domains (format v3)
+  ============================================================================= }
+
+{ Generic HKDF-SHA256 (RFC 5869) over arbitrary info. The KDF helpers above are
+  bound to the container key schedule; this is the one the obfuscation domains
+  use, with an explicit info label so two derivations can never collide. }
+function HkdfSha256(const AIKM, ASalt, AInfo: TBytes; ALen: Integer): TBytes;
+var
+  PRK: TBytes;
+begin
+  PRK := HkdfExtractSHA256(ASalt, AIKM);
+  try
+    Result := HkdfExpandSHA256(PRK, AInfo, ALen);
+  finally
+    AvroWipeAndRelease(PRK);
+  end;
+end;
+
+{ True when AName is one of the developer-documentation fields. Matched as an
+  exact name: 'Comment' and 'comment' are distinct keys in the mapping schema
+  and both are documentation, but a value field that merely contains the word
+  must not be swept into the comment domain. }
+function AvroShieldIsCommentField(const AName: string): Boolean;
+var
+  I: Integer;
+begin
+  Result := False;
+  for I := Low(OBF_COMMENT_FIELDS) to High(OBF_COMMENT_FIELDS) do
+    if AName = OBF_COMMENT_FIELDS[I] then
+      Exit(True);
+end;
+
+{ Context of a comment field: the ordinary child path under a distinct prefix.
+  The prefix matters even though the comment domain already uses a different
+  key - it keeps the two keystream namespaces disjoint by construction, so no
+  pair of (key, ctx) inputs can ever coincide across domains. }
+function AvroShieldCommentCtx(const ACtx, AName: string): string;
+begin
+  Result := 'cmt/' + ChildCtx(ACtx, AName);
+end;
+
+{ Metadata mask for a container the caller has already opened:
+
+    KeyMeta = HKDF-SHA256(IKM = master, info = OBF_INFO_META)
+
+  Master is already a per-container salted secret, so the mask needs no second
+  salt. Before this existed the mask was a constant compiled into the unit, so
+  anyone could unmask the metadata - and therefore the value seed and the whole
+  obfuscation - without any key at all. }
+function AvroShieldMetaMask(const AMaster: TBytes): TBytes;
+var
+  InfoMeta: TBytes;
+begin
+  Result := nil;
+  if Length(AMaster) = 0 then
+    Exit;
+  InfoMeta := TEncoding.ASCII.GetBytes(OBF_INFO_META);
+  try
+    Result := HkdfSha256(AMaster, nil, InfoMeta, 32);
+  finally
+    AvroWipeAndRelease(InfoMeta);
+  end;
+end;
+
+{ Comment domain key:
+
+    KeyComments = HKDF-SHA256(IKM = comment IKM, salt = value seed,
+                              info = OBF_INFO_COMMENTS)
+
+  The developer IKM is what the runtime never has, and the value seed is only
+  reachable through the keyed metadata blob, so comment text needs both the
+  container key and the developer key. Salting with the per-build seed also
+  keeps a comment token from being replayed into another container that used
+  the same comment key. }
+function AvroShieldCommentKey(const ACommentsIKM, ASeed: TBytes): TBytes;
+var
+  InfoCmt: TBytes;
+begin
+  Result := nil;
+  if (Length(ACommentsIKM) = 0) or (Length(ASeed) = 0) then
+    Exit;
+  InfoCmt := TEncoding.ASCII.GetBytes(OBF_INFO_COMMENTS);
+  try
+    Result := HkdfSha256(ACommentsIKM, ASeed, InfoCmt, 32);
+  finally
+    AvroWipeAndRelease(InfoCmt);
+  end;
+end;
+
+{ Recursive deobfuscator.
+
+  AEffSeed is the obfuscation key in force for this subtree: the value seed by
+  default, the comment key inside a comment field. ACommentSeed is the comment
+  domain key; empty means the domain falls back to the value seed, which is
+  what a container built without a comment key used (mirror of the writer).
+
+  ACommentDomain distinguishes the two container formats. Format v3 gives
+  comment fields their own context path and key; format v2 had no comment
+  domain at all, so its comment fields are ordinary strings and must be decoded
+  with the plain child context and the value seed - decoding them at the v3
+  comment context produces garbage and, because that garbage is invalid UTF-8,
+  used to fail the whole load of every existing v2 container.
+
+  AIncludeComments=False is the runtime behaviour and the reason comments cost
+  nothing to load: a comment field is skipped here, before the Base64 decode,
+  before the keystream and before the UTF-16 allocation, instead of being
+  decoded and then thrown away by the mapping parser. }
+function DeobfValue(ANode: TAvroNode; const ACtx: string;
+  const AEffSeed, ACommentSeed: TBytes; AIncludeComments, ACommentDomain: Boolean;
   const ARev: TDictionary<string, string>;
   const ASkip: TDictionary<string, Boolean>): TAvroNode;
 var
   I: Integer;
   OrigKey, HashedKey: string;
   Child: TAvroNode;
+  ChildSeed, EffCmtSeed: TBytes;
+  ChildCtxPath: string;
+  IsComment: Boolean;
 begin
+  EffCmtSeed := ACommentSeed;
+  if Length(EffCmtSeed) = 0 then
+    EffCmtSeed := AEffSeed;
+
   Result := TAvroNode.Create;
   case ANode.Kind of
     nkObject:
@@ -871,8 +1117,23 @@ begin
             Continue;
           if not ARev.TryGetValue(HashedKey, OrigKey) then
             OrigKey := HashedKey;
-          Child := DeobfValue(ANode.Items[I], ChildCtx(ACtx, HashedKey), ASeed,
-            ARev, ASkip);
+          IsComment := AvroShieldIsCommentField(OrigKey);
+          if IsComment and (not AIncludeComments) then
+            Continue;
+          if IsComment and ACommentDomain then
+          begin
+            ChildSeed := EffCmtSeed;
+            ChildCtxPath := AvroShieldCommentCtx(ACtx, HashedKey);
+          end
+          else
+          begin
+            // Value fields, and every comment field in a v2 container, which
+            // has no separate comment domain.
+            ChildSeed := AEffSeed;
+            ChildCtxPath := ChildCtx(ACtx, HashedKey);
+          end;
+          Child := DeobfValue(ANode.Items[I], ChildCtxPath, ChildSeed,
+            EffCmtSeed, AIncludeComments, ACommentDomain, ARev, ASkip);
           Result.Keys.Add(OrigKey);
           Result.Items.Add(Child);
         end;
@@ -881,13 +1142,14 @@ begin
       begin
         Result.Kind := nkArray;
         for I := 0 to ANode.Items.Count - 1 do
-          Result.Items.Add(DeobfValue(ANode.Items[I], IndexCtx(ACtx, I), ASeed,
-            ARev, ASkip));
+          Result.Items.Add(DeobfValue(ANode.Items[I], IndexCtx(ACtx, I),
+            AEffSeed, EffCmtSeed, AIncludeComments, ACommentDomain, ARev,
+            ASkip));
       end;
     nkString:
       begin
         Result.Kind := nkString;
-        Result.StrVal := TEncoding.UTF8.GetString(DeobfCodec(ASeed,
+        Result.StrVal := TEncoding.UTF8.GetString(DeobfCodec(AEffSeed,
           TNetEncoding.Base64.DecodeStringToBytes(ANode.StrVal), ACtx));
       end;
   else
@@ -898,9 +1160,19 @@ begin
   end;
 end;
 
-function AvroShieldDeobfuscate(const AObfuscated: TAvroNode; out AValue: TAvroNode): Boolean;
+{ The shared deobfuscation core: unmasks the metadata blob with AKeyMeta, then
+  walks the tree with AKeyComments as the comment-domain key.
+
+  AKeyMeta=nil selects the format-v2 constant mask (MetaSeed), which is what a
+  v2 container carries; v3 passes its derived key. An empty ACommentsIKM means
+  the comment domain is not separable from the value domain (v2), so comments
+  are decoded with the value seed exactly as before. }
+function DeobfuscateCore(const AObfuscated: TAvroNode;
+  const AKeyMeta, ACommentsIKM: TBytes; AIncludeComments: Boolean;
+  out AValue: TAvroNode): Boolean;
 var
-  Seed: TBytes;
+  Seed, CommentKey: TBytes;
+  MetaMask: TBytes;
   Rev: TDictionary<string, string>;
   Skip: TDictionary<string, Boolean>;
   MetaIdx, I: Integer;
@@ -925,8 +1197,13 @@ begin
       if MetaVal.Kind <> nkString then
         Exit;
 
+      if Length(AKeyMeta) > 0 then
+        MetaMask := AKeyMeta
+      else
+        MetaMask := MetaSeed;
+
       Json := TJSONObject.ParseJSONValue(TEncoding.UTF8.GetString(DeobfCodec(
-        MetaSeed, TNetEncoding.Base64.DecodeStringToBytes(MetaVal.StrVal),
+        MetaMask, TNetEncoding.Base64.DecodeStringToBytes(MetaVal.StrVal),
         META_KEY)));
       if not (Json is TJSONObject) then
         Exit;
@@ -945,9 +1222,19 @@ begin
         Json.Free;
       end;
 
-      AValue := DeobfValue(AObfuscated, '', Seed, Rev, Skip);
+      // The comment key is derived only now, after the metadata blob has been
+      // unmasked: the comment domain is layered on top of the container key
+      // rather than sitting beside it.
+      CommentKey := AvroShieldCommentKey(ACommentsIKM, Seed);
+      // A keyed metadata mask is exactly the marker of format v3, and format
+      // v3 is the only format with a separate comment domain. The legacy entry
+      // point passes no mask, which keeps its v2 semantics.
+      AValue := DeobfValue(AObfuscated, '', Seed, CommentKey,
+        AIncludeComments, Length(AKeyMeta) > 0, Rev, Skip);
       Result := True;
     finally
+      AvroWipeAndRelease(CommentKey);
+      AvroWipeAndRelease(Seed);
       Rev.Free;
       Skip.Free;
     end;
@@ -955,6 +1242,21 @@ begin
     on E: Exception do
       Result := False;
   end;
+end;
+
+function AvroShieldDeobfuscate(const AObfuscated: TAvroNode; out AValue: TAvroNode): Boolean;
+begin
+  // Format v2: constant metadata mask, comments in the value domain, and the
+  // caller decides what to do with them (this entry point always keeps them).
+  Result := DeobfuscateCore(AObfuscated, nil, nil, True, AValue);
+end;
+
+function AvroShieldDeobfuscateEx(const AObfuscated: TAvroNode;
+  const AKeyMeta, ACommentsIKM: TBytes; AIncludeComments: Boolean;
+  out AValue: TAvroNode): Boolean;
+begin
+  Result := DeobfuscateCore(AObfuscated, AKeyMeta, ACommentsIKM,
+    AIncludeComments, AValue);
 end;
 
 { =============================================================================
@@ -1069,36 +1371,37 @@ end;
   Container reader
   ============================================================================= }
 
-{ Core loader. Delivers the deobfuscated mapping as UTF-8 bytes rather than a
-  Delphi string: a string is reference-counted and may be shared with other
-  holders, so the caller cannot reliably wipe the last copy. The byte buffer
-  that leaves this function belongs to the caller, which must wipe it with
-  AvroWipeAndRelease once the mapping has been parsed into runtime tables.
+{ Crypto stage of the loader: header validation, HMAC-SHA512 verification,
+  AES-256-GCM decryption and zlib, leaving the decrypted but still OBFUSCATED
+  bytecode. Deobfuscation is deliberately not done here, so the static-leak
+  gate can inspect exactly the payload an attacker sees after extracting the
+  container key.
 
-  Every intermediate - derived keys, the GCM tag, the HMAC input, the
-  decompressed bytecode - is wiped before return. }
-function AvroShieldLoadFromBytesUtf8(const AData: TBytes; const APassword: string;
-  out AJsonUtf8: TBytes; AUseMachineBind: Boolean): TAvroShieldResult;
+  AMaster and ASalt come back because the obfuscation keys are derived from
+  them; the caller owns and must wipe all three outs. Every other intermediate
+  - derived keys, the GCM tag, the HMAC input, the compressed blob - is wiped
+  here, so the container crypto stage exists in exactly one place. }
+function ShieldOpenContainer(const AData: TBytes; const APassword: string;
+  const ADefaultSecretIKM: TBytes; AUseMachineBind: Boolean;
+  out ABytecode, AMaster, ASalt: TBytes): TAvroShieldResult;
 var
   Flags: Byte;
   Salt, IV, StoredMachine, Master: TBytes;
   MachineF, HardwareF, FinalKey, EncKey, MacKey: TBytes;
   DefaultIKM, PasswordIKM: TBytes;
   Cipher, Tag, ExpectedMac, HmacData, Compressed, Bytecode: TBytes;
-  Root, Deobf: TAvroNode;
-  JsonText: string;
   MacOk, CryptoOk: Boolean;
 begin
-  AJsonUtf8 := nil;
-  Root := nil;
-  Deobf := nil;
+  ABytecode := nil;
+  AMaster := nil;
+  ASalt := nil;
   Result := asrUnknown;
 
   if Length(AData) < AS_HEADER_SIZE + AS_TRAILER_SIZE + 1 then
     Exit(asrFileTooShort);
   if not BytesEqualAt(AData, 0, AsMagic) then
     Exit(asrBadMagic);
-  if AData[8] <> AS_VERSION then
+  if not AvroShieldSupportedVersion(AData[8]) then
     Exit(asrBadVersion);
 
   Flags := AData[9];
@@ -1130,7 +1433,12 @@ begin
     // containers, PBKDF2 for password containers.
     if (Flags and AVROSHLD_FLAG_DEFAULT_KEY) <> 0 then
     begin
-      DefaultIKM := GetAvroEncoSecretIKM;
+      // An offline tool (AvroEncoBuilder --unpack) passes the key file in;
+      // the runtime passes nothing and gets the embedded secret.
+      if Length(ADefaultSecretIKM) > 0 then
+        DefaultIKM := Copy(ADefaultSecretIKM, 0, Length(ADefaultSecretIKM))
+      else
+        DefaultIKM := GetAvroEncoSecretIKM;
       Master := ShieldKdfDefaultKey(DefaultIKM, Salt);
     end
     else
@@ -1193,31 +1501,16 @@ begin
     if not BytesEqualAt(Bytecode, 0, TEncoding.ASCII.GetBytes('AVROBC')) then
       Exit(asrBadBytecode);
 
-    if not AvroShieldParseBytecode(Bytecode, Root) then
-      Exit(asrBadBytecode);
-    try
-      if not AvroShieldDeobfuscate(Root, Deobf) then
-        Exit(asrCorruptPayload);
-      try
-        JsonText := AvroShieldNodeToJSON(Deobf);
-        try
-          AJsonUtf8 := TEncoding.UTF8.GetBytes(JsonText);
-          Result := asrOk;
-        finally
-          // The serializer necessarily builds a UTF-16 string first, so wipe
-          // that interim copy here and leave only the caller-owned UTF-8
-          // buffer behind. Removing the interim string altogether is the job
-          // of the v3 pooled-table loader.
-          AvroWipeString(JsonText);
-        end;
-      finally
-        Deobf.Free;
-        Deobf := nil;
-      end;
-    finally
-      Root.Free;
-      Root := nil;
-    end;
+    // Ownership of the three caller-owned buffers moves out here; the locals
+    // are cleared so the wipe list below does not destroy what the caller now
+    // holds.
+    ABytecode := Bytecode;
+    Bytecode := nil;
+    AMaster := Master;
+    Master := nil;
+    ASalt := Salt;
+    Salt := nil;
+    Result := asrOk;
   finally
     // Every intermediate that held key material or plaintext mapping data is
     // wiped here. The previous version wiped only Master, FinalKey and
@@ -1242,6 +1535,120 @@ begin
     AvroWipeAndRelease(Compressed);
     AvroWipeAndRelease(Bytecode);
   end;
+end;
+
+{ Tooling: the decrypted but still obfuscated bytecode of a container. }
+function AvroShieldExtractObfuscatedBytecode(const AData: TBytes;
+  const APassword: string; const ADefaultSecretIKM: TBytes;
+  AUseMachineBind: Boolean; out ABytecode: TBytes): TAvroShieldResult;
+var
+  Master, Salt: TBytes;
+begin
+  ABytecode := nil;
+  Result := ShieldOpenContainer(AData, APassword, ADefaultSecretIKM,
+    AUseMachineBind, ABytecode, Master, Salt);
+  AvroWipeAndRelease(Master);
+  AvroWipeAndRelease(Salt);
+  if Result <> asrOk then
+    AvroWipeAndRelease(ABytecode);
+end;
+
+function AvroShieldDefaultLoadOptions: TAvroShieldLoadOptions;
+begin
+  Result.UseMachineBind := True;
+  Result.IncludeComments := False;
+  Result.DefaultSecretIKM := nil;
+  Result.CommentsIKM := nil;
+end;
+
+function AvroShieldSupportedVersion(AVer: Byte): Boolean;
+begin
+  Result := (AVer = AS_VERSION) or (AVer = AS_VERSION_LEGACY);
+end;
+
+function AvroShieldCurrentVersion: Byte;
+begin
+  Result := AS_VERSION;
+end;
+
+{ Core loader. Delivers the deobfuscated mapping as UTF-8 bytes rather than a
+  Delphi string: a string is reference-counted and may be shared with other
+  holders, so the caller cannot reliably wipe the last copy. The byte buffer
+  that leaves this function belongs to the caller, which must wipe it with
+  AvroWipeAndRelease once the mapping has been parsed into runtime tables.
+
+  Stage 1 unwraps the container; stage 2 parses the bytecode and deobfuscates
+  it with the metadata mask derived from the container master key and the
+  comment key derived from the caller's comment IKM. Every intermediate - the
+  derived keys, the bytecode, the interim UTF-16 JSON - is wiped before
+  return. }
+function AvroShieldLoadFromBytesUtf8Ex(const AData: TBytes; const APassword: string;
+  const AOptions: TAvroShieldLoadOptions; out AJsonUtf8: TBytes): TAvroShieldResult;
+var
+  Bytecode, Master, Salt, KeyMeta, KeyComments: TBytes;
+  Root, Deobf: TAvroNode;
+  JsonText: string;
+begin
+  AJsonUtf8 := nil;
+  Root := nil;
+  Deobf := nil;
+  Result := ShieldOpenContainer(AData, APassword, AOptions.DefaultSecretIKM,
+    AOptions.UseMachineBind, Bytecode, Master, Salt);
+  if Result <> asrOk then
+    Exit;
+  try
+    // Format v2 keeps the legacy constant metadata mask and has no separate
+    // comment domain; format v3 derives the mask from the container key and
+    // levels the comment domain on top of it.
+    if AData[8] = AS_VERSION then
+      KeyMeta := AvroShieldMetaMask(Master)
+    else
+      KeyMeta := nil;
+    try
+      if not AvroShieldParseBytecode(Bytecode, Root) then
+        Exit(asrBadBytecode);
+      try
+        if not AvroShieldDeobfuscateEx(Root, KeyMeta, AOptions.CommentsIKM,
+          AOptions.IncludeComments, Deobf) then
+          Exit(asrCorruptPayload);
+        try
+          JsonText := AvroShieldNodeToJSON(Deobf);
+          try
+            AJsonUtf8 := TEncoding.UTF8.GetBytes(JsonText);
+            Result := asrOk;
+          finally
+            // The serializer necessarily builds a UTF-16 string first, so
+            // wipe that interim copy here and leave only the caller-owned
+            // UTF-8 buffer behind.
+            AvroWipeString(JsonText);
+          end;
+        finally
+          Deobf.Free;
+          Deobf := nil;
+        end;
+      finally
+        Root.Free;
+        Root := nil;
+      end;
+    finally
+      AvroWipeAndRelease(KeyMeta);
+      AvroWipeAndRelease(KeyComments);
+    end;
+  finally
+    AvroWipeAndRelease(Master);
+    AvroWipeAndRelease(Salt);
+    AvroWipeAndRelease(Bytecode);
+  end;
+end;
+
+function AvroShieldLoadFromBytesUtf8(const AData: TBytes; const APassword: string;
+  out AJsonUtf8: TBytes; AUseMachineBind: Boolean): TAvroShieldResult;
+var
+  Options: TAvroShieldLoadOptions;
+begin
+  Options := AvroShieldDefaultLoadOptions;
+  Options.UseMachineBind := AUseMachineBind;
+  Result := AvroShieldLoadFromBytesUtf8Ex(AData, APassword, Options, AJsonUtf8);
 end;
 
 { String-returning wrapper, kept so the builder, the KATs and support tooling
@@ -1319,7 +1726,7 @@ begin
       FS.ReadBuffer(Hdr, 10);
       if not CompareMem(@Hdr[0], @AsMagic[0], 8) then
         Exit;
-      if Hdr[8] <> AS_VERSION then
+      if not AvroShieldSupportedVersion(Hdr[8]) then
         Exit;
       Result := (Hdr[9] and AVROSHLD_FLAG_DEFAULT_KEY) <> 0;
     finally
@@ -1408,14 +1815,28 @@ end;
   object keys -> SHA-256 hex (original kept in ARev for the key_map), string
   values -> Base64(DeobfCodec(seed, UTF-8(value), ctx)) with the exact same
   ChildCtx/IndexCtx path semantics the deobfuscator walks, so the round trip
-  is exact. Keys present in ASkip are dropped (META_KEY + dummies). }
-function ObfuscateTree(ANode: TAvroNode; const ACtx: string; const ASeed: TBytes;
+  is exact. Keys present in ASkip are dropped (META_KEY + dummies).
+
+  Developer documentation fields (OBF_COMMENT_FIELDS) are encoded in their own
+  domain under AvroShieldCommentCtx, with a key derived from the developer
+  comment IKM - which is never derived from anything the runtime holds. }
+function ObfuscateTree(ANode: TAvroNode; const ACtx: string;
+  const ASeed, ACommentSeed: TBytes;
   ARev: TDictionary<string, string>; const ASkip: TDictionary<string, Boolean>): TAvroNode;
 var
   I:         Integer;
   OrigKey, HashedKey: string;
   Child:     TAvroNode;
+  ChildSeed, EffCommentSeed: TBytes;
+  ChildCtxPath: string;
+  IsComment: Boolean;
 begin
+  // A container built without a comment key keeps comments in the value domain,
+  // exactly like format v2, so the reader's fallback matches on both sides.
+  EffCommentSeed := ACommentSeed;
+  if Length(EffCommentSeed) = 0 then
+    EffCommentSeed := ASeed;
+
   Result := TAvroNode.Create;
   case ANode.Kind of
     nkObject:
@@ -1429,8 +1850,19 @@ begin
             Continue;
           if not ARev.ContainsKey(HashedKey) then
             ARev.Add(HashedKey, OrigKey);
-          Child := ObfuscateTree(ANode.Items[I], ChildCtx(ACtx, HashedKey),
-            ASeed, ARev, ASkip);
+          IsComment := AvroShieldIsCommentField(OrigKey);
+          if IsComment then
+          begin
+            ChildSeed := EffCommentSeed;
+            ChildCtxPath := AvroShieldCommentCtx(ACtx, HashedKey);
+          end
+          else
+          begin
+            ChildSeed := ASeed;
+            ChildCtxPath := ChildCtx(ACtx, HashedKey);
+          end;
+          Child := ObfuscateTree(ANode.Items[I], ChildCtxPath, ChildSeed,
+            EffCommentSeed, ARev, ASkip);
           Result.Keys.Add(HashedKey);
           Result.Items.Add(Child);
         end;
@@ -1440,7 +1872,7 @@ begin
         Result.Kind := nkArray;
         for I := 0 to ANode.Items.Count - 1 do
           Result.Items.Add(ObfuscateTree(ANode.Items[I], IndexCtx(ACtx, I),
-            ASeed, ARev, ASkip));
+            ASeed, EffCommentSeed, ARev, ASkip));
       end;
     nkString:
       begin
@@ -1740,14 +2172,16 @@ end;
 
 function AvroShieldBuildFromJson(const AJsonText, APassword: string;
   const ADefaultKey, ABindToMachine, AUseHardwareFactor: Boolean;
-  out AOutBytes: TBytes; const ADefaultSecretIKM: TBytes): TAvroShieldResult;
+  out AOutBytes: TBytes; const ADefaultSecretIKM: TBytes;
+  const ACommentsIKM: TBytes): TAvroShieldResult;
 var
   Json:      TJSONValue;
   Root, Obf, MetaNode: TAvroNode;
   Rev:       TDictionary<string, string>;
   Skip:      TDictionary<string, Boolean>;
   Dummies:   TStringList;
-  Seed, Salt, IV, Machine, Master, FinalKey, EncKey, MacKey: TBytes;
+  Seed, CommentSeed, MetaMask: TBytes;
+  Salt, IV, Machine, Master, FinalKey, EncKey, MacKey: TBytes;
   MachineF, HardwareF: TBytes;
   DefaultIKM, PasswordIKM: TBytes;
   Flags, B:  Byte;
@@ -1775,26 +2209,55 @@ begin
     Json.Free;
   end;
   try
+    // ---- container key material ----
+    // Salt and the master key must exist before the obfuscation stage: the
+    // metadata blob that carries the value seed and the key map is masked with
+    // a key derived from the master key (format v3), never with a constant
+    // compiled into this unit.
+    FillRandomBytes(Salt, 16);
+    if ADefaultKey then
+    begin
+      if Length(ADefaultSecretIKM) > 0 then
+        DefaultIKM := Copy(ADefaultSecretIKM, 0, Length(ADefaultSecretIKM))
+      else
+        DefaultIKM := GetAvroEncoSecretIKM;
+      Master := ShieldKdfDefaultKey(DefaultIKM, Salt);
+    end
+    else
+    begin
+      PasswordIKM := TEncoding.UTF8.GetBytes(APassword);
+      Master := ShieldKdfPasswordKey(PasswordIKM, Salt);
+      AvroWipeAndRelease(PasswordIKM);
+    end;
+    MetaMask := AvroShieldMetaMask(Master);
+
     // ---- obfuscate ----
     FillRandomBytes(Seed, 32);
+    // Comment key: developer IKM salted with this build's value seed. The
+    // runtime has neither, so comment text cannot be recovered from a shipped
+    // container even by someone who extracted the container key.
+    CommentSeed := AvroShieldCommentKey(ACommentsIKM, Seed);
     Rev := TDictionary<string, string>.Create;
     Skip := TDictionary<string, Boolean>.Create;
     Dummies := TStringList.Create;
     try
       Skip.Add(META_KEY, True);
-      Obf := ObfuscateTree(Root, '', Seed, Rev, Skip);
+      Obf := ObfuscateTree(Root, '', Seed, CommentSeed, Rev, Skip);
       // Decoys are injected into the OBFUSCATED tree (their keys must appear
       // exactly once, already hashed, and they are dropped by the
       // deobfuscator via ASkip).
       AddDummyEntries(Obf, Seed, Skip, Dummies);
       try
-        // _obf_meta entry: Base64(DeobfCodec(MetaSeed, metaJson, META_KEY)).
-        // MetaNode is owned by Obf.Items (TObjectList with OwnsObjects=True).
+        // _obf_meta entry: Base64(DeobfCodec(MetaMask, metaJson, META_KEY))
+        // with MetaMask derived from the container master key, so the value
+        // seed and the key map are only reachable by whoever can open the
+        // container. MetaNode is owned by Obf.Items (TObjectList with
+        // OwnsObjects=True).
         MetaJson := BuildMetaJson(Seed, Rev, Dummies);
         MetaNode := TAvroNode.Create;
         MetaNode.Kind := nkString;
         MetaNode.StrVal := TNetEncoding.Base64.EncodeBytesToString(
-          DeobfCodec(MetaSeed, TEncoding.UTF8.GetBytes(MetaJson), META_KEY));
+          DeobfCodec(MetaMask, TEncoding.UTF8.GetBytes(MetaJson), META_KEY));
         Obf.Keys.Add(META_KEY);
         Obf.Items.Add(MetaNode);
         Bytecode := AssembleBytecode(Obf);
@@ -1816,8 +2279,8 @@ begin
     if Length(Compressed) = 0 then
       Exit(asrCorruptPayload);
 
-    // ---- key derivation (mirror of the loader) ----
-    FillRandomBytes(Salt, 16);
+    // ---- header flags (Salt/Master were derived before the obfuscation
+    //      stage; the IV is per container and not needed earlier) ----
     FillRandomBytes(IV, 16);
     Flags := FLAG_PASSWORD or FLAG_BYTECODE_V1;
     if ADefaultKey then
@@ -1835,30 +2298,8 @@ begin
       FillChar(Machine[0], 16, 0);
     end;
 
-    // v2 schedule, mirror of the loader: HKDF for default-key, PBKDF2 for
-    // password containers. No Argon2 anywhere in the project.
-    //
-    // ADefaultSecretIKM lets the offline builder be driven by a key file
-    // rather than the embedded secret, so the build tool binary carries no
-    // secret at all (AvroEncoBuilder --secret-file). An empty value means
-    // "use the embedded secret", which is what the self-tests do and what a
-    // verify-only load-back needs. Both sides derive from the same IKM bytes,
-    // so a key file that does not match the embedded secret is caught by the
-    // builder's load-back verification rather than shipping silently.
-    if ADefaultKey then
-    begin
-      if Length(ADefaultSecretIKM) > 0 then
-        DefaultIKM := Copy(ADefaultSecretIKM, 0, Length(ADefaultSecretIKM))
-      else
-        DefaultIKM := GetAvroEncoSecretIKM;
-      Master := ShieldKdfDefaultKey(DefaultIKM, Salt);
-    end
-    else
-    begin
-      PasswordIKM := TEncoding.UTF8.GetBytes(APassword);
-      Master := ShieldKdfPasswordKey(PasswordIKM, Salt);
-      AvroWipeAndRelease(PasswordIKM);
-    end;
+    // The key schedule (HKDF for default-key, PBKDF2 for password containers,
+    // no Argon2 anywhere) already ran above, before the obfuscation stage.
     try
       SetLength(MachineF, 16);
       FillChar(MachineF[0], 16, 0);
@@ -1936,6 +2377,8 @@ begin
       AvroWipeAndRelease(Compressed);
       AvroWipeAndRelease(Bytecode);
       AvroWipeAndRelease(Seed);
+      AvroWipeAndRelease(CommentSeed);
+      AvroWipeAndRelease(MetaMask);
     end;
   finally
     Root.Free;

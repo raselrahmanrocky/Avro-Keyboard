@@ -28,15 +28,39 @@ program AvroEncoBuilder;
 
   After building, the tool ALWAYS loads the container back through the
   runtime reader and verifies the recovered JSON is semantically identical to
-  the input (unless --no-verify), so a format regression can never ship.
+  the input (unless --no-verify), so a format regression can never ship. The
+  load-back runs with --comments-key-file applied, so a comment-codec
+  regression cannot ship either.
+
+  Pack / unpack round trip:
+    --pack    Authoring JSON (readable Bengali comments) -> .AvroEnco. This is
+              the default mode, spelled out so the pair is symmetric.
+    --unpack  .AvroEnco -> authoring JSON with the comments restored, for
+              developer review and editing. Needs --secret-file for a
+              default-key container and --comments-key-file to recover
+              comment text; without the comment key the comment fields are
+              dropped rather than written out as opaque tokens.
+
+  The comment key is a developer-side IKM. Comment fields are obfuscated in a
+  domain keyed by it, which is never derived from a container key and is never
+  linked into the runtime, so a decrypted container does not disclose them.
+  See AvroEncoEngine\docs\obfuscation-codec.md.
 
   Usage:
     AvroEncoBuilder <input.json> <output.avroenco> [options]
+    AvroEncoBuilder --unpack <input.avroenco> <output.json> [options]
 
   Options:
+    --pack                Shield/v2 build from authoring JSON (default).
+    --unpack              Developer round trip: container -> JSON.
     -p, --password <pw>   User password protection (prompts at load time).
     --default-key         Shield: protect with the default-key secret.
-    --secret-file <path>  Raw default-key IKM. Required with --default-key.
+    --secret-file <path>  Raw default-key IKM. Required with --default-key,
+                          and required by --unpack for a default-key
+                          container (the tool embeds no secret of its own).
+    --comments-key-file <path>
+                          Raw developer comment IKM. Encodes comment fields
+                          on build, decodes them on --unpack.
     --format <fmt>        shield (default) | v2
     --bind                Shield: bind the container to this machine.
     --hardware            Shield: add the hardware factor to the KDF.
@@ -45,7 +69,7 @@ program AvroEncoBuilder;
 
   Exit codes: 0 OK, 1 usage, 2 input read failure, 3 invalid JSON,
               4 build failure, 5 output write failure, 6 verification failure,
-              7 secret file missing/empty.
+              7 secret file missing/empty, 8 unpack failed.
   ============================================================================= }
 
 { The builder is a local offline tool, so it keeps the descriptive parse
@@ -74,24 +98,42 @@ const
   EXIT_WRITE    = 5;
   EXIT_VERIFY   = 6;
   EXIT_KEYFILE  = 7;
+  EXIT_UNPACK   = 8;
+
+  { The authoring files are UTF-8 with a BOM and LF line breaks. Emitting
+    exactly that is what lets the unpack round trip be checked byte for byte
+    against source-mappings instead of only semantically - a much stronger
+    gate, and the reason this is not sLineBreak (CRLF on Windows). }
+  JSON_BREAK = #10;
 
   FORMAT_SHIELD = 1;
   FORMAT_V2     = 2;
 
 var
   InputPath, OutputPath, Password, ErrMsg, SecretFilePath: string;
+  CommentsKeyPath: string;
   ContainerFormat: Integer;
   UseDefaultKey, BindMachine, UseHardware, NoVerify, Quiet: Boolean;
-  KeyIKM: TBytes;
+  UnpackMode, PackMode: Boolean;
+  KeyIKM, CommentsIKM: TBytes;
 
 procedure Usage;
 begin
   WriteLn('AvroEncoBuilder - offline .AvroEnco container builder');
   WriteLn;
   WriteLn('Usage: AvroEncoBuilder <input.json> <output.avroenco> [options]');
+  WriteLn('       AvroEncoBuilder --unpack <input.avroenco> <output.json> [options]');
+  WriteLn;
+  WriteLn('Modes:');
+  WriteLn('  --pack                Build a container from authoring JSON (default).');
+  WriteLn('  --unpack              Developer round trip: container -> authoring JSON');
+  WriteLn('                        with the Bengali comments restored.');
   WriteLn;
   WriteLn('Options:');
   WriteLn('  -p, --password <pw>   User password protection (prompts at load time).');  WriteLn('    --default-key         Shield: protect with the default-key secret.');
+  WriteLn('    --comments-key-file <path>');
+  WriteLn('                          Raw developer comment IKM: encodes comment');
+  WriteLn('                          fields on build, decodes them on --unpack.');
   WriteLn('    --secret-file <path>  Raw default-key IKM file. REQUIRED with');
   WriteLn('                          --default-key: the builder deliberately has no');
   WriteLn('                          embedded secret, so building and running the');
@@ -104,7 +146,7 @@ begin
   WriteLn;
   WriteLn('Exit codes: 0 OK, 1 usage, 2 input read failure, 3 invalid JSON,');
   WriteLn('            4 build failure, 5 output write failure, 6 verification failure,');
-  WriteLn('            7 secret file missing/empty.');
+  WriteLn('            7 secret file missing/empty, 8 unpack failed.');
 end;
 
 { Reads a UTF-8 text file, strips a leading BOM. }
@@ -188,17 +230,28 @@ end;
 
 { Loads AOutBytes back through the runtime loader and compares the recovered
   JSON against the input document. For default-key containers APassword is
-  ignored by the loader (it substitutes the built-in secret itself). }
+  ignored by the loader (it substitutes the built-in secret itself).
+
+  The caller passes the options the build used, with IncludeComments enabled:
+  the load-back then also proves that every comment field survives the comment
+  domain round trip, not just that the operational fields do. }
 function VerifyRoundTrip(const AJsonText, APassword: string;
-  const ADefaultKey: Boolean; const AOutBytes: TBytes; out AErr: string): Boolean;
+  const ADefaultKey: Boolean; const AOutBytes: TBytes;
+  const AOptions: TAvroShieldLoadOptions; out AErr: string): Boolean;
 var
   Loaded: string;
+  LoadedBytes: TBytes;
   R: TAvroShieldResult;
   JsonA, JsonB: TJSONValue;
 begin
   Result := False;
   AErr := '';
-  R := AvroShieldLoadFromBytes(AOutBytes, APassword, Loaded, True);
+  R := AvroShieldLoadFromBytesUtf8Ex(AOutBytes, APassword, AOptions, LoadedBytes);
+  if R = asrOk then
+  begin
+    Loaded := TEncoding.UTF8.GetString(LoadedBytes);
+    AvroWipeAndRelease(LoadedBytes);
+  end;
   if R <> asrOk then
   begin
     AErr := 'runtime loader rejected the container (code ' + IntToStr(Ord(R)) + ')';
@@ -240,20 +293,29 @@ begin
   UseHardware := False;
   NoVerify := False;
   Quiet := False;
+  UnpackMode := False;
+  PackMode := False;
   Password := '';
   SecretFilePath := '';
+  CommentsKeyPath := '';
+  InputPath := '';
+  OutputPath := '';
 
   if ParamCount < 2 then
     Exit;
 
-  InputPath := ParamStr(1);
-  OutputPath := ParamStr(2);
-
-  I := 3;
+  // Options may appear before or after the two positional paths, so the
+  // positional arguments are collected in order rather than assumed to be
+  // the first two (--unpack in front of the input is the normal spelling).
+  I := 1;
   while I <= ParamCount do
   begin
     Arg := ParamStr(I);
-    if (Arg = '-p') or (Arg = '--password') then
+    if Arg = '--unpack' then
+      UnpackMode := True
+    else if Arg = '--pack' then
+      PackMode := True
+    else if (Arg = '-p') or (Arg = '--password') then
     begin
       if I + 1 > ParamCount then
         Exit;
@@ -273,6 +335,13 @@ begin
       Inc(I);
       SecretFilePath := ParamStr(I);
     end
+    else if Arg = '--comments-key-file' then
+    begin
+      if I + 1 > ParamCount then
+        Exit;
+      Inc(I);
+      CommentsKeyPath := ParamStr(I);
+    end
     else if Arg = '--no-verify' then
       NoVerify := True
     else if Arg = '--quiet' then
@@ -289,9 +358,33 @@ begin
       else
         Exit;
     end
+    else if (Arg <> '') and (Arg[1] = '-') then
+      Exit // unknown argument
     else
-      Exit; // unknown argument
+    begin
+      if InputPath = '' then
+        InputPath := Arg
+      else if OutputPath = '' then
+        OutputPath := Arg
+      else
+        Exit; // more than two paths
+    end;
     Inc(I);
+  end;
+
+  if (InputPath = '') or (OutputPath = '') then
+    Exit;
+  if UnpackMode and PackMode then
+    Exit; // contradictory modes
+
+  // Unpack takes its protection mode from the container header, so the
+  // build-side rules below do not apply to it.
+  if UnpackMode then
+  begin
+    if UseDefaultKey or BindMachine or UseHardware then
+      Exit;
+    Result := True;
+    Exit;
   end;
 
   // Protection-mode validation per format.
@@ -355,6 +448,225 @@ begin
   end;
 end;
 
+{ Loads the developer comment IKM when --comments-key-file was given. False
+  only when a path was supplied but cannot be read: running without the file is
+  allowed (comments then fall back to the value domain on build, and are left
+  out of an unpack), but a path that does not work is a build error. }
+function ReadCommentsKey: Boolean;
+begin
+  Result := True;
+  CommentsIKM := nil;
+  if CommentsKeyPath = '' then
+    Exit;
+  Result := ReadKeyFile(CommentsKeyPath, CommentsIKM);
+end;
+
+{ Escapes a string for JSON output, leaving non-ASCII (the Bengali comments)
+  as raw UTF-8 so an unpacked file reads like the authoring source. }
+function EscapeJsonString(const S: string): string;
+var
+  I: Integer;
+  C: Char;
+begin
+  Result := '';
+  for I := 1 to Length(S) do
+  begin
+    C := S[I];
+    case C of
+      '"': Result := Result + '\"';
+      '\': Result := Result + '\\';
+      #8: Result := Result + '\b';
+      #9: Result := Result + '\t';
+      #10: Result := Result + '\n';
+      #12: Result := Result + '\f';
+      #13: Result := Result + '\r';
+    else
+      if Ord(C) < 32 then
+        Result := Result + Format('\u%.4x', [Ord(C)])
+      else
+        Result := Result + C;
+    end;
+  end;
+end;
+
+{ Developer-shaped JSON: 4-space indent, key order preserved, objects and
+  arrays multi-line, empty containers inline. Deliberately the same shape the
+  authoring files in AvroEncoEngine\source-mappings use, so an unpacked
+  container can be diffed against them directly. }
+function PrettyJson(const AValue: TJSONValue; AIndent: Integer): string;
+var
+  I: Integer;
+  Pad, Inner: string;
+  Obj: TJSONObject;
+  Arr: TJSONArray;
+begin
+  Pad := StringOfChar(' ', AIndent);
+  Inner := StringOfChar(' ', AIndent + 4);
+  if AValue is TJSONObject then
+  begin
+    Obj := TJSONObject(AValue);
+    if Obj.Count = 0 then
+      Exit('{}');
+    Result := '{' + JSON_BREAK;
+    for I := 0 to Obj.Count - 1 do
+    begin
+      Result := Result + Inner + '"' + Obj.Pairs[I].JsonString.Value + '": ' +
+        PrettyJson(Obj.Pairs[I].JsonValue, AIndent + 4);
+      if I < Obj.Count - 1 then
+        Result := Result + ',';
+      Result := Result + JSON_BREAK;
+    end;
+    Result := Result + Pad + '}';
+  end
+  else if AValue is TJSONArray then
+  begin
+    Arr := TJSONArray(AValue);
+    if Arr.Count = 0 then
+      Exit('[]');
+    Result := '[' + JSON_BREAK;
+    for I := 0 to Arr.Count - 1 do
+    begin
+      Result := Result + Inner + PrettyJson(Arr.Items[I], AIndent + 4);
+      if I < Arr.Count - 1 then
+        Result := Result + ',';
+      Result := Result + JSON_BREAK;
+    end;
+    Result := Result + Pad + ']';
+  end
+  // Order matters: in System.JSON, TJSONNumber descends from TJSONString, so a
+  // number has to be recognised before the string branch - otherwise an
+  // integer read back as a number is re-emitted as a quoted string and the
+  // unpack output stops matching the authored source.
+  else if AValue is TJSONNumber then
+    Result := TJSONNumber(AValue).Value
+  else if AValue is TJSONString then
+    Result := '"' + EscapeJsonString(TJSONString(AValue).Value) + '"'
+  else
+    Result := AValue.ToString;
+end;
+
+{ Writes UTF-8 with a BOM and CRLF breaks, matching the authoring files. }
+function WriteTextFileUtf8Bom(const APath, AText: string): Boolean;
+var
+  Bytes: TBytes;
+begin
+  Result := False;
+  try
+    Bytes := TEncoding.UTF8.GetBytes(AText);
+    TFile.WriteAllBytes(APath, TEncoding.UTF8.GetPreamble + Bytes);
+    Result := True;
+  except
+    Result := False;
+  end;
+end;
+
+{ Developer round trip: container -> authoring JSON with the comments restored.
+  The comment text is only recoverable with the developer comment key; without
+  it the comment fields are dropped instead of written out as opaque tokens. }
+function UnpackContainer: Integer;
+var
+  Data: TBytes;
+  Options: TAvroShieldLoadOptions;
+  LoadedBytes: TBytes;
+  R: TAvroShieldResult;
+  Text, Pretty: string;
+  Json: TJSONValue;
+  Version: Byte;
+  CommentKeyFailed: Boolean;
+begin
+  Result := EXIT_UNPACK;
+  if not FileExists(InputPath) then
+  begin
+    WriteLn('ERROR: container not found: ' + InputPath);
+    Exit(EXIT_READ);
+  end;
+  try
+    Data := TFile.ReadAllBytes(InputPath);
+  except
+    WriteLn('ERROR: cannot read container: ' + InputPath);
+    Exit(EXIT_READ);
+  end;
+
+  // A default-key container needs the key file. This tool deliberately embeds
+  // no secret of its own, so there is nothing to fall back to.
+  if AvroShieldContainerUsesDefaultKey(InputPath) then
+    if not ReadKeyFile(SecretFilePath, KeyIKM) then
+    begin
+      WriteLn('ERROR: this is a default-key container and no usable secret ' +
+        'file was given.');
+      WriteLn('       Pass --secret-file <keys\avroenco.key>.');
+      Exit(EXIT_KEYFILE);
+    end;
+
+  Options := AvroShieldDefaultLoadOptions;
+  Options.IncludeComments := Length(CommentsIKM) > 0;
+  Options.DefaultSecretIKM := KeyIKM;
+  Options.CommentsIKM := CommentsIKM;
+
+  CommentKeyFailed := False;
+  R := AvroShieldLoadFromBytesUtf8Ex(Data, Password, Options, LoadedBytes);
+  if (R <> asrOk) and Options.IncludeComments then
+  begin
+    // The comment domain fails closed on a wrong key: the codec cannot tell a
+    // rotated developer key from a damaged container. The operational mapping
+    // is keyed by the container key alone, so retry with comments dropped - a
+    // wrong comment key must never cost a developer the mapping - and say
+    // afterwards which key looks wrong.
+    Options.IncludeComments := False;
+    R := AvroShieldLoadFromBytesUtf8Ex(Data, Password, Options, LoadedBytes);
+    CommentKeyFailed := R = asrOk;
+  end;
+  if R <> asrOk then
+  begin
+    WriteLn('ERROR: cannot unpack the container (code ' + IntToStr(Ord(R)) + ')');
+    WriteLn('       A wrong --secret-file/--password and a damaged container ' +
+      'are indistinguishable here by design; both fail closed.');
+    Exit(EXIT_UNPACK);
+  end;
+
+  Text := TEncoding.UTF8.GetString(LoadedBytes);
+  AvroWipeAndRelease(LoadedBytes);
+
+  Json := TJSONObject.ParseJSONValue(Trim(Text));
+  if Json = nil then
+  begin
+    WriteLn('ERROR: the unpacked payload is not valid JSON');
+    Exit(EXIT_UNPACK);
+  end;
+  try
+    Pretty := PrettyJson(Json, 0);
+  finally
+    Json.Free;
+  end;
+
+  // No trailing line break: the authoring files end at '}' and the round trip
+  // is checked byte for byte against them.
+  if not WriteTextFileUtf8Bom(OutputPath, Pretty) then
+  begin
+    WriteLn('ERROR: cannot write output file: ' + OutputPath);
+    Exit(EXIT_WRITE);
+  end;
+
+  if not Quiet then
+  begin
+    Version := 0;
+    if Length(Data) >= 9 then
+      Version := Data[8];
+    WriteLn('unpack: ' + InputPath);
+    WriteLn('format: shield v' + IntToStr(Version));
+    if Options.IncludeComments then
+      WriteLn('comments: restored (developer comment key applied)')
+    else if CommentKeyFailed then
+      WriteLn('comments: NOT decoded - this comment key does not match the ' +
+        'container (the mapping itself is intact)')
+    else
+      WriteLn('comments: omitted (no --comments-key-file; add one to see them)');
+    WriteLn('output: ' + OutputPath);
+    WriteLn('OK');
+  end;
+  Result := EXIT_OK;
+end;
+
 var
   JsonText: string;
   OutBytes: TBytes;
@@ -369,6 +681,14 @@ begin
     Usage;
     ExitCode := EXIT_USAGE;
   end
+  else if not ReadCommentsKey then
+  begin
+    WriteLn('ERROR: cannot read comment key file (missing or empty): ' +
+      CommentsKeyPath);
+    ExitCode := EXIT_KEYFILE;
+  end
+  else if UnpackMode then
+    ExitCode := UnpackContainer
   else if UseDefaultKey and (ContainerFormat = FORMAT_SHIELD) and
     (not ReadKeyFile(SecretFilePath, KeyIKM)) then
   begin
@@ -401,8 +721,13 @@ begin
 
       if ContainerFormat = FORMAT_SHIELD then
       begin
+        // Without a comment key the comment fields fall back to the value
+        // domain, which keeps the runtime able to read them with the container
+        // key alone. Shipped builds always pass one (build_avroenco.bat).
+        if (Length(CommentsIKM) = 0) and (not Quiet) then
+          WriteLn('warning: no --comments-key-file, comments use the value domain');
         var R: TAvroShieldResult := AvroShieldBuildFromJson(JsonText, Password,
-          UseDefaultKey, BindMachine, UseHardware, OutBytes, KeyIKM);
+          UseDefaultKey, BindMachine, UseHardware, OutBytes, KeyIKM, CommentsIKM);
         if R <> asrOk then
         begin
           WriteLn('ERROR: shield build failed (code ' + IntToStr(Ord(R)) + ')');
@@ -418,7 +743,14 @@ begin
           ExitCode := EXIT_OK;
           if not NoVerify then
           begin
-            if not VerifyRoundTrip(JsonText, Password, UseDefaultKey, OutBytes, ErrMsg) then
+            // Verify with the same options the build used, comments included:
+            // the load-back then covers the comment domain too.
+            var VerifyOpts: TAvroShieldLoadOptions := AvroShieldDefaultLoadOptions;
+            VerifyOpts.IncludeComments := True;
+            VerifyOpts.DefaultSecretIKM := KeyIKM;
+            VerifyOpts.CommentsIKM := CommentsIKM;
+            if not VerifyRoundTrip(JsonText, Password, UseDefaultKey, OutBytes,
+              VerifyOpts, ErrMsg) then
             begin
               WriteLn('ERROR: verification failed - ' + ErrMsg);
               if UseDefaultKey then
@@ -474,7 +806,8 @@ begin
 
   if not Quiet then
   begin
-    if ExitCode = EXIT_OK then
+    // UnpackContainer prints its own summary; this block is the build report.
+    if (ExitCode = EXIT_OK) and (not UnpackMode) then
     begin
       SrcSize := Length(TEncoding.UTF8.GetBytes(JsonText));
       OutSize := 0;

@@ -22,6 +22,15 @@ Two consequences, both verified against the current build:
    `LoadAnsiMappingFromJSON` matches those names literally. So the hashes are
    dictionary-attackable using the binary itself as the dictionary.
 
+> **Amended (format v3, implemented).** Consequence 1 is now scoped: the
+> metadata blob that carries the key map is masked with a key derived from the
+> container master key instead of a constant compiled into `uAvroShield`, so
+> "anyone who decrypts one container" has to mean "anyone who has the container
+> key" too. Consequence 2 is unchanged - the field vocabulary is still in the
+> binary, which is precisely the residual exposure the ordinal encoding below
+> removes. See `obfuscation-codec.md` for the implemented codec, including the
+> separate developer comment domain.
+
 `kat_staticleak` reports the v2 tokens (`_obf_meta`, `key_map`, `dummies`,
 `AvroShieldBytecodeXORv1`) in any executable that links the runtime. That
 warning list becomes empty when v3 lands.
@@ -182,6 +191,31 @@ The largest security improvement here is deleted code.
    offset, unknown field id).
 7. `kat_staticleak`'s warning list should then be empty; make that a hard
    failure at that point.
+
+## Interaction with the obfuscation codec (implemented ahead of this design)
+
+Format v3 shipped with a *keyed* obfuscation codec and a separate developer
+comment domain (`obfuscation-codec.md`) before the ordinal encoding landed.
+Two things carry over when the ordinal layout replaces the current bytecode:
+
+1. **The comment domain derivation must survive the rewrite.** Comments stop
+   being a schema key and become `fidComment` records, but they must keep
+   their own key (`HKDF-SHA256(developer IKM, salt = value seed, info =
+   'AvroShield-v3/comments')`) and their own context namespace, and the loader
+   must keep dropping them before any decode. That key is the only reason a
+   container does not disclose its author documentation; losing it in the
+   rewrite would silently undo the property.
+2. **`kat_obfcodec` must be updated, not deleted.** Its assertions (comments
+   unrecoverable without the developer key, no legible text in the payload,
+   no cost on the runtime path) are properties of the pipeline, not of the v2
+   bytecode, and they apply to the ordinal layout unchanged. The
+   `_obf_meta` presence check is the one assertion that must be replaced, since
+   this design deletes that entry.
+
+The metadata mask is the one piece of this design's delete-list that should not
+be dropped without replacement: with `_obf_meta` gone there is nothing left to
+mask, which is the intent, but any future container-wide obfuscation seed must
+still be derived from the container key rather than from a constant.
 
 ## Residual exposure after v3
 

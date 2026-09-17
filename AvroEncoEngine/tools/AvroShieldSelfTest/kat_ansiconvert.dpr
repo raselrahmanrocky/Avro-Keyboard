@@ -37,7 +37,7 @@
 
   Only the KAT's own temp file is written (inside %TEMP%).
 
-  Usage: kat_ansiconvert <mapping-dir> [quiet]
+  Usage: kat_ansiconvert <mapping-dir> [source-json-dir] [quiet]
   Exit code: 0 all PASS, 1 FAIL.
 }
 
@@ -81,6 +81,12 @@ var
   Fails: Integer;
   Checks: Integer;
   Quiet: Boolean;
+  // Optional reference folder for the authoring JSON
+  // (AvroEncoEngine\source-mappings). The plain mirrors that used to sit next to the
+  // containers are no longer tracked - they were a legible copy of the whole
+  // mapping sitting in the repository - so the reference is passed in
+  // explicitly instead of being picked up from the container folder.
+  SourceDir: string;
   Corpus: TArray<TCorpusCase>;
 
 { ---- reporting ----------------------------------------------------------- }
@@ -779,7 +785,17 @@ begin
   begin
     Base := ChangeFileExt(ExtractFileName(FileName), '');
     Tag := Base;
-    JsonPath := TPath.Combine(ADir, Base + '.json');
+    // The authored source is the authority. A same-named mirror sitting next
+    // to the container is only a fallback when no source folder was passed:
+    // a stale mirror is precisely how a drift between the authored JSON and
+    // the shipped container stayed invisible before (the ou-kar value in the
+    // V4 mirror was wrong for a whole release while the gate compared the
+    // container against that mirror).
+    JsonPath := '';
+    if SourceDir <> '' then
+      JsonPath := TPath.Combine(SourceDir, Base + '.json');
+    if (JsonPath = '') or (not TFile.Exists(JsonPath)) then
+      JsonPath := TPath.Combine(ADir, Base + '.json');
 
     // Convert through the container.
     if InstallMapping(LoadMappingText(FileName), ParseLog) then
@@ -814,19 +830,22 @@ begin
   Checks := 0;
   Quiet := False;
   DirArg := '';
+  SourceDir := '';
 
   for I := 1 to ParamCount do
     if SameText(ParamStr(I), 'quiet') then
       Quiet := True
     else if DirArg = '' then
-      DirArg := ParamStr(I);
+      DirArg := ParamStr(I)
+    else if SourceDir = '' then
+      SourceDir := ParamStr(I);
 
   BuildCorpus;
   Outputs := TDictionary<string, TArray<string>>.Create;
 
   if DirArg = '' then
   begin
-    WriteLn('usage: kat_ansiconvert <mapping-dir> [quiet]');
+    WriteLn('usage: kat_ansiconvert <mapping-dir> [source-json-dir] [quiet]');
     ExitCode := 2;
     Exit;
   end;
