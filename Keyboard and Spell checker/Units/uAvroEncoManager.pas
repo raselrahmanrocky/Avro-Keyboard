@@ -43,6 +43,40 @@ function GetJSONString(const AObj: TJSONValue; const AKey: string): string;
 function FindMetadataJsonPath(const ADisplayName: string; const ADirectory: string): string;
 function GetActiveEncoFilePath(const ADisplayName: string; const ADirectory: string): string;
 
+{ ============================================================================== }
+{ Mapping list order and picker shortcuts }
+{ ============================================================================== }
+
+{ Natural (human) ordering for mapping display names: a digit run compares
+  numerically, so "Ansi V2" sorts before "Ansi V10" instead of after it. The
+  encoding menus (tray + top bar) and the version picker must all use this,
+  otherwise the same three lists can disagree - the menus used to enumerate the
+  AvroEncoFiles dictionary, whose bucket order put V4 between V1 and V2 while
+  the picker (fed by the sorted AnsiMappingNames) looked correct. }
+function CompareMappingDisplayNames(const ALeft, ARight: string): Integer;
+
+{ Sorts ANames in place with CompareMappingDisplayNames. No-op for TStrings
+  implementations without CustomSort (only TStringList has it). }
+procedure SortMappingDisplayNames(ANames: TStrings);
+
+{ Fills ANames with every mapping display name in the shared natural order,
+  excluding 'Default' (which is built into the application and is always listed
+  first by the caller). This is the single source of truth for menu and picker
+  order. }
+procedure GetSortedMappingDisplayNames(ANames: TStrings);
+
+{ Shortcut resolution used by the picker's key handlers (form-level and list
+  box level share one implementation). Maps the 1-based number the picker draws
+  next to an item back to its index: the main number row (VK_1..VK_9) and the
+  numpad (VK_NUMPAD1..VK_NUMPAD9). Returns -1 for any other key, or when the
+  number has no item. }
+function MappingIndexForKey(const ANames: TStrings; AKey: Word): Integer;
+
+{ Index of the first name whose first character matches AChar,
+  case-insensitively. Returns -1 when nothing matches (so the caller can leave
+  the key alone and fall through to the list box's own type-ahead). }
+function MappingIndexForChar(const ANames: TStrings; AChar: Char): Integer;
+
 { True when a font family with this name is registered on this computer.
   Matching is intentionally loose (case, spaces and punctuation ignored, with
   either name allowed to be a prefix of the other) so that "Adarsh aLipi" finds
@@ -439,6 +473,117 @@ begin
     Exit(AppDir + 'assets\' + ADisplayName + '.json');
   if FileExists(AppDir + 'AnsiMapping\' + ADisplayName + '.json') then
     Exit(AppDir + 'AnsiMapping\' + ADisplayName + '.json');
+end;
+
+{ ============================================================================== }
+{ Mapping list order and picker shortcuts }
+{ ============================================================================== }
+
+{ First significant digit of one digit run (the run's end when it is all
+  zeros), so leading zeros cannot change the ordering. }
+function DigitRunStart(const AText: string; AStart, AStop: Integer): Integer;
+begin
+  Result := AStart;
+  while (Result < AStop) and (AText[Result] = '0') do
+    Inc(Result);
+end;
+
+function CompareMappingDisplayNames(const ALeft, ARight: string): Integer;
+var
+  I, J, L1, L2, S1, S2: Integer;
+begin
+  I := 1;
+  J := 1;
+  while (I <= Length(ALeft)) and (J <= Length(ARight)) do
+  begin
+    if CharInSet(ALeft[I], ['0'..'9']) and CharInSet(ARight[J], ['0'..'9']) then
+    begin
+      // Compare the whole digit run numerically: "V2" must come before
+      // "V10", which plain ordinal comparison gets backwards.
+      L1 := I;
+      while (L1 <= Length(ALeft)) and CharInSet(ALeft[L1], ['0'..'9']) do
+        Inc(L1);
+      L2 := J;
+      while (L2 <= Length(ARight)) and CharInSet(ARight[L2], ['0'..'9']) do
+        Inc(L2);
+      S1 := DigitRunStart(ALeft, I, L1);
+      S2 := DigitRunStart(ARight, J, L2);
+      // Length first, digits second: this stays correct for runs far longer
+      // than any integer type could hold. Both runs are never empty, so the
+      // loop always advances.
+      Result := (L1 - S1) - (L2 - S2);
+      if Result = 0 then
+        Result := CompareStr(Copy(ALeft, S1, L1 - S1), Copy(ARight, S2, L2 - S2));
+      if Result <> 0 then
+        Exit;
+      I := L1;
+      J := L2;
+    end
+    else
+    begin
+      Result := Ord(UpCase(ALeft[I])) - Ord(UpCase(ARight[J]));
+      if Result <> 0 then
+        Exit;
+      Inc(I);
+      Inc(J);
+    end;
+  end;
+  // A prefix sorts before the string that extends it.
+  Result := (Length(ALeft) - I) - (Length(ARight) - J);
+end;
+
+function CompareMappingNamesCallback(List: TStringList; Index1, Index2: Integer): Integer;
+begin
+  Result := CompareMappingDisplayNames(List[Index1], List[Index2]);
+end;
+
+procedure SortMappingDisplayNames(ANames: TStrings);
+begin
+  if ANames is TStringList then
+    TStringList(ANames).CustomSort(CompareMappingNamesCallback);
+end;
+
+procedure GetSortedMappingDisplayNames(ANames: TStrings);
+var
+  Key: string;
+begin
+  if not Assigned(ANames) then
+    Exit;
+  ANames.Clear;
+  // AvroEncoFiles is a hash table: enumerating its keys is exactly the
+  // unordered source the encoding menus used to build themselves from.
+  if Assigned(AvroEncoFiles) then
+    for Key in AvroEncoFiles.Keys do
+      if not SameText(Key, 'default') then
+        ANames.Add(AvroEncoFiles[Key].DisplayName);
+  SortMappingDisplayNames(ANames);
+end;
+
+function MappingIndexForKey(const ANames: TStrings; AKey: Word): Integer;
+begin
+  Result := -1;
+  if not Assigned(ANames) then
+    Exit;
+  if (AKey >= Ord('1')) and (AKey <= Ord('9')) then
+    Result := AKey - Ord('1')
+  else if (AKey >= VK_NUMPAD1) and (AKey <= VK_NUMPAD9) then
+    Result := AKey - VK_NUMPAD1
+  else
+    Exit;
+  if (Result < 0) or (Result >= ANames.Count) then
+    Result := -1;
+end;
+
+function MappingIndexForChar(const ANames: TStrings; AChar: Char): Integer;
+var
+  I: Integer;
+begin
+  Result := -1;
+  if (not Assigned(ANames)) or (AChar = #0) then
+    Exit;
+  for I := 0 to ANames.Count - 1 do
+    if (ANames[I] <> '') and (UpCase(ANames[I][1]) = UpCase(AChar)) then
+      Exit(I);
 end;
 
 end.

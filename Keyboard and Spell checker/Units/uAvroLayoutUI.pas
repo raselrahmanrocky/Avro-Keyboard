@@ -55,8 +55,7 @@ procedure RebuildAnviVersionMenus;
     SR: TSearchRec;
     FileTitle: string;
     Sep, MoreOptMenu, Item: TMenuItem;
-    Info: TAvroEncoFileInfo;
-    Key: string;
+    I: Integer;
     DisplayName: string;
     Checked: Boolean;
 
@@ -110,16 +109,20 @@ procedure RebuildAnviVersionMenus;
 
     AddDirectItem(AMenu, 'Default', SameText(AnsiVersion, 'Default'));
 
-    for Key in AvroEncoFiles.Keys do
-    begin
-      Info := AvroEncoFiles[Key];
-      DisplayName := Info.DisplayName;
-      if not SameText(DisplayName, 'Default') then
+    // AnsiMappingNames is the shared, naturally sorted list of display names
+    // that TAvroMainForm1.BuildAnsiVersionMenus and the version picker both
+    // use. Enumerating AvroEncoFiles.Keys here read a hash table, whose bucket
+    // order could list V4 between V1 and V2.
+    if Assigned(AvroMainForm1.AnsiMappingNames) then
+      for I := 0 to AvroMainForm1.AnsiMappingNames.Count - 1 do
       begin
-        Checked := SameText(AnsiVersion, DisplayName);
-        AddDirectItem(AMenu, DisplayName, Checked);
+        DisplayName := AvroMainForm1.AnsiMappingNames[I];
+        if not SameText(DisplayName, 'Default') then
+        begin
+          Checked := SameText(AnsiVersion, DisplayName);
+          AddDirectItem(AMenu, DisplayName, Checked);
+        end;
       end;
-    end;
 
     Sep := TMenuItem.Create(AMenu);
     Sep.Caption := '-';
@@ -131,13 +134,13 @@ procedure RebuildAnviVersionMenus;
 
     AddMappingActionSubmenu(MoreOptMenu, 'Default', True);
 
-    for Key in AvroEncoFiles.Keys do
-    begin
-      Info := AvroEncoFiles[Key];
-      DisplayName := Info.DisplayName;
-      if not SameText(DisplayName, 'Default') then
-        AddMappingActionSubmenu(MoreOptMenu, DisplayName, False);
-    end;
+    if Assigned(AvroMainForm1.AnsiMappingNames) then
+      for I := 0 to AvroMainForm1.AnsiMappingNames.Count - 1 do
+      begin
+        DisplayName := AvroMainForm1.AnsiMappingNames[I];
+        if not SameText(DisplayName, 'Default') then
+          AddMappingActionSubmenu(MoreOptMenu, DisplayName, False);
+      end;
 
     Sep := TMenuItem.Create(MoreOptMenu);
     Sep.Caption := '-';

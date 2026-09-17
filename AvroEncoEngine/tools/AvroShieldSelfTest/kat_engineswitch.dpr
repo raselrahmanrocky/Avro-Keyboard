@@ -27,7 +27,9 @@
     5. a new container appearing in the folder at runtime,
     6. a corrupt container (must fail closed and keep the live engine),
     7. a deliberately hollowed live engine (must be detected and repaired),
-    8. the warm pass.
+    8. the warm pass,
+    9. the encoding-list order the two menus and the picker must share, and the
+       picker's number (row + numpad) and first-letter shortcut resolution.
 
   After every step it fingerprints the LIVE engine - a corpus of kars, clusters
   and conjuncts converted through whatever engine is actually installed - and
@@ -46,6 +48,7 @@
 program kat_engineswitch;
 
 uses
+  Winapi.Windows,
   System.SysUtils,
   System.Classes,
   System.IOUtils,
@@ -107,6 +110,20 @@ begin
   end;
   if Result = '' then
     Result := '..';
+end;
+
+// Compact view of a name list, for the order assertions below.
+function Joined(AList: TStrings): string;
+var
+  I: Integer;
+begin
+  Result := '';
+  for I := 0 to AList.Count - 1 do
+  begin
+    if I > 0 then
+      Result := Result + ',';
+    Result := Result + AList[I];
+  end;
 end;
 
 // Where two fingerprints first diverge - the one line that makes a mismatch
@@ -387,6 +404,9 @@ var
   Count: Integer;
   Bytes: TBytes;
   Prev: string;
+  Shortcuts: TStringList;
+  I: Integer;
+  SortedOk, HasDefault: Boolean;
 begin
   Fails := 0;
   FQuiet := False;
@@ -520,6 +540,91 @@ begin
     Say('--- 8. warm pass ---');
     AnsiEngineManager.WarmAllEngines(Prev);
     ExpectLive(Prev, '8 (after WarmAllEngines)');
+
+    // ---- 9. encoding list order + picker shortcuts -----------------------
+    // The two encoding menus and the version picker must present one single
+    // order (the shipped bug: the menus enumerated the AvroEncoFiles hash table
+    // and showed Default, V1, V4, V2, V3 next to a correctly sorted picker),
+    // and the picker's number/letter shortcuts must land on exactly the rows
+    // the owner-drawn list numbers.
+    Say('--- 9. mapping order + picker shortcut resolution ---');
+    Shortcuts := TStringList.Create;
+    try
+      // No zero-padded duplicate here: names that are numerically equal (V1 /
+      // V01) compare equal, so their relative order is unspecified on purpose.
+      Shortcuts.Add('Ansi V10');
+      Shortcuts.Add('Ansi V2');
+      Shortcuts.Add('Default');
+      Shortcuts.Add('Ansi V1');
+      SortMappingDisplayNames(Shortcuts);
+      Check(Joined(Shortcuts) = 'Ansi V1,Ansi V2,Ansi V10,Default',
+        '9: natural order puts V2 before V10 (' + Joined(Shortcuts) + ')');
+      Check(CompareMappingDisplayNames('Ansi V2', 'Ansi V10') < 0, '9: V2 < V10');
+      Check(CompareMappingDisplayNames('Ansi V10', 'Ansi V2') > 0, '9: V10 > V2');
+      Check(CompareMappingDisplayNames('Ansi V1', 'Ansi V1') = 0,
+        '9: identical names compare equal');
+      Check(CompareMappingDisplayNames('ansi v1', 'Ansi V1') = 0,
+        '9: comparison ignores case');
+      Check(CompareMappingDisplayNames('Ansi V1', 'Ansi V10') < 0,
+        '9: a prefix sorts before its extension');
+      Check(CompareMappingDisplayNames('Ansi V01', 'Ansi V1') = 0,
+        '9: leading zeros do not change the number');
+      Check(CompareMappingDisplayNames('Ansi V3', 'Ansi V10') < 0,
+        '9: 3 still sorts before 10');
+
+      // Teeth check, on the same list the assertion above used: a plain
+      // alphabetical sort puts V10 before V2, so that assertion is not
+      // satisfied by the list merely happening to be pre-sorted.
+      Names.Assign(Shortcuts);
+      Names.Sort;
+      Check(Joined(Names) = 'Ansi V1,Ansi V10,Ansi V2,Default',
+        '9: the alphabetical sort this replaced really was wrong (' + Joined(Names) + ')');
+
+      // Exactly the list the picker draws: 1. Default, 2. Ansi V1, ...
+      Shortcuts.Clear;
+      Shortcuts.Add('Default');
+      Shortcuts.Add('Ansi V1');
+      Shortcuts.Add('Ansi V2');
+      Shortcuts.Add('Ansi V3');
+      Check(MappingIndexForKey(Shortcuts, Ord('1')) = 0, '9: number row 1 -> Default');
+      Check(MappingIndexForKey(Shortcuts, Ord('4')) = 3, '9: number row 4 -> last row');
+      Check(MappingIndexForKey(Shortcuts, Ord('9')) = -1,
+        '9: a number past the last row is not a shortcut');
+      Check(MappingIndexForKey(Shortcuts, Ord('0')) = -1, '9: 0 is not a shortcut');
+      Check(MappingIndexForKey(Shortcuts, VK_NUMPAD1) = 0, '9: numpad 1 -> Default');
+      Check(MappingIndexForKey(Shortcuts, VK_NUMPAD4) = 3, '9: numpad 4 -> last row');
+      Check(MappingIndexForKey(Shortcuts, VK_NUMPAD9) = -1,
+        '9: numpad past the last row is not a shortcut');
+      Check(MappingIndexForKey(Shortcuts, VK_F1) = -1, '9: function keys are not shortcuts');
+      Check(MappingIndexForKey(Shortcuts, VK_ESCAPE) = -1, '9: Escape is not a number shortcut');
+      Check(MappingIndexForChar(Shortcuts, 'd') = 0, '9: ''d'' selects Default');
+      Check(MappingIndexForChar(Shortcuts, 'D') = 0, '9: ''D'' matches Default as well');
+      Check(MappingIndexForChar(Shortcuts, 'a') = 1, '9: ''a'' selects the first Ansi entry');
+      Check(MappingIndexForChar(Shortcuts, 'A') = 1, '9: ''A'' matches as well');
+      Check(MappingIndexForChar(Shortcuts, 'v') = -1,
+        '9: only the first character matches');
+      Check(MappingIndexForChar(Shortcuts, #0) = -1, '9: control characters are ignored');
+      Shortcuts.Insert(0, '');
+      Check(MappingIndexForChar(Shortcuts, 'd') = 1, '9: an empty row is skipped by letter search');
+      Check(MappingIndexForKey(Shortcuts, Ord('1')) = 0, '9: numbering still follows the rows');
+
+      // The registry hands out the same order the menus iterate, and never
+      // 'Default' - the menus and the picker pin that row at the top themselves.
+      GetSortedMappingDisplayNames(Names);
+      SortedOk := Names.Count > 0;
+      for I := 0 to Names.Count - 2 do
+        if CompareMappingDisplayNames(Names[I], Names[I + 1]) > 0 then
+          SortedOk := False;
+      HasDefault := False;
+      for I := 0 to Names.Count - 1 do
+        if SameText(Names[I], 'Default') then
+          HasDefault := True;
+      Check(SortedOk, '9: registry names come back in the shared order (' +
+        IntToStr(Names.Count) + ' names)');
+      Check(not HasDefault, '9: the registry list excludes Default');
+    finally
+      Shortcuts.Free;
+    end;
   finally
     Goldens.Free;
     TagGolden.Free;

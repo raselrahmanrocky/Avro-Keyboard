@@ -1427,19 +1427,14 @@ begin
 end;
 
 procedure TAvroMainForm1.RefreshAnsiMappingNames;
-var
-  Key: string;
 begin
   if AnsiMappingNames = nil then
     AnsiMappingNames := TStringList.Create;
-  AnsiMappingNames.Clear;
   // AvroEncoFiles is kept fresh by the watcher / periodic poll / import /
-  // delete flows, so this is pure memory work - no disk scan.
-  if Assigned(AvroEncoFiles) then
-    for Key in AvroEncoFiles.Keys do
-      if not SameText(Key, 'default') then
-        AnsiMappingNames.Add(AvroEncoFiles[Key].DisplayName);
-  AnsiMappingNames.Sort;
+  // delete flows, so this is pure memory work - no disk scan. The natural
+  // ordering lives in uAvroEncoManager, shared with the encoding menus, so
+  // this list and both menus can never disagree again.
+  GetSortedMappingDisplayNames(AnsiMappingNames);
 end;
 
 procedure TAvroMainForm1.RefreshAnsiMappingList;
@@ -2832,8 +2827,8 @@ var
 
   procedure BuildSingleMenu(AMenu: TMenuItem);
   var
-    Key, DisplayName: string;
-    Info: TAvroEncoFileInfo;
+    I: Integer;
+    DisplayName: string;
   begin
     if not Assigned(AMenu) then Exit;
     AMenu.Clear;
@@ -2842,16 +2837,18 @@ var
     AddDirectItem(AMenu, 'Default', SameText(AnsiVersion, 'Default'));
 
     // ২. স্ক্যান করা সব ফাইল
-    if Assigned(AvroEncoFiles) then
-    begin
-      for Key in AvroEncoFiles.Keys do
+    // AnsiMappingNames is sorted in the shared natural order by
+    // RefreshAnsiMappingNames (called just before this) and is the very same
+    // list the version picker shows. Enumerating AvroEncoFiles.Keys instead
+    // meant reading a hash table, which is why this menu could show
+    // Default, V1, V4, V2, V3 while the picker looked sorted.
+    if Assigned(AnsiMappingNames) then
+      for I := 0 to AnsiMappingNames.Count - 1 do
       begin
-        Info := AvroEncoFiles[Key];
-        DisplayName := Info.DisplayName;
+        DisplayName := AnsiMappingNames[I];
         if not SameText(DisplayName, 'Default') then
           AddDirectItem(AMenu, DisplayName, SameText(AnsiVersion, DisplayName));
       end;
-    end;
 
     // Separator
     Sep := TMenuItem.Create(AMenu);
@@ -2865,16 +2862,14 @@ var
 
     AddMappingActionSubmenu(MoreOptMenu, 'Default', True);
 
-    if Assigned(AvroEncoFiles) then
-    begin
-      for Key in AvroEncoFiles.Keys do
+    // Same sorted order as the submenu above (and as the picker).
+    if Assigned(AnsiMappingNames) then
+      for I := 0 to AnsiMappingNames.Count - 1 do
       begin
-        Info := AvroEncoFiles[Key];
-        DisplayName := Info.DisplayName;
+        DisplayName := AnsiMappingNames[I];
         if not SameText(DisplayName, 'Default') then
           AddMappingActionSubmenu(MoreOptMenu, DisplayName, False);
       end;
-    end;
 
     // Separator
     Sep := TMenuItem.Create(MoreOptMenu);
