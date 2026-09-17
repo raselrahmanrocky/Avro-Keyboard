@@ -92,7 +92,10 @@ const
   AVROSHLD_MAGIC: array [0 .. 7] of Byte = (
     $41, $56, $52, $4F, $53, $48, $4C, $44
   );
-  AVROSHLD_VERSION = $02;
+  // There is deliberately no local copy of the Shield version byte here any
+  // more: it used to be duplicated from uAvroShield, which is exactly how the
+  // two drifted apart when the container format was bumped. Detection asks
+  // uAvroShield.AvroShieldSupportedVersion instead.
   // Shield layout: header(58) + ciphertext + auth_tag(16) + hmac(64).
   AVROSHLD_HEADER_SIZE = 58;
   AVROSHLD_TRAILER_SIZE = 80; // auth_tag(16) + hmac(64)
@@ -174,9 +177,11 @@ end;
 
 function HasAvroShieldMagic(const AFileBytes: TBytes): Boolean;
 begin
+  // Any version this build can read. The loader still rejects an unsupported
+  // one with asrBadVersion; this predicate only answers "is the magic ours".
   Result := (Length(AFileBytes) >= MAGIC_SIZE) and
     CompareMem(@AFileBytes[0], @AVROSHLD_MAGIC[0], 8) and
-    (AFileBytes[8] = AVROSHLD_VERSION);
+    AvroShieldSupportedVersion(AFileBytes[8]);
 end;
 
 function IsAvroShieldContainer(const AFilePath: string): Boolean;
