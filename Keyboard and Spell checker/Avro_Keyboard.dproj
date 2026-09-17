@@ -217,6 +217,7 @@
     </DCCReference>
     <DCCReference Include="Units\DebugLog.pas" />
     <DCCReference Include="Units\WindowsDarkMode.pas" />
+    <DCCReference Include="Units\uThemeManager.pas" />
     <DCCReference Include="Units\uKeyboardMacro.pas" />
     <DCCReference Include="Units\Avro.Types.pas" />
     <DCCReference Include="..\Unicode to ascii converter\clsAnsiSequenceLookup.pas" />

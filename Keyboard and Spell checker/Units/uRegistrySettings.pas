@@ -43,6 +43,9 @@ var
   InterfaceSkin:           string;
   TrayHintShowTimes:       string;
   TopHintShowTimes:        string;
+  // Application theme: 'SYSTEM' (follow Windows), 'LIGHT' or 'DARK'. Drives
+  // both the VCL style and the hand-painted flyout palettes (uThemeManager).
+  AppThemeMode:            string;
 
   // Webbuddy Options
   AvroUpdateCheck:     string;
@@ -127,7 +130,8 @@ uses
   WindowsVersion,
   clsUnicodeToBijoy2000,
   uKeyboardMacro,
-  uAvroEncoManager;
+  uAvroEncoManager,
+  uThemeManager;
 
 { =============================================================================== }
 { Per-encoding password memory (helpers)                                        }
@@ -285,6 +289,7 @@ begin
   TopBarTransparent := XML.GetValue('TopBarTransparent', 'YES');
   TrayHintShowTimes := XML.GetValue('TrayHintShowTimes', '0');
   TopHintShowTimes := XML.GetValue('TopHintShowTimes', '0');
+  AppThemeMode := UpperCase(XML.GetValue('AppThemeMode', APP_THEME_SETTING_SYSTEM));
 
   // Webbuddy Options
   AvroUpdateCheck := UpperCase(XML.GetValue('AvroUpdateCheck', 'Yes'));
@@ -374,6 +379,7 @@ begin
   XML.SetValue('TopBarTransparent', TopBarTransparent);
   XML.SetValue('TrayHintShowTimes', TrayHintShowTimes);
   XML.SetValue('TopHintShowTimes', TopHintShowTimes);
+  XML.SetValue('AppThemeMode', AppThemeMode);
 
   // Webbuddy Options
   XML.SetValue('AvroUpdateCheck', AvroUpdateCheck);
@@ -475,6 +481,7 @@ begin
     TopBarTransparent := Reg.ReadStringDef('TopBarTransparent', 'YES');
     TrayHintShowTimes := Reg.ReadStringDef('TrayHintShowTimes', '0');
     TopHintShowTimes := Reg.ReadStringDef('TopHintShowTimes', '0');
+    AppThemeMode := UpperCase(Reg.ReadStringDef('AppThemeMode', APP_THEME_SETTING_SYSTEM));
 
     // Hotkey settings
     ModeSwitchKey := UpperCase(Reg.ReadStringDef('ModeSwitchKey', 'F12'));
@@ -566,6 +573,7 @@ begin
     Reg.WriteString('TopBarTransparent', TopBarTransparent);
     Reg.WriteString('TrayHintShowTimes', TrayHintShowTimes);
     Reg.WriteString('TopHintShowTimes', TopHintShowTimes);
+    Reg.WriteString('AppThemeMode', AppThemeMode);
 
     // Webbuddy Options
     Reg.WriteString('AvroUpdateCheck', AvroUpdateCheck);
@@ -717,6 +725,11 @@ begin
     TopBarXButton := 'SHOW MENU';
   if not((TopBarTransparent = 'YES') or (TopBarTransparent = 'NO')) then
     TopBarTransparent := 'YES';
+
+  // Application theme: anything unexpected falls back to following Windows.
+  if not((AppThemeMode = APP_THEME_SETTING_SYSTEM) or (AppThemeMode = APP_THEME_SETTING_LIGHT) or
+    (AppThemeMode = APP_THEME_SETTING_DARK)) then
+    AppThemeMode := APP_THEME_SETTING_SYSTEM;
 
   // Keyboard Mode settings
   // No restrictive validation - the hotkey recording UI ensures only valid

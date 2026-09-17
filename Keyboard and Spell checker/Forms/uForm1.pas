@@ -478,6 +478,7 @@ uses
   ufrmEncodingWarning,
   DebugLog,
   WindowsDarkMode,
+  uThemeManager,
   System.UITypes,
   uKeyboardMacro,
   uAvroEncoCrypto,
@@ -745,6 +746,9 @@ begin
 
   AnsiMappingNames := TStringList.Create;
   LoadSettings;
+  // The call above only covered the built-in default - AppThemeMode is read
+  // here, so the stored theme has to be applied once more.
+  HandleThemes;
   LoadApp;
 end;
 
@@ -1897,6 +1901,13 @@ begin
   IgnoreCapsLock2.Checked := (IgnoreCapsLock = 'YES');
 
   UpdateTrayIcon;
+
+  // Apply the stored theme here as well: the Customize dialog saves its
+  // settings and then calls RefreshSettings, so a theme change takes effect
+  // immediately (the no-op guard inside ApplyAppTheme keeps every other
+  // RefreshSettings caller free).
+  HandleThemes;
+
   SaveUISettings;
 end;
 
@@ -1912,7 +1923,13 @@ end;
 
 procedure TAvroMainForm1.HandleThemes;
 begin
-  SetAppropriateThemeMode('Windows10 Dark', 'Windows10');
+  // The stored theme setting is the source of truth: SYSTEM follows Windows,
+  // LIGHT / DARK force the theme even when Windows disagrees. ApplyAppTheme
+  // also switches the VCL style (which is what makes the top bar popup menus
+  // and every dialog match) and caches the resolved theme for the hand-painted
+  // flyouts. Re-applying an unchanged theme is a no-op, because this runs after
+  // every settings change in the app.
+  ApplyAppTheme(AppThemeModeFromSetting(AppThemeMode));
 end;
 
 procedure TAvroMainForm1.RestoreAvroTopBar1Click(Sender: TObject);

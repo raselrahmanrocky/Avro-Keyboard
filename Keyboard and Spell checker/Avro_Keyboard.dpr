@@ -69,6 +69,7 @@ uses
   Vcl.Themes,
   Vcl.Styles,
   WindowsDarkMode in 'Units\WindowsDarkMode.pas',
+  uThemeManager in 'Units\uThemeManager.pas',
   uKeyboardMacro in 'Units\uKeyboardMacro.pas',
   Avro.Types in 'Units\Avro.Types.pas',
   uAvroCryptoUtils in 'Units\uAvroCryptoUtils.pas',

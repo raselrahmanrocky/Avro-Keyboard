@@ -77,6 +77,8 @@ type
     ScrollBox1: TScrollBox;
     SkinPreviewPic: TImage;
     ccmdAboutSkin: TButton;
+    Label_AppTheme: TLabel;
+    cboAppTheme: TComboBox;
     AvroPhonetic_Panel: TPanel;
     GroupBox3: TGroupBox;
     Label_PhoneticTypingMode: TLabel;
@@ -175,7 +177,8 @@ uses
   uForm1,
   u_Admin,
   ufrmEncodingWarning,
-  uKeyboardMacro;
+  uKeyboardMacro,
+  uThemeManager;
 
 const
   Show_Window_in_Taskbar = True;
@@ -582,6 +585,14 @@ begin
 
   KeyboardMode_Panel.Height := GroupBox10.Top + GroupBox10.Height + 16;
 
+  // =======================================================
+  // Theme selector (Interface Settings page, control created in the DFM).
+  // Items are added in TAppThemeMode order, so the item index IS the mode.
+  cboAppTheme.Items.Clear;
+  cboAppTheme.Items.Add(AppThemeModeCaption(atmSystemDefault));
+  cboAppTheme.Items.Add(AppThemeModeCaption(atmLight));
+  cboAppTheme.Items.Add(AppThemeModeCaption(atmDark));
+
   // Load Settings (AFTER controls are created)
   Self.LoadSettings;
 
@@ -705,6 +716,10 @@ begin
   end;
 
   TrackBar_Transparency.Position := StrToInt(TopBarTransparencyLevel);
+
+  // Application theme: SYSTEM follows Windows, LIGHT / DARK force the theme.
+  cboAppTheme.ItemIndex := Ord(AppThemeModeFromSetting(AppThemeMode));
+
   { Load Skin Names }
   Skins := TStringList.Create;
   Count := GetFileList(GetAvroDataDir + 'Skin\*.avroskin', Skins);
@@ -1151,6 +1166,14 @@ begin
     IgnoreCapsLock := 'YES'
   else
     IgnoreCapsLock := 'NO';
+
+  // Application theme (Interface Settings). The combo items are in
+  // TAppThemeMode order; a missing selection means "follow Windows".
+  // AvroMainForm1.RefreshSettings then applies it to the whole application.
+  if cboAppTheme.ItemIndex < 0 then
+    AppThemeMode := AppThemeModeToSetting(atmSystemDefault)
+  else
+    AppThemeMode := AppThemeModeToSetting(TAppThemeMode(cboAppTheme.ItemIndex));
 
   uRegistrySettings.SaveSettings;
 end;

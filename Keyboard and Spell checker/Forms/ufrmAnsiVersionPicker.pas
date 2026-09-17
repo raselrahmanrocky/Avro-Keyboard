@@ -25,6 +25,7 @@ uses
   System.Types,
   uRegistrySettings,
   clsUnicodeToBijoy2000,
+  uThemeManager,
   System.IOUtils;
 
 const
@@ -53,6 +54,9 @@ type
       FPopup:                TPopupMenu;
       FPrevFocusedWindow:    HWND;
       FPrevForegroundWindow: HWND;
+      // Resolved once per open (the form is created fresh every time it is
+      // shown), so the draw handler never reads the registry.
+      FTheme:                TAppThemePalette;
       function GetSelectedVersion: string;
       procedure AutoSizeForm;
       procedure CloseAndRestoreTarget;
@@ -60,6 +64,7 @@ type
       function HandlePickerChar(var AChar: Char): Boolean;
       procedure MoveSelection(ADelta: Integer);
       procedure ActivateIndex(AIndex: Integer);
+      procedure FormPaint(Sender: TObject);
       procedure WMNCActivate(var Msg: TWMNCActivate); message WM_NCACTIVATE;
       procedure WMFocusPicker(var Msg: TMessage); message WM_FOCUS_PICKER;
       procedure WMTimer(var Msg: TMessage); message WM_TIMER;
@@ -161,17 +166,21 @@ begin
   FHoverIndex := -1;
   FPrevFocusedWindow := GetFocus;
   FPrevForegroundWindow := GetForegroundWindow;
+  // Resolve the theme palette here, once: the picker is created fresh on every
+  // open, so it always shows the current theme while the draw handler stays
+  // free of registry reads.
+  FTheme := CurrentPalette;
   BorderStyle := bsNone;
   FormStyle := fsStayOnTop;
   PopupMode := pmAuto;
-  Color := RGB(246, 246, 246);
+  Color := FTheme.Background;
   ListBox := TListBox.Create(Self);
   ListBox.Parent := Self;
   ListBox.BorderStyle := bsNone;
-  ListBox.Color := RGB(246, 246, 246);
+  ListBox.Color := FTheme.Background;
   ListBox.Font.Name := 'Segoe UI';
   ListBox.Font.Size := 10;
-  ListBox.Font.Color := RGB(20, 20, 20);
+  ListBox.Font.Color := FTheme.Text;
   ListBox.ItemHeight := 28;
   ListBox.Style := lbOwnerDrawFixed;
   ListBox.OnKeyDown := ListBoxKeyDown;
@@ -201,8 +210,14 @@ begin
 
   OnShow := FormShow;
   OnClose := FormClose;
+  OnPaint := FormPaint;
   PopulateVersions;
   AutoSizeForm;
+
+  // The picker is a borderless popup, so there is no frame to darken - but the
+  // same call is what gives a themed frame when the embedded VCL styles are
+  // unavailable and the app falls back to native window frames.
+  ApplyImmersiveDarkMode(Handle, FTheme.IsDark);
 end;
 
 procedure TfrmAnsiVersionPicker.FormShow(Sender: TObject);
@@ -308,9 +323,11 @@ begin
     if W > MaxW then
       MaxW := W;
   end;
-  Width := MaxW + 56;
-  Height := ListBox.Items.Count * 28 + 8;
-  ListBox.SetBounds(0, 4, Width, Height - 8);
+  Width := MaxW + 58;
+  // +10 is the exact item height for the list box plus the 1px themed frame on
+  // each side of it (see FormPaint), so no row is clipped.
+  Height := ListBox.Items.Count * 28 + 10;
+  ListBox.SetBounds(1, 5, Width - 2, Height - 10);
 end;
 
 procedure TfrmAnsiVersionPicker.PositionFormNearCursor;
@@ -340,6 +357,17 @@ begin
     Result := ListBox.Items[ListBox.ItemIndex];
 end;
 
+{ Fills the thin band the list box does not cover and draws the themed 1px
+  frame around it; AutoSizeForm insets the list box by one pixel so that frame
+  stays visible on all four sides. }
+procedure TfrmAnsiVersionPicker.FormPaint(Sender: TObject);
+begin
+  Canvas.Brush.Color := FTheme.Background;
+  Canvas.FillRect(Canvas.ClipRect);
+  Canvas.Brush.Color := FTheme.Border;
+  Canvas.FrameRect(ClientRect);
+end;
+
 procedure TfrmAnsiVersionPicker.ListBoxDrawItem(Control: TWinControl; Index: Integer; Rect: TRect; State: TOwnerDrawState);
 var
   IsActive, IsHovered: Boolean;
@@ -348,7 +376,7 @@ var
 begin
   if (index < 0) or (index >= ListBox.Items.Count) then
   begin
-    ListBox.Canvas.Brush.Color := RGB(246, 246, 246);
+    ListBox.Canvas.Brush.Color := FTheme.Background;
     ListBox.Canvas.FillRect(Rect);
     Exit;
   end;
@@ -356,13 +384,13 @@ begin
   IsHovered := (index = FHoverIndex) or (odSelected in State);
 
   // 1. Base background
-  ListBox.Canvas.Brush.Color := RGB(246, 246, 246);
+  ListBox.Canvas.Brush.Color := FTheme.Background;
   ListBox.Canvas.FillRect(Rect);
 
   // 2. Row highlight on Hover / Selected
   if IsHovered then
   begin
-    ListBox.Canvas.Brush.Color := RGB(218, 236, 255);
+    ListBox.Canvas.Brush.Color := FTheme.HoverFill;
     ListBox.Canvas.FillRect(Rect);
   end;
 
@@ -373,10 +401,10 @@ begin
   // 4. Active indicator
   if IsActive then
   begin
-    ListBox.Canvas.Brush.Color := RGB(0, 120, 215);
+    ListBox.Canvas.Brush.Color := FTheme.SelectionFill;
     ListBox.Canvas.FillRect(GutterRect);
 
-    ListBox.Canvas.Font.Color := RGB(255, 255, 255);
+    ListBox.Canvas.Font.Color := FTheme.SelectionText;
     ListBox.Canvas.Font.Style := [fsBold];
     DrawText(ListBox.Canvas.Handle, #$2713, -1, GutterRect, DT_CENTER or DT_VCENTER or DT_SINGLELINE);
     ListBox.Canvas.Font.Style := [];
@@ -384,7 +412,7 @@ begin
 
   // 5. Draw item text
   ListBox.Canvas.Brush.Style := bsClear;
-  ListBox.Canvas.Font.Color := RGB(20, 20, 20);
+  ListBox.Canvas.Font.Color := FTheme.Text;
   if index < 9 then
     DisplayText := IntToStr(index + 1) + '. ' + ListBox.Items[index]
   else
