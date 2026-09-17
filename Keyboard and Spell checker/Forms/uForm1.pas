@@ -156,7 +156,6 @@ type
     N28: TMenuItem;
     Exit2: TMenuItem;
     Popup_Tray: TPopupMenu;
-    MenuItem26: TMenuItem;
     ogglekeyboardmode2: TMenuItem;
     RestoreAvroTopBar1: TMenuItem;
     N29: TMenuItem;
@@ -165,62 +164,21 @@ type
     // "Select keyboard layout"; its items are built by BuildAnsiVersionMenus.
     mnuTraySelectAnsiEncoding: TMenuItem;
     AvroMouseClicknType4: TMenuItem;
-    Ontheweb2: TMenuItem;
-    N30: TMenuItem;
     N31: TMenuItem;
-    Helpfiles2: TMenuItem;
-    AboutAvroKeyboard3: TMenuItem;
-    N32: TMenuItem;
     Exit3: TMenuItem;
-    CheckupdateforAvroKeyboard3: TMenuItem;
-    MoreFreeDownloads3: TMenuItem;
-    AvroKeyboardontheweb3: TMenuItem;
-    PortableAvroKeyboardontheweb3: TMenuItem;
-    wwwOmicronLabcom3: TMenuItem;
-    UserForum3: TMenuItem;
-    N33: TMenuItem;
-    FreeBanglaFonts3: TMenuItem;
-    UsefultoolsforBangla3: TMenuItem;
     AvroPhoneticEnglishtoBangla3: TMenuItem;
     N34: TMenuItem;
     Showactivekeyboardlayout3: TMenuItem;
-    Configuringyoursystem3: TMenuItem;
-    OTFBanglaFontscamewithAvroKeyboard3: TMenuItem;
-    Helponhelp3: TMenuItem;
-    N35: TMenuItem;
-    BeforeYouStart3: TMenuItem;
-    Overview3: TMenuItem;
-    CustomizingAvroKeyboard3: TMenuItem;
-    BanglaTypingwithAvroPhonetic3: TMenuItem;
-    BanglaTypingwithFixedKeyboardLayouts3: TMenuItem;
-    BanglaTypingwithAvroMouse3: TMenuItem;
-    FrequentlyAskedQuestionsFAQ3: TMenuItem;
-    N36: TMenuItem;
-    CreatingEditingFixedKeyboardLayouts3: TMenuItem;
-    N37: TMenuItem;
-    HowtoBanglaFileFolderName3: TMenuItem;
-    HowtoBanglaChat3: TMenuItem;
-    HowtoSearchingwebinBangla3: TMenuItem;
-    N38: TMenuItem;
-    HowtoDevelopBanglaWebPage3: TMenuItem;
-    HowtoEmbedBanglaFontinWebPages3: TMenuItem;
-    N39: TMenuItem;
-    Moredocumentsontheweb3: TMenuItem;
-    FreeOnlineSupport3: TMenuItem;
-    N40: TMenuItem;
-    GetAcrobatReader3: TMenuItem;
     WindowCheck: TTimer;
     InternetCheck: TTimer;
     Spellcheck1: TMenuItem;
     N41: TMenuItem;
     Spellcheck2: TMenuItem;
     Spellcheck3: TMenuItem;
+    Spellcheck4: TMenuItem;
     N43: TMenuItem;
     IdleTimer: TTimer;
     AboutCurrentskin1: TMenuItem;
-    N2: TMenuItem;
-    Aboutcurrentkeyboardlayout2: TMenuItem;
-    Aboutcurrentskin2: TMenuItem;
     UnicodetoBijoytextconverter1: TMenuItem;
     ools1: TMenuItem;
     N46: TMenuItem;
@@ -231,8 +189,28 @@ type
     KeyboardLayoutEditorBuildcustomlayouts2: TMenuItem;
     SkinDesignerDesignyourownskin2: TMenuItem;
     LayoutViewerShowactivekeyboardlayout2: TMenuItem;
-    AvroMouseClicknType5: TMenuItem;
     N48: TMenuItem;
+    Helpfiles2: TMenuItem;
+    Configuringyoursystem3: TMenuItem;
+    OTFBanglaFontscamewithAvroKeyboard3: TMenuItem;
+    Helponhelp3: TMenuItem;
+    N35: TMenuItem;
+    BeforeYouStart3: TMenuItem;
+    Overview3: TMenuItem;
+    CustomizingAvroKeyboard3: TMenuItem;
+    BanglaTypingwithAvroPhonetic3: TMenuItem;
+    BanglaTypingwithFixedKeyboardLayouts3: TMenuItem;
+    BanglaTypingwithAvroMouse3: TMenuItem;
+    N36: TMenuItem;
+    CreatingEditingFixedKeyboardLayouts3: TMenuItem;
+    N39: TMenuItem;
+    Moredocumentsontheweb3: TMenuItem;
+    FreeOnlineSupport3: TMenuItem;
+    N40: TMenuItem;
+    GetAcrobatReader3: TMenuItem;
+    N2: TMenuItem;
+    Aboutcurrentkeyboardlayout2: TMenuItem;
+    Aboutcurrentskin2: TMenuItem;
     Options2: TMenuItem;
     FixedKeyboardLayout1: TMenuItem;
     UseModernStyleTyping1: TMenuItem;
@@ -400,7 +378,6 @@ type
       KeyLayout:           TLayout;
       Updater:             TUpdateCheck;
       AnsiVersionSubmenu1: TMenuItem;
-      AnsiVersionSubmenu2: TMenuItem;
       { Cached, sorted list of mapping display names (excluding 'Default'),
         kept fresh by the directory watcher / periodic poll. The ANSI picker
         opens from this list with zero disk I/O. }
@@ -929,10 +906,6 @@ begin
   AnsiVersionSubmenu1.Caption := 'Select ANSI Encoding';
   Popup_Tools.Items.Insert(OutputasANSIAreyousure1.MenuIndex + 1, AnsiVersionSubmenu1);
 
-  AnsiVersionSubmenu2 := TMenuItem.Create(ools1);
-  AnsiVersionSubmenu2.Caption := 'Select ANSI Encoding';
-  ools1.Insert(OutputasANSIAreyousure2.MenuIndex + 1, AnsiVersionSubmenu2);
-
   // Create Ignore Caps Lock toggle items
   IgnoreCapsLock1 := TMenuItem.Create(Popup_Tools);
   IgnoreCapsLock1.Caption := 'Ignore Caps Lock for Bangla typing';
@@ -946,7 +919,7 @@ begin
   IgnoreCapsLock2.AutoCheck := False;
   IgnoreCapsLock2.Checked := (IgnoreCapsLock = 'YES');
   IgnoreCapsLock2.OnClick := IgnoreCapsLockClick;
-  ools1.Insert(AnsiVersionSubmenu2.MenuIndex + 1, IgnoreCapsLock2);
+  ools1.Insert(OutputasANSIAreyousure2.MenuIndex + 1, IgnoreCapsLock2);
 end;
 
 {$HINTS Off}
@@ -1589,7 +1562,7 @@ begin
   // Update Spell Checker Shortcut in Menu
   Spellcheck1.ShortCut := TextToShortcut('Ctrl+' + SpellerLauncherKey);
   Spellcheck2.ShortCut := TextToShortcut('Ctrl+' + SpellerLauncherKey);
-  Spellcheck3.ShortCut := TextToShortcut('Ctrl+' + SpellerLauncherKey);
+  Spellcheck4.ShortCut := TextToShortcut('Ctrl+' + SpellerLauncherKey);
 
   if VowelFormating = 'NO' then
   begin
@@ -1991,10 +1964,7 @@ end;
 
 procedure TAvroMainForm1.PopupTrayPopup(Sender: TObject);
 begin
-  // Both tray copies of the ANSI menu: the one under "Select keyboard layout"
-  // and the older one inside the Tools submenu.
   SyncAnsiVersionChecks(mnuTraySelectAnsiEncoding);
-  SyncAnsiVersionChecks(AnsiVersionSubmenu2);
 end;
 
 procedure TAvroMainForm1.UpdateTrayIcon;
@@ -2792,11 +2762,7 @@ procedure TAvroMainForm1.UpdateAnsiVersionMenuChecks(const AName: string);
     end;
   end;
 begin
-  // Every ANSI menu in the application: Top Bar (1), tray Tools (2) and the
-  // tray "Select ANSI Encoding" under "Select keyboard layout" (3). All three
-  // are built by BuildSingleMenu, so they can never show different state.
   UpdateOne(AnsiVersionSubmenu1);
-  UpdateOne(AnsiVersionSubmenu2);
   UpdateOne(mnuTraySelectAnsiEncoding);
 end;
 
@@ -2930,7 +2896,6 @@ begin
   end;
   RefreshAnsiMappingNames;
   BuildSingleMenu(AnsiVersionSubmenu1);
-  BuildSingleMenu(AnsiVersionSubmenu2);
   BuildSingleMenu(mnuTraySelectAnsiEncoding);
 end;
 
