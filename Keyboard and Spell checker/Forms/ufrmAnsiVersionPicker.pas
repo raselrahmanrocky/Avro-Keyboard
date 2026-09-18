@@ -31,6 +31,15 @@ uses
 const
   WM_FOCUS_PICKER = WM_APP + 2;
 
+  { Trailing layout badge: the same 16 px icon the tray's "Select ANSI
+    Encoding" submenu draws on the right of every row that carries one.
+    BADGE_RIGHT_GAP + BADGE_SIZE is the badge's inset from the row's right
+    edge, and BADGE_COLUMN is what AutoSizeForm adds to the widest caption so
+    no name can ever run under a badge. }
+  BADGE_SIZE      = 16;
+  BADGE_RIGHT_GAP = 6;
+  BADGE_COLUMN    = 24;
+
 type
   TfrmAnsiVersionPicker = class(TForm)
     ListBox: TListBox;
@@ -58,6 +67,7 @@ type
       // shown), so the draw handler never reads the registry.
       FTheme:                TAppThemePalette;
       function GetSelectedVersion: string;
+      function RowIconHandle(const AVersionName: string): HICON;
       procedure AutoSizeForm;
       procedure CloseAndRestoreTarget;
       function HandlePickerKey(var AKey: Word): Boolean;
@@ -319,8 +329,10 @@ procedure TfrmAnsiVersionPicker.AutoSizeForm;
 var
   I, W, MaxW: Integer;
   TempStr:    string;
+  HasBadge:   Boolean;
 begin
   MaxW := 0;
+  HasBadge := False;
   Canvas.Font := ListBox.Font;
   for I := 0 to ListBox.Items.Count - 1 do
   begin
@@ -331,8 +343,17 @@ begin
     W := Canvas.TextWidth(TempStr);
     if W > MaxW then
       MaxW := W;
+    if not HasBadge then
+      HasBadge := RowIconHandle(ListBox.Items[I]) <> 0;
   end;
-  Width := MaxW + 58;
+  // +58 is the gutter, the caption inset and the right margin. When any row
+  // draws a trailing badge the column it needs is reserved as well, once for
+  // the widest caption - more than the badge's own inset, so a long name can
+  // never run under it. A folder of iconless mappings keeps its exact width.
+  if HasBadge then
+    Width := MaxW + 58 + BADGE_COLUMN
+  else
+    Width := MaxW + 58;
   // +10 is the exact item height for the list box plus the 1px themed frame on
   // each side of it (see FormPaint), so no row is clipped.
   Height := ListBox.Items.Count * 28 + 10;
@@ -377,11 +398,27 @@ begin
   Canvas.FrameRect(ClientRect);
 end;
 
+{ The row's badge handle, or 0 when that row draws none. The handle is borrowed
+  from the main form's icon cache (DPI-keyed, filled by the startup preload and
+  released by ReleaseAnsiIconCache), so it must never be destroyed here - there
+  is nothing to free, and therefore nothing that can leak.
+  'Default' is the built-in mapping with no container of its own, so it has no
+  icon, exactly as in the tray's ANSI submenu. }
+function TfrmAnsiVersionPicker.RowIconHandle(const AVersionName: string): HICON;
+begin
+  Result := 0;
+  if SameText(AVersionName, 'Default') then
+    Exit;
+  if Assigned(AvroMainForm1) then
+    Result := AvroMainForm1.GetAnsiTrayIcon(AVersionName);
+end;
+
 procedure TfrmAnsiVersionPicker.ListBoxDrawItem(Control: TWinControl; Index: Integer; Rect: TRect; State: TOwnerDrawState);
 var
   IsActive, IsHovered: Boolean;
   GutterRect:          TRect;
   DisplayText:         string;
+  IconHandle:          HICON;
 begin
   if (index < 0) or (index >= ListBox.Items.Count) then
   begin
@@ -429,6 +466,17 @@ begin
   ListBox.Canvas.TextOut(Rect.Left + 34, Rect.Top + 4, DisplayText);
 
   ListBox.Canvas.Brush.Style := bsSolid;
+
+  // 6. Trailing layout badge - the same 16 px icon the tray's "Select ANSI
+  //    Encoding" submenu shows, so the picker and the menu agree about which
+  //    encoding carries which icon. Rows without an icon ('Default', or a
+  //    container whose icon section is missing) stay badge-free.
+  IconHandle := RowIconHandle(ListBox.Items[index]);
+  if IconHandle <> 0 then
+    DrawIconEx(ListBox.Canvas.Handle,
+      Rect.Right - BADGE_RIGHT_GAP - BADGE_SIZE,
+      Rect.Top + ((Rect.Bottom - Rect.Top - BADGE_SIZE) div 2),
+      IconHandle, BADGE_SIZE, BADGE_SIZE, 0, 0, DI_NORMAL);
 end;
 
 procedure TfrmAnsiVersionPicker.ListBoxMouseMove(Sender: TObject; Shift: TShiftState; X, Y: Integer);

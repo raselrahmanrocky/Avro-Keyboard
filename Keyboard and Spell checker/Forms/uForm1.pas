@@ -24,7 +24,8 @@ uses
   StdCtrls,
   ImgList,
   ExtCtrls,
-  Menus,
+  Vcl.Menus,
+  Math,
   clsLayout,
   Generics.Collections,
   StrUtils,
@@ -361,7 +362,6 @@ type
       FAnsiRootIconIndex: Integer; // ImageList1 slot appended for the active layout icon (-1 = none yet)
 
       function EnsureAnsiIconIndex(const AName: string): Integer;
-      function GetAnsiTrayIcon(const AName: string): HICON;
       procedure ReleaseAnsiIconCache;
       procedure ReplaceAnsiMenuParentIcon;
 
@@ -409,6 +409,20 @@ type
       procedure DeleteAnsiMappingClick(Sender: TObject);
       procedure ImportAnsiMappingClick(Sender: TObject);
       procedure OpenAnsiMappingDirClick(Sender: TObject);
+      procedure AnsiVersionItemAdvancedDrawItem(Sender: TObject;
+        ACanvas: TCanvas; ARect: TRect; AState: TOwnerDrawState);
+      procedure AnsiVersionItemMeasureItem(Sender: TObject;
+        ACanvas: TCanvas; var Width, Height: Integer);
+      { The cached HICON for a mapping at the CURRENT small-icon metric, or 0
+        when that mapping carries no icon ('Default', a legacy container, a
+        plain .json, or one whose icon failed to decode).
+
+        The handle is BORROWED: it belongs to the DPI-keyed cache filled by the
+        startup preload and is freed by ReleaseAnsiIconCache, so a caller must
+        never destroy it. Public so the ANSI version picker can draw the very
+        same trailing badge the tray's "Select ANSI Encoding" submenu draws
+        (AnsiVersionItemAdvancedDrawItem above). }
+      function GetAnsiTrayIcon(const AName: string): HICON;
 
       procedure BuildAnsiVersionMenus;
       procedure UpdateAnsiVersionMenuChecks(const AName: string);
@@ -2182,6 +2196,102 @@ begin
     mnuTraySelectAnsiEncoding.ImageIndex := 30;
 end;
 
+{ Owner-draw handler for ANSI version submenu items.  Renders the gutter
+  checkmark matching the AnsiVersionPicker style and the layout icon badge
+  on the right side. }
+procedure TAvroMainForm1.AnsiVersionItemAdvancedDrawItem(Sender: TObject;
+  ACanvas: TCanvas; ARect: TRect; AState: TOwnerDrawState);
+var
+  Item: TMenuItem;
+  IconHandle: HICON;
+  X, Y: Integer;
+  CapStr: string;
+  TextH: Integer;
+  GutterRect, TextRect: TRect;
+const
+  GUTTER_W = 26;
+  ICON_SZ  = 16;
+  ICON_PAD = 4;
+begin
+  Item := Sender as TMenuItem;
+
+  { 1. Full background }
+  ACanvas.Brush.Color := CurrentPalette.Background;
+  ACanvas.FillRect(ARect);
+
+  { 2. Hover highlight for non-checked items }
+  if (not Item.Checked) and ((odSelected in AState) or (odHotLight in AState)) then
+  begin
+    ACanvas.Brush.Color := CurrentPalette.HoverFill;
+    ACanvas.FillRect(ARect);
+  end;
+
+  { 3. Left indicator gutter }
+  GutterRect := Rect(ARect.Left, ARect.Top, ARect.Left + GUTTER_W, ARect.Bottom);
+  TextRect := Rect(ARect.Left + GUTTER_W, ARect.Top, ARect.Right, ARect.Bottom);
+
+  if Item.Checked then
+  begin
+    { Checked: dark gutter + lighter text area }
+    ACanvas.Brush.Color := CurrentPalette.SelectionFill;
+    ACanvas.FillRect(GutterRect);
+
+    ACanvas.Brush.Color := CurrentPalette.HoverFill;
+    ACanvas.FillRect(TextRect);
+
+    { Restore gutter brush before drawing the checkmark }
+    ACanvas.Brush.Color := CurrentPalette.SelectionFill;
+    ACanvas.Font.Color := CurrentPalette.SelectionText;
+    ACanvas.Font.Style := [fsBold];
+    DrawText(ACanvas.Handle, #$2713, -1, GutterRect,
+      DT_CENTER or DT_VCENTER or DT_SINGLELINE);
+    ACanvas.Font.Style := [];
+
+    ACanvas.Font.Color := CurrentPalette.Text;
+  end
+  else
+    ACanvas.Font.Color := CurrentPalette.Text;
+
+  { 4. Caption text }
+  CapStr := Item.Caption;
+  TextH := ACanvas.TextHeight(CapStr);
+  ACanvas.Brush.Style := bsClear;
+  ACanvas.TextOut(ARect.Left + GUTTER_W + 4,
+    ARect.Top + ((ARect.Bottom - ARect.Top - TextH) div 2), CapStr);
+  ACanvas.Brush.Style := bsSolid;
+
+  { 5. Right-side icon badge }
+  IconHandle := 0;
+  if (Item.Hint <> '') and (not SameText(Item.Hint, 'Default')) then
+    IconHandle := GetAnsiTrayIcon(Item.Hint);
+  if IconHandle <> 0 then
+  begin
+    X := ARect.Right - ICON_SZ - ICON_PAD;
+    Y := ARect.Top + ((ARect.Bottom - ARect.Top - ICON_SZ) div 2);
+    DrawIconEx(ACanvas.Handle, X, Y, IconHandle, ICON_SZ, ICON_SZ, 0, 0, DI_NORMAL);
+  end;
+end;
+
+{ Owner-draw measure handler: accounts for the trailing icon badge width. }
+procedure TAvroMainForm1.AnsiVersionItemMeasureItem(Sender: TObject;
+  ACanvas: TCanvas; var Width, Height: Integer);
+const
+  GUTTER_W = 26;
+  ICON_SZ  = 16;
+  ICON_PAD = 4;
+var
+  Item: TMenuItem;
+  HasIcon: Boolean;
+begin
+  Item := Sender as TMenuItem;
+  HasIcon := (Item.Hint <> '') and (not SameText(Item.Hint, 'Default'));
+
+  Width := GUTTER_W + 4 + ACanvas.TextWidth(Item.Caption) + 12;
+  if HasIcon then
+    Width := Width + ICON_SZ + ICON_PAD;
+  Height := Max(GUTTER_W, ACanvas.TextHeight(Item.Caption) + 4);
+end;
+
 procedure TAvroMainForm1.UpdateTrayIcon;
 var
   ICN: TIcon;
@@ -3012,10 +3122,10 @@ var
     MItem.GroupIndex := 10;
     MItem.RadioItem := True;
     MItem.Checked := AChecked;
-    // The layout's own icon, when its container carries one. An ImageIndex of
-    // -1 draws nothing, which is exactly what a legacy container should show
-    // (the menu then looks the way it did before this feature existed).
-    MItem.ImageIndex := EnsureAnsiIconIndex(AName);
+    // Owner-draw: icon badge rendered on the RIGHT side via OnAdvancedDrawItem,
+    // leaving the LEFT gutter free for the native radio checkmark.
+    MItem.OnAdvancedDrawItem := AnsiVersionItemAdvancedDrawItem;
+    MItem.OnMeasureItem := AnsiVersionItemMeasureItem;
     MItem.OnClick := AnsiVersionMenuClick;
     ParentMenu.Add(MItem);
   end;
@@ -3133,15 +3243,10 @@ begin
   BuildSingleMenu(AnsiVersionSubmenu1);
   BuildSingleMenu(mnuTraySelectAnsiEncoding);
 
-  // Assigned after the build, because the list is created lazily on the first
-  // icon that is found. TMenuItem.SubMenuImages is what an item's CHILDREN
-  // resolve their ImageIndex against, and the tray menu and the top-bar submenu
-  // are two separate TMenuItem trees built from the same names - so sharing one
-  // list gives both the same icons without a second copy of every bitmap.
-  if Assigned(AnsiVersionSubmenu1) then
-    AnsiVersionSubmenu1.SubMenuImages := AnsiIconImages;
-  if Assigned(mnuTraySelectAnsiEncoding) then
-    mnuTraySelectAnsiEncoding.SubMenuImages := AnsiIconImages;
+  // Child items now use OnAdvancedDrawItem for trailing icon badges, so
+  // SubMenuImages is no longer needed for them.  The root parent item
+  // mnuTraySelectAnsiEncoding still gets its left-gutter icon via
+  // ImageList1 in ReplaceAnsiMenuParentIcon.
 end;
 
 end.

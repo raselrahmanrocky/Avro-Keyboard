@@ -111,6 +111,7 @@ uses
   clsUnicodeToBijoy2000,
   uFileFolderHandling,
   System.Win.Registry,
+  System.IOUtils,
   DebugLog;
 
 procedure InitializeEncoManager;
@@ -172,6 +173,8 @@ begin
   Result := SameText(ExtractFileExt(AFilePath), '.AvroEnco');
 end;
 
+procedure ExtractAndStoreNewFileIcons; forward;
+
 procedure ScanDirHelper(const ADir: string);
 var
   SR: TSearchRec;
@@ -229,22 +232,95 @@ end;
 procedure ScanAvroEncoFiles(const ADirectory: string);
 var
   AppDir: string;
+  OldKeys: TList<string>;
+  Key: string;
 begin
   InitializeEncoManager;
-  AvroEncoFiles.Clear;
 
-  AppDir := ExtractFilePath(ParamStr(0));
+  // Snapshot current keys so we can prune stale icon entries afterward.
+  OldKeys := TList<string>.Create;
+  try
+    if Assigned(AvroEncoFiles) then
+      for Key in AvroEncoFiles.Keys do
+        OldKeys.Add(Key);
 
-  // 1. Scan Primary Directory
-  ScanDirHelper(ADirectory);
+    AvroEncoFiles.Clear;
 
-  // 2. Scan assets/ folder
-  ScanDirHelper(AppDir + 'assets\');
+    AppDir := ExtractFilePath(ParamStr(0));
 
-  // 3. Scan AnsiMapping/ folder
-  ScanDirHelper(AppDir + 'AnsiMapping\');
+    // 1. Scan Primary Directory
+    ScanDirHelper(ADirectory);
 
-  Log('Scanned AvroEnco files: ' + IntToStr(AvroEncoFiles.Count) + ' found');
+    // 2. Scan assets/ folder
+    ScanDirHelper(AppDir + 'assets\');
+
+    // 3. Scan AnsiMapping/ folder
+    ScanDirHelper(AppDir + 'AnsiMapping\');
+
+    // Remove icon entries for files that no longer exist on disk (renamed or
+    // deleted).  This prevents stale icon badges lingering in the menu.
+    for Key in OldKeys do
+      if not AvroEncoFiles.ContainsKey(Key) then
+        StoreMappingIcon(Key, nil);
+
+    Log('Scanned AvroEnco files: ' + IntToStr(AvroEncoFiles.Count) + ' found');
+
+    // Proactively extract and cache icons for newly discovered files so the
+    // tray menus show icon badges immediately on the first popup.
+    ExtractAndStoreNewFileIcons;
+  finally
+    OldKeys.Free;
+  end;
+end;
+
+{ Proactively extracts and caches icons for every file in AvroEncoFiles that
+  does not yet have icon bytes in MappingIcons.  Called at the end of
+  ScanAvroEncoFiles so that newly discovered or renamed files carry their icon
+  badge on the very first tray-menu popup — without waiting for the user to
+  click the item (which would trigger on-demand ParseJSONIntoSlot).
+
+  Default-key .AvroEnco containers decrypt transparently with an empty
+  password.  Password-protected containers that have no cached password fail
+  decryption here; their icon is extracted on-demand when the user enters the
+  password.  Plain .json mappings are read directly. }
+procedure ExtractAndStoreNewFileIcons;
+var
+  Info: TAvroEncoFileInfo;
+  JSONContent: string;
+begin
+  if not Assigned(AvroEncoFiles) then
+    Exit;
+
+  for Info in AvroEncoFiles.Values do
+  begin
+    // Already cached — nothing to do.
+    if GetMappingIconBytes(Info.DisplayName) <> nil then
+      Continue;
+
+    if Info.IsEncoFile then
+    begin
+      try
+        JSONContent := Trim(DecryptAvroEncoToString(Info.FilePath, ''));
+        if (JSONContent <> '') and (JSONContent[1] = '{') then
+          StoreMappingIcon(Info.DisplayName, ExtractIconSection(JSONContent));
+      except
+        // Corrupted or password-protected file — icon will appear on demand.
+      end;
+    end
+    else
+    begin
+      try
+        if FileExists(Info.FilePath) then
+        begin
+          JSONContent := Trim(TFile.ReadAllText(Info.FilePath, TEncoding.UTF8));
+          if (JSONContent <> '') and (JSONContent[1] = '{') then
+            StoreMappingIcon(Info.DisplayName, ExtractIconSection(JSONContent));
+        end;
+      except
+        // Read error — icon will appear on demand.
+      end;
+    end;
+  end;
 end;
 
 function LoadMappingFromEnco(
@@ -319,7 +395,7 @@ var
   LContent: string;
   LJSON: TJSONValue;
   LMeta: TJSONValue;
-  LFileBase, LFileName, LEncoding, LType, LVersion, LCompany, LDeveloper, LModifiedBy, LFont: string;
+  LFileName, LEncoding, LType, LVersion, LCompany, LDeveloper, LModifiedBy, LFont: string;
 begin
   Result := '';
   LContent := AJSONContent;
@@ -344,22 +420,18 @@ begin
         Exit;
       // New metadata schema; fall back to the legacy keys (Name/Font) so old
       // .AvroEnco containers and third-party files still render.
-      // The card shows the mapping's file name (as seen in Explorer/picker):
-      // "Name" gets the full file name, "Encoding" the name without the
-      // extension. The JSON Encoding/Name keys are only a fallback for
-      // callers that pass no file path.
+      // The metadata block is the document's own documentation, so the card
+      // reports it verbatim: "Name" is the file as seen in Explorer and in the
+      // picker, "Encoding" is the profile the JSON declares (e.g. "ANSI V1").
+      // Deriving Encoding from the path made the two lines say the same thing,
+      // and made the card contradict the document for a container named after a
+      // font instead of after its profile. When neither key exists the line is
+      // left out rather than filled in with the file's base name.
       if AFilePath <> '' then
-      begin
         LFileName := ExtractFileName(AFilePath);
-        LFileBase := GetEncoDisplayName(AFilePath);
-      end;
-      LEncoding := LFileBase;
+      LEncoding := GetJSONString(LMeta, 'Encoding');
       if LEncoding = '' then
-      begin
-        LEncoding := GetJSONString(LMeta, 'Encoding');
-        if LEncoding = '' then
-          LEncoding := GetJSONString(LMeta, 'Name');
-      end;
+        LEncoding := GetJSONString(LMeta, 'Name');
       LType      := GetJSONString(LMeta, 'Type');
       LVersion   := GetJSONString(LMeta, 'Version');
       LCompany   := GetJSONString(LMeta, 'Company');
