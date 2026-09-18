@@ -78,6 +78,7 @@ uses
   uAvroShieldSecret in 'Units\uAvroShieldSecret.pas',
   uAvroEncoCrypto in 'Units\uAvroEncoCrypto.pas',
   uAvroEncoManager in 'Units\uAvroEncoManager.pas',
+  uAvroEncoIconSection in 'Units\uAvroEncoIconSection.pas',
   uAvroEncoImporter in 'Units\uAvroEncoImporter.pas',
   uAvroShield in 'Units\uAvroShield.pas',
   uAnsiPersistentCache in 'Units\uAnsiPersistentCache.pas',

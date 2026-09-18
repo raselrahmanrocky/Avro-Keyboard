@@ -375,19 +375,25 @@ begin
 
     {$ENDREGION}
     {$REGION 'Keyboard layout management'}
-    if (wParam = 257) or (wParam = 261) then
-    begin // Key Up
-      AvroMainForm1.TransferKeyUp(kbdllhs.vkCode, ShouldBlock);
-      if ShouldBlock = True then
-        goto ExitHere;
-    end
-    else if (wParam = 256) or (wParam = 260) then
-    begin // KeyDown
-      T := AvroMainForm1.TransferKeyDown(kbdllhs.vkCode, ShouldBlock);
-      if T <> '' then
-        SendKey_Char(T);
-      if ShouldBlock = True then
-        goto ExitHere;
+    // When the ANSI version picker is open, skip layout engine processing so
+    // letter/number keys reach the picker's own keyboard handlers instead of
+    // being consumed by the Bangla engine.
+    if not AvroMainForm1.IsPickerOpen then
+    begin
+      if (wParam = 257) or (wParam = 261) then
+      begin // Key Up
+        AvroMainForm1.TransferKeyUp(kbdllhs.vkCode, ShouldBlock);
+        if ShouldBlock = True then
+          goto ExitHere;
+      end
+      else if (wParam = 256) or (wParam = 260) then
+      begin // KeyDown
+        T := AvroMainForm1.TransferKeyDown(kbdllhs.vkCode, ShouldBlock);
+        if T <> '' then
+          SendKey_Char(T);
+        if ShouldBlock = True then
+          goto ExitHere;
+      end;
     end;
 
     {$ENDREGION}

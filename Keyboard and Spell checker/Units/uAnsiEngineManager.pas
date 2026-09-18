@@ -58,7 +58,8 @@ uses
   System.Classes,
   System.Generics.Collections,
   System.SyncObjs,
-  clsUnicodeToBijoy2000;
+  clsUnicodeToBijoy2000,
+  uAvroEncoIconSection;
 
 type
   { One cached engine: the parked parser state plus the file it was parsed
@@ -91,7 +92,7 @@ type
     DisplayName: string;
     FilePath: string;
     JSON: string;
-    OK: Boolean;
+      OK: Boolean;
     ErrorMsg: string;
   end;
 
@@ -468,6 +469,14 @@ begin
   if FCache.ContainsKey(SlotKey(AName)) then
     DropSlot(SlotKey(AName));
   FCache.Add(SlotKey(AName), Slot);
+
+  // The per-layout icon a container carries rides inside the payload, so it is
+  // refreshed here - the one place every parse path goes through: the startup
+  // preload, the directory watcher's re-parse, an on-demand switch and an
+  // import. The cached icon therefore stays in step with the file exactly like
+  // the engine's own rules do, and a legacy container simply clears its entry.
+  StoreMappingIcon(AName, ExtractIconSection(JSON));
+
   Result := True;
 end;
 

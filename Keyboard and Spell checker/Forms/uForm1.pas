@@ -33,6 +33,7 @@ uses
   System.ImageList,
   Vcl.AppEvnts,
   ShellAPI,
+  Winapi.CommCtrl,
   uAvroDirectoryWatcher;
 
 type
@@ -343,6 +344,27 @@ type
       FAnsiMappingSnapshot:         string;  // last seen file-name list of AnsiMappingDir
       FDirectoryWatcher:            TAvroDirectoryWatcher;
 
+      { Per-layout icons, decoded from the payload each container carries.
+
+        The tray needs its own HICON at the metric Windows asks for, and that
+        metric changes with the display DPI, so AnsiIconHandles is keyed
+        'name@size' - a DPI change then builds a second handle at the new size
+        instead of handing the shell a stale one to rescale. The menus need an
+        image-list slot instead, which every item can share.
+
+        Handles here are handed to the tray through CopyIcon, so the tray owns a
+        private copy and this cache stays valid across tray updates. Everything
+        is released by ReleaseAnsiIconCache. }
+      AnsiIconImages:  TImageList;
+      AnsiIconHandles: TDictionary<string, HICON>;
+      AnsiIconIndexes: TDictionary<string, Integer>;
+      FAnsiRootIconIndex: Integer; // ImageList1 slot appended for the active layout icon (-1 = none yet)
+
+      function EnsureAnsiIconIndex(const AName: string): Integer;
+      function GetAnsiTrayIcon(const AName: string): HICON;
+      procedure ReleaseAnsiIconCache;
+      procedure ReplaceAnsiMenuParentIcon;
+
       procedure ChangeTypingStyle(const sStyle: string);
       function IgnorableWindow(const lngHWND: HWND): Boolean;
 
@@ -355,7 +377,6 @@ type
       procedure MenuFixedLayoutClick(Sender: TObject);
       procedure KeyLayout_KeyboardLayoutChanged(CurrentKeyboardLayout: string);
       procedure KeyLayout_KeyboardModeChanged(CurrentMode: enumMode);
-      procedure UpdateTrayIcon;
 
       procedure HandleThemes;
       procedure HandleLayoutDirectoryChanged(Sender: TObject);
@@ -397,6 +418,7 @@ type
       procedure ExitApp;
       function GetMyCurrentLayout: string;
       procedure RefreshSettings;
+      procedure UpdateTrayIcon;
 
       procedure RestoreFromTray;
       procedure OpenHelpFile(const HelpID: Integer);
@@ -409,6 +431,7 @@ type
       procedure TopBarDocToTop;
       function TransferKeyDown(const KeyCode: Integer; var Block: Boolean): string;
       procedure TransferKeyUp(const KeyCode: Integer; var Block: Boolean);
+      function IsPickerOpen: Boolean;
       procedure TrimAppMemorySize;
       procedure Initmenu;
       procedure ToggleOutputEncoding;
@@ -463,6 +486,7 @@ uses
   uAvroEncoCrypto,
   uAvroEncoManager,
   uAvroEncoImporter,
+  uAvroEncoIconSection,
   uAvroLayoutUI,
   uAnsiEngineManager;
 
@@ -657,6 +681,12 @@ begin
   Log('FreeAndNil: FDirectoryWatcher');
   FinalizeEncoManager;
   Log('FinalizeEncoManager');
+  ReleaseAnsiIconCache;
+  // The caches themselves go too - ReleaseAnsiIconCache only empties them,
+  // because a re-scan reuses the same dictionaries.
+  FreeAndNil(AnsiIconHandles);
+  FreeAndNil(AnsiIconIndexes);
+  Log('ReleaseAnsiIconCache');
 
   FreeAndNil(WindowDict);
   FreeAndNil(AnsiMappingNames);
@@ -724,6 +754,8 @@ begin
   Application.ProcessMessages;
 
   AnsiMappingNames := TStringList.Create;
+  AnsiIconHandles := TDictionary<string, HICON>.Create;
+  AnsiIconIndexes := TDictionary<string, Integer>.Create;
   LoadSettings;
   // The call above only covered the built-in default - AppThemeMode is read
   // here, so the stored theme has to be applied once more.
@@ -1127,6 +1159,7 @@ var
   DesiredVersion: string;
 begin
   Set_Process_Priority(HIGH_PRIORITY_CLASS);
+  FAnsiRootIconIndex := -1;
 
   InitDict;
   LoadKeyboardLayoutNames;
@@ -1308,6 +1341,14 @@ begin
     WindowCheck.Enabled := True;
   end;
   BuildAnsiVersionMenus;
+
+  // The preload block above is what caches every layout's icon, and the tray
+  // was already shown before it ran (the UI-mode restore earlier in this
+  // procedure calls ShowOnTray). Re-apply the tray icon now, so a cold start in
+  // tray mode shows the ACTIVE layout's icon straight away instead of the
+  // built-in one until the user next toggles the keyboard mode.
+  UpdateTrayIcon;
+  ReplaceAnsiMenuParentIcon;
 
   FDirectoryWatcher := TAvroDirectoryWatcher.Create(AnsiMappingDir);
   FDirectoryWatcher.OnChanged := HandleLayoutDirectoryChanged;
@@ -1963,46 +2004,246 @@ end;
 procedure TAvroMainForm1.PopupTrayPopup(Sender: TObject);
 begin
   SyncAnsiVersionChecks(mnuTraySelectAnsiEncoding);
+  ReplaceAnsiMenuParentIcon;
+end;
+
+{ =============================================================================== }
+{ Per-layout icons (system tray + encoding menus)                               }
+{ =============================================================================== }
+
+{ The image-list slot for AName, adding that layout's icon on first use.
+  -1 means the mapping carries no icon (a legacy container, a plain .json, or a
+  damaged one), and the caller then leaves the item's ImageIndex alone.
+
+  A shared 32bpp TImageList rather than a per-item TBitmap: the menu renderer
+  draws an image-list entry with correct alpha and keeps the radio check in its
+  own gutter, whereas assigning a TBitmap to TMenuItem.Bitmap is what left a
+  dark background behind the transparent pixels of an icon. }
+function TAvroMainForm1.EnsureAnsiIconIndex(const AName: string): Integer;
+var
+  IconBytes: TBytes;
+  H: HICON;
+  Ico: TIcon;
+  Key: string;
+begin
+  Result := -1;
+  if (AName = '') or SameText(AName, 'Default') then
+    Exit;
+  if not Assigned(AnsiIconIndexes) then
+    Exit;
+
+  Key := Lowercase(AName);
+  if AnsiIconIndexes.TryGetValue(Key, Result) then
+    Exit;
+  Result := -1; // TryGetValue leaves 0 behind on a miss
+
+  IconBytes := GetMappingIconBytes(AName);
+  if Length(IconBytes) = 0 then
+    Exit;
+
+  if not Assigned(AnsiIconImages) then
+  begin
+    AnsiIconImages := TImageList.Create(Self);
+    AnsiIconImages.Width := 16;
+    AnsiIconImages.Height := 16;
+    AnsiIconImages.ColorDepth := cd32Bit;
+    AnsiIconImages.Masked := False;
+    AnsiIconImages.DrawingStyle := dsTransparent;
+  end;
+
+  // 16 px is a frame the shipped icons really carry, so this is the authored
+  // artwork at its own size rather than a rescaled copy.
+  H := CreateHIconAtSize(IconBytes, 16, 16);
+  if H = 0 then
+    Exit;
+  Ico := TIcon.Create;
+  try
+    // TIcon adopts the handle, so freeing the wrapper releases H - and AddIcon
+    // has already copied the image into the list's own bitmap by then.
+    Ico.Handle := H;
+    H := 0;
+    Result := AnsiIconImages.AddIcon(Ico);
+    AnsiIconIndexes.AddOrSetValue(Key, Result);
+  finally
+    Ico.Free;
+    if H <> 0 then
+      DestroyIcon(H);
+  end;
+end;
+
+{ A cached HICON for the tray at the CURRENT small-icon metric, or 0 when this
+  layout has no icon.
+
+  The metric is part of the cache key because it follows the display DPI: 16 px
+  at 100%, 20 at 125%, 24 at 150%, 32 at 200%. Asking the icon library for
+  exactly that size means Windows is never handed a mismatched handle to
+  rescale, which is what made the tray icon look soft on a scaled display. }
+function TAvroMainForm1.GetAnsiTrayIcon(const AName: string): HICON;
+var
+  IconBytes: TBytes;
+  Cx, Cy: Integer;
+  Key: string;
+begin
+  Result := 0;
+  if (AName = '') or SameText(AName, 'Default') then
+    Exit;
+  if not Assigned(AnsiIconHandles) then
+    Exit;
+
+  Cx := GetSystemMetrics(SM_CXSMICON);
+  Cy := GetSystemMetrics(SM_CYSMICON);
+  if (Cx <= 0) or (Cy <= 0) then
+    Exit;
+
+  Key := Lowercase(AName) + '@' + IntToStr(Cx);
+  if AnsiIconHandles.TryGetValue(Key, Result) then
+    Exit;
+  Result := 0; // TryGetValue leaves 0 behind on a miss
+
+  IconBytes := GetMappingIconBytes(AName);
+  if Length(IconBytes) = 0 then
+    Exit;
+
+  Result := CreateHIconAtSize(IconBytes, Cx, Cy);
+  if Result <> 0 then
+    AnsiIconHandles.AddOrSetValue(Key, Result);
+end;
+
+{ Frees every cached handle and the shared image list. Called when the mapping
+  folders are re-scanned (the icons belong to files that may be gone) and on the
+  way out. The menu objects are left pointing at no image list, so a rebuild
+  cannot draw from a freed one. }
+procedure TAvroMainForm1.ReleaseAnsiIconCache;
+var
+  H: HICON;
+begin
+  FAnsiRootIconIndex := -1;
+  // SubMenuImages, not Images: TMenuItem has no Images. VCL resolves an
+  // item's image list by walking its parents for SubMenuImages and only then
+  // falling back to the owning TMenu's Images, so setting it on these two
+  // items gives their version lists the icons without giving every unrelated
+  // item of Popup_Tools and Popup_Tray an image list they never had.
+  if Assigned(AnsiVersionSubmenu1) then
+    AnsiVersionSubmenu1.SubMenuImages := nil;
+  if Assigned(mnuTraySelectAnsiEncoding) then
+    mnuTraySelectAnsiEncoding.SubMenuImages := nil;
+
+  if Assigned(AnsiIconHandles) then
+  begin
+    for H in AnsiIconHandles.Values do
+      if H <> 0 then
+        DestroyIcon(H);
+    AnsiIconHandles.Clear;
+  end;
+  if Assigned(AnsiIconIndexes) then
+    AnsiIconIndexes.Clear;
+  FreeAndNil(AnsiIconImages);
+end;
+
+{ Appends or updates a dedicated ImageList1 slot for the active layout icon,
+  and assigns it to mnuTraySelectAnsiEncoding so the parent menu item shows
+  the current layout in its left gutter. When no ANSI layout is active, falls
+  back to the built-in ANSI icon at slot 30. }
+procedure TAvroMainForm1.ReplaceAnsiMenuParentIcon;
+var
+  AnsiHIcon: HICON;
+  Ico: TIcon;
+begin
+  if not Assigned(ImageList1) then Exit;
+  if not Assigned(mnuTraySelectAnsiEncoding) then Exit;
+
+  if (AnsiVersion <> '') and
+     (not SameText(AnsiVersion, 'Default')) and
+     (OutputIsBijoy = 'YES') then
+  begin
+    AnsiHIcon := GetAnsiTrayIcon(AnsiVersion);
+    if AnsiHIcon <> 0 then
+    begin
+      Ico := TIcon.Create;
+      try
+        Ico.Handle := CopyIcon(AnsiHIcon);
+        if Ico.Handle <> 0 then
+        begin
+          if FAnsiRootIconIndex < 0 then
+            FAnsiRootIconIndex := ImageList1.AddIcon(Ico)
+          else
+            ImageList_ReplaceIcon(ImageList1.Handle, FAnsiRootIconIndex, Ico.Handle);
+        end;
+      finally
+        Ico.Free;
+      end;
+    end;
+    if FAnsiRootIconIndex >= 0 then
+      mnuTraySelectAnsiEncoding.ImageIndex := FAnsiRootIconIndex
+    else
+      mnuTraySelectAnsiEncoding.ImageIndex := 30;
+  end
+  else
+    mnuTraySelectAnsiEncoding.ImageIndex := 30;
 end;
 
 procedure TAvroMainForm1.UpdateTrayIcon;
 var
   ICN: TIcon;
+  AnsiHIcon, IconCopy: HICON;
 begin
   if IsFormVisible('TopBar') = False then
   begin
+    // try/finally: this runs on every mode change and on startup, so a failure
+    // part-way through must not leak the TIcon.
     ICN := TIcon.Create;
-    if KeyLayout.KeyboardMode = bangla then
-    begin
-      if IsWin2000 = True then
-        ImageList1.GetIcon(14, ICN)
-      else
+    try
+      if KeyLayout.KeyboardMode = bangla then
       begin
-        if OutputIsBijoy = 'YES' then
-          ImageList1.GetIcon(30, ICN)
+        if IsWin2000 = True then
+          ImageList1.GetIcon(14, ICN)
         else
-          ImageList1.GetIcon(20, ICN);
+        begin
+          if OutputIsBijoy = 'YES' then
+          begin
+            // The active layout's own icon, so the tray shows WHICH ANSI
+            // encoding is running. CopyIcon is required: TIcon adopts and
+            // destroys whatever handle it is given, and the cached handle has
+            // to stay valid for the next tray update.
+            AnsiHIcon := GetAnsiTrayIcon(AnsiVersion);
+            IconCopy := 0;
+            if AnsiHIcon <> 0 then
+              IconCopy := CopyIcon(AnsiHIcon);
+            if IconCopy <> 0 then
+              ICN.Handle := IconCopy
+            else
+              ImageList1.GetIcon(30, ICN); // built-in ANSI icon
+          end
+          else
+            ImageList1.GetIcon(20, ICN);
+        end;
+
+        if OutputIsBijoy = 'YES' then
+          Tray.Hint := 'Avro Keyboard.' + #13 + 'Running Bangla Keyboard Mode (ANSI Version).' + #13 + 'Press ' + ModeSwitchKey + ' to switch to System default.'
+        else
+          Tray.Hint := 'Avro Keyboard.' + #13 + 'Running Bangla Keyboard Mode.' + #13 + 'Press ' + ModeSwitchKey + ' to switch to System default.';
+      end
+      else if KeyLayout.KeyboardMode = SysDefault then
+      begin
+        if IsWin2000 = True then
+          ImageList1.GetIcon(19, ICN)
+        else
+          ImageList1.GetIcon(21, ICN);
+
+        Tray.Hint := 'Avro Keyboard.' + #13 + 'Running System default Keyboard Mode.' + #13 + 'Press ' + ModeSwitchKey + ' to switch to Bangla.';
       end;
-
-      if OutputIsBijoy = 'YES' then
-        Tray.Hint := 'Avro Keyboard.' + #13 + 'Running Bangla Keyboard Mode (ANSI Version).' + #13 + 'Press ' + ModeSwitchKey + ' to switch to System default.'
-      else
-        Tray.Hint := 'Avro Keyboard.' + #13 + 'Running Bangla Keyboard Mode.' + #13 + 'Press ' + ModeSwitchKey + ' to switch to System default.';
-    end
-    else if KeyLayout.KeyboardMode = SysDefault then
-    begin
-      if IsWin2000 = True then
-        ImageList1.GetIcon(19, ICN)
-      else
-        ImageList1.GetIcon(21, ICN);
-
-      Tray.Hint := 'Avro Keyboard.' + #13 + 'Running System default Keyboard Mode.' + #13 + 'Press ' + ModeSwitchKey + ' to switch to Bangla.';
+      ReplaceAnsiMenuParentIcon;
+      Tray.Icon := ICN;
+    finally
+      ICN.Free;
     end;
-    Tray.Icon := ICN;
-    ICN.Free;
   end
   else
   begin
+    // The floating TopBar is visible, which means the tray icon is hidden
+    // (RestoreFromTray sets Tray.Visible := False before showing it), so there
+    // is no tray icon to refresh here. The per-layout icon swap is deliberately
+    // tray-only: the TopBar's own skinned "ANSI" badge stays its indicator.
     if KeyLayout.KeyboardMode = bangla then
       Topbar.SetButtonModeState(State2)
     else if KeyLayout.KeyboardMode = SysDefault then
@@ -2238,6 +2479,11 @@ end;
 procedure TAvroMainForm1.TransferKeyUp(const KeyCode: Integer; var Block: Boolean);
 begin
   KeyLayout.ProcessVKeyUP(KeyCode, Block);
+end;
+
+function TAvroMainForm1.IsPickerOpen: Boolean;
+begin
+  Result := CurrentPicker <> nil;
 end;
 
 procedure TAvroMainForm1.TrayClick(Sender: TObject);
@@ -2492,6 +2738,9 @@ begin
     SyncActiveMappingTimestamp('Default');
     SaveAnsiVersionOnly;
     UpdateAnsiVersionMenuChecks('Default');
+    // 'Default' has no container of its own, so this restores the built-in
+    // icon rather than a layout's.
+    UpdateTrayIcon;
     if ShowAnsiSwitchNotification = 'YES' then
       ShowAnsiToastNotification('ANSI Encoding: Default');
     Exit;
@@ -2545,6 +2794,8 @@ begin
     SyncActiveMappingTimestamp(SelectedVersion);
     SaveAnsiVersionOnly;
     UpdateAnsiVersionMenuChecks(SelectedVersion);
+    // The tray shows the icon of the layout that is now in force.
+    UpdateTrayIcon;
     if ShowAnsiSwitchNotification = 'YES' then
       ShowAnsiToastNotification('ANSI Encoding: ' + SelectedVersion);
     Exit;
@@ -2602,7 +2853,7 @@ var
 begin
   OpenDialog := TOpenDialog.Create(nil);
   try
-    OpenDialog.Filter := 'ANSI Mapping|*.json;*.AvroEnco';
+    OpenDialog.Filter := 'ANSI Mapping|*.AvroEnco';
     OpenDialog.DefaultExt := 'AvroEnco';
     OpenDialog.Title := 'Import ANSI Mapping';
     OpenDialog.Options := OpenDialog.Options + [ofAllowMultiSelect, ofFileMustExist];
@@ -2625,28 +2876,6 @@ begin
           // for password-protected imports (default-key imports stay silent).
           if not ImportEncoFile(OpenDialog.Files[I], ErrMsg) and (ErrMsg <> '') then
             AddError(OpenDialog.Files[I], ErrMsg);
-        end
-        else if SameText(ExtractFileExt(OpenDialog.Files[I]), '.json') then
-        begin
-          if not ValidateAnsiMappingFile(OpenDialog.Files[I], ErrMsg) then
-            AddError(OpenDialog.Files[I],
-              'ANSI mapping import failed:'#13#10#13#10 + ErrMsg)
-          else
-          begin
-            ForceDirectories(AnsiMappingDir);
-            if not CopyFile(PChar(OpenDialog.Files[I]),
-              PChar(AnsiMappingDir + ExtractFileName(OpenDialog.Files[I])), False) then
-              AddError(OpenDialog.Files[I], 'Failed to copy file to the mapping directory.')
-            else
-            begin
-              // Plain JSON mappings are unprotected: import activates them.
-              AnsiVersion := ChangeFileExt(ExtractFileName(OpenDialog.Files[I]), '');
-              SaveSettings;
-              AnsiEngineManager.InvalidateEngine(AnsiVersion);
-              AnsiEngineManager.SwitchEngine(AnsiVersion);
-              ShowAnsiToastNotification('Mapping imported: ' + AnsiVersion);
-            end;
-          end;
         end;
       end;
 
@@ -2783,6 +3012,10 @@ var
     MItem.GroupIndex := 10;
     MItem.RadioItem := True;
     MItem.Checked := AChecked;
+    // The layout's own icon, when its container carries one. An ImageIndex of
+    // -1 draws nothing, which is exactly what a legacy container should show
+    // (the menu then looks the way it did before this feature existed).
+    MItem.ImageIndex := EnsureAnsiIconIndex(AName);
     MItem.OnClick := AnsiVersionMenuClick;
     ParentMenu.Add(MItem);
   end;
@@ -2890,11 +3123,25 @@ begin
   begin
     FAnsiMappingSnapshot := Snap;
     CleanupDuplicateMappings;
+    // ScanAvroEncoFiles drops the per-mapping icon bytes; the GDI handles and
+    // image-list slots derived from them have to go with them, or a renamed or
+    // deleted mapping would keep drawing its old icon.
+    ReleaseAnsiIconCache;
     ScanAvroEncoFiles(AnsiMappingDir);
   end;
   RefreshAnsiMappingNames;
   BuildSingleMenu(AnsiVersionSubmenu1);
   BuildSingleMenu(mnuTraySelectAnsiEncoding);
+
+  // Assigned after the build, because the list is created lazily on the first
+  // icon that is found. TMenuItem.SubMenuImages is what an item's CHILDREN
+  // resolve their ImageIndex against, and the tray menu and the top-bar submenu
+  // are two separate TMenuItem trees built from the same names - so sharing one
+  // list gives both the same icons without a second copy of every bitmap.
+  if Assigned(AnsiVersionSubmenu1) then
+    AnsiVersionSubmenu1.SubMenuImages := AnsiIconImages;
+  if Assigned(mnuTraySelectAnsiEncoding) then
+    mnuTraySelectAnsiEncoding.SubMenuImages := AnsiIconImages;
 end;
 
 end.

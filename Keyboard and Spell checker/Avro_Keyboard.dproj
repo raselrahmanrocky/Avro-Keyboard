@@ -228,6 +228,7 @@
     <DCCReference Include="Units\uAnsiPersistentCache.pas" />
     <DCCReference Include="Units\uAnsiEngineManager.pas" />
     <DCCReference Include="Units\uAvroEncoManager.pas" />
+    <DCCReference Include="Units\uAvroEncoIconSection.pas" />
     <DCCReference Include="Units\uAvroEncoImporter.pas" />
     <DCCReference Include="Units\uAvroDirectoryWatcher.pas" />
     <DCCReference Include="Units\uAvroLayoutUI.pas" />

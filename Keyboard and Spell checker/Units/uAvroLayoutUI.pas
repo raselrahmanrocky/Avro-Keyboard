@@ -198,18 +198,19 @@ begin
 
   SaveDialog := TSaveDialog.Create(nil);
   try
-    if IsEncoFile(SourcePath) then
+    if not IsEncoFile(SourcePath) then
     begin
-      SaveDialog.Filter := 'Avro Encoded Mapping|*.AvroEnco';
-      SaveDialog.DefaultExt := 'AvroEnco';
-    end
-    else
-    begin
-      SaveDialog.Filter := 'ANSI Mapping JSON|*.json';
-      SaveDialog.DefaultExt := 'json';
+      MessageDlg(
+        'This mapping is a plain JSON file and cannot be exported as .AvroEnco.' + sLineBreak +
+        'Re-import it as an .AvroEnco file to enable export.',
+        mtError, [mbOK], 0
+      );
+      Exit;
     end;
+    SaveDialog.Filter := 'Avro Encoded Mapping|*.AvroEnco';
+    SaveDialog.DefaultExt := 'AvroEnco';
     SaveDialog.Title := 'Export ' + AMapName + ' Mapping';
-    SaveDialog.FileName := AMapName + ExtractFileExt(SourcePath);
+    SaveDialog.FileName := AMapName + '.AvroEnco';
 
     if SaveDialog.Execute then
     begin
