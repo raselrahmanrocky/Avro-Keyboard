@@ -16,7 +16,9 @@ uses
   SysUtils,
   Classes,
   Generics.Collections,
-  System.JSON;
+  SyncObjs,
+  System.JSON,
+  uAvroEncoIconSection;
 
 type
   TAvroEncoFileInfo = record
@@ -37,6 +39,25 @@ function GetEncoDisplayName(const AFilePath: string): string;
 { True for any protected mapping container (.AvroEnco extension; both the
   legacy CBC and the Shield container format live under this extension). }
 function IsEncoFile(const AFilePath: string): Boolean;
+{ ============================================================================== }
+{ Per-layout icon carried inside the mapping payload }
+{ ============================================================================== }
+
+{ Caches the icon a container carries (see uAvroEncoIconSection: it is one
+  scalar Base64 member of the decrypted mapping JSON). Keyed by the same
+  lowercase display name AvroEncoFiles uses, so the menus and the version
+  picker can ask with the name they already hold. Empty bytes clear the entry.
+
+  Written from the startup preload worker as well as the UI thread and read by
+  the UI thread while menus are being built, so it is guarded by its own lock
+  instead of depending on call order. }
+procedure StoreMappingIcon(const ADisplayName: string; const AIconBytes: TBytes);
+
+{ The cached icon, or nil when this mapping has none - a legacy container, a
+  plain .json mapping, an icon that failed to decode, or a mapping that has not
+  been decrypted yet. }
+function GetMappingIconBytes(const ADisplayName: string): TBytes;
+
 function LoadMappingFromEnco(const AFilePath: string; const APassword: AnsiString; ErrorLog: TStringList = nil): Boolean;
 function ExtractMetadataFromJSON(const AJSONContent: string; const AFilePath: string = ''): string;
 function GetJSONString(const AObj: TJSONValue; const AKey: string): string;
@@ -106,6 +127,40 @@ end;
 function GetEncoDisplayName(const AFilePath: string): string;
 begin
   Result := ChangeFileExt(ExtractFileName(AFilePath), '');
+end;
+
+var
+  { Keyed like AvroEncoFiles: Lowercase(DisplayName). Created in this unit's
+    initialization, so no caller has to remember to set it up first. }
+  MappingIcons: TDictionary<string, TBytes>;
+  MappingIconsLock: TCriticalSection;
+
+procedure StoreMappingIcon(const ADisplayName: string; const AIconBytes: TBytes);
+begin
+  if ADisplayName = '' then
+    Exit;
+  MappingIconsLock.Enter;
+  try
+    if Length(AIconBytes) = 0 then
+      MappingIcons.Remove(Lowercase(ADisplayName))
+    else
+      MappingIcons.AddOrSetValue(Lowercase(ADisplayName), AIconBytes);
+  finally
+    MappingIconsLock.Leave;
+  end;
+end;
+
+function GetMappingIconBytes(const ADisplayName: string): TBytes;
+begin
+  Result := nil;
+  if ADisplayName = '' then
+    Exit;
+  MappingIconsLock.Enter;
+  try
+    MappingIcons.TryGetValue(Lowercase(ADisplayName), Result);
+  finally
+    MappingIconsLock.Leave;
+  end;
 end;
 
 function IsEncoFile(const AFilePath: string): Boolean;
@@ -242,6 +297,13 @@ begin
       Exit;
     end;
 
+    // The per-layout icon rides INSIDE the payload, so it arrives with the
+    // decryption that just succeeded: no second file read, no extra key, and
+    // it is covered by the same HMAC verdict and AES-GCM tag as the mapping.
+    // A legacy container or a plain .json has no such member, which clears the
+    // entry rather than serving a stale icon.
+    StoreMappingIcon(GetEncoDisplayName(AFilePath), ExtractIconSection(JSONContent));
+
     LoadAnsiMappingFromJSON(JSONContent, ErrorLog);
     Result := True;
   end
@@ -340,6 +402,8 @@ begin
         'text encoded with this mapping reads correctly only in ' + LFont + '.' +
         sLineBreak;
   end;
+  // Escape '&' for VCL display (MessageDlg treats '&' as accelerator prefix).
+  Result := StringReplace(Result, '&', '&&', [rfReplaceAll]);
 end;
 
 function NormalizeFontName(const S: string): string;
@@ -585,5 +649,13 @@ begin
     if (ANames[I] <> '') and (UpCase(ANames[I][1]) = UpCase(AChar)) then
       Exit(I);
 end;
+
+initialization
+  MappingIcons := TDictionary<string, TBytes>.Create;
+  MappingIconsLock := TCriticalSection.Create;
+
+finalization
+  FreeAndNil(MappingIcons);
+  FreeAndNil(MappingIconsLock);
 
 end.

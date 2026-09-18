@@ -237,11 +237,15 @@ begin
   if ListBox.CanFocus then
     ListBox.SetFocus;
   if GetFocus <> ListBox.Handle then
-    // The pre-08d48cd build handed the list box this message directly and its
-    // keyboard shortcuts worked. Kept as the fallback for when
-    // SetForegroundWindow loses the activation race with the menu/popup the
-    // picker was opened from.
-    PostMessage(ListBox.Handle, WM_SETFOCUS, 0, 0);
+  begin
+    // ListBox.SetFocus may have failed (activation race): ensure the form
+    // itself holds focus so KeyPreview can route keys to FormKeyDown.
+    if GetFocus <> Handle then
+      Windows.SetFocus(Handle);
+    // Last-resort fallback: post WM_SETFOCUS to the ListBox.
+    if GetFocus <> ListBox.Handle then
+      PostMessage(ListBox.Handle, WM_SETFOCUS, 0, 0);
+  end;
 end;
 
 procedure TfrmAnsiVersionPicker.WMTimer(var Msg: TMessage);
@@ -262,6 +266,11 @@ begin
   // Foreground, but the focus went elsewhere (activation raced with the menu
   // that opened the picker): the window looks alive and simply ignores the
   // keyboard. Re-assert the focus; SetFocus is idempotent once it holds.
+  //
+  // If focus is not on either the form or the ListBox, restore it to the form
+  // first (KeyPreview routes keys to FormKeyDown), then promote to the ListBox.
+  if (GetFocus <> Handle) and (GetFocus <> ListBox.Handle) then
+    Windows.SetFocus(Handle);
   if (GetFocus <> ListBox.Handle) and ListBox.CanFocus then
     ListBox.SetFocus;
 end;
@@ -477,6 +486,7 @@ begin
       AvroMainForm1.SyncActiveMappingTimestamp('Default');
       SaveAnsiVersionOnly;
       AvroMainForm1.UpdateAnsiVersionMenuChecks('Default');
+      AvroMainForm1.UpdateTrayIcon;
       if ShowAnsiSwitchNotification = 'YES' then
         ShowAnsiToastNotification('ANSI Version: Default');
     end;
@@ -545,6 +555,7 @@ begin
     AvroMainForm1.SyncActiveMappingTimestamp(SelectedVersion);
     SaveAnsiVersionOnly;
     AvroMainForm1.UpdateAnsiVersionMenuChecks(SelectedVersion);
+    AvroMainForm1.UpdateTrayIcon;
     if ShowAnsiSwitchNotification = 'YES' then
       ShowAnsiToastNotification('ANSI Version: ' + SelectedVersion);
 
@@ -706,34 +717,38 @@ var
   SaveDlg: TSaveDialog;
 begin
   if not (Sender is TMenuItem) then Exit;
-  // Dismiss the transient picker as soon as the action is chosen.
   Close;
   MapName := (Sender as TMenuItem).Hint;
 
+  if SameText(MapName, 'Default') then
+  begin
+    MessageDlg(
+      'Built-in Default mapping cannot be exported as a file.' + sLineBreak +
+      'It is compiled into Avro Keyboard.',
+      mtInformation, [mbOK], 0
+    );
+    Exit;
+  end;
+
+  SourcePath := AnsiMappingDir + MapName + '.AvroEnco';
+  if not FileExists(SourcePath) then
+  begin
+    MessageDlg('Mapping file not found: ' + MapName, mtError, [mbOK], 0);
+    Exit;
+  end;
+
   SaveDlg := TSaveDialog.Create(nil);
   try
-    SaveDlg.Filter := 'Avro Encoded Mapping|*.AvroEnco|ANSI Mapping JSON|*.json';
+    SaveDlg.Filter := 'Avro Encoded Mapping|*.AvroEnco';
+    SaveDlg.DefaultExt := 'AvroEnco';
     SaveDlg.Title := 'Export ' + MapName + ' Mapping';
-    if FileExists(AnsiMappingDir + MapName + '.AvroEnco') then
-      SaveDlg.DefaultExt := 'AvroEnco'
-    else
-      SaveDlg.DefaultExt := 'json';
-    SaveDlg.FileName := MapName + '.' + SaveDlg.DefaultExt;
+    SaveDlg.FileName := MapName + '.AvroEnco';
     if SaveDlg.Execute then
     begin
-      if SameText(MapName, 'Default') then
-        ExportAnsiMapping(SaveDlg.FileName)
+      if Windows.CopyFile(PChar(SourcePath), PChar(SaveDlg.FileName), False) then
+        MessageDlg('Mapping exported to: '#13#10 + SaveDlg.FileName, mtInformation, [mbOK], 0)
       else
-      begin
-        SourcePath := AnsiMappingDir + MapName + '.AvroEnco';
-        if not FileExists(SourcePath) then
-          SourcePath := AnsiMappingDir + MapName + '.json';
-        if FileExists(SourcePath) then
-          Windows.CopyFile(PChar(SourcePath), PChar(SaveDlg.FileName), False)
-        else
-          ExportAnsiMapping(SaveDlg.FileName);
-      end;
-      MessageDlg('Mapping exported to: '#13#10 + SaveDlg.FileName, mtInformation, [mbOK], 0);
+        MessageDlg('Failed to export file: ' + SysErrorMessage(GetLastError), mtError, [mbOK], 0);
     end;
   finally
     SaveDlg.Free;
@@ -859,6 +874,7 @@ begin
       // Drop the deleted engine from the cache so it cannot be restored.
       AnsiEngineManager.RemoveEngine(MapName);
       AvroMainForm1.BuildAnsiVersionMenus;
+      AvroMainForm1.UpdateTrayIcon;
       PopulateVersions;
       AutoSizeForm;
     end;

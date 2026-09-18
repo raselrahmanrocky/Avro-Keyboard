@@ -1,12 +1,12 @@
 ﻿{
     "Metadata": {
-        "Encoding": "Ansi V1",
+        "Encoding": "ANSI V1",
         "Type": "ANSI Encoding",
-        "Version": "1.0",
-        "Company": "AnandaComputer",
-        "Developer": "Md Rasel Rahman Rocky",
-        "Modified By": "Md Rasel Rahman Rocky",
-        "Suggested Font": "Adarsh aLipi"
+        "Version": "1.2",
+        "Company": "Ananda Computers",
+        "Developer": "Mustafa Jabbar",
+        "Modified By": "Md Rasel Rahman Rocky & Sherlock",
+        "Suggested Font": "Kalpurush ANSI, Siyam Rupali ANSI"
     },
     "Constants": {
         "Numbers": {

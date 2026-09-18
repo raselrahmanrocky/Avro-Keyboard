@@ -36,7 +36,9 @@ rem  through preload, switch and background re-parse - a hollowed engine there
 rem  showed the version as selected while every kar emitted nothing; and
 rem  kat_obfcodec proves the obfuscation codec and the developer comment domain
 rem  behave (keyed metadata mask, comment text unrecoverable without the
-rem  comment key, comments skipped for free at runtime).
+rem  comment key, comments skipped for free at runtime); and kat_iconsection
+rem  proves every container carries a usable per-layout icon, in a frame set
+rem  the tray and the menus actually draw at 100/125/150/200% display scaling.
 rem
 rem  STYLE NOTE: this script uses labels and goto, never parenthesised
 rem  if-blocks. The Delphi path expands to "C:\Program Files (x86)\..."
@@ -76,15 +78,15 @@ echo   python gen_shield_secret.py --random 44 --key-file "%COMMENTKEY%"
 exit /b 1
 :havecommentkey
 
-echo [1/8] Compiling AvroEncoBuilder.exe ...
+echo [1/9] Compiling AvroEncoBuilder.exe ...
 dcc32 -CC -Q -B -NS"System;Winapi;Data;Xml;Web;Soap" -U"%UNITS%;%RTL%" AvroEncoBuilder.dpr
 if errorlevel 1 goto buildfailed
 
-echo [2/8] Building assets\Ansi V1..V4.AvroEnco (shield v3, default-key) ...
+echo [2/9] Building assets\Ansi V1..V4.AvroEnco (shield v3, default-key, with layout icons) ...
 for %%F in (V1 V2 V3 V4) do call :onecontainer %%F
 if errorlevel 1 goto containfailed
 
-echo [3/8] Compiling the gates ...
+echo [3/9] Compiling the gates ...
 dcc32 -CC -Q -B -NS"System;Winapi;Data;Xml;Web;Soap" -U"%UNITS%;%RTL%" "%GATEDIR%\kat_staticleak.dpr"
 if errorlevel 1 goto gatebuildfailed
 
@@ -107,7 +109,13 @@ rem  units include relative to their own location.
 dcc32 -CC -Q -B -I"%APP%" -NS"System;System.Win;Winapi;Vcl;Vcl.Imaging;Data;Xml;Web;Soap" -U"%UNITS%;%CONVERTER%;%APP%\Classes;%APP%\Forms;%APP%\Layout;%APP%\SpellChecker;%RTL%" "%GATEDIR%\kat_engineswitch.dpr"
 if errorlevel 1 goto gatebuildfailed
 
-echo [4/8] Static-leak gate over the generated containers ...
+rem  kat_iconsection synthesises its own ICOs and builds a password-protected
+rem  container of its own, so unlike the others it needs no key file and no
+rem  asset folder to be runnable.
+dcc32 -CC -Q -B -NS"System;Winapi;Data;Xml;Web;Soap" -U"%UNITS%;%RTL%" "%GATEDIR%\kat_iconsection.dpr"
+if errorlevel 1 goto gatebuildfailed
+
+echo [4/9] Static-leak gate over the generated containers ...
 rem  Scans both the container bytes and the unwrapped payload. The second pass
 rem  is the one that would catch a build that shipped legible mapping text or
 rem  fell back to a non-keyed obfuscation mask. The source-mappings folder is
@@ -116,21 +124,21 @@ rem  containers are no longer tracked, so nothing here depends on them.
 "%GATEDIR%\kat_staticleak.exe" "" "%ROOT%\assets" "..\..\source-mappings"
 if errorlevel 1 goto gatefailed
 
-echo [5/8] Protection-flag gate over the generated containers ...
+echo [5/9] Protection-flag gate over the generated containers ...
 rem  Every shipped container must report the default-key flag AND decrypt with
 rem  an empty password, which is exactly what the menu import relies on. The
 rem  quiet flag keeps the PASS lines out of the build log; only failures speak.
 "%GATEDIR%\kat_flagdetect.exe" "%ROOT%\assets" quiet
 if errorlevel 1 goto flaggatefailed
 
-echo [6/8] Conversion + parser-fidelity gate over the generated containers ...
+echo [6/9] Conversion + parser-fidelity gate over the generated containers ...
 rem  Each container must convert byte-identically to the authored source in
 rem  AvroEncoEngine\source-mappings, and loading it must not drop or shrink any
 rem  section the mapping declares.
 "%GATEDIR%\kat_ansiconvert.exe" "%ROOT%\assets" "..\..\source-mappings" quiet
 if errorlevel 1 goto convertgatefailed
 
-echo [7/8] Engine-cache gate over the generated containers ...
+echo [7/9] Engine-cache gate over the generated containers ...
 rem  Drives the real engine cache: preload, switching, background re-parse and a
 rem  deliberately hollowed live engine. Every step must leave the requested
 rem  mapping installed and behaving exactly like its fresh-loaded reference.
@@ -144,13 +152,25 @@ rem  checkmark-sync routines as the other two ANSI menus.
 "%GATEDIR%\kat_engineswitch.exe" "%ROOT%\assets" quiet
 if errorlevel 1 goto switchgatefailed
 
-echo [8/8] Obfuscation codec + comment domain gate ...
+echo [8/9] Obfuscation codec + comment domain gate ...
 rem  Pins the codec contract: keyed metadata mask, positional salting, comment
 rem  text unrecoverable without the comment key (and not even held in memory on
 rem  the runtime path), plus the frozen v2 fixture that proves the legacy read
 rem  path still works.
 "%GATEDIR%\kat_obfcodec.exe" "..\..\source-mappings" "%COMMENTKEY%" quiet
 if errorlevel 1 goto obfcodecfailed
+
+echo [9/9] Layout-icon gate over the generated containers ...
+rem  Proves the icon section itself: the frame-selection rule (an exact frame
+rem  wins, otherwise the smallest frame that is at least as large, so the 125%
+rem  and 150% tray metrics never fall back to the largest frame), that
+rem  CreateHIconAtSize hands Windows a handle measuring EXACTLY the requested
+rem  metric, that the icon survives the whole container pipeline byte-for-byte,
+rem  that a container without it still loads, and - for every shipped
+rem  container - that a 16 px frame is present and nothing above
+rem  AVRO_ICON_MAX_FRAME_SIZE is carried.
+"%GATEDIR%\kat_iconsection.exe" "%ROOT%\assets" quiet
+if errorlevel 1 goto icongatefailed
 
 echo Done.
 endlocal
@@ -161,7 +181,13 @@ rem Explicit path: some Windows configurations set
 rem NoDefaultCurrentDirectoryInExePath, which makes a bare
 rem "AvroEncoBuilder.exe" fail with "not recognized" even though the file is
 rem sitting in the current directory.
-"%~dp0AvroEncoBuilder.exe" "..\..\source-mappings\Ansi %1.json" "..\..\..\assets\Ansi %1.AvroEnco" --pack --default-key --format shield --secret-file "%KEYFILE%" --comments-key-file "%COMMENTKEY%"
+rem  The per-layout icon is embedded INSIDE the payload (one scalar Base64
+rem  member), so it inherits the container's HMAC verdict, AES-GCM tag and
+rem  obfuscation instead of needing a second container format or a sidecar file.
+rem  Only the frames the tray and the menus actually draw are embedded - the
+rem  authored 256 px frame alone is 270 KB, five times a whole container.
+rem  kat_iconsection fails the build if that ever regresses.
+"%~dp0AvroEncoBuilder.exe" "..\..\source-mappings\Ansi %1.json" "..\..\..\assets\Ansi %1.AvroEnco" --pack --default-key --format shield --secret-file "%KEYFILE%" --comments-key-file "%COMMENTKEY%" --icon "..\..\..\assets\icons\Ansi%1.ico"
 if errorlevel 1 echo FAILED: Ansi %1
 exit /b %errorlevel%
 
@@ -195,6 +221,10 @@ exit /b 1
 
 :obfcodecfailed
 echo OBFUSCATION GATE FAILED - the codec or the comment domain regressed
+exit /b 1
+
+:icongatefailed
+echo LAYOUT-ICON GATE FAILED - a container's icon is missing, oversized or mis-sized
 exit /b 1
 
 :nodcc

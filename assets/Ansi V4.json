@@ -1,12 +1,12 @@
 ﻿{
     "Metadata": {
-        "Encoding": "Ansi V4",
+        "Encoding": "ANSI V4",
         "Type": "ANSI Encoding",
-        "Version": "1.0",
-        "Company": "AnandaComputer",
-        "Developer": "Md Rasel Rahman Rocky",
-        "Modified By": "Md Rasel Rahman Rocky",
-        "Suggested Font": "BanglapediaII"
+        "Version": "1.1",
+        "Company": "Computer Village",
+        "Developer": "Computer Village",
+        "Modified By": "Md Rasel Rahman Rocky & Sherlock",
+        "Suggested Font": "BanglapediaII, Ittefaq, Prothom Alo"
     },
     "Constants": {
         "Numbers": {
@@ -199,7 +199,7 @@
             },
             "A_OUKar": {
                 "UnicodeKey": "#$09CC",
-                "Value": "#$02C6#$0152",
+                "Value": "#$0152",
                 "Comment": "ৌ (ঔ-কার)"
             }
         },

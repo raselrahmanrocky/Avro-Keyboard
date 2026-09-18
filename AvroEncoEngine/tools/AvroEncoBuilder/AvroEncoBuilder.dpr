@@ -62,6 +62,11 @@ program AvroEncoBuilder;
                           Raw developer comment IKM. Encodes comment fields
                           on build, decodes them on --unpack.
     --format <fmt>        shield (default) | v2
+    --icon <path>         Embed an .ico inside the payload, so the runtime can
+                          draw the layout's own tray and menu icon.
+    --icon-sizes <list>   Frames to embed, e.g. 16,32,48 (default). Bounded by
+                          the unit's AVRO_ICON_MAX_FRAME_SIZE: the authored
+                          256 px artwork is what made the section necessary.
     --bind                Shield: bind the container to this machine.
     --hardware            Shield: add the hardware factor to the KDF.
     --no-verify           Skip the load-back round-trip verification.
@@ -86,6 +91,7 @@ uses
   System.JSON,
   System.IOUtils,
   uAvroEncoCrypto,
+  uAvroEncoIconSection,
   uAvroSecureMem,
   uAvroShield;
 
@@ -111,11 +117,13 @@ const
 
 var
   InputPath, OutputPath, Password, ErrMsg, SecretFilePath: string;
-  CommentsKeyPath: string;
-  ContainerFormat: Integer;
+  CommentsKeyPath, IconPath, IconSizesText, BuildJsonText: string;
+  IconSectionBase64: string;
+  ContainerFormat, IconErrCode: Integer;
   UseDefaultKey, BindMachine, UseHardware, NoVerify, Quiet: Boolean;
   UnpackMode, PackMode: Boolean;
-  KeyIKM, CommentsIKM: TBytes;
+  KeyIKM, CommentsIKM, IconBytes: TBytes;
+  IconSizes: TArray<Integer>;
 
 procedure Usage;
 begin
@@ -139,6 +147,9 @@ begin
   WriteLn('                          embedded secret, so building and running the');
   WriteLn('                          tool never exposes one.');
   WriteLn('  --format <fmt>        shield (default) | v2');
+  WriteLn('  --icon <path>         Embed an .ico inside the payload, so the runtime');
+  WriteLn('                        can draw the layout''s own tray and menu icon.');
+  WriteLn('  --icon-sizes <list>   Frames to embed, e.g. 16,32,48 (default).');
   WriteLn('  --bind                Shield: bind the container to this machine.');
   WriteLn('  --hardware            Shield: add the hardware factor to the KDF.');
   WriteLn('  --no-verify           Skip the load-back round-trip verification.');
@@ -235,6 +246,103 @@ end;
   The caller passes the options the build used, with IncludeComments enabled:
   the load-back then also proves that every comment field survives the comment
   domain round trip, not just that the operational fields do. }
+function SizesText(const ASizes: TArray<Integer>): string;
+var
+  I: Integer;
+begin
+  Result := '';
+  for I := 0 to High(ASizes) do
+  begin
+    if I > 0 then
+      Result := Result + ',';
+    Result := Result + IntToStr(ASizes[I]);
+  end;
+end;
+
+{ The document that will actually be built. Without --icon this is AJsonText
+  unchanged. With --icon the ICO is down-selected to IconSizes, Base64'd and
+  added as ONE top-level scalar member, so it rides the existing
+  obfuscate -> zlib -> AES-256-GCM -> HMAC pipeline and the container format,
+  its magic and its version byte stay exactly as they are.
+
+  The member is a scalar on purpose: kat_ansiconvert censuses every top-level
+  member whose value is an array or an object and fails when the parser drops
+  one, so a scalar keeps the mapping's section accounting untouched. An ICO is
+  self-describing (its ICONDIR lists the frame sizes), so nothing is lost.
+
+  False means the caller must not build; the reason has already been printed
+  and IconErrCode holds the exit code to report. }
+function BuildDocumentText(const AJsonText: string; out AText: string): Boolean;
+var
+  Root, Repro: TJSONValue;
+  Serialized: string;
+begin
+  Result := False;
+  IconErrCode := EXIT_BUILD;
+  AText := AJsonText;
+  if IconPath = '' then
+    Exit(True);
+
+  if not FileExists(IconPath) then
+  begin
+    WriteLn('ERROR: icon file not found: ' + IconPath);
+    IconErrCode := EXIT_READ;
+    Exit;
+  end;
+  try
+    IconBytes := TFile.ReadAllBytes(IconPath);
+  except
+    WriteLn('ERROR: cannot read icon file: ' + IconPath);
+    IconErrCode := EXIT_READ;
+    Exit;
+  end;
+  if Length(IconBytes) = 0 then
+  begin
+    WriteLn('ERROR: icon file is empty: ' + IconPath);
+    IconErrCode := EXIT_READ;
+    Exit;
+  end;
+
+  IconSectionBase64 := EncodeIconSection(IconBytes, IconSizes);
+  if IconSectionBase64 = '' then
+  begin
+    WriteLn('ERROR: no frame of ' + IconPath + ' matches ' + SizesText(IconSizes) +
+      '; allowed frame sizes are 8..' + IntToStr(AVRO_ICON_MAX_FRAME_SIZE) +
+      ' px square');
+    Exit;
+  end;
+
+  Root := TJSONObject.ParseJSONValue(Trim(AJsonText));
+  if (Root = nil) or not (Root is TJSONObject) then
+  begin
+    Root.Free;
+    WriteLn('ERROR: input is not a valid JSON object: ' + InputPath);
+    IconErrCode := EXIT_PARSE;
+    Exit;
+  end;
+  try
+    TJSONObject(Root).AddPair(AVRO_ICON_SECTION, IconSectionBase64);
+    Serialized := TJSONObject(Root).ToJSON;
+
+    // The build runs on Serialized, so prove the serialize step kept every
+    // member before trusting the load-back check: a round trip that dropped a
+    // field would otherwise be compared against itself and never noticed.
+    Repro := TJSONObject.ParseJSONValue(Serialized);
+    if (Repro = nil) or (not JsonTreesEqual(Root, Repro)) then
+    begin
+      Repro.Free;
+      WriteLn('ERROR: the icon-injected document does not survive JSON serialization');
+      Exit;
+    end;
+    Repro.Free;
+  finally
+    Root.Free;
+  end;
+
+  AText := Serialized;
+  Result := True;
+end;
+
 function VerifyRoundTrip(const AJsonText, APassword: string;
   const ADefaultKey: Boolean; const AOutBytes: TBytes;
   const AOptions: TAvroShieldLoadOptions; out AErr: string): Boolean;
@@ -298,6 +406,8 @@ begin
   Password := '';
   SecretFilePath := '';
   CommentsKeyPath := '';
+  IconPath := '';
+  IconSizesText := '';
   InputPath := '';
   OutputPath := '';
 
@@ -342,6 +452,20 @@ begin
       Inc(I);
       CommentsKeyPath := ParamStr(I);
     end
+    else if Arg = '--icon' then
+    begin
+      if I + 1 > ParamCount then
+        Exit;
+      Inc(I);
+      IconPath := ParamStr(I);
+    end
+    else if Arg = '--icon-sizes' then
+    begin
+      if I + 1 > ParamCount then
+        Exit;
+      Inc(I);
+      IconSizesText := ParamStr(I);
+    end
     else if Arg = '--no-verify' then
       NoVerify := True
     else if Arg = '--quiet' then
@@ -381,7 +505,8 @@ begin
   // build-side rules below do not apply to it.
   if UnpackMode then
   begin
-    if UseDefaultKey or BindMachine or UseHardware then
+    // --icon is a build input: there is nothing to inject on the way out.
+    if UseDefaultKey or BindMachine or UseHardware or (IconPath <> '') then
       Exit;
     Result := True;
     Exit;
@@ -402,6 +527,24 @@ begin
   if (ContainerFormat = FORMAT_SHIELD) and UseDefaultKey and
     (SecretFilePath = '') then
     Exit;
+
+  // --icon embeds a per-layout icon in the payload. The frame list defaults to
+  // the sizes the tray and the menus actually draw (AVRO_ICON_FRAME_SIZES); a
+  // mis-typed list is a usage error, never a silently icon-less container.
+  if IconSizesText <> '' then
+  begin
+    if not ParseIconSizes(IconSizesText, IconSizes, ErrMsg) then
+    begin
+      WriteLn('ERROR: --icon-sizes: ' + ErrMsg);
+      Exit;
+    end;
+  end
+  else
+  begin
+    SetLength(IconSizes, Length(AVRO_ICON_FRAME_SIZES));
+    for I := 0 to High(AVRO_ICON_FRAME_SIZES) do
+      IconSizes[I] := AVRO_ICON_FRAME_SIZES[I];
+  end;
 
   Result := True;
 end;
@@ -572,7 +715,7 @@ var
   Text, Pretty: string;
   Json: TJSONValue;
   Version: Byte;
-  CommentKeyFailed: Boolean;
+  CommentKeyFailed, HadIcon: Boolean;
 begin
   Result := EXIT_UNPACK;
   if not FileExists(InputPath) then
@@ -634,6 +777,18 @@ begin
     Exit(EXIT_UNPACK);
   end;
   try
+    // The icon is a build artifact of assets\icons\*.ico, not authoring
+    // content. Leaving a multi-kilobyte Base64 blob in the unpacked document
+    // would make it undiffable against source-mappings, which is the only
+    // reason --unpack exists. The next build's --icon puts it back.
+    HadIcon := False;
+    if Json is TJSONObject then
+    begin
+      var IconPair: TJSONPair := TJSONObject(Json).RemovePair(AVRO_ICON_SECTION);
+      HadIcon := IconPair <> nil;
+      // RemovePair hands ownership to the caller.
+      IconPair.Free;
+    end;
     Pretty := PrettyJson(Json, 0);
   finally
     Json.Free;
@@ -661,6 +816,8 @@ begin
         'container (the mapping itself is intact)')
     else
       WriteLn('comments: omitted (no --comments-key-file; add one to see them)');
+    if HadIcon then
+      WriteLn('icon    : dropped from the output (rebuild with --icon to re-add it)');
     WriteLn('output: ' + OutputPath);
     WriteLn('OK');
   end;
@@ -704,6 +861,8 @@ begin
     WriteLn('ERROR: cannot read input file: ' + InputPath);
     ExitCode := EXIT_READ;
   end
+  else if not BuildDocumentText(JsonText, BuildJsonText) then
+    ExitCode := IconErrCode
   else
   begin
     // Validate the input parses as a JSON object before doing any crypto.
@@ -726,7 +885,7 @@ begin
         // key alone. Shipped builds always pass one (build_avroenco.bat).
         if (Length(CommentsIKM) = 0) and (not Quiet) then
           WriteLn('warning: no --comments-key-file, comments use the value domain');
-        var R: TAvroShieldResult := AvroShieldBuildFromJson(JsonText, Password,
+        var R: TAvroShieldResult := AvroShieldBuildFromJson(BuildJsonText, Password,
           UseDefaultKey, BindMachine, UseHardware, OutBytes, KeyIKM, CommentsIKM);
         if R <> asrOk then
         begin
@@ -749,7 +908,7 @@ begin
             VerifyOpts.IncludeComments := True;
             VerifyOpts.DefaultSecretIKM := KeyIKM;
             VerifyOpts.CommentsIKM := CommentsIKM;
-            if not VerifyRoundTrip(JsonText, Password, UseDefaultKey, OutBytes,
+            if not VerifyRoundTrip(BuildJsonText, Password, UseDefaultKey, OutBytes,
               VerifyOpts, ErrMsg) then
             begin
               WriteLn('ERROR: verification failed - ' + ErrMsg);
@@ -772,7 +931,7 @@ begin
       end
       else // FORMAT_V2
       begin
-        if not EncryptJsonToAvroEncoFile(JsonText, AnsiString(Password), OutputPath) then
+        if not EncryptJsonToAvroEncoFile(BuildJsonText, AnsiString(Password), OutputPath) then
         begin
           WriteLn('ERROR: v2 build failed');
           ExitCode := EXIT_BUILD;
@@ -784,7 +943,7 @@ begin
           begin
             // Load the v2 container back through the runtime reader.
             var Loaded: string := Trim(DecryptAvroEncoToString(OutputPath, AnsiString(Password)));
-            var JsonA: TJSONValue := TJSONObject.ParseJSONValue(Trim(JsonText));
+            var JsonA: TJSONValue := TJSONObject.ParseJSONValue(Trim(BuildJsonText));
             var JsonB: TJSONValue := TJSONObject.ParseJSONValue(Loaded);
             if (JsonA = nil) or (JsonB = nil) or (not JsonTreesEqual(JsonA, JsonB)) then
             begin
@@ -846,6 +1005,10 @@ begin
       if (SrcSize > 0) and (OutSize > 0) then
         Write(Format(' (%.1f%% of source)', [100.0 * OutSize / SrcSize]));
       WriteLn;
+      if IconPath <> '' then
+        WriteLn('icon  : ' + ExtractFileName(IconPath) + ', frames ' +
+          SizesText(IconSizes) + ', ' + IntToStr(Length(IconSectionBase64)) +
+          ' Base64 chars in the payload');
       WriteLn('OK: ' + OutputPath);
     end;
   end;
