@@ -1864,11 +1864,6 @@ object AvroMainForm1: TAvroMainForm1
       object N51: TMenuItem
         Caption = '-'
       end
-      object UnicodetoBijoytextconverter2: TMenuItem
-        Caption = 'Avro Text Converter'
-        ImageIndex = 25
-        OnClick = UnicodetoBijoytextconverter1Click
-      end
       object KeyboardLayoutEditorBuildcustomlayouts2: TMenuItem
         Caption = 'Keyboard Layout Editor : Build custom layouts'
         ImageIndex = 3
@@ -1878,11 +1873,6 @@ object AvroMainForm1: TAvroMainForm1
         Caption = 'Skin Designer : Design your own skin'
         ImageIndex = 4
         OnClick = SkinDesignerDesignyourownskin1Click
-      end
-      object LayoutViewerShowactivekeyboardlayout2: TMenuItem
-        Caption = 'Layout Viewer : Show active keyboard layout...'
-        ImageIndex = 22
-        OnClick = Showactivekeyboardlayout1Click
       end
       object Helpfiles2: TMenuItem
         Caption = 'Help files'

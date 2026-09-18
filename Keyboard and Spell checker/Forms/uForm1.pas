@@ -185,10 +185,8 @@ type
     AvroPhonetic2: TMenuItem;
     EnableAutoCorrect2: TMenuItem;
     ManageAutoCorrectentries2: TMenuItem;
-    UnicodetoBijoytextconverter2: TMenuItem;
     KeyboardLayoutEditorBuildcustomlayouts2: TMenuItem;
     SkinDesignerDesignyourownskin2: TMenuItem;
-    LayoutViewerShowactivekeyboardlayout2: TMenuItem;
     N48: TMenuItem;
     Helpfiles2: TMenuItem;
     Configuringyoursystem3: TMenuItem;
