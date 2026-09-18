@@ -489,11 +489,57 @@ begin
   CheckKarOnce(ATag, 'ou-kar', 'ou-kar length-mark', AOut, ['A_OUKar'], False);
 end;
 
+{ ---- metadata card ------------------------------------------------------- }
+
+{ The value on the card's "<Key>: " line, or '' when the card has no such
+  line. The card is one "<Key>: <Value>" line per metadata field. }
+function CardValue(const ACard, AKey: string): string;
+var
+  Lines: TStringList;
+  I: Integer;
+begin
+  Result := '';
+  Lines := TStringList.Create;
+  try
+    Lines.Text := ACard;
+    for I := 0 to Lines.Count - 1 do
+      if Pos(AKey + ': ', Lines[I]) = 1 then
+        Exit(Copy(Lines[I], Length(AKey) + 3, MaxInt));
+  finally
+    Lines.Free;
+  end;
+end;
+
+{ The profile name the document itself declares: the same Encoding/Name lookup
+  the card performs, so the two can be compared. '' when it declares none. }
+function DeclaredEncoding(const AJSON: string): string;
+var
+  Root, Meta: TJSONValue;
+begin
+  Result := '';
+  Root := TJSONObject.ParseJSONValue(Trim(StripBom(AJSON)));
+  if not Assigned(Root) then
+    Exit;
+  try
+    Meta := nil;
+    if Root is TJSONObject then
+      Meta := TJSONObject(Root).Values['Metadata'];
+    if Assigned(Meta) and (Meta is TJSONObject) then
+    begin
+      Result := GetJSONString(Meta, 'Encoding');
+      if Result = '' then
+        Result := GetJSONString(Meta, 'Name');
+    end;
+  finally
+    Root.Free;
+  end;
+end;
+
 procedure AnalyseOneMapping(const APath, ATag: string; const AOut: TArray<string>);
 var
   SourceText, ExportText, ParseLog, TmpFile: string;
   SrcCounts, ExpCounts: TDictionary<string, Integer>;
-  Name, Card: string;
+  Name, Card, DeclaredEnc: string;
   CardLines: TStringList;
   SrcN, ExpN, I: Integer;
   Shrunk, Dropped: TList<string>;
@@ -573,11 +619,31 @@ begin
     CardLines.Text := Card;
     for I := 0 to CardLines.Count - 1 do
       if (Pos('Suggested Font', CardLines[I]) > 0) or
-         (Pos('was not found', CardLines[I]) > 0) then
+         (Pos('was not found', CardLines[I]) > 0) or
+         (Pos('Name: ', CardLines[I]) = 1) or
+         (Pos('Encoding: ', CardLines[I]) = 1) then
         Note(ATag + ': card: ' + Trim(CardLines[I]));
   finally
     CardLines.Free;
   end;
+
+  // The card's two identifying lines are a contract with the user:
+  //   Name     - the file as it appears in Explorer and in the picker,
+  //   Encoding - the profile the DOCUMENT declares.
+  // Encoding is never a second copy of the file name: a path-derived value
+  // made the card contradict the document, and for a container named after a
+  // font (STM-BNT-Arjun.AvroEnco) it reported the font as the encoding. The
+  // comparison is deliberately case-sensitive - the shipped containers are
+  // named "Ansi V2" while declaring "ANSI V2", so SameText would pass against
+  // the path-derived value this gate exists to catch.
+  DeclaredEnc := DeclaredEncoding(SourceText);
+  Check(ATag + ': card Encoding reports the declared profile',
+    (DeclaredEnc <> '') and (CardValue(Card, 'Encoding') = DeclaredEnc),
+    'card: "' + CardValue(Card, 'Encoding') + '" declared: "' + DeclaredEnc + '"');
+  Check(ATag + ': card Name reports the file',
+    CardValue(Card, 'Name') = ExtractFileName(APath),
+    'card: "' + CardValue(Card, 'Name') + '" file: "' +
+    ExtractFileName(APath) + '"');
 
   Check(ATag + ': conversion produced output', Length(AOut) = Length(Corpus),
     'the corpus did not convert');

@@ -69,6 +69,8 @@ procedure RebuildAnviVersionMenus;
       MItem.Checked := AChecked;
       MItem.RadioItem := True;
       MItem.Tag := 9903;
+      MItem.OnAdvancedDrawItem := AvroMainForm1.AnsiVersionItemAdvancedDrawItem;
+      MItem.OnMeasureItem := AvroMainForm1.AnsiVersionItemMeasureItem;
       MItem.OnClick := AvroMainForm1.AnsiVersionMenuClick;
       AParentMenu.Add(MItem);
     end;
