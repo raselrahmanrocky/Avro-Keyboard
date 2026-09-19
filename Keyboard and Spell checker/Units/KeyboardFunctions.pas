@@ -10,7 +10,9 @@
   1. IsAltGr no longer calls Log().  It is called once per keystroke by the
   layout engine, so that Log() ran on EVERY key press and appended to a
   growing log file - the cause of "it gets slower and slower after a few
-  thousand words".
+  thousand words".  (DebugLog writes no file at all any more and its define
+  is off, so a Log() call now compiles away entirely; the rule is kept here
+  because the string argument would still be built on every call.)
 
   2. SendKey_Char no longer calls Log() either (same problem, once per
   emitted character).
@@ -55,6 +57,19 @@ function IsWinKey: Boolean;
 function IsOnlyLeftAltKey: Boolean;
 function IsOnlyCtrlKey: Boolean;
 function IsIgnorableModifierKey(const KeyCode: Integer): Boolean;
+
+{
+  TEST / EMBEDDING HOOK. Every modifier probe
+  below reads the keys that happen to be down on THIS machine through
+  GetAsyncKeyState, so a head-less test run would silently change behaviour
+  depending on how it was launched (e.g. a console that holds Ctrl made the
+  layout engine bail out and every expectation fail with an empty screen).
+  With IgnoreModifierState set no modifier is ever reported as pressed, so a
+  result depends only on the synthetic input the test feeds the engine.
+  Nothing in the shipped application sets it.
+}
+var
+  IgnoreModifierState: Boolean = False;
 
 implementation
 
@@ -121,6 +136,8 @@ end;
 
 function IsOnlyCtrlKey: Boolean;
 begin
+  if IgnoreModifierState then
+    Exit(False);
   Result := IsKeyDown(VK_CONTROL) and (not IsKeyDown(VK_MENU));
 end;
 
@@ -128,6 +145,8 @@ end;
 
 function IsOnlyLeftAltKey: Boolean;
 begin
+  if IgnoreModifierState then
+    Exit(False);
   Result := (not IsKeyDown(VK_CONTROL)) and IsKeyDown(VK_LMENU);
 end;
 
@@ -135,6 +154,8 @@ end;
 
 function IsWinKey: Boolean;
 begin
+  if IgnoreModifierState then
+    Exit(False);
   Result := IsKeyDown(VK_LWIN) or IsKeyDown(VK_RWIN);
 end;
 
@@ -156,6 +177,8 @@ end;
 
 function IsAltGr: Boolean;
 begin
+  if IgnoreModifierState then
+    Exit(False);
   Result := (IsKeyDown(VK_LCONTROL) and IsKeyDown(VK_LMENU)) or IsKeyDown(VK_RMENU);
   // PERF: no Log() here - this runs on EVERY keystroke (see header).
 end;
@@ -171,6 +194,8 @@ end;
 
 function IsTrueShift_L: Boolean;
 begin
+  if IgnoreModifierState then
+    Exit(False);
   Result := IsKeyDown(VK_LSHIFT);
 end;
 
@@ -178,6 +203,8 @@ end;
 
 function IsTrueShift_R: Boolean;
 begin
+  if IgnoreModifierState then
+    Exit(False);
   Result := IsKeyDown(VK_RSHIFT);
 end;
 

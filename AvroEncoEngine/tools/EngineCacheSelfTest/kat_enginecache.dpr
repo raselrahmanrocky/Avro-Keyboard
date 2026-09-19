@@ -214,8 +214,10 @@ begin
           ' ms total (' + Format('%.3f', [SwitchMs / 200.0]) + ' ms each avg)');
         // 200 warm switches must be nothing but pointer moves. The budget is
         // an absolute one and it is tight on purpose: DebugLog's per-line file
-        // append measured at ~8.5 ms, so a single trace line left on this path
-        // would already spend 1700 ms here (which is how it was caught). A
+        // append used to measure ~8.5 ms, so a single trace line left on this
+        // path would have spent 1700 ms here (which is how it was caught).
+        // The sink writes no file any more, so that particular trip-wire is
+        // gone and this budget now only judges the cache itself. A
         // parse, a decrypt or a disk read costs 17..60 ms per switch.
         Check('warm switches are ~instant', SwitchMs < 500,
           IntToStr(SwitchMs) + ' ms for 200 switches (' +

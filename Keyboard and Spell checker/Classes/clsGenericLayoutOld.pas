@@ -23,11 +23,14 @@
   ে(mem) + ক -> কে,  দ + ি(mem) + ত -> দতি
   * same kar pressed AGAIN   -> attaches AT ONCE to the previous letter
   (double press = commit): ক + ি + ি -> কি
-  * different kar pressed    -> replaces the pending one (nothing was
-  visible, so nothing is lost)
+  * different kar pressed    -> REPLACES the pending one: nothing was
+  visible, so nothing is lost. In ANSI mode every press is ink instead, so
+  the earlier mark simply stays on screen (see the ANSI block below)
   * non-consonant key (digit, punctuation, vowel letter/sign) or a
-  delimiter (space/enter/tab) -> the pending kar is flushed as a
-  standalone character first, then the key is processed (ি + '-' -> ি-)
+  delimiter (space/enter/tab) -> the pending kar run is COMMITTED: the
+  delayed kar is emitted as a standalone character first, then the key is
+  processed (ি + '-' -> ি-) and in ANSI not a single backspace is sent -
+  the glyphs are already ink and simply stop waiting for a consonant
   * ে(memory) + া -> ো  and  ে(memory) + ৗ -> ৌ  compose on the fly
   * ্ + ও -> ো and ্ + ঔ -> ৌ still work; a chandrabindu before the
   hasanta is re-placed AFTER the vowel sign: ক + ঁ + ্ + ও -> কোঁ
@@ -68,6 +71,24 @@
   Backspace on a pending kar erases just the glyph (K‡ -> K). The
   conjunct ladder ি জ ্ ব -> জ্বি works. Kar-first typing never
   diverts to the isolated-modifier engine.
+
+  THE INK RECORD (ANSI): every kar press is remembered as ONE entry
+  (KarPressUni + KarPressAns) together with the SEAM it was typed at
+  (KarAnchor = buffer snapshot, KarAnchorConv = its conversion).
+  AnsiSplice() is the only place that decides where that ink sits in a
+  stream, so:
+  * the diff of a keystroke is an APPEND whenever the ink has not been
+  bound yet - a symbol, a digit, a punctuation mark or a vowel after an
+  unfinished kar run can never trigger SendBackSpace, and the glyphs
+  that were already typed always survive: িি- stays িি- (frozen ink),
+  never '-ি'.
+  * one press = one glyph on backspace, whatever the seam position is,
+  and the ink keeps being poppable after the run was frozen.
+  * frozen ink is NOT bindable any more (the sequence was committed by
+  the key that ended it); a consonant binds only the LAST press.
+  Erase + retype is therefore reserved for what genuinely needs it: a
+  conjunct/ligature substitution, a split ো/ৌ, a reph/phala move, and
+  Convert's own pre-base reorder when a kar binds mid-word.
   ============================================================================ }
 
 unit clsGenericLayoutOld;
@@ -82,6 +103,15 @@ uses
 
 const
   TrackL = 100;
+
+type
+  {
+    Lowest-level output sink: EraseCount backspaces, then Text.
+    A caller - a regression harness or an embedding - may assign one to capture the
+    exact stream; in production it is nil and the real keyboard injection
+    runs unchanged.
+  }
+  TAnsiEmitEvent = procedure(const EraseCount: Integer; const Text: string) of object;
 
   // Skeleton of Class TGenericLayoutOld
 type
@@ -106,18 +136,35 @@ type
       // ী is a POST-base kar and attaches directly)
       EKarActive, IKarActive, OIKarActive: Boolean;
 
-      // OLD STYLE backspace un-reorder state:
-      KarFirstKar:    string;  // pre-base kar that was typed BEFORE its consonant
-      UnwindConjunct: Boolean; // last join completed a conjunct after [kar ্] (জি্ + ব -> জ্বি)
-      KarConsumed:    Boolean; // KarFirstKar was reordered onto its consonant (True) vs still floating (False)
-      KarRunCount:    Integer; // copies in the current kar-first run (floating OR consumed)
+      // ---- OLD-STYLE kar presses: ONE entry per kar key press --------------
+      // Unicode classic: the ink is invisible (nothing is emitted for the
+      // kar) - the record only remembers what an aborted sequence has to
+      // flush. ANSI classic: every press ALSO streamed KarPressAns to the
+      // screen, so the record IS the screen truth that the Unicode buffer
+      // does not own. A key pressed AFTER the ink never rewrites history:
+      // the run is frozen, not erased.
+      KarPressUni: array [1 .. TrackL] of string; // canonical kar of the press
+      KarPressAns: array [1 .. TrackL] of string; // glyph on screen ('' = none)
+      KarPressN:   Integer;                       // presses currently live
+      KarCanBind:  Boolean;                       // the LAST press may bind
+      KarFrozen:   Boolean;                       // ink committed - poppable, not bindable
 
       // ANSI ZERO-FLICKER VISUAL STREAM: a pending pre-base kar is NOT in
-      // the Unicode buffer - its glyph is streamed straight to the screen
-      // and AnsiMirror holds the screen truth until the syllable binds
-      AnsiMirrorActive: Boolean; // True while a streamed kar is pending
+      // the Unicode buffer - its glyph is streamed straight to the screen and
+      // AnsiMirror holds the screen truth until the syllable binds.
+      // KarAnchor is the buffer snapshot taken when the FIRST ink glyph was
+      // streamed: AnsiSplice() puts the ink back at exactly that seam, so
+      // every stream is the typed sequence and every diff is append-only.
+      AnsiMirrorActive: Boolean; // True while streamed ink is on screen
       AnsiMirror:       string;  // ANSI stream rendered so far (screen mirror)
-      KarAnsiGlyph:     string;  // the glyph(s) streamed for the pending kar
+      KarAnchor:        string;  // buffer snapshot when the ink started
+      KarAnchorConv:    string;  // ConvCached(KarAnchor) - cached for the splice
+
+      // TEST / EMBEDDING HOOKS: nil/false in production, so the
+      // engine always talks to the real host unless a caller replaces it.
+      FOnRawEmit:    TAnsiEmitEvent;
+      FModeOverride: Boolean;
+      FModeValue:    Integer;
 
       // PERFORMANCE (hot path): Bijoy.Convert() is by far the most
       // expensive call in the unit and the SAME text is converted several
@@ -135,7 +182,17 @@ type
       procedure ResetLastChar;
       procedure ClearIsoState;
       function HandleIsolatedModifier(const ModifierStr: string): Boolean;
-      procedure ClearKarFirstState;
+      procedure ClearKarRun;
+      procedure FreezeKarRun;
+      procedure PushKarPress(const UniKar, AnsGlyph: string);
+      function PopKarPress: string;
+      function KarActive: Boolean;
+      function KarBindable: Boolean;
+      function KarUniRun(const WithoutLast: Boolean = False): string;
+      function AnsiSplice(const ConvText: string): string;
+      procedure RawSend(const EraseCount: Integer; const Text: string);
+      function IsBanglaMode: Boolean;
+      function IsAnsiClassic: Boolean;
       procedure SendAnsiDiff(const PrevAnsi, NewAnsi: string);
       procedure EmitBatch(const EraseCount: Integer; const Text: string);
       procedure CommitContext(const Word: string);
@@ -161,6 +218,11 @@ type
       procedure ProcessVKeyUP(const KeyCode: Integer; var Block: Boolean);
       procedure ResetDeadKey;
       procedure FlushEmit;
+
+      { TEST / EMBEDDING HOOKS - see the field comments above. Assigning one
+        replaces the real host for the duration. }
+      property OnRawEmit: TAnsiEmitEvent read FOnRawEmit write FOnRawEmit;
+      procedure SetKeyboardModeOverride(const Enabled: Boolean; const Mode: Integer);
   end;
 
 implementation
@@ -237,10 +299,10 @@ begin
   SpacePendingCount := 0;
   LastIsoContext := '';
   LastIsoToggleKey := '';
-  KarFirstKar := '';
-  UnwindConjunct := False;
-  KarConsumed := False;
-  KarRunCount := 0;
+  ClearKarRun;
+  FOnRawEmit := nil;
+  FModeOverride := False;
+  FModeValue := Ord(SysDefault);
   FConvSrc := '';
   FConvAnsi := '';
   {$IFDEF AVRO_DEFER_EMIT}
@@ -287,16 +349,193 @@ end;
 { =============================================================================== }
 
 {
-  OLD STYLE: drops the kar-first bookkeeping only (the armed kar flags are
-  kept separately, so a kar that is still pending is never lost by a
-  deletion).
+  OLD STYLE: forgets the kar press record - and with it every glyph the
+  record still owed the screen. Only for the callers that KNOW the ink is
+  gone (a word reset, a consonant that took the whole run, a deletion of the
+  ink itself). When the glyphs are still on screen and must stay poppable,
+  use FreezeKarRun instead.
 }
-procedure TGenericLayoutOld.ClearKarFirstState;
+procedure TGenericLayoutOld.ClearKarRun;
+var
+  I: Integer;
 begin
-  KarFirstKar := '';
-  UnwindConjunct := False;
-  KarConsumed := False;
-  KarRunCount := 0;
+  for I := 1 to TrackL do
+  begin
+    KarPressUni[I] := '';
+    KarPressAns[I] := '';
+  end;
+  KarPressN := 0;
+  KarCanBind := False;
+  KarFrozen := False;
+  KarAnchor := '';
+  KarAnchorConv := '';
+end;
+
+{
+  OLD STYLE: the ink stays EXACTLY where it is on screen, it only stops
+  waiting for a consonant. Used when a symbol/punctuation/vowel follows an
+  unfinished kar run: the sequence is committed as typed, nothing is erased
+  and the glyphs can still be popped one press at a time.
+}
+procedure TGenericLayoutOld.FreezeKarRun;
+begin
+  KarCanBind := False;
+  KarFrozen := True;
+end;
+
+{
+  Appends one kar key press to the record.
+  UniKar      - the canonical kar the press stands for (ে, ি, ৈ ...)
+  AnsGlyph    - the glyph that was streamed to the screen ('' in Unicode
+                classic mode, where nothing at all is emitted)
+}
+procedure TGenericLayoutOld.PushKarPress(const UniKar, AnsGlyph: string);
+begin
+  if KarPressN >= TrackL then
+    Exit; // not a sequence a human types - keep the screen exactly as it is
+  Inc(KarPressN);
+  KarPressUni[KarPressN] := UniKar;
+  KarPressAns[KarPressN] := AnsGlyph;
+end;
+
+{
+  Removes the LAST press and returns the glyph that left the screen.
+  One backspace = one press = one glyph, whatever that glyph was.
+}
+function TGenericLayoutOld.PopKarPress: string;
+begin
+  Result := '';
+  if KarPressN < 1 then
+    Exit;
+
+  Result := KarPressAns[KarPressN];
+  KarPressUni[KarPressN] := '';
+  KarPressAns[KarPressN] := '';
+  Dec(KarPressN);
+
+  { the anchor only belongs to a run that still has ink }
+  if KarPressN = 0 then
+  begin
+    KarAnchor := '';
+    KarAnchorConv := '';
+  end;
+end;
+
+{ a kar press is live (either still waiting for its consonant or frozen ink) }
+function TGenericLayoutOld.KarActive: Boolean;
+begin
+  Result := (KarPressN > 0) and (KarPressUni[KarPressN] <> '');
+end;
+
+{
+  A kar that may still be taken by a coming consonant: it is armed AND the
+  run was not frozen by a symbol/punctuation/vowel key in between.
+}
+function TGenericLayoutOld.KarBindable: Boolean;
+begin
+  Result := KarCanBind and (not KarFrozen) and KarActive and (GetActivePreBaseKar <> '');
+end;
+
+{ the whole run in canonical Unicode order; WithoutLast drops the press a
+  consonant is about to take }
+function TGenericLayoutOld.KarUniRun(const WithoutLast: Boolean): string;
+var
+  I, N: Integer;
+begin
+  Result := '';
+  N := KarPressN;
+  if WithoutLast then
+    Dec(N);
+  for I := 1 to N do
+    if KarPressUni[I] <> '' then
+      Result := Result + KarPressUni[I];
+end;
+
+{
+  ANSI: every glyph the run streamed, in stream order. A kar key pressed
+  three times is THREE glyphs - the old single-glyph bookkeeping is what made
+  repeated kars disappear on the next key.
+}
+function TGenericLayoutOld.KarInkRun: string;
+var
+  I: Integer;
+begin
+  Result := '';
+  if (KarPressN < 1) or (KarPressN > TrackL) then
+    Exit;
+  for I := 1 to KarPressN do
+    if KarPressAns[I] <> '' then
+      Result := Result + KarPressAns[I];
+end;
+
+{
+  ANSI classic mode: the glyph stream IS the buffer - purely visual, no
+  vowel/consonant reordering. Unicode classic mode keeps the reorder machine
+  (and the delayed in-memory kar).
+}
+function TGenericLayoutOld.IsAnsiClassic: Boolean;
+begin
+  Result := OutputIsBijoy = 'YES';
+end;
+
+{
+  True in Bangla mode. Reads AvroMainForm1 unless a test/embedding override
+  is set, so the engine is never reachable through a nil form.
+}
+function TGenericLayoutOld.IsBanglaMode: Boolean;
+begin
+  if FModeOverride then
+    Result := FModeValue = Ord(bangla)
+  else if Assigned(AvroMainForm1) then
+    Result := AvroMainForm1.GetMyCurrentKeyboardMode = bangla
+  else
+    Result := False;
+end;
+
+{ see the fixed anchor note on AnsiSplice }
+procedure TGenericLayoutOld.SetKeyboardModeOverride(const Enabled: Boolean; const Mode: Integer);
+begin
+  FModeOverride := Enabled;
+  if Enabled then
+    FModeValue := Mode;
+end;
+
+{
+  Conv(text) with the screen-only ink put back in EXACTLY the place it was
+  typed. This is the single place that decides where ink sits, so
+  ParseAndSendNow, AnsiVisualPop's candidates and the hasanta paths can never
+  disagree about the stream:
+  * the ink was streamed right behind Conv(KarAnchor), so it is spliced there
+    (KarAnchor = '' means "at the very head of the word")
+  * when the anchor is gone (a deletion or a ligature crossed it) the safest
+    stream is the ink trailing at the end - never a backspace storm.
+}
+function TGenericLayoutOld.AnsiSplice(const ConvText: string): string;
+var
+  Ink, Head: string;
+begin
+  Ink := KarInkRun;
+  if Ink = '' then
+    Exit(ConvText);
+
+  Head := Copy(ConvText, 1, Length(KarAnchorConv));
+  if (Length(KarAnchorConv) = 0) or (Head = KarAnchorConv) then
+    Result := Head + Ink + Copy(ConvText, Length(KarAnchorConv) + 1, MaxInt)
+  else
+    Result := ConvText + Ink;
+end;
+
+{
+  The lowest emission point. When a sink is assigned (the regression harness)
+  it captures the stream; otherwise the real keyboard injection runs exactly
+  as before.
+}
+procedure TGenericLayoutOld.RawSend(const EraseCount: Integer; const Text: string);
+begin
+  if Assigned(FOnRawEmit) then
+    FOnRawEmit(EraseCount, Text)
+  else
+    SendInputBatch_BackspaceAndChar(EraseCount, Text);
 end;
 
 { =============================================================================== }
@@ -369,8 +608,9 @@ end;
 {
   HOT PATH OUTPUT. One single SendInput batch (SendInputBatch_BackspaceAndChar)
   replaces 4*EraseCount + 4*Length(Text) separate SendInput calls, and it also
-  skips the per-character Log() that SendKey_Char does (disk I/O on every
-  character was a large part of the 4.35 ms ParseAndSendNow measurement).
+  skips the per-character Log() that SendKey_Char does (the disk write per
+  character was a large part of the 4.35 ms ParseAndSendNow measurement;
+  DebugLog is file-free now, so what is left to avoid is the string).
 
   A whole "erase + retype" is emitted ATOMICALLY, so fast typing can no longer
   interleave with it - that is what produced the "everything appears at once"
@@ -381,15 +621,20 @@ begin
   if (EraseCount <= 0) and (Text = '') then
     Exit;
   {$IFDEF AVRO_DEFER_EMIT}
-  if FEmitN >= Length(FEmitQ) then
-    SetLength(FEmitQ, FEmitN + 32);
-  FEmitQ[FEmitN].EraseCount := EraseCount;
-  FEmitQ[FEmitN].Text := Text;
-  Inc(FEmitN);
-  { Runs after the hook callback returned - see the AVRO_DEFER_EMIT note. }
-  PostMessage(AvroMainForm1.Handle, WM_AVRO_EMIT, 0, 0);
+  if Assigned(FOnRawEmit) then
+    FOnRawEmit(EraseCount, Text) // test sink: no message pump, no main form
+  else
+  begin
+    if FEmitN >= Length(FEmitQ) then
+      SetLength(FEmitQ, FEmitN + 32);
+    FEmitQ[FEmitN].EraseCount := EraseCount;
+    FEmitQ[FEmitN].Text := Text;
+    Inc(FEmitN);
+    { Runs after the hook callback returned - see the AVRO_DEFER_EMIT note. }
+    PostMessage(AvroMainForm1.Handle, WM_AVRO_EMIT, 0, 0);
+  end;
   {$ELSE}
-  SendInputBatch_BackspaceAndChar(EraseCount, Text);
+  RawSend(EraseCount, Text);
   {$ENDIF}
 end;
 
@@ -401,23 +646,12 @@ var
 begin
   for I := 0 to FEmitN - 1 do
   begin
-    SendInputBatch_BackspaceAndChar(FEmitQ[I].EraseCount, FEmitQ[I].Text);
+    RawSend(FEmitQ[I].EraseCount, FEmitQ[I].Text);
   end;
   FEmitN := 0;
 end;
 
 { =============================================================================== }
-
-{ ANSI: the whole pending kar run exactly as it sits on screen - the glyph
-  of one copy repeated KarRunCount times (a kar key may be pressed several
-  times in a row: every press is ink). }
-function TGenericLayoutOld.KarInkRun: string;
-begin
-  if (KarAnsiGlyph = '') or (KarRunCount < 1) then
-    Result := ''
-  else
-    Result := DupeString(KarAnsiGlyph, KarRunCount);
-end;
 
 { =============================================================================== }
 
@@ -509,12 +743,14 @@ begin
   else
     S := ConvCached(B);
 
-  { ink of a kar that is still pending (its Unicode is NOT in the buffer).
-    Ink     = the glyph of ONE copy  - step 1 pops exactly one glyph
-    InkAll  = the whole run          - what the candidate streams must show }
-  if (GetActivePreBaseKar <> '') and (not KarConsumed) then
+  { ink of a kar run whose Unicode is NOT in the buffer: either still waiting
+    for its consonant or FROZEN by a symbol typed after it - both must stay
+    poppable (the frozen case had no backspace handler at all before).
+    Ink     = the glyph of the LAST press - step 1 pops exactly that one
+    InkAll  = the whole run             - what the candidates must show }
+  if KarActive and (KarInkRun <> '') then
   begin
-    Ink := KarAnsiGlyph;
+    Ink := KarPressAns[KarPressN];
     InkAll := KarInkRun;
   end
   else
@@ -531,17 +767,18 @@ begin
     NewBanglaText := B;
     PrevBanglaT := B;
     AnsiMirror := LeftStr(S, Length(S) - Length(Ink));
-    if KarRunCount > 1 then
+    PopKarPress; // ONE press = ONE glyph
+    if KarInkRun <> '' then
     begin
-      Dec(KarRunCount); // one copy is gone - the kar stays armed
+      { earlier presses of the run are still ink on screen, in typed order,
+        and may still be taken by a consonant - nothing else changes }
       AnsiMirrorActive := True;
     end
     else
     begin
-      KarAnsiGlyph := '';
       AnsiMirrorActive := False;
       ResetAllKarsToInactive;
-      ClearKarFirstState;
+      ClearKarRun;
     end;
     Block := True;
     Result := True;
@@ -566,9 +803,9 @@ begin
     InternalBackspace(1);
     SendAnsiDiff(S, BestAnsi);
     PrevBanglaT := NewBanglaText;
-    KarAnsiGlyph := '';
     AnsiMirrorActive := False;
-    ClearKarFirstState;
+    ResetAllKarsToInactive;
+    ClearKarRun;
     Block := True;
     Result := True;
     Exit;
@@ -611,7 +848,7 @@ begin
   if (BestOps > 1) and (Length(B) >= 1) and ((B[Length(B)] = b_Okar) or (B[Length(B)] = b_OUkar)) then
   begin
     Cand := LeftStr(B, Length(B) - 1) + b_Ekar;
-    CandAnsi := ConvCached(Cand) + InkAll;
+    CandAnsi := AnsiSplice(ConvCached(Cand));
     Ops := AnsiDiffOps(S, CandAnsi);
     if Ops < BestOps then
     begin
@@ -632,7 +869,7 @@ begin
     ((B[Length(B)] = b_Ekar) or (B[Length(B)] = b_Ikar) or (B[Length(B)] = b_OIkar)) and IsPureConsonent(B[Length(B) - 3]) then
   begin
     Cand := LeftStr(B, Length(B) - 3) + B[Length(B)] + b_Hasanta;
-    CandAnsi := ConvCached(Cand) + InkAll;
+    CandAnsi := AnsiSplice(ConvCached(Cand));
     Ops := AnsiDiffOps(S, CandAnsi);
     if Ops < BestOps then
     begin
@@ -654,7 +891,7 @@ begin
     if (BestOps <= 1) or (Length(B) - K < 0) then
       Break; // cost 1 = "one glyph gone, nothing retyped" - already optimal
     Cand := LeftStr(B, Length(B) - K);
-    CandAnsi := ConvCached(Cand) + InkAll;
+    CandAnsi := AnsiSplice(ConvCached(Cand));
     Ops := AnsiDiffOps(S, CandAnsi);
     if Ops < BestOps then
     begin
@@ -696,43 +933,47 @@ begin
   SendAnsiDiff(S, BestAnsi);
   PrevBanglaT := NewBanglaText;
 
-  if BestInk <> '' then
+  { --- 4. rebuild the kar press record so it describes the NEW screen --- }
+  if UnwindKar <> '' then
   begin
-    if (PeelKar = '') and (UnwindKar = '') then
-      { the pending kar run survives untouched: KarAnsiGlyph still holds
-        the glyph of ONE copy and KarRunCount the number of copies }
-    else
-      KarAnsiGlyph := BestInk; // a freshly peeled kar = a single copy
+    { the kar is back inside the buffer, in front of the pending hasanta:
+      one press, with no ink of its own (the buffer renders it) }
+    ClearKarRun;
+    PushKarPress(UnwindKar, '');
+    ResetAllKarsToInactive;
+    ArmPreBaseFlag(UnwindKar);
+    KarCanBind := True;
+    KarAnchor := NewBanglaText;
+    KarAnchorConv := ConvCached(NewBanglaText);
+    AnsiMirror := BestAnsi;
+    AnsiMirrorActive := False;
+  end
+  else if PeelKar <> '' then
+  begin
+    { a freshly peeled kar: it is screen ink again and sits right behind the
+      buffer it was peeled off - the next consonant may take it back }
+    ClearKarRun;
+    PushKarPress(PeelKar, BestInk);
+    ResetAllKarsToInactive;
+    ArmPreBaseFlag(PeelKar);
+    KarCanBind := True;
+    KarAnchor := BestBuf;
+    KarAnchorConv := ConvCached(BestBuf);
+    AnsiMirror := BestAnsi;
+    AnsiMirrorActive := True;
+  end
+  else if BestInk <> '' then
+  begin
+    { the ink run survived the deletion untouched: the record already holds
+      the per-press glyphs and the splice anchor }
     AnsiMirror := BestAnsi;
     AnsiMirrorActive := True;
   end
   else
   begin
-    KarAnsiGlyph := '';
+    ClearKarRun;
     AnsiMirrorActive := False;
   end;
-
-  if PeelKar <> '' then
-  begin
-    { the kar is pending again - the next consonant takes it back }
-    ResetAllKarsToInactive;
-    ArmPreBaseFlag(PeelKar);
-    KarFirstKar := PeelKar;
-    KarConsumed := False;
-    KarRunCount := 1;
-  end
-  else if UnwindKar <> '' then
-  begin
-    { the kar is back inside the buffer, in front of the pending hasanta }
-    ResetAllKarsToInactive;
-    ArmPreBaseFlag(UnwindKar);
-    KarFirstKar := UnwindKar;
-    KarConsumed := False;
-    KarRunCount := 1;
-    KarAnsiGlyph := '';
-  end
-  else if BestInk = '' then
-    ClearKarFirstState;
 
   Block := True;
   Result := True;
@@ -798,42 +1039,57 @@ begin
     kar stays armed (handled by the ANSI block right after this one).
     -------------------------------------------------------------------- }
   ArmedKar := GetActivePreBaseKar;
-  if (ArmedKar <> '') and (not KarConsumed) and not((PrevBanglaT <> '') and (RightStr(PrevBanglaT, 1) = b_Hasanta)) then
+  if ((ArmedKar <> '') or (KarInkRun <> '')) and not((PrevBanglaT <> '') and (RightStr(PrevBanglaT, 1) = b_Hasanta)) then
   begin
-    if (OutputIsBijoy = 'YES') and (KarAnsiGlyph <> '') then
+    { ANSI: the ink of the LAST press is what the user sees going away - pop
+      exactly that one glyph (one press = one glyph), even when the run was
+      frozen by an earlier symbol. Runs FORWARD / FROZEN are both handled. }
+    if IsAnsiClassic and (KarPressN > 0) and (KarPressAns[KarPressN] <> '') and (Length(AnsiMirror) >= Length(KarPressAns[KarPressN])) and
+      (RightStr(AnsiMirror, Length(KarPressAns[KarPressN])) = KarPressAns[KarPressN]) then
     begin
-      EmitBatch(Length(KarAnsiGlyph), ''); // one glyph of the run
-      if KarRunCount > 1 then
+      EmitBatch(Length(KarPressAns[KarPressN]), '');
+      AnsiMirror := LeftStr(AnsiMirror, Length(AnsiMirror) - Length(KarPressAns[KarPressN]));
+      PopKarPress;
+      if KarInkRun <> '' then
       begin
-        Dec(KarRunCount); // kar stays armed - one copy left
-        if (AnsiMirror <> '') and (Length(AnsiMirror) >= Length(KarAnsiGlyph)) then
-          AnsiMirror := LeftStr(AnsiMirror, Length(AnsiMirror) - Length(KarAnsiGlyph));
+        { earlier presses of the run are still on screen }
+        AnsiMirrorActive := True;
         Block := True;
         Exit;
       end;
-      KarAnsiGlyph := '';
+      { the screen equals Convert(PrevBanglaT) again }
+      AnsiMirrorActive := False;
+      ResetAllKarsToInactive;
+      ClearKarRun;
+      Block := True;
+      Exit;
     end;
-    { the screen now equals Convert(PrevBanglaT) again - no mirror needed }
-    AnsiMirror := '';
-    AnsiMirrorActive := False;
-    ResetAllKarsToInactive;
-    ClearKarFirstState;
-    Block := True;
-    Exit;
+
+    if KarInkRun = '' then
+    begin
+      { Unicode classic - the kar was never emitted, so the press is swallowed
+        and the letter typed before it stays: মন + ে(memory) + BS -> মন }
+      AnsiMirror := '';
+      AnsiMirrorActive := False;
+      ResetAllKarsToInactive;
+      ClearKarRun;
+      Block := True;
+      Exit;
+    end;
   end;
 
   { ANSI: a pending kar whose glyph is already on screen while the VISIBLE
     hasanta is being deleted. Remove the hasanta and keep the kar ink:
     ক + ে + ্  =  K‡~   ->   K‡   (kar still armed, buffer = 'ক') }
-  if (OutputIsBijoy = 'YES') and (KarAnsiGlyph <> '') and (Length(PrevBanglaT) >= 2) and (RightStr(PrevBanglaT, 1) = b_Hasanta) then
+  if IsAnsiClassic and (KarInkRun <> '') and (Length(PrevBanglaT) >= 2) and (RightStr(PrevBanglaT, 1) = b_Hasanta) then
   begin
     if AnsiMirrorActive then
       PrevAnsi := AnsiMirror
     else
-      PrevAnsi := ConvCached(PrevBanglaT) + KarAnsiGlyph;
+      PrevAnsi := AnsiSplice(ConvCached(PrevBanglaT));
 
     InternalBackspace(1); // drop the visible hasanta only
-    NewAnsi := Bijoy.Convert(NewBanglaText) + KarAnsiGlyph;
+    NewAnsi := AnsiSplice(ConvCached(NewBanglaText));
 
     SendAnsiDiff(PrevAnsi, NewAnsi);
     PrevBanglaT := NewBanglaText;
@@ -915,11 +1171,9 @@ begin
     end
     else
     begin
-      BijoyNewBanglaText := ConvCached(NewBanglaText);
-      { a streamed kar glyph would be orphaned - erase it together with
-        the last letter of the word }
-      if KarAnsiGlyph <> '' then
-        BijoyNewBanglaText := BijoyNewBanglaText + KarAnsiGlyph;
+      { the streamed ink would be orphaned - erase it together with the rest
+        of the word (AnsiSplice keeps it in its typed position) }
+      BijoyNewBanglaText := AnsiSplice(ConvCached(NewBanglaText));
       if Length(BijoyNewBanglaText) >= 1 then
       begin
         EmitBatch(Length(BijoyNewBanglaText), '');
@@ -950,18 +1204,19 @@ begin
       PrevBanglaT := LeftStr(PrevBanglaT, Length(PrevBanglaT) - 3) + SavedChar;
       NewBanglaText := PrevBanglaT;
       SetLastChar(SavedChar);
-      ClearKarFirstState;
+      if KarInkRun = '' then
+        ClearKarRun; // the deleted reph/phala took the buffer's kar with it
     end
     else
     begin
       { STEPWISE DELETION (GitHub behaviour, identical to the behaviour
         after a space): exactly ONE unit leaves the buffer - one code
         point, or a whole phala / reph tail. The kar-first bookkeeping
-        goes away with the deleted text; a kar that is still PENDING is
-        deliberately left alone. }
+        goes away with the deleted text; a kar that is still PENDING (or
+        still ink on screen) is deliberately left alone. }
       InternalBackspace(DeleteCount);
-      if GetActivePreBaseKar = '' then
-        ClearKarFirstState;
+      if (GetActivePreBaseKar = '') and (KarInkRun = '') then
+        ClearKarRun;
       ParseAndSendNow;
     end;
   end;
@@ -1143,7 +1398,7 @@ end;
 {
   OLD STYLE - METHOD 1 (pure in-memory delayed buffering):
   * A pre-base kar key (ে/ি/ৈ) is NOT emitted at all. It is only ARMED in
-  memory (flags + KarFirstKar/KarRunCount). The document shows nothing -
+  memory (flags + the kar press record). The document shows nothing -
   no dummy characters, no dotted circles, no font switching.
   * The NEXT pure consonant emits  consonant + kar  directly (canonical):
   ি(memory) + দ -> দি,  দ + ি(memory) + ত -> দতি.
@@ -1156,6 +1411,8 @@ end;
   and is emitted directly (স+ত+ী+ন -> সতীন).
 }
 function TGenericLayoutOld.PressPreBaseKar(const KarChar: string): string;
+var
+  mGlyph: string;
 
 { the glyph for the DETACHED visual cell, per the ACTIVE mapping:
   - word start (buffer empty): Convert(kar) = A_EKar1/A_OIKar1 form
@@ -1184,68 +1441,90 @@ function TGenericLayoutOld.PressPreBaseKar(const KarChar: string): string;
     end;
   end;
 
-{ the screen mirror while the kar is pending = the ANSI stream }
+{ the screen mirror while kar ink is live = the ANSI stream. The FIRST
+    glyph of the run also records the SEAM (anchor) the ink belongs to, so
+    every later stream can put it back in exactly the typed position. }
   procedure StreamMirrorAppend(const AGlyph: string);
   begin
     if not AnsiMirrorActive then
     begin
       AnsiMirror := ConvCached(PrevBanglaT);
+      KarAnchor := PrevBanglaT;
+      KarAnchorConv := ConvCached(PrevBanglaT);
       AnsiMirrorActive := True;
     end;
     AnsiMirror := AnsiMirror + AGlyph;
   end;
 
-  procedure StreamMirrorShrink(const AGlyph: string);
-  begin
-    if AnsiMirrorActive and (Length(AnsiMirror) >= Length(AGlyph)) then
-    begin
-      AnsiMirror := LeftStr(AnsiMirror, Length(AnsiMirror) - Length(AGlyph));
-      if AnsiMirror = ConvCached(PrevBanglaT) then
-        AnsiMirrorActive := False;
-    end;
-  end;
+  { NOTE: the mirror never SHRINKS its ink any more. The old helper existed
+    only for "a different kar erases the streamed glyph" and for the ী key
+    wiping the pending run - both are gone: ink is frozen, not erased. A
+    deletion path that really must take a glyph off the screen emits the
+    backspace itself and pops the press (see DoBackspace / HandleIsolated). }
 
 begin
   if KarChar = b_IIkar then
   begin
-    { POST-BASE ী: direct emit; erase a pending STREAMED kar glyph first
-      or it orphans on screen before ী }
-    if (OutputIsBijoy = 'YES') and (GetActivePreBaseKar <> '') and (not KarConsumed) and (KarAnsiGlyph <> '') then
+    { POST-BASE ী: a normal key - it is emitted and the buffer renders it.
+      It NEVER erases a pending pre-base run any more: the run is simply
+      frozen (still on screen, still poppable) and the ী is typed after it.
+      Erasing here is what made one of the kar signs disappear completely. }
+    mGlyph := '';
+    if KarActive then
     begin
-      EmitBatch(Length(KarInkRun), ''); // the WHOLE run is on screen
-      StreamMirrorShrink(KarInkRun);
-      KarAnsiGlyph := '';
+      if IsAnsiClassic then
+        FreezeKarRun // the ink is on screen - keep it there, poppable
+      else
+      begin
+        { Unicode: the delayed run was never emitted. COMMIT it - returning
+          it makes it real text in front of the ী, exactly like the
+          double-press commit. Dropping it here is what made a typed ি
+          vanish when ী followed it. }
+        mGlyph := KarUniRun;
+        ClearKarRun;
+      end;
+      ResetAllKarsToInactive;
     end;
-    ResetAllKarsToInactive;
-    ClearKarFirstState;
-    PressPreBaseKar := KarChar;
+    PressPreBaseKar := mGlyph + KarChar;
     Exit;
   end;
 
   { SAME kar again:
-    ANSI mode  - ANSI VISUAL ORDER: every keypress is ink, so a second
-    press simply types a second kar glyph (a typewriter never
-    de-duplicates). The run is remembered (KarRunCount) - the next
-    consonant takes the LAST copy and the earlier ones stay in the
-    stream exactly where they were typed.
+    ANSI mode  - ANSI VISUAL ORDER: every keypress is ink, so a second press
+    simply types a second kar glyph (a typewriter never de-duplicates). The
+    press is remembered, so ONE backspace removes exactly ONE of them.
     Unicode    - COMMIT: emit the kar right away - it renders attached to
-    the letter just typed (ক + ি + ি -> কি). ALL kar-first
-    state is cleared and backspace deletes it normally. }
+    the letter just typed (ক + ি + ি -> কি). The run is released and
+    backspace deletes it normally. }
   if GetActivePreBaseKar = KarChar then
   begin
-    if OutputIsBijoy = 'YES' then
+    if IsAnsiClassic then
     begin
-      Inc(KarRunCount);                 // one more copy is on screen
-      StreamMirrorAppend(KarAnsiGlyph); // same glyph - typed again
-      EmitBatch(0, KarAnsiGlyph);
+      mGlyph := KarPressAns[KarPressN]; // the glyph of THIS kar (before pushing)
+      PushKarPress(KarChar, mGlyph);
+      StreamMirrorAppend(mGlyph);
+      EmitBatch(0, mGlyph);
       PressPreBaseKar := '';
       Exit;
     end;
     ResetAllKarsToInactive;
-    ClearKarFirstState;
+    ClearKarRun;
     PressPreBaseKar := KarChar; // Unicode: EMIT now - attaches instantly
     Exit;
   end;
+
+  { a DIFFERENT PRE-BASE kar key while a run is live:
+    ANSI    - APPEND. Every press is ink and nothing the user typed may
+    disappear; the earlier presses stay on screen as frozen ink
+    (ক + ে + ি -> K‡w, two poppable presses).
+    Unicode - REPLACE the pending one: it was never visible (the classic
+    delayed buffer holds it), so replacing it loses nothing the user can
+    see. The POST-BASE ী above is the opposite case and COMMITS instead,
+    because it is emitted immediately and cannot take the pending slot. }
+  if IsAnsiClassic and KarActive then
+    FreezeKarRun
+  else
+    ClearKarRun;
 
   ResetAllKarsToInactive;
   if KarChar = b_Ekar then
@@ -1255,33 +1534,27 @@ begin
   else if KarChar = b_OIkar then
     OIKarActive := True;
 
-  KarFirstKar := KarChar; // remembered for backspace un-reorder
-  UnwindConjunct := False;
-  KarConsumed := False; // pending - no consonant took it yet
-  KarRunCount := 1;     // one copy
+  KarCanBind := True; // this press is the one a consonant may take
+  KarFrozen := False;
 
-  if OutputIsBijoy = 'YES' then
+  if IsAnsiClassic then
   begin
     { ANSI ZERO-FLICKER VISUAL STREAM: the kar NEVER enters the Unicode
-      buffer. Its glyph goes straight to the screen (typewriter stream,
-      left to right) with the mapping-correct variant (সাধারণ at a word
-      start, ঝুলন্ত after a letter). A DIFFERENT pending kar first erases
-      its streamed glyph in place (ক [ে] -> ক [ি]). AnsiMirror carries
-      the screen truth, so when the consonant arrives and the syllable
-      binds (করে -> Convert = K‡v), the diff against K‡ appends ONLY the
-      consonant glyph - zero backspaces, zero visual jumping. }
-    if KarAnsiGlyph <> '' then
-    begin
-      EmitBatch(Length(KarInkRun), ''); // wipe every copy of the other kar
-      StreamMirrorShrink(KarInkRun);
-    end;
-    KarAnsiGlyph := StreamGlyph(KarChar);
-    StreamMirrorAppend(KarAnsiGlyph);
-    EmitBatch(0, KarAnsiGlyph);
+      buffer. Its glyph goes straight to the screen (typewriter stream, left
+      to right) with the mapping-correct variant (সাধারণ at a word start,
+      ঝুলন্ত after a letter). AnsiMirror carries the screen truth, so when
+      the consonant arrives and the syllable binds (করে -> Convert = K‡v) the
+      diff APPENDS ONLY the consonant glyph - zero backspaces, zero visual
+      jumping. }
+    PushKarPress(KarChar, StreamGlyph(KarChar));
+    StreamMirrorAppend(KarPressAns[KarPressN]);
+    EmitBatch(0, KarPressAns[KarPressN]);
     PressPreBaseKar := '';
     Exit;
   end;
-  PressPreBaseKar := ''; // Unicode METHOD 1: emit NOTHING
+
+  PushKarPress(KarChar, ''); // Unicode METHOD 1: emit NOTHING
+  PressPreBaseKar := '';
 end;
 
 { =============================================================================== }
@@ -1316,27 +1589,28 @@ end;
 }
 function TGenericLayoutOld.ResolveHasantaVowelPrefix(const PendingKar: string): string;
 begin
-  if (KarFirstKar <> '') and (not KarConsumed) and (NewBanglaText <> '') then
+  if KarActive and (NewBanglaText <> '') then
   begin
     // kar run (possibly attached) right before the hasanta
-    if (Length(NewBanglaText) >= KarRunCount + 1) and (RightStr(NewBanglaText, KarRunCount + 1) = DupeString(KarFirstKar, KarRunCount) + b_Hasanta) then
+    if (Length(NewBanglaText) >= KarPressN + 1) and (RightStr(NewBanglaText, KarPressN + 1) = KarUniRun + b_Hasanta) then
     begin
-      if (Length(NewBanglaText) >= KarRunCount + 2) and IsPureConsonent(NewBanglaText[Length(NewBanglaText) - KarRunCount - 1]) then
+      if (Length(NewBanglaText) >= KarPressN + 2) and IsPureConsonent(NewBanglaText[Length(NewBanglaText) - KarPressN - 1]) then
       begin
         // ATTACHED (করে + ্): keep the kar on its consonant, drop the hasanta
         InternalBackspace(1);
-        KarConsumed := True;
-        KarAnsiGlyph := ''; // reset so next kar won't issue false backspace
-        KarRunCount := 1;
-        UnwindConjunct := False;
+        // the kar is a real buffer character now - the screen ink (if any) is
+        // rendered by the buffer, so it simply stops being a pending press
+        ClearKarRun;
+        AnsiMirrorActive := False;
         Result := '';
         Exit;
       end
       else
       begin
         // BARE (ে + ্ at word start): drop the whole run + hasanta
-        InternalBackspace(KarRunCount + 1);
-        ClearKarFirstState;
+        InternalBackspace(KarPressN + 1);
+        ClearKarRun;
+        AnsiMirrorActive := False;
         Result := '';
         Exit;
       end;
@@ -1346,7 +1620,8 @@ begin
     if RightStr(NewBanglaText, 1) = b_Hasanta then
     begin
       InternalBackspace(1);
-      ClearKarFirstState;
+      ClearKarRun;
+      AnsiMirrorActive := False;
       Result := '';
       Exit;
     end;
@@ -1362,19 +1637,20 @@ function TGenericLayoutOld.MyProcessVKeyDown(const KeyCode: Integer; var Block: 
   const var_IsLogicalShift, var_IsTrueShift, var_IsAltGr: Boolean): string;
 var
   CharForKey, tmpString, PendingKar: string;
-  ArmedKar, mKar:                    string;
+  ArmedKar, LastKar, mKar:           string;
   KarInBuffer:                       Boolean;
+  KeepFrozenInk:                     Boolean;
   IsRephTailCtx:                     Boolean;
 begin
+  KeepFrozenInk := False;
 
-  if AvroMainForm1.GetMyCurrentKeyboardMode = SysDefault then
+  if not IsBanglaMode then
   begin
-
     Block := False;
     MyProcessVKeyDown := '';
     Exit;
   end
-  else if AvroMainForm1.GetMyCurrentKeyboardMode = bangla then
+  else if IsBanglaMode then
   begin
     CharForKey := GetCharForKey(KeyCode, var_IsLogicalShift, var_IsTrueShift, var_IsAltGr);
     if LastChar = b_Hasanta then
@@ -1399,7 +1675,7 @@ begin
         are untouched.) }
       IsRephTailCtx := (LastChars[2] = b_R) and (LastChars[3] <> b_Hasanta) and (LastChars[3] <> ' ') and (CharForKey <> b_Ikar);
 
-      if (not IsRephTailCtx) or ((KarFirstKar <> '') and (not KarConsumed)) or ((CharForKey <> b_Ekar) and (CharForKey <> b_Ikar) and (CharForKey <> b_OIkar))
+      if (not IsRephTailCtx) or KarBindable or ((CharForKey <> b_Ekar) and (CharForKey <> b_Ikar) and (CharForKey <> b_OIkar))
       then
       begin
 
@@ -1417,7 +1693,7 @@ begin
           else
             mKar := b_OUkar;
           ResetAllKarsToInactive;
-          ClearKarFirstState;
+          ClearKarRun;
           MyProcessVKeyDown := mKar + b_Chandra;
           Exit;
         end;
@@ -1597,30 +1873,33 @@ begin
         { OLD STYLE: the kar STAYS VISIBLE (typewriter ink). The hasanta
           only marks a pending conjunct while the kar waits for the next
           consonant: করে + ্ shows করে্, and ম completes it to কর্মে }
-        EKarActive := True;
-        KarFirstKar := b_Ekar;
-        UnwindConjunct := False;
-        KarConsumed := False; // reserved for the next consonant
+        if KarPressN = 0 then
+          PushKarPress(b_Ekar, ''); // the BUFFER owns this kar - no ink to stream
+        ArmPreBaseFlag(b_Ekar);
+        KarCanBind := True;
+        KarFrozen := False;
         MyProcessVKeyDown := b_Hasanta;
         Exit;
       end
       else if LastChar = b_Ikar then
       begin
         { OLD STYLE: the kar STAYS VISIBLE (typewriter ink) - see b_Ekar }
-        IKarActive := True;
-        KarFirstKar := b_Ikar;
-        UnwindConjunct := False;
-        KarConsumed := False; // reserved for the next consonant
+        if KarPressN = 0 then
+          PushKarPress(b_Ikar, '');
+        ArmPreBaseFlag(b_Ikar);
+        KarCanBind := True;
+        KarFrozen := False;
         MyProcessVKeyDown := b_Hasanta;
         Exit;
       end
       else if LastChar = b_OIkar then
       begin
         { OLD STYLE: the kar STAYS VISIBLE (typewriter ink) - see b_Ekar }
-        OIKarActive := True;
-        KarFirstKar := b_OIkar;
-        UnwindConjunct := False;
-        KarConsumed := False; // reserved for the next consonant
+        if KarPressN = 0 then
+          PushKarPress(b_OIkar, '');
+        ArmPreBaseFlag(b_OIkar);
+        KarCanBind := True;
+        KarFrozen := False;
         MyProcessVKeyDown := b_Hasanta;
         Exit;
       end
@@ -1642,21 +1921,21 @@ begin
     if (KeyCode = VK_RETURN) or (KeyCode = VK_SPACE) or (KeyCode = VK_TAB) then
     begin
       ArmedKar := GetActivePreBaseKar;
-      if (ArmedKar <> '') and (not KarConsumed) then
+      if (ArmedKar <> '') and KarActive then
       begin
-        if OutputIsBijoy = 'YES' then
+        if IsAnsiClassic then
         begin
-          { ANSI: the streamed kar glyph stays as typed ink before the
-            delimiter - just disarm (the mirrors reset with the word) }
+          { ANSI: the streamed glyphs ARE the typed ink and stay before the
+            delimiter. Freeze them - nothing is emitted, nothing is erased,
+            the screen already shows exactly what the user typed. }
+          FreezeKarRun;
           ResetAllKarsToInactive;
-          ClearKarFirstState;
-          KarAnsiGlyph := '';
         end
         else
         begin
-          mKar := DupeString(ArmedKar, KarRunCount);
+          mKar := KarUniRun;
           ResetAllKarsToInactive;
-          ClearKarFirstState;
+          ClearKarRun;
           EmitBatch(0, mKar); // visible before the delimiter
           PrevBanglaT := PrevBanglaT + mKar;
           NewBanglaText := PrevBanglaT;
@@ -1703,24 +1982,21 @@ begin
           { OLD STYLE: a kar typed first sits before a pending hasanta
             (জি্). A consonant now completes the conjunct and the kar
             re-forms AFTER it: জি্ + ব -> জ্বি }
-          if (KarFirstKar <> '') and (KarRunCount >= 1) and (Length(NewBanglaText) >= KarRunCount + 1) and
-            (RightStr(NewBanglaText, KarRunCount + 1) = DupeString(KarFirstKar, KarRunCount) + b_Hasanta) and (Length(CharForKey) = 1) and
-            IsPureConsonent(CharForKey) then
+          if KarActive and (Length(NewBanglaText) >= KarPressN + 1) and (RightStr(NewBanglaText, KarPressN + 1) = KarUniRun + b_Hasanta) and
+            (Length(CharForKey) = 1) and IsPureConsonent(CharForKey) then
           begin
             { Only the LAST kar of the hidden run goes with the consonant;
               earlier copies stay in the buffer before it, in typed order
               (িি + ্ + ব -> ি + ্বি) }
+            LastKar := KarPressUni[KarPressN];
             InternalBackspace(2); // visible kar + hasanta (both were emitted)
             if (NewBanglaText <> '') and (RightStr(NewBanglaText, 1) = b_Hasanta) then
               InternalBackspace(1); // absorb an earlier (reph) hasanta into the new conjunct
             ResetAllKarsToInactive; // the kar is SPENT on this consonant - the next
             // consonant must not pull it again
             // (জ্বি + ত -> জ্বিত, NOT জ্বতি)
-            UnwindConjunct := True;
-            KarConsumed := True;
-            KarRunCount := 1;
-            KarAnsiGlyph := ''; // reset: consonant consumed the kar
-            MyProcessVKeyDown := b_Hasanta + CharForKey + KarFirstKar;
+            ClearKarRun; // consonant consumed the kar - the buffer owns it now
+            MyProcessVKeyDown := b_Hasanta + CharForKey + LastKar;
             Exit;
           end;
 
@@ -1728,15 +2004,15 @@ begin
           begin
             { OLD STYLE METHOD 1: a pre-base kar is pending IN MEMORY
               (nothing was emitted for it). Route the incoming key: }
-            KarInBuffer := (not KarConsumed) and (NewBanglaText <> '') and (RightStr(NewBanglaText, 1) = ArmedKar);
+            KarInBuffer := KarCanBind and (NewBanglaText <> '') and (RightStr(NewBanglaText, 1) = ArmedKar);
 
             { ে(memory) + া -> ো   /   ে(memory) + ৗ -> ৌ :
               compose directly - there is no dummy character to delete }
             if (ArmedKar = b_Ekar) and (CharForKey = b_AAkar) then
             begin
               ResetAllKarsToInactive;
-              ClearKarFirstState;
-              KarAnsiGlyph := ''; // ে+া -> ো composes the streamed glyph away
+              ClearKarRun; // ে+া -> ো composes the streamed glyph away
+              AnsiMirrorActive := False;
               if (NewBanglaText <> '') and (RightStr(NewBanglaText, 1) = b_Hasanta) then
                 InternalBackspace(1); // pending hasanta joins the vowel
               MyProcessVKeyDown := b_Okar;
@@ -1745,8 +2021,8 @@ begin
             else if (ArmedKar = b_Ekar) and (CharForKey = b_LengthMark) then
             begin
               ResetAllKarsToInactive;
-              ClearKarFirstState;
-              KarAnsiGlyph := ''; // ে+ৗ -> ৌ composes the streamed glyph away
+              ClearKarRun; // ে+ৗ -> ৌ composes the streamed glyph away
+              AnsiMirrorActive := False;
               if (NewBanglaText <> '') and (RightStr(NewBanglaText, 1) = b_Hasanta) then
                 InternalBackspace(1);
               MyProcessVKeyDown := b_OUkar;
@@ -1754,25 +2030,26 @@ begin
             end
             else if (Length(CharForKey) = 1) and IsPureConsonent(CharForKey) then
             begin
-              { THE NEXT CONSONANT: emit consonant + kar in canonical order.
-                The kar becomes visible for the first time, already attached. }
+              { THE NEXT CONSONANT: only the LAST press binds. Earlier
+                presses of the run re-appear through Convert in exactly the
+                order they were typed, so the stream is a pure APPEND:
+                ি ি + ক -> buffer 'িকি' -> Conv 'ििK' = ink + 'K'  (0 BS)
+                ি ে + ক -> buffer 'িকে' -> Conv 'ि‡K' = ink + 'K'  (0 BS) }
               ResetAllKarsToInactive;
-              KarFirstKar := ArmedKar; { consumed by this reorder - remembered for un-reorder }
-              KarConsumed := True;
+              KarCanBind := True;
               if (NewBanglaText <> '') and (RightStr(NewBanglaText, 1) = b_Hasanta) then
               begin
                 { hidden behind a pending hasanta: the hasanta joins the
                   new conjunct (ে + ্ + ম -> ্মে, ি + ্ + ব -> ্বি).
-                  ANSI: the kar is ALSO in the buffer (visible ink right
-                  before the hasanta, e.g. জি্ after a peel) - it joins
-                  the conjunct too: জি্ + ব -> জ্বি }
-                if (OutputIsBijoy = 'YES') and (Length(NewBanglaText) >= KarRunCount + 1) and
-                  (RightStr(NewBanglaText, KarRunCount + 1) = DupeString(ArmedKar, KarRunCount) + b_Hasanta) then
-                  InternalBackspace(KarRunCount + 1)
+                  ANSI: when the run has no ink of its own it is ALSO in the
+                  buffer (visible right before the hasanta, e.g. জি্ after a
+                  peel) - it joins the conjunct too: জি্ + ব -> জ্বি }
+                if IsAnsiClassic and (KarInkRun = '') and (Length(NewBanglaText) >= KarPressN + 1) and
+                  (RightStr(NewBanglaText, KarPressN + 1) = KarUniRun + b_Hasanta) then
+                  InternalBackspace(KarPressN + 1)
                 else
                   InternalBackspace(1);
-                UnwindConjunct := True;
-                MyProcessVKeyDown := DupeString(ArmedKar, KarRunCount - 1) + b_Hasanta + CharForKey + ArmedKar;
+                MyProcessVKeyDown := KarUniRun(True) + b_Hasanta + CharForKey + ArmedKar;
               end
               else if KarInBuffer then
               begin
@@ -1780,36 +2057,72 @@ begin
                   attach, কি - Unicode). It stays attached to its own
                   letter; the pending kar belongs to the NEW consonant:
                   ক + ি + ি + ত -> কি + তি = কিতি }
-                UnwindConjunct := False;
                 MyProcessVKeyDown := CharForKey + ArmedKar;
+              end
+              else if IsAnsiClassic and (KarPressN > 1) then
+              begin
+                { ANSI, run of several presses: the earlier presses are
+                  ALREADY ink on screen. Only the LAST press binds - the
+                  buffer gets consonant + kar (canonical), the earlier marks
+                  stay exactly where the user typed them. Pushing them into
+                  the buffer would make Convert() pull them in front of the
+                  consonant (ReArrangeKars) and force a whole-head erase +
+                  retype of the composition. }
+                MyProcessVKeyDown := CharForKey + ArmedKar;
+                PopKarPress; // the last press is owned by the buffer now
+                KeepFrozenInk := KarPressN > 0;
               end
               else
               begin
-                { pure in-memory: nothing to delete, nothing was on screen;
-                  earlier copies of the run flush before the consonant }
-                UnwindConjunct := False;
-                MyProcessVKeyDown := DupeString(ArmedKar, KarRunCount - 1) + CharForKey + ArmedKar;
+                { pure in-memory (Unicode / single ANSI press): nothing to
+                  delete, nothing was on screen; earlier presses of the run
+                  flush before the consonant }
+                MyProcessVKeyDown := KarUniRun(True) + CharForKey + ArmedKar;
               end;
-              KarAnsiGlyph := ''; // reset: consonant owns the screen now
-              KarRunCount := 1;
+              if not KeepFrozenInk then
+                ClearKarRun; // consonant owns the screen now
               Exit;
             end
             else if CharForKey = b_R + b_Hasanta then
             begin
               { reph key: Unicode flushes the pending kar standalone
-                first, then the reph; ANSI keeps the buffered (visible)
-                kar as-is and never duplicates it }
-              if OutputIsBijoy = 'YES' then
-                mKar := ''
+                first, then the reph; ANSI keeps the (visible) ink as-is and
+                never duplicates it - the reph is typed after the ink }
+              if IsAnsiClassic then
+              begin
+                mKar := '';
+                FreezeKarRun;
+              end
               else
-                mKar := DupeString(ArmedKar, KarRunCount);
+              begin
+                mKar := KarUniRun;
+                ClearKarRun;
+              end;
               ResetAllKarsToInactive;
-              ClearKarFirstState;
               MyProcessVKeyDown := mKar + InsertReph;
               Exit;
             end
             else if CharForKey = '' then
             begin
+              { unmapped key: the word ends here.
+                ANSI    - the ink is already on screen as previous-word ink
+                (exactly like after a space): freeze it so it stays there and
+                stays poppable, then let the record go with the word instead
+                of leaving a stale mirror behind.
+                Unicode - the delayed run was never emitted: COMMIT it as
+                standalone text first, exactly like a space does, so a kar
+                typed before the key does not vanish without a trace. }
+              if IsAnsiClassic then
+                FreezeKarRun
+              else if KarActive then
+              begin
+                mKar := KarUniRun;
+                ClearKarRun;
+                ResetAllKarsToInactive;
+                EmitBatch(0, mKar);
+                PrevBanglaT := PrevBanglaT + mKar;
+                NewBanglaText := PrevBanglaT;
+              end;
               ResetLastChar;
               Block := False;
               MyProcessVKeyDown := '';
@@ -1818,15 +2131,24 @@ begin
             else
             begin
               { NON-CONSONANT (punctuation, digit, vowel letter/sign ...):
-                Unicode flushes the pending kar as a standalone character
-                first (ি + '-' -> ি-). ANSI: the kar is ALREADY in the
-                buffer (visible ink) - never duplicate it, just the key }
-              if OutputIsBijoy = 'YES' then
-                mKar := ''
+                the pending kar run is COMMITTED here, it is never erased.
+                Unicode - the delayed run becomes standalone text first
+                (ি + '-' -> ি-).
+                ANSI    - the glyphs are already ink on screen; they simply
+                stop waiting for a consonant, stay poppable, and the key
+                follows them - the stream diff is a pure append, so not a
+                single SendBackSpace is issued for the aborted sequence. }
+              if IsAnsiClassic then
+              begin
+                FreezeKarRun;
+                mKar := '';
+              end
               else
-                mKar := DupeString(ArmedKar, KarRunCount);
+              begin
+                mKar := KarUniRun;
+                ClearKarRun;
+              end;
               ResetAllKarsToInactive;
-              ClearKarFirstState;
               MyProcessVKeyDown := mKar + CharForKey;
               Exit;
             end;
@@ -1931,12 +2253,12 @@ procedure TGenericLayoutOld.MyProcessVKeyUP(const KeyCode: Integer; var Block: B
 var
   CharForKey: string;
 begin
-  if AvroMainForm1.GetMyCurrentKeyboardMode = SysDefault then
+  if not IsBanglaMode then
   begin
     Block := False;
     Exit;
   end
-  else if AvroMainForm1.GetMyCurrentKeyboardMode = bangla then
+  else if IsBanglaMode then
   begin
     CharForKey := GetCharForKey(KeyCode, var_IsLogicalShift, var_IsTrueShift, var_IsAltGr);
 
@@ -1960,7 +2282,6 @@ procedure TGenericLayoutOld.ParseAndSendNow;
 var
   Matched, UnMatched:                   Integer;
   BijoyPrevBanglaT, BijoyNewBanglaText: string;
-  PrevConv:                             string;
 begin
   Matched := 0;
 
@@ -1988,34 +2309,30 @@ begin
   else
   begin
     { Output to Bijoy }
-    { ZERO-FLICKER STREAM: while a streamed kar is pending, the screen
-      mirror is the ANSI STREAM kept by the kar press - the pending kar
-      is deliberately NOT in the Unicode buffer, so Convert(PrevBanglaT)
-      would NOT describe the screen }
+    { ZERO-FLICKER STREAM: while kar ink is live, the screen mirror is the
+      ANSI stream kept by the kar press - the ink is deliberately NOT in the
+      Unicode buffer, so Convert(PrevBanglaT) would NOT describe the screen }
     if AnsiMirrorActive then
       BijoyPrevBanglaT := AnsiMirror
     else
       BijoyPrevBanglaT := ConvCached(PrevBanglaT);
-    BijoyNewBanglaText := ConvCached(NewBanglaText);
 
-    { a kar glyph is STILL pending on screen: keep it inside the stream so
-      that typing after it (্, a vowel sign, a digit ...) does not erase
-      it, and a later backspace can remove exactly that one glyph.
-      * text appended -> the ink keeps the position it was streamed at
-      * text shrank   -> the ink trails at the end of the stream }
-    if KarAnsiGlyph <> '' then
+    { EVERY stream the buffer produces goes through the ONE splice point, so
+      ink typed before the current key keeps the position it was typed at and
+      the diff stays append-only:
+      ি(ink) + '-'  ->  ি-   with ZERO backspaces, whatever the buffer holds.
+      The previous version spliced ONE glyph at the conversion of the CURRENT
+      buffer, which sent the whole tail through erase-and-retype as soon as a
+      key had been typed after the ink. }
+    BijoyNewBanglaText := AnsiSplice(ConvCached(NewBanglaText));
+
+    if KarInkRun <> '' then
     begin
-      { OPTIMISED: one conversion instead of three identical ones }
-      PrevConv := ConvCached(PrevBanglaT);
-      if (PrevBanglaT <> '') and (Pos(PrevConv, BijoyNewBanglaText) = 1) then
-        BijoyNewBanglaText := PrevConv + KarAnsiGlyph + Copy(BijoyNewBanglaText, Length(PrevConv) + 1, MaxInt)
-      else
-        BijoyNewBanglaText := BijoyNewBanglaText + KarAnsiGlyph;
       AnsiMirror := BijoyNewBanglaText;
       AnsiMirrorActive := True;
     end
     else
-      AnsiMirrorActive := False; // the stream window closes on every send
+      AnsiMirrorActive := False; // the stream window closes when the run is empty
 
     if BijoyPrevBanglaT = '' then
     begin
@@ -2073,10 +2390,16 @@ begin
   // OLD STYLE: a floating pre-base kar (ে/ি/ী/ৈ just pressed) belongs to the
   // word being typed - never divert it to the isolated engine, so kar-first
   // typing always starts a fresh word. Other modifiers keep old behaviour.
+  //
+  // KarInkRun = '' is the same rule one step further: ink that has already
+  // been STREAMED to the screen (a frozen kar run, e.g. িিিি) is still the
+  // word being typed. Without this guard the isolated engine sniffed our own
+  // glyph, resolved "glyph + ী" as a replacement and sent one backspace that
+  // ate the last ি.
   IsoChainCont := (LastIsoContext <> '') and (RightStr(LastIsoContext, 1) = b_Hasanta) and (Length(m_Str) = 1) and (Ord(m_Str[1]) >= $0980);
 
   if (m_Str <> '') and (not uCaretContextSniffer.SniffingActive) and (OutputIsBijoy = 'YES') and (NewBanglaText = '') and (GetActivePreBaseKar = '') and
-    (IsModifierOrJoiner(m_Str) or IsoChainCont) then
+    (KarInkRun = '') and (IsModifierOrJoiner(m_Str) or IsoChainCont) then
   begin
     if HandleIsolatedModifier(m_Str) then
     begin
@@ -2106,6 +2429,15 @@ begin
   end;
 
   Block := m_Block;
+
+  { Block = False hands this key to the host, which inserts its character
+    itself. We deliberately do NOT drain the deferred emit queue here even
+    though a queued glyph would then reach the screen behind that character:
+    FlushEmit calls SendInput, and the AVRO_DEFER_EMIT note above explains why
+    that must never happen inside the hook callback. The queue is a FIFO that
+    the main loop drains microseconds after we return, so the ink is on screen
+    before the next keystroke in every realistically reachable case. }
+
   ProcessVKeyDown := '';
 end;
 
@@ -2156,6 +2488,10 @@ procedure TGenericLayoutOld.ResetLastChar;
 var
   I: Integer;
 begin
+  { NOTE: on-screen ANSI ink belongs to the word that just ended; the record
+    is dropped here, so the glyphs simply stay as previous-word text (exactly
+    like a word typed before a space). Callers that still need them (the
+    unmapped-key path) freeze them first. }
   // Save committed context before clearing (soft reset)
   if PrevBanglaT <> '' then
   begin
@@ -2171,10 +2507,9 @@ begin
   IsAtWordBoundary := True;
   ClearIsoState;
   SpacePendingCount := 0;
-  ClearKarFirstState;
+  ClearKarRun;
   AnsiMirrorActive := False;
   AnsiMirror := '';
-  KarAnsiGlyph := '';
   FConvSrc := ''; // the conversion memo dies with the word
   FConvAnsi := '';
 
@@ -2213,15 +2548,25 @@ begin
   if Bijoy = nil then
     Exit;
 
-  { Hasanta after a space starts a new word — don't treat as isolated modifier }
-  if (SpacePendingCount > 0) and (Length(ModifierStr) = 1) and (ModifierStr[1] = b_Hasanta) then
+  { A delimiter the host just typed is a HARD word boundary: a modifier typed
+    after it belongs to the NEW word, so nothing may cross the space. Crossing
+    it used to erase the space ("space then ে -> attach to the previous word")
+    and pull the kar to the left. The hasanta case already refused to cross -
+    that rule now covers every modifier, which is the only consistent reading
+    of "space = word boundary". SpacePendingCount survives for the backspace
+    bookkeeping in DoBackspace. }
+  if SpacePendingCount > 0 then
+    Exit;
+
+  { Our own streamed ANSI ink is the word being typed, never a foreign
+    context: composing over it is what ate the last pre-base kar when a kar
+    followed a kar run. }
+  if KarInkRun <> '' then
     Exit;
 
   { --- 1. Establish PrecedingContext --- }
   if LastIsoContext <> '' then
     Ctx := LastIsoContext // chained isolated emission (ক -> ক্ -> ক্র)
-  else if (SpacePendingCount > 0) and (LastCommittedUnicode <> '') then
-    Ctx := LastCommittedUnicode // cross our own delimiter(s)
   else
   begin
     if not SniffCharBeforeCaret(Sniffed, Kind) then
@@ -2241,8 +2586,6 @@ begin
     Exit;
 
   { --- 3. Emit with exact diff counts --- }
-  if SpacePendingCount > 0 then
-    EmitBatch(SpacePendingCount, ''); // remove only our delimiter(s)
   if EraseCount > 0 then
     EmitBatch(EraseCount, ''); // replace the default/context glyph
   EmitBatch(0, ResolvedAnsi);
@@ -2269,7 +2612,6 @@ begin
   else
     LastIsoContext := '';
 
-  SpacePendingCount := 0;
   IsAtWordBoundary := False;
   Result := True;
 end;

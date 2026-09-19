@@ -11,50 +11,36 @@ unit DebugLog;
 
 interface
 
-uses
-  Windows,
-  System.SysUtils,
-  System.SyncObjs;
+{
+  DIAGNOSTIC SINK - touches no file, ever.
 
+  Log() used to AssignFile / Append / Rewrite / WriteLn / CloseFile
+  %TEMP%\AvroKeyboard_debug.log on EVERY call (measured at ~8.5 ms, and the
+  keyboard hook called it from hot paths), and it left behind a file that
+  recorded what the user typed. That disk I/O, the global lock that serialised
+  it, and the file itself are all gone: the message now goes to the debugger
+  via OutputDebugString, which is free when no debugger is attached.
+
+  The DebugLog define in ProjectDefines.inc is the switch, and it is OFF now -
+  with it off the body below compiles away entirely, so every Log() call in the
+  project costs one empty call and only the string arguments are built. To see
+  the lines live, uncomment that define and attach DebugView; no log file is
+  produced either way.
+}
 procedure Log(const Msg: string); overload;
 procedure Log(const Msg: string; i: LongInt); overload;
 
 implementation
 
-var
-  LogFileLock: TCriticalSection;
-
-function LogFilePath: string;
-begin
-  Result := IncludeTrailingPathDelimiter(GetEnvironmentVariable('TEMP')) +
-    'AvroKeyboard_debug.log';
-end;
+uses
+  Winapi.Windows,
+  System.SysUtils;
 
 procedure Log(const Msg: string);
-var
-  F: TextFile;
-  Line: string;
 begin
   {$IFDEF DebugLog}
-  Line := Format('[%d.%03d T%d] %s',
-    [GetTickCount div 1000, GetTickCount mod 1000,
-     GetCurrentThreadId, Msg]);
-  OutputDebugString(PChar(Line));
-  LogFileLock.Enter;
-  try
-    AssignFile(F, LogFilePath);
-    try
-      if FileExists(LogFilePath) then
-        Append(F)
-      else
-        Rewrite(F);
-      WriteLn(F, Line);
-    finally
-      CloseFile(F);
-    end;
-  finally
-    LogFileLock.Leave;
-  end;
+  OutputDebugString(PChar(Format('[%d.%03d T%d] %s',
+    [GetTickCount div 1000, GetTickCount mod 1000, GetCurrentThreadId, Msg])));
   {$ENDIF}
 end;
 
@@ -62,11 +48,5 @@ procedure Log(const Msg: string; i: LongInt);
 begin
   Log(Msg + IntToStr(i));
 end;
-
-initialization
-  LogFileLock := TCriticalSection.Create;
-
-finalization
-  FreeAndNil(LogFileLock);
 
 end.

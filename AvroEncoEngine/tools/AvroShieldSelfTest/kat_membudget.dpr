@@ -69,9 +69,12 @@ const
   BUDGET_ALL_ICONS_HEAP = 2 * 1024 * 1024;
   { 200 switches between the live engine and the parked one.
 
-    Deliberately generous, because the honest floor is DebugLog: each switch
-    writes one log line, and DebugLog opens, appends and closes a file per line
-    (measured ~8 ms, printed by this gate as "200 log lines cost ..."). The
+    Deliberately generous, and now looser than it needs to be: the floor used
+    to be DebugLog - each switch wrote one log line and DebugLog opened,
+    appended and closed a file per line, measured ~8 ms and printed by this
+    gate as "200 log lines cost ...". That sink is file-free and compiled out
+    now (see DebugLog), so the probe below reports ~0 ms and the 2500 ms here
+    no longer trips on a re-introduced log line. The
     assertion this budget really makes is "no switch in that loop did disk
     I/O, decryption or parsing" - a cold parse is ~60 ms, so anything that
     started parsing would blow through this by an order of magnitude. The
@@ -250,9 +253,9 @@ begin
 
       // ---- 5. warm switching stays O(1) -----------------------------------
       WarmName := 'Default';
-      // The switch path logs through DebugLog, which appends to a file on
-      // every line. Measure that floor separately so the budget judges the
-      // cache and not the logger.
+      // The switch path used to log through DebugLog, which appended to a file
+      // on every line. Measure that floor separately so the budget judges the
+      // cache and not the logger - it is ~0 now that the sink writes no file.
       SW := TStopwatch.StartNew;
       for I := 0 to 199 do
         Log('membudget: logging cost probe');
@@ -280,7 +283,7 @@ begin
         'warm=' + IntToStr(AnsiEngineManager.WarmEngineCount));
       // Relative check: a warm switch must be a small fraction of a cold one,
       // i.e. it does no decryption, no disk I/O and no parsing. An absolute
-      // budget would mostly measure DebugLog's per-line file append.
+      // budget would mostly have measured DebugLog's per-line file append.
       Check('a warm switch is a fraction of a cold one',
         (ColdMs > 0) and ((WarmMs div 200) * 4 <= ColdMs),
         'warm=' + IntToStr(WarmMs div 200) + ' ms, cold=' + IntToStr(ColdMs) +

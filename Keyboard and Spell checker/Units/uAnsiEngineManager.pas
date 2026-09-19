@@ -952,13 +952,14 @@ begin
       ErrorLog.Free;
   end;
   // NOTHING is logged on a successful switch, here or in TrySwitchCached.
-  // DebugLog opens, appends and closes a file per line, which measured at
+  // DebugLog used to open, append and close a file per line, which measured at
   // ~8.5 ms - an order of magnitude more than the O(1) pointer moves a warm
   // switch actually costs, and this is the path a menu click or a picker
-  // selection takes. What the log keeps is every SHAPE change: parses,
-  // evictions, releases, repairs (the Log calls above) and the preload batch.
-  // Measured by kat_enginecache: 200 warm switches were 1702 ms with the
-  // transition line and a few ms without it.
+  // selection takes. The sink is file-free now, but the rule stands: what the
+  // log keeps is every SHAPE change - parses, evictions, releases, repairs
+  // (the Log calls above) and the preload batch. Measured back then by
+  // kat_enginecache: 200 warm switches were 1702 ms with the transition line
+  // and a few ms without it.
 end;
 
 function TAnsiEngineManager.TrySwitchCached(const AName: string): Boolean;

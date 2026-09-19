@@ -45,6 +45,14 @@ type
 var
   SniffingActive: Boolean = False; // reentrancy guard checked by layout engines
 
+  { TEST / EMBEDDING HOOK. While the override is
+    active the sniffer never touches a window or the clipboard: it reports
+    exactly the context the caller asked for, so the isolated-modifier engine
+    can be driven - and pinned - from a head-less test. Nothing in the shipped
+    application sets these. }
+  SniffOverrideActive: Boolean = False;
+  SniffOverride:       string  = '';
+
 // Reads one char left of the caret. Returns True when Chars is meaningful.
 function SniffCharBeforeCaret(out Chars: string; out Kind: TSniffResult): Boolean;
 
@@ -259,6 +267,26 @@ begin
   Kind := srNone;
   Chars := '';
   Result := False;
+
+  if SniffOverrideActive then
+  begin
+    { head-less test: no window, no clipboard, no reentrancy - just the
+      context the case asked for ('' = nothing usable before the caret) }
+    if SniffOverride = '' then
+      Exit;
+    Chars := SniffOverride;
+    case Chars[1] of
+      ' ', #9, #13, #10:
+        Kind := srDelimiter;
+    else
+      if (Ord(Chars[1]) >= $0980) and (Ord(Chars[1]) <= $09FF) then
+        Kind := srUnicodeChar
+      else
+        Kind := srAnsiGlyph;
+    end;
+    Result := True;
+    Exit;
+  end;
 
   if SniffingActive then
     Exit; // never reenter
