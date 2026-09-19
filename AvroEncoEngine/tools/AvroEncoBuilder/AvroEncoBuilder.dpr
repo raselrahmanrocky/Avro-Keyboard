@@ -108,7 +108,7 @@ const
 
   { The authoring files are UTF-8 with a BOM and LF line breaks. Emitting
     exactly that is what lets the unpack round trip be checked byte for byte
-    against source-mappings instead of only semantically - a much stronger
+    against the authored sources instead of only semantically - a much stronger
     gate, and the reason this is not sLineBreak (CRLF on Windows). }
   JSON_BREAK = #10;
 
@@ -634,7 +634,7 @@ end;
 
 { Developer-shaped JSON: 4-space indent, key order preserved, objects and
   arrays multi-line, empty containers inline. Deliberately the same shape the
-  authoring files in AvroEncoEngine\source-mappings use, so an unpacked
+  authoring files in assets\ use, so an unpacked
   container can be diffed against them directly. }
 function PrettyJson(const AValue: TJSONValue; AIndent: Integer): string;
 var
@@ -779,7 +779,7 @@ begin
   try
     // The icon is a build artifact of assets\icons\*.ico, not authoring
     // content. Leaving a multi-kilobyte Base64 blob in the unpacked document
-    // would make it undiffable against source-mappings, which is the only
+    // would make it undiffable against the authored sources, which is the only
     // reason --unpack exists. The next build's --icon puts it back.
     HadIcon := False;
     if Json is TJSONObject then

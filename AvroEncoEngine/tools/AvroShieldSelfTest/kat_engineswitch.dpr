@@ -33,10 +33,16 @@
    10. the application theme contract: how SYSTEM / LIGHT / DARK resolve against
        Windows' AppsUseLightTheme, the stored-setting round trip and the
        documented dark/light palettes,
-   11. the tray "Select ANSI Encoding" menu item: that it exists in the DFM
-       directly beneath "Select keyboard layout", that the DFM holds no second
-       copy of the list, and that the unit wires it into the same build and
-       checkmark-sync routines as the other two ANSI menus.
+   11. the "Select ANSI Encoding" menu items: that the tray one exists in the
+       DFM directly beneath "Select keyboard layout", that the DFM holds no
+       second copy of the list, that the unit wires it into the same build and
+       checkmark-sync routines as the other two ANSI menus, and that BOTH
+       parent items are given the active layout's badge - resolved through the
+       one icon lookup the submenu rows use, decoded at ImageList1's own 16x16
+       metric rather than from the DPI-scaled tray handle (the 20/24/32 px
+       handle is what made the list refuse it and the parent fall back to the
+       built-in icon), before the tray/TopBar split so the TopBar branch
+       refreshes too.
 
   After every step it fingerprints the LIVE engine - a corpus of kars, clusters
   and conjuncts converted through whatever engine is actually installed - and
@@ -356,6 +362,33 @@ begin
   Result := False;
 end;
 
+// The source of one routine, from its own signature line up to the first 'end;'
+// in column 0 after it (nested blocks are indented, so they cannot match).
+// Section 11 uses it so a check can say "this routine does X" instead of "the
+// file mentions X somewhere" - which is the only way to pin a call that moved
+// into, or out of, a procedure without running the GUI.
+function RoutineBody(ALines: TStrings; const ASignature: string): string;
+var
+  I, Start: Integer;
+begin
+  Result := '';
+  Start := -1;
+  for I := 0 to ALines.Count - 1 do
+    if Pos(ASignature, ALines[I]) > 0 then
+    begin
+      Start := I;
+      Break;
+    end;
+  if Start < 0 then
+    Exit;
+  for I := Start to ALines.Count - 1 do
+  begin
+    Result := Result + ALines[I] + sLineBreak;
+    if (I > Start) and (TrimRight(ALines[I]) = 'end;') then
+      Exit;
+  end;
+end;
+
 // Builds every golden with the live globals parked, so that "nothing is live"
 // (a cold start) is still reachable for the manager scenarios below.
 procedure BuildGoldens(const ADir: string; ANames: TStringList);
@@ -488,6 +521,8 @@ var
   DfmPath, PasPath, CaptionLine: string;
   TrayIdx, ItemIdx, AnsiIdx, LayoutIdx: Integer;
   Indent: Integer;
+  ParentBody, SlotBody, ToolsBody, TrayBody: string;
+  SplitPos: Integer;
   HasNestedObject: Boolean;
 begin
   Fails := 0;
@@ -865,6 +900,55 @@ begin
           '11: UpdateAnsiVersionMenuChecks marks the active version in it');
         Check(LinesContain(PasText, 'SyncAnsiVersionChecks(mnuTraySelectAnsiEncoding)'),
           '11: PopupTrayPopup re-syncs its checkmark on every popup');
+
+        // The parent badge. Both parent items carry the caption, and the badge
+        // has to be the one the checked submenu row draws - most of all on a
+        // scaled display, where the tray handle is 20/24/32 px and a 16x16
+        // image list refuses it.
+        ParentBody := RoutineBody(PasText,
+          'procedure TAvroMainForm1.ReplaceAnsiMenuParentIcon;');
+        Check(ParentBody <> '', '11: ReplaceAnsiMenuParentIcon is present');
+        Check(Pos('mnuTraySelectAnsiEncoding.ImageIndex := Slot', ParentBody) > 0,
+          '11: the tray parent item gets the active layout badge');
+        Check(Pos('AnsiVersionSubmenu1.ImageIndex := Slot', ParentBody) > 0,
+          '11: the TopBar tools parent item gets the SAME badge');
+        Check(Pos('AnsiRootIconSlot(', ParentBody) > 0,
+          '11: and it is resolved through AnsiRootIconSlot');
+        Check(Pos('ANSI_ROOT_IMAGE_INDEX = 30;', ParentBody) > 0,
+          '11: the built-in ANSI icon stays the named fallback at slot 30');
+        Check(Pos('OutputIsBijoy', ParentBody) = 0,
+          '11: the badge follows the selection like the checkmark, not the output mode');
+        Check(Pos('GetAnsiTrayIcon', ParentBody) = 0,
+          '11: the DPI-scaled tray handle is not what the parent badge is built from');
+
+        SlotBody := RoutineBody(PasText,
+          'function TAvroMainForm1.AnsiRootIconSlot(');
+        Check(SlotBody <> '', '11: AnsiRootIconSlot is present');
+        Check(Pos('GetMappingIconBytes(AName)', SlotBody) > 0,
+          '11: it resolves the one icon key the submenu badges use');
+        Check(Pos('CreateHIconAtSize(IconBytes, Cols, Rows)', SlotBody) > 0,
+          '11: the frame is decoded at ImageList1''s own metric');
+        Check(Pos('ImageList_ReplaceIcon', SlotBody) > 0,
+          '11: an appended slot is overwritten in place, not appended again');
+        Check(Pos('ExtractFileName', SlotBody) = 0,
+          '11: no second key derivation (case/space/name guessing) was added');
+        Check(not LinesContain(PasText, 'EnsureAnsiIconIndex'),
+          '11: the orphaned second icon cache from the previous refactor is gone');
+        Check(not LinesContain(PasText, 'AnsiIconIndexes'),
+          '11: ...and so is its index dictionary');
+
+        ToolsBody := RoutineBody(PasText, 'procedure TAvroMainForm1.PopupToolsPopup(');
+        Check(Pos('ReplaceAnsiMenuParentIcon', ToolsBody) > 0,
+          '11: the TopBar tools popup refreshes the parent badge on every popup');
+
+        TrayBody := RoutineBody(PasText, 'procedure TAvroMainForm1.UpdateTrayIcon;');
+        SplitPos := Pos('IsFormVisible(''TopBar'')', TrayBody);
+        Check((SplitPos > 0) and
+          (Pos('ReplaceAnsiMenuParentIcon', TrayBody) > 0) and
+          (Pos('ReplaceAnsiMenuParentIcon', TrayBody) < SplitPos),
+          '11: UpdateTrayIcon refreshes the badge BEFORE the tray/TopBar split');
+        Check(Pos('ReplaceAnsiMenuParentIcon', Copy(TrayBody, SplitPos)) = 0,
+          '11: ...so the TopBar branch refreshes it too, and never twice');
       finally
         TrayChildren.Free;
         PasText.Free;

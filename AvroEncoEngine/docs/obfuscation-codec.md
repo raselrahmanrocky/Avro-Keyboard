@@ -159,18 +159,18 @@ that is the intended direction for a format change.
 
 ```bat
 rem pack: authoring JSON -> container
-AvroEncoBuilder "AvroEncoEngine\source-mappings\Ansi V1.json" "assets\Ansi V1.AvroEnco" ^
+AvroEncoBuilder "assets\Ansi V1.json" "assets\Ansi V1.AvroEnco" ^
   --pack --default-key --format shield ^
   --secret-file keys\avroenco.key --comments-key-file keys\avrocomments.key
 
 rem unpack: container -> authoring JSON, comments restored
-AvroEncoBuilder --unpack "assets\Ansi V1.AvroEnco" "source-mappings\Ansi V1.json" ^
+AvroEncoBuilder --unpack "assets\Ansi V1.AvroEnco" "assets\Ansi V1.json" ^
   --secret-file keys\avroenco.key --comments-key-file keys\avrocomments.key
 ```
 
 `--unpack` writes exactly the authored shape: UTF-8 with BOM, LF line breaks,
 4-space indent, no trailing newline. For the four shipped mappings the output
-is **byte-identical** to `AvroEncoEngine\source-mappings\Ansi V*.json`; the gate
+is **byte-identical** to `assets\Ansi V*.json`; the gate
 below asserts that.
 
 `--pack` always runs the load-back verification with comments enabled, so a
@@ -195,25 +195,25 @@ authored documentation, `--unpack` is the export to use.
 * Both live under `keys\`, which is git-ignored. **Back the comment key up
   outside the repository.** It is never embedded anywhere, so if it is lost,
   comment text in already-built containers is unrecoverable for good; the
-  untracked `source-mappings\*.json` files are the only other record.
+  tracked `assets\Ansi V*.json` sources are the only other record.
 * Rotating the comment key means rebuilding the containers; old containers keep
   needing the old key (`--unpack` reports which key is the problem).
 
 ### Repository hygiene
 
-The plain `assets\Ansi V*.json` mirrors that used to sit next to the containers
-are no longer tracked: they were a fully legible copy of every mapping in the
-repository, which made the container protection pointless for anyone with repo
-access. The authored source is `AvroEncoEngine\source-mappings\*.json`
-(untracked, generated into locally on demand by `--unpack`), and the installer
-only ever shipped `*.AvroEnco` (`avro-setup.iss`). The conversion gate now
-takes the source folder explicitly and prefers it over any local mirror, so a
-stale mirror can no longer hide a source/container drift - which is how the
-V4 ou-kar value stayed wrong in one of them for a release.
+The authored `assets\Ansi V*.json` sources are tracked beside the containers
+they pack into, so a mapping and its packed form are reviewed and changed in one
+place. They are a fully legible copy of every mapping to anyone with repo
+access - the deliberate trade for being able to reproduce the packed artifacts
+from the repository alone. The *runtime* never reads them: the mapping scanner
+prefers `<name>.AvroEnco` over a same-named `.json`, and the installer only ever
+ships `*.AvroEnco` (`avro-setup.iss`). The conversion gate compares each
+container against the json beside it, so a source/container drift cannot hide -
+which is how the V4 ou-kar value stayed wrong in one of them for a release.
 
 ## Golden vector
 
-Input record (from `source-mappings\Ansi V1.json`):
+Input record (from `assets\Ansi V1.json`):
 
 ```json
 "A_0": { "UnicodeKey": "#$09E6", "Value": "#$0030", "Comment": "০" }

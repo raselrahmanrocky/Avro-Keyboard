@@ -81,11 +81,11 @@ var
   Fails: Integer;
   Checks: Integer;
   Quiet: Boolean;
-  // Optional reference folder for the authoring JSON
-  // (AvroEncoEngine\source-mappings). The plain mirrors that used to sit next to the
-  // containers are no longer tracked - they were a legible copy of the whole
-  // mapping sitting in the repository - so the reference is passed in
-  // explicitly instead of being picked up from the container folder.
+  // Optional reference folder for the authoring JSON. It is assets\, the folder
+  // the containers are packed from, so the reference is normally that same
+  // folder - passed in explicitly all the same, because a run that names no
+  // source at all would skip the byte-for-byte comparison silently, which is
+  // the one way a source/container drift could hide from this gate.
   SourceDir: string;
   Corpus: TArray<TCorpusCase>;
 

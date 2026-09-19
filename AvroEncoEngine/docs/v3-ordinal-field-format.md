@@ -37,7 +37,7 @@ warning list becomes empty when v3 lands.
 
 ## The validated vocabulary
 
-Extracted from the four shipped sources (`AvroEncoEngine/source-mappings`,
+Extracted from the four shipped sources (`assets/Ansi V*.json`,
 which carry a UTF-8 BOM). Union across all four files:
 
 Top-level sections (11, identical set in all four files):

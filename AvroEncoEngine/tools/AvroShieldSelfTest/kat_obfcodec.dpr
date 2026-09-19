@@ -36,7 +36,7 @@
   (kat_shield_v2.AvroEnco) keeps the legacy read path covered after every
   shipped container is rebuilt as v3.
 
-  Usage: kat_obfcodec <source-mappings-dir> <comments-key-file> [quiet]
+  Usage: kat_obfcodec <mapping-source-dir> <comments-key-file> [quiet]
   Exit code: 0 pass, 1 fail.
 }
 
@@ -575,11 +575,11 @@ begin
 
   if not TDirectory.Exists(ADir) then
   begin
-    Check('source-mappings folder exists', False, ADir);
+    Check('mapping source folder exists', False, ADir);
     Exit;
   end;
   Files := TDirectory.GetFiles(ADir, '*.json');
-  Check('source-mappings folder has JSON sources', Length(Files) > 0, ADir);
+  Check('mapping source folder has JSON sources', Length(Files) > 0, ADir);
 
   for I := 0 to Length(Files) - 1 do
   begin
@@ -727,7 +727,7 @@ begin
 
   if (SourcesDir = '') or (CommentsKeyPath = '') then
   begin
-    WriteLn('usage: kat_obfcodec <source-mappings-dir> <comments-key-file> [quiet]');
+    WriteLn('usage: kat_obfcodec <mapping-source-dir> <comments-key-file> [quiet]');
     Halt(2);
   end;
 
