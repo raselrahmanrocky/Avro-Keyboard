@@ -39,6 +39,7 @@ type
       procedure ParseAndSendNow;
       function InsertKar(const sKar: string): string;
       function InsertReph: string;
+      procedure HostEdit(const EraseCount: Integer; const Text: string);
       procedure DeleteLastCharSteps_Ex(StepCount: Integer);
       procedure SetLastChar(const wChar: string);
       procedure ResetLastChar;
@@ -67,8 +68,7 @@ uses
   KeyboardLayoutLoader,
   clsLayout,
   VirtualKeycode,
-  WindowsVersion,
-  DebugLog;
+  WindowsVersion;
 
 { =============================================================================== }
 
@@ -208,13 +208,11 @@ begin
       SavedChar := PrevBanglaT[Length(PrevBanglaT)];
       if OutputIsBijoy = 'YES' then
       begin
-        Backspace(Length(Bijoy.Convert(MidStr(PrevBanglaT, Length(PrevBanglaT) - 2, 3))));
-        SendKey_Char(Bijoy.Convert(SavedChar));
+        HostEdit(Length(Bijoy.Convert(MidStr(PrevBanglaT, Length(PrevBanglaT) - 2, 3))), Bijoy.Convert(SavedChar));
       end
       else
       begin
-        Backspace(3);
-        SendKey_Char(SavedChar);
+        HostEdit(3, SavedChar);
       end;
       PrevBanglaT := LeftStr(PrevBanglaT, Length(PrevBanglaT) - 3) + SavedChar;
       NewBanglaText := PrevBanglaT;
@@ -374,6 +372,17 @@ end;
 
 { =============================================================================== }
 
+{
+  The single place this engine writes to the host.
+}
+procedure TGenericLayoutModern.HostEdit(const EraseCount: Integer; const Text: string);
+begin
+  if EraseCount > 0 then
+    Backspace(EraseCount);
+  if Text <> '' then
+    SendKey_Char(Text);
+end;
+
 procedure TGenericLayoutModern.InternalBackspace(KeyRepeat: Integer);
 begin
   if KeyRepeat <= 0 then
@@ -426,10 +435,12 @@ begin
   begin
     CharForKey := GetCharForKey(KeyCode, var_IsLogicalShift, var_IsTrueShift, var_IsAltGr);
     // PERF/PRIVACY: no Log() here. This runs on EVERY keystroke, and DebugLog
-    // opens, appends and closes a file per line (measured: ~8 ms), so logging
-    // here cost more than the whole conversion it describes - and it wrote
-    // every keystroke to a file in %TEMP%. Same reasoning as the PERF notes in
-    // KeyboardFunctions.pas; the value is available to the debugger instead.
+    // used to open, append and close a file per line (measured: ~8 ms), so
+    // logging here cost more than the whole conversion it describes - and it
+    // wrote every keystroke to a file in %TEMP%. DebugLog touches no file any
+    // more (see its header), but the rule stands: this path stays free of
+    // string building too. Same reasoning as the PERF notes in
+    // KeyboardFunctions.pas; the value reaches the debugger instead.
 
     if VowelFormating = 'NO' then
       DeadKey := False;
@@ -854,7 +865,7 @@ begin
     { Output to Unicode }
     if PrevBanglaT = '' then
     begin
-      SendKey_Char(NewBanglaText);
+      HostEdit(0, NewBanglaText);
       PrevBanglaT := NewBanglaText;
     end
     else
@@ -868,9 +879,7 @@ begin
       end;
       UnMatched := Length(PrevBanglaT) - Matched;
 
-      if UnMatched >= 1 then
-        Backspace(UnMatched);
-      SendKey_Char(MidStr(NewBanglaText, Matched + 1, Length(NewBanglaText)));
+      HostEdit(UnMatched, MidStr(NewBanglaText, Matched + 1, Length(NewBanglaText)));
       PrevBanglaT := NewBanglaText;
     end;
 
@@ -883,7 +892,7 @@ begin
 
     if BijoyPrevBanglaT = '' then
     begin
-      SendKey_Char(BijoyNewBanglaText);
+      HostEdit(0, BijoyNewBanglaText);
       PrevBanglaT := NewBanglaText;
     end
     else
@@ -897,9 +906,7 @@ begin
       end;
       UnMatched := Length(BijoyPrevBanglaT) - Matched;
 
-      if UnMatched >= 1 then
-        Backspace(UnMatched);
-      SendKey_Char(MidStr(BijoyNewBanglaText, Matched + 1, Length(BijoyNewBanglaText)));
+      HostEdit(UnMatched, MidStr(BijoyNewBanglaText, Matched + 1, Length(BijoyNewBanglaText)));
       PrevBanglaT := NewBanglaText;
     end;
 
