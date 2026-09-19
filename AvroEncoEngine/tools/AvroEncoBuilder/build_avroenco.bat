@@ -23,7 +23,7 @@ rem  the comment key the same way but WITHOUT --out-pas:
 rem
 rem    python gen_shield_secret.py --random 44 --key-file keys\avrocomments.key
 rem
-rem  The generated containers are gated six times: kat_staticleak proves that
+rem  The generated containers are gated seven times: kat_staticleak proves that
 rem  no plaintext secret or payload leaked into them AND that the unwrapped
 rem  payload (the view an attacker has after recovering the key) carries no
 rem  legible Bengali, no '#$' literal and no authored mapping text;
@@ -38,7 +38,11 @@ rem  kat_obfcodec proves the obfuscation codec and the developer comment domain
 rem  behave (keyed metadata mask, comment text unrecoverable without the
 rem  comment key, comments skipped for free at runtime); and kat_iconsection
 rem  proves every container carries a usable per-layout icon, in a frame set
-rem  the tray and the menus actually draw at 100/125/150/200% display scaling.
+rem  the tray and the menus actually draw at 100/125/150/200% display scaling;
+rem  and kat_membudget proves the runtime side of that same economy: the startup
+rem  scan neither parses nor decrypts anything, only the activated layout's
+rem  engine stays resident, a warm switch is a pointer move rather than a
+rem  re-parse, and releasing the last parked engine actually returns its memory.
 rem
 rem  STYLE NOTE: this script uses labels and goto, never parenthesised
 rem  if-blocks. The Delphi path expands to "C:\Program Files (x86)\..."
@@ -78,15 +82,15 @@ echo   python gen_shield_secret.py --random 44 --key-file "%COMMENTKEY%"
 exit /b 1
 :havecommentkey
 
-echo [1/9] Compiling AvroEncoBuilder.exe ...
+echo [1/10] Compiling AvroEncoBuilder.exe ...
 dcc32 -CC -Q -B -NS"System;Winapi;Data;Xml;Web;Soap" -U"%UNITS%;%RTL%" AvroEncoBuilder.dpr
 if errorlevel 1 goto buildfailed
 
-echo [2/9] Building assets\Ansi V1..V4.AvroEnco from assets\Ansi V*.json (shield v3, default-key) ...
+echo [2/10] Building assets\Ansi V1..V4.AvroEnco from assets\Ansi V*.json (shield v3, default-key) ...
 for %%F in (V1 V2 V3 V4) do call :onecontainer %%F
 if errorlevel 1 goto containfailed
 
-echo [3/9] Compiling the gates ...
+echo [3/10] Compiling the gates ...
 dcc32 -CC -Q -B -NS"System;Winapi;Data;Xml;Web;Soap" -U"%UNITS%;%RTL%" "%GATEDIR%\kat_staticleak.dpr"
 if errorlevel 1 goto gatebuildfailed
 
@@ -115,7 +119,13 @@ rem  asset folder to be runnable.
 dcc32 -CC -Q -B -NS"System;Winapi;Data;Xml;Web;Soap" -U"%UNITS%;%RTL%" "%GATEDIR%\kat_iconsection.dpr"
 if errorlevel 1 goto gatebuildfailed
 
-echo [4/9] Static-leak gate over the generated containers ...
+rem  kat_membudget links the engine cache and the runtime's own stats unit, so
+rem  it needs the converter, the app's unit folders and VCL on the search path,
+rem  exactly like kat_engineswitch.
+dcc32 -CC -Q -B -I"%APP%" -NS"System;System.Win;Winapi;Vcl;Vcl.Imaging;Data;Xml;Web;Soap" -U"%UNITS%;%CONVERTER%;%APP%\Classes;%APP%\Forms;%APP%\Layout;%APP%\SpellChecker;%RTL%" "%GATEDIR%\kat_membudget.dpr"
+if errorlevel 1 goto gatebuildfailed
+
+echo [4/10] Static-leak gate over the generated containers ...
 rem  Scans both the container bytes and the unwrapped payload. The second pass
 rem  is the one that would catch a build that shipped legible mapping text or
 rem  fell back to a non-keyed obfuscation mask. The authored json sources now
@@ -124,21 +134,21 @@ rem  canary source: every container is paired with the <name>.json beside it.
 "%GATEDIR%\kat_staticleak.exe" "" "%ROOT%\assets" "%ROOT%\assets"
 if errorlevel 1 goto gatefailed
 
-echo [5/9] Protection-flag gate over the generated containers ...
+echo [5/10] Protection-flag gate over the generated containers ...
 rem  Every shipped container must report the default-key flag AND decrypt with
 rem  an empty password, which is exactly what the menu import relies on. The
 rem  quiet flag keeps the PASS lines out of the build log; only failures speak.
 "%GATEDIR%\kat_flagdetect.exe" "%ROOT%\assets" quiet
 if errorlevel 1 goto flaggatefailed
 
-echo [6/9] Conversion + parser-fidelity gate over the generated containers ...
+echo [6/10] Conversion + parser-fidelity gate over the generated containers ...
 rem  Each container must convert byte-identically to the authored json source
 rem  beside it in assets\, and loading it must not drop or shrink any
 rem  section the mapping declares.
 "%GATEDIR%\kat_ansiconvert.exe" "%ROOT%\assets" "%ROOT%\assets" quiet
 if errorlevel 1 goto convertgatefailed
 
-echo [7/9] Engine-cache gate over the generated containers ...
+echo [7/10] Engine-cache gate over the generated containers ...
 rem  Drives the real engine cache: preload, switching, background re-parse and a
 rem  deliberately hollowed live engine. Every step must leave the requested
 rem  mapping installed and behaving exactly like its fresh-loaded reference.
@@ -156,7 +166,7 @@ rem  branch refreshes it too.
 "%GATEDIR%\kat_engineswitch.exe" "%ROOT%\assets" quiet
 if errorlevel 1 goto switchgatefailed
 
-echo [8/9] Obfuscation codec + comment domain gate ...
+echo [8/10] Obfuscation codec + comment domain gate ...
 rem  Pins the codec contract: keyed metadata mask, positional salting, comment
 rem  text unrecoverable without the comment key (and not even held in memory on
 rem  the runtime path), plus the frozen v2 fixture that proves the legacy read
@@ -164,7 +174,7 @@ rem  path still works.
 "%GATEDIR%\kat_obfcodec.exe" "%ROOT%\assets" "%COMMENTKEY%" quiet
 if errorlevel 1 goto obfcodecfailed
 
-echo [9/9] Layout-icon gate over the generated containers ...
+echo [9/10] Layout-icon gate over the generated containers ...
 rem  Proves the icon section itself: the frame-selection rule (an exact frame
 rem  wins, otherwise the smallest frame that is at least as large, so the 125%
 rem  and 150% tray metrics never fall back to the largest frame), that
@@ -175,6 +185,18 @@ rem  container - that a 16 px frame is present and nothing above
 rem  AVRO_ICON_MAX_FRAME_SIZE is carried.
 "%GATEDIR%\kat_iconsection.exe" "%ROOT%\assets" quiet
 if errorlevel 1 goto icongatefailed
+
+echo [10/10] Memory-budget gate over the runtime's engine lifecycle ...
+rem  The one gate that measures rather than inspects: it drives the real engine
+rem  cache and reads its own GetMemoryManagerState / GetProcessMemoryInfo
+rem  numbers. Bounded budgets, not exact values, so a Delphi RTL change cannot
+rem  turn it red - but a return to preloading every mapping, to extracting
+rem  icons for containers nobody selected, or to re-parsing on switch, cannot
+rem  pass it. The engine it activates is the persisted version plus every
+rem  container in assets\, so it is also the gate that would catch a container
+rem  whose mapping no longer loads at all.
+"%GATEDIR%\kat_membudget.exe" "%ROOT%\assets" quiet
+if errorlevel 1 goto membudgetgatefailed
 
 echo Done.
 endlocal
@@ -229,6 +251,10 @@ exit /b 1
 
 :icongatefailed
 echo LAYOUT-ICON GATE FAILED - a container's icon is missing, oversized or mis-sized
+exit /b 1
+
+:membudgetgatefailed
+echo MEMORY BUDGET GATE FAILED - the runtime holds more than the active engine resident
 exit /b 1
 
 :nodcc

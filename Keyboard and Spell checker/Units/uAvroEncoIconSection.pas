@@ -378,42 +378,189 @@ begin
   Result := TNetEncoding.Base64.EncodeBytesToString(Trimmed);
 end;
 
+{ Reads the value of a TOP-LEVEL string member out of AJSON without building a
+  DOM.
+
+  System.JSON's TJSONObject.ParseJSONValue materialises one object per member -
+  plus a TDictionary, a TJSONPair and a TJSONString/TJSONNumber for each - so
+  parsing a 49..114 KB mapping to read ONE scalar cost an order of magnitude
+  more memory than the document itself, on every container, at startup. This is
+  what replaced that call.
+
+  Strictness is deliberately the same as the DOM lookup it stands in for:
+    - only depth-1 members are considered, so a "AnsiLayoutIcon" nested inside
+      Metadata (where a hand-edited file could put one) is NOT the section;
+    - the value must be a JSON string; an object/array/number/bool/null answer
+      is reported as "not a string";
+    - string escapes are decoded like the DOM does (\" \\ \/ \b \f \n \r \t
+      and \uXXXX). They are not optional: a JSON writer may escape the '/' of a
+      Base64 payload as '\/', which is exactly how the shipped containers
+      arrived, and a scanner that refused escapes reported "no icon" for every
+      one of them. An UNKNOWN escape still reports "no icon" instead of
+      guessing.
+  Returns False only when the member is absent or malformed. }
+function FindTopLevelStringMember(const AJSON, AName: string;
+  out AValue: string): Boolean;
+var
+  I, P, Depth: Integer;
+  Key, Text: string;
+  NextPos: Integer;
+
+  { Skips whitespace and returns the index of the next non-blank character
+    (Len + 1 when the string ends). }
+  function SkipBlank(AFrom: Integer): Integer;
+  begin
+    Result := AFrom;
+    while (Result <= Length(AJSON)) and
+      CharInSet(AJSON[Result], [' ', #9, #10, #13]) do
+      Inc(Result);
+  end;
+
+  { Reads the string token whose opening quote is at AStart and decodes its
+    escapes. ANext is the index after the closing quote; False when the token
+    never closes or contains an escape this reader does not understand.
+
+    One buffer for the whole token: the output is built into a string sized to
+    the remaining document and only shrunk at the end, so a 7.6 KB Base64
+    payload costs one allocation instead of one per character. }
+  function ReadString(AStart: Integer; out ADecoded: string;
+    out ANext: Integer): Boolean;
+  var
+    Q, N, H, V: Integer;
+    C: Char;
+  begin
+    Result := False;
+    ADecoded := '';
+    ANext := AStart + 1;
+    Q := AStart + 1;
+    if Q > Length(AJSON) then
+      Exit;
+    SetLength(ADecoded, Length(AJSON) - Q);
+    N := 0;
+    while Q <= Length(AJSON) do
+    begin
+      C := AJSON[Q];
+      if C = '"' then
+      begin
+        SetLength(ADecoded, N);
+        ANext := Q + 1;
+        Exit(True);
+      end;
+      if C = '\' then
+      begin
+        if Q >= Length(AJSON) then
+          Exit; // trailing backslash: the token cannot be trusted
+        Inc(Q);
+        case AJSON[Q] of
+          '"', '\', '/': C := AJSON[Q];
+          'b': C := #8;
+          'f': C := #12;
+          'n': C := #10;
+          'r': C := #13;
+          't': C := #9;
+          'u':
+            begin
+              if Q + 4 > Length(AJSON) then
+                Exit;
+              V := 0;
+              for H := 1 to 4 do
+                case AJSON[Q + H] of
+                  '0'..'9': V := V * 16 + (Ord(AJSON[Q + H]) - Ord('0'));
+                  'a'..'f': V := V * 16 + (Ord(AJSON[Q + H]) - Ord('a') + 10);
+                  'A'..'F': V := V * 16 + (Ord(AJSON[Q + H]) - Ord('A') + 10);
+                else
+                  Exit;
+                end;
+              // One UTF-16 code unit per \u, so a surrogate pair survives as
+              // the two units the document wrote.
+              C := Char(V);
+              Inc(Q, 4);
+            end;
+        else
+          Exit; // unknown escape: report "no icon" rather than guess
+        end;
+      end;
+      Inc(N);
+      ADecoded[N] := C;
+      Inc(Q);
+    end;
+  end;
+
+begin
+  Result := False;
+  AValue := '';
+  // Deliberately no Trim(): a trimmed copy of a 114 KB document is exactly the
+  // kind of transient the DOM build was, and leading blanks are already
+  // handled by SkipBlank / the scanner's own character walk.
+  if (AJSON = '') or (AName = '') then
+    Exit;
+
+  I := 1;
+  Depth := 0;
+  while I <= Length(AJSON) do
+  begin
+    case AJSON[I] of
+      '{', '[':
+        begin
+          Inc(Depth);
+          Inc(I);
+        end;
+      '}', ']':
+        begin
+          Dec(Depth);
+          Inc(I);
+        end;
+      '"':
+        begin
+          if not ReadString(I, Key, NextPos) then
+            Exit;
+          P := SkipBlank(NextPos);
+          if (P <= Length(AJSON)) and (AJSON[P] = ':') then
+          begin
+            // A member key. Only the root object's own members count.
+            if (Depth = 1) and (Key = AName) then
+            begin
+              P := SkipBlank(P + 1);
+              if (P > Length(AJSON)) or (AJSON[P] <> '"') then
+                Exit; // present but not a string: same verdict as the DOM
+              if not ReadString(P, Text, NextPos) then
+                Exit;
+              AValue := Text;
+              Exit(True);
+            end;
+            I := NextPos;
+          end
+          else
+            I := NextPos; // a string VALUE (or a key we do not want)
+        end;
+    else
+      Inc(I);
+    end;
+  end;
+end;
+
 function ExtractIconSection(const AJSONContent: string): TBytes;
 var
-  Root: TJSONValue;
-  Value: TJSONValue;
+  Encoded: string;
 begin
   Result := nil;
-  if Trim(AJSONContent) = '' then
+  if AJSONContent = '' then
     Exit;
-  Root := nil;
+  if not FindTopLevelStringMember(AJSONContent, AVRO_ICON_SECTION, Encoded) then
+    Exit;
   try
-    try
-      Root := TJSONObject.ParseJSONValue(AJSONContent);
-    except
-      Root := nil;
-    end;
-    if (Root = nil) or not (Root is TJSONObject) then
-      Exit;
-    Value := TJSONObject(Root).GetValue(AVRO_ICON_SECTION);
-    if not (Value is TJSONString) then
-      Exit;
-    try
-      Result := TNetEncoding.Base64.DecodeStringToBytes(TJSONString(Value).Value);
-    except
-      // A damaged section must never cost the user a working layout: it reads
-      // as "this mapping has no icon" and the caller falls back.
-      Result := nil;
-      Exit;
-    end;
-    // Decoded bytes that are not an .ico are as useless as no icon at all, and
-    // rejecting them here means the UI never has to reason about a blob it
-    // cannot draw.
-    if Length(IconFramesOf(Result)) = 0 then
-      Result := nil;
-  finally
-    Root.Free;
+    Result := TNetEncoding.Base64.DecodeStringToBytes(Encoded);
+  except
+    // A damaged section must never cost the user a working layout: it reads
+    // as "this mapping has no icon" and the caller falls back.
+    Result := nil;
+    Exit;
   end;
+  // Decoded bytes that are not an .ico are as useless as no icon at all, and
+  // rejecting them here means the UI never has to reason about a blob it
+  // cannot draw.
+  if Length(IconFramesOf(Result)) = 0 then
+    Result := nil;
 end;
 
 function CreateHIconAtSize(const AIcoBytes: TBytes; ACX, ACY: Integer): HICON;

@@ -26,6 +26,17 @@ procedure InitDict;
 procedure LoadDict;
 procedure DestroyDict;
 
+{ Lookup used by the typing path. Loads the dictionary on FIRST use instead of
+  at application start.
+
+  The 42 KB autodict.dct parses into a TDictionary<string,string> of ~2500
+  entries with two heap strings each - a few hundred KB that used to sit in RAM
+  from startup for every user, including the ones who never type
+  phonetically. Nothing but typing needs it, and the first keystroke pays for
+  it once (single-digit milliseconds; the file is in the page cache by then). }
+function TryAutoCorrectWord(const AWord: string;
+  out AReplacement: string): Boolean;
+
 var
   Dict: TDictionary<string, string>;
 
@@ -35,8 +46,25 @@ implementation
 
 procedure InitDict;
 begin
+  // Idempotent: the lookup path calls this on every keystroke until the
+  // dictionary exists, and the auto-correct editor calls it after saving.
+  if Assigned(Dict) then
+    Exit;
   Dict := TDictionary<string, string>.create;
   LoadDict;
+end;
+
+function TryAutoCorrectWord(const AWord: string;
+  out AReplacement: string): Boolean;
+begin
+  AReplacement := '';
+  if AWord = '' then
+    Exit(False);
+  if not Assigned(Dict) then
+    InitDict;
+  if not Assigned(Dict) then
+    Exit(False); // dictionary file missing/corrupt: behave as "no match"
+  Result := Dict.TryGetValue(AWord, AReplacement);
 end;
 
 { =============================================================================== }

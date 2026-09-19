@@ -575,11 +575,47 @@ begin
     ScanAvroEncoFiles(TmpCold);
     Count := RunPreload;
     Say('  preloaded ' + IntToStr(Count) + ' engine(s)');
+    // Teeth check for the trim assertion below: this batch really does fill
+    // more engines than the budget allows, so "at most one parked" cannot hold
+    // by construction - something has to drop engines for it to pass.
+    Check(Count > MaxWarmEngines,
+      '1: the batch filled more engines than the warm limit (' +
+      IntToStr(Count) + ')');
     Check(AnsiEngineManager.SwitchEngine(TAG_COLD_B), '1: first switch parses on demand');
     ExpectLive(TAG_COLD_B, '1 (after cold preload + switch)');
-    Check(AnsiEngineManager.CachedEngineReady(TAG_COLD_A), '1: sibling engine is cached');
-    Check(AnsiEngineManager.TrySwitchCached(TAG_COLD_A), '1: fast switch to the sibling');
-    ExpectLive(TAG_COLD_A, '1 (fast switch to the sibling)');
+
+    // A batch is a cache FILL, not a session: the switch that follows it trims
+    // the warm set to the limit. This is the assertion the idle-footprint fix
+    // rests on - a folder of preloaded mappings must not stay resident just
+    // because something parsed it once.
+    Check(AnsiEngineManager.WarmEngineCount <= MaxWarmEngines,
+      '1: the switch trims the batch to the warm limit (warm=' +
+      IntToStr(AnsiEngineManager.WarmEngineCount) + ')');
+
+    // What survives the trim is the engine the switch left behind, not a
+    // preload leftover: parking stamps a slot as the most recent use, so the
+    // layout the user was just in comes back in O(1) while mappings nobody
+    // touched are the ones dropped. (The alternating click pattern that gets
+    // the fast path on BOTH sides is section 3's job.)
+    Check(AnsiEngineManager.CachedEngineReady('Default'),
+      '1: the engine the switch left behind is the one kept warm');
+    Check(AnsiEngineManager.TrySwitchCached('Default'),
+      '1: clicking back to it takes the fast path');
+    Check(AnsiEngineManager.LiveEngineReady and
+      (AnsiEngineManager.CurrentEngineName = DefaultEngineSlotKey),
+      '1: the built-in engine is live again (got "' +
+      AnsiEngineManager.CurrentEngineName + '")');
+
+    // A trimmed leftover is no longer resident, so reaching it parses again -
+    // and must still land as exactly the fresh-loaded reference.
+    Check(AnsiEngineManager.SwitchEngine(TAG_COLD_A),
+      '1: a trimmed sibling still activates (cold re-parse)');
+    ExpectLive(TAG_COLD_A, '1 (cold re-parse of a trimmed sibling)');
+    Check(AnsiEngineManager.CachedEngineReady('Default'),
+      '1: and the engine THAT switch left is the one kept warm');
+    Check(AnsiEngineManager.WarmEngineCount <= MaxWarmEngines,
+      '1: still one parked engine after three switches (warm=' +
+      IntToStr(AnsiEngineManager.WarmEngineCount) + ')');
 
     // ---- 2. the reported order: live engine, then a preload batch -------
     // This is the shape the app hits at every start: the active mapping is

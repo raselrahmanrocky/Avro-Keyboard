@@ -425,8 +425,11 @@ begin
   else if AvroMainForm1.GetMyCurrentKeyboardMode = bangla then
   begin
     CharForKey := GetCharForKey(KeyCode, var_IsLogicalShift, var_IsTrueShift, var_IsAltGr);
-    Log(Format('Keycode: %d, CharForKey:%s, var_IsLogicalShift:%s, var_IsTrueShift:%s, var_IsAltGr:%s', [KeyCode, CharForKey, BoolToStr(var_IsLogicalShift, True),
-          BoolToStr(var_IsTrueShift, True), BoolToStr(var_IsAltGr, True)]));
+    // PERF/PRIVACY: no Log() here. This runs on EVERY keystroke, and DebugLog
+    // opens, appends and closes a file per line (measured: ~8 ms), so logging
+    // here cost more than the whole conversion it describes - and it wrote
+    // every keystroke to a file in %TEMP%. Same reasoning as the PERF notes in
+    // KeyboardFunctions.pas; the value is available to the debugger instead.
 
     if VowelFormating = 'NO' then
       DeadKey := False;
@@ -933,7 +936,7 @@ begin
     SetLastChar(m_Str);
   end;
 
-  Log(Format('m_Block:%s, m_Str:%s', [BoolToStr(m_Block, True), m_Str]));
+  // PERF/PRIVACY: no Log() per emitted character (see ProcessVKeyDown).
 
   NewBanglaText := NewBanglaText + m_Str;
 

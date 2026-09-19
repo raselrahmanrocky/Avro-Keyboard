@@ -83,6 +83,7 @@ uses
   uAvroShield in 'Units\uAvroShield.pas',
   uAnsiPersistentCache in 'Units\uAnsiPersistentCache.pas',
   uAnsiEngineManager in 'Units\uAnsiEngineManager.pas',
+  uAvroEngineStats in 'Units\uAvroEngineStats.pas',
   uAvroDirectoryWatcher in 'Units\uAvroDirectoryWatcher.pas',
   uAvroLayoutUI in 'Units\uAvroLayoutUI.pas',
   uAvroPasswordDlg in 'Forms\uAvroPasswordDlg.pas' {frmAvroPasswordDlg};
