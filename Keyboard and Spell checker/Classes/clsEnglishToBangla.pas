@@ -237,9 +237,13 @@ begin
     Exit;
 
   // As is support
+  //
+  // TryAutoCorrectWord (not dict.TryGetValue) so the auto-correct dictionary is
+  // loaded on first use: it used to be parsed during startup, before the
+  // keyboard hook was even installed, and nothing else in the process reads it.
   if AutoCorrect = True then
   begin
-    if dict.TryGetValue(EnglishT, DictItem) then
+    if TryAutoCorrectWord(EnglishT, DictItem) then
     begin
       if EnglishT = DictItem then
       begin
@@ -255,7 +259,7 @@ begin
 
   if AutoCorrect = True then
   begin
-    if dict.TryGetValue(EngStr, DictItem) then
+    if TryAutoCorrectWord(EngStr, DictItem) then
     begin
       pEnglishText := DictItem;
       Convert := MyConvert;
@@ -268,7 +272,7 @@ begin
       Ending_Ignorable_T := '';
       CutText(EngStr, Starting_Ignoreable_T, Middle_Main_T, Ending_Ignorable_T);
 
-      if dict.TryGetValue(Middle_Main_T, DictItem) then
+      if TryAutoCorrectWord(Middle_Main_T, DictItem) then
       begin
         if Starting_Ignoreable_T <> '' then
         begin

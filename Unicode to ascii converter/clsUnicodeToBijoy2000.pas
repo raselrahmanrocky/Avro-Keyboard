@@ -179,7 +179,13 @@ type
     DisplayName: string;
     // A_* glyph variables, captured through AnsiRegistry.Ptr indirection so
     // per-version scalar overrides round-trip exactly.
-    ScalarValues: TDictionary<string, string>;
+    //
+    // POSITIONAL, index-aligned with TEngineState.AnsiRegistry: entry I is the
+    // value of AnsiRegistry[I]. Not a name-keyed dictionary - that shape
+    // allocated a hash table, a node and a fresh copy of every variable NAME
+    // (about 300) in every parked engine, and hashed each name on capture and
+    // restore, for data the registry's fixed build order already identifies.
+    ScalarValues: TArray<string>;
     CustomFullForms:          TArray<TReplacementPair>;
     CustomPreReplacements:    TArray<TReplacementPair>;
     CustomPostReplacements:   TArray<TReplacementPair>;
@@ -3139,6 +3145,15 @@ procedure TAnsiEngineState.Clear;
     AvroWipeString(CopyRec.Comment);
   end;
 
+  { Positional scalar capture: refcounted strings, no name copies. }
+  procedure WipeScalarValues(AArr: TArray<string>);
+  var
+    I: Integer;
+  begin
+    for I := 0 to Length(AArr) - 1 do
+      AvroWipeString(AArr[I]);
+  end;
+
   { Snapshots keys and values, releases the dictionary, then wipes. }
   procedure WipeStringDict(ADict: TDictionary<string, string>);
   var
@@ -3225,7 +3240,7 @@ procedure TAnsiEngineState.Clear;
 begin
   DisplayName := '';
 
-  WipeStringDict(ScalarValues);
+  WipeScalarValues(ScalarValues);
   WipePairs(CustomFullForms);
   WipePairs(CustomPreReplacements);
   WipePairs(CustomPostReplacements);
@@ -3245,7 +3260,7 @@ begin
   WipeSequenceMap(AnsiSequenceLookup);
   WipeStrListDict(AnsiToUniMap);
 
-  FreeAndNil(ScalarValues);
+  ScalarValues := nil;
   CustomFullForms := nil;
   CustomPreReplacements := nil;
   CustomPostReplacements := nil;
@@ -3304,20 +3319,26 @@ procedure CaptureEngineState(var AState: TAnsiEngineState);
 var
   Rec: TAnsiVarRec;
   Val: string;
+  I: Integer;
 begin
   AState.Clear;
   AState.DisplayName := AnsiVersion;
 
-  AState.ScalarValues := TDictionary<string, string>.Create;
+  // Positional capture; see the ScalarValues field comment. The only
+  // allocation is the array itself: a value that already lives in an A_*
+  // variable is shared by refcount, and the name never has to be copied.
   if AnsiRegistry <> nil then
-    for Rec in AnsiRegistry do
+  begin
+    SetLength(AState.ScalarValues, AnsiRegistry.Count);
+    for I := 0 to AnsiRegistry.Count - 1 do
     begin
+      Rec := AnsiRegistry[I];
       if Rec.VarType = avChar then
-        Val := PChar(Rec.Ptr)^
+        AState.ScalarValues[I] := PChar(Rec.Ptr)^
       else
-        Val := PString(Rec.Ptr)^;
-      AState.ScalarValues.AddOrSetValue(Rec.Name, Val);
+        AState.ScalarValues[I] := PString(Rec.Ptr)^;
     end;
+  end;
 
   AState.CustomFullForms := CustomFullForms;          CustomFullForms := nil;
   AState.CustomPreReplacements := CustomPreReplacements; CustomPreReplacements := nil;
@@ -3348,6 +3369,7 @@ procedure RestoreEngineState(var AState: TAnsiEngineState);
 var
   Rec: TAnsiVarRec;
   Val: string;
+  I: Integer;
 begin
   CustomFullForms := AState.CustomFullForms;          AState.CustomFullForms := nil;
   CustomPreReplacements := AState.CustomPreReplacements; AState.CustomPreReplacements := nil;
@@ -3368,20 +3390,32 @@ begin
   AnsiSequenceLookup := AState.AnsiSequenceLookup;    AState.AnsiSequenceLookup := nil;
   AnsiToUniMap := AState.AnsiToUniMap;                AState.AnsiToUniMap := nil;
 
-  // Scalars: write the captured values back through the stable registry Ptrs.
-  if (AnsiRegistry <> nil) and (AState.ScalarValues <> nil) then
-    for Rec in AnsiRegistry do
-      if AState.ScalarValues.TryGetValue(Rec.Name, Val) then
+  // Scalars: write the captured values back through the stable registry Ptrs,
+  // positionally. The count guard is the correctness condition of the flat
+  // layout: a registry that no longer matches the capture (it is only ever
+  // rebuilt from the same InitializeAnsiRegistry source) would otherwise map
+  // values onto the wrong variables, so a mismatch writes nothing and leaves
+  // the caller's ResetAnsiToDefaults values in place.
+  if (AnsiRegistry <> nil) and (AState.ScalarValues <> nil) and
+    (Length(AState.ScalarValues) = AnsiRegistry.Count) then
+    for I := 0 to AnsiRegistry.Count - 1 do
+    begin
+      Rec := AnsiRegistry[I];
+      Val := AState.ScalarValues[I];
+      if Rec.VarType = avChar then
       begin
-        if Rec.VarType = avChar then
-        begin
-          if Val <> '' then
-            PChar(Rec.Ptr)^ := Val[1];
-        end
-        else
-          PString(Rec.Ptr)^ := Val;
-      end;
-  FreeAndNil(AState.ScalarValues);
+        if Val <> '' then
+          PChar(Rec.Ptr)^ := Val[1];
+      end
+      else
+        PString(Rec.Ptr)^ := Val;
+    end
+  else if (AState.ScalarValues <> nil) and (AnsiRegistry <> nil) then
+    OutputDebugString(PChar(Format(
+      '[AvroEnco] engine state scalar mismatch: captured=%d registry=%d; ' +
+      'scalars left at defaults',
+      [Length(AState.ScalarValues), AnsiRegistry.Count])));
+  AState.ScalarValues := nil;
 end;
 
 { =============================================================================== }

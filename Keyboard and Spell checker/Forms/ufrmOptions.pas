@@ -556,16 +556,16 @@ begin
   CheckShowLayoutSwitchNotification.Width := 150;
 
   // =======================================================
-  // ANSI Version Switcher Hotkey UI (runtime-created)
+  // ANSI Encoding Switcher Hotkey UI (runtime-created)
   GroupBox10 := TGroupBox.Create(KeyboardMode_Panel);
   GroupBox10.Parent := KeyboardMode_Panel;
   GroupBox10.Left := GroupBox4.Left;
   GroupBox10.Width := GroupBox4.Width;
   GroupBox10.Top := GroupBox11.Top + GroupBox11.Height + GROUP_SPACING;
   GroupBox10.Height := GROUP_HEIGHT;
-  GroupBox10.Caption := 'ANSI Version Switcher';
+  GroupBox10.Caption := 'ANSI Encoding Switcher';
 
-  // Create TEdit for ANSI Version Switcher (in GroupBox10)
+  // Create TEdit for ANSI Encoding Switcher (in GroupBox10)
   edtAnsiVersion := TEdit.Create(GroupBox10);
   edtAnsiVersion.Parent := GroupBox10;
   edtAnsiVersion.Left := LEFT_MARGIN;

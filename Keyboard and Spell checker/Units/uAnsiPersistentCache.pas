@@ -78,17 +78,44 @@ begin
   Result := H.HashAsBytes;
 end;
 
+{ Size of one hashing read. 64 KB keeps the buffer in the allocator's medium
+  block class and small enough that the read itself never dominates. }
+const
+  HASH_CHUNK_SIZE = 64 * 1024;
+
+{ SHA-256 of a file, streamed in fixed-size chunks.
+
+  This used to be TFile.ReadAllBytes + one Update: a full private copy of the
+  container (114 KB for the largest shipped mapping) allocated, hashed and then
+  zeroed, on every load path - on top of the decrypt buffer and the UTF-16
+  string the caller builds next, with the parsed engine parked in RAM behind
+  all three. Hashing needs none of that to exist at once, and the digest is
+  identical because SHA-256 is defined over a stream. }
 function HashFile(const APath: string; out ASize: Int64): TBytes;
 var
-  Data: TBytes;
+  FS: TFileStream;
+  Chunk: TBytes;
+  BytesRead: Integer;
+  H: THashSHA2;
 begin
-  Data := TFile.ReadAllBytes(APath);
+  Result := nil;
+  ASize := 0;
+  SetLength(Chunk, HASH_CHUNK_SIZE);
+  FS := TFileStream.Create(APath, fmOpenRead or fmShareDenyNone);
   try
-    ASize := Length(Data);
-    Result := HashBytes(Data);
+    H := THashSHA2.Create(THashSHA2.TSHA2Version.SHA256);
+    repeat
+      BytesRead := FS.Read(Chunk[0], HASH_CHUNK_SIZE);
+      if BytesRead <= 0 then
+        Break;
+      H.Update(Chunk, Cardinal(BytesRead));
+      Inc(ASize, BytesRead);
+    until False;
+    Result := H.HashAsBytes;
   finally
-    if Length(Data) > 0 then
-      FillChar(Data[0], Length(Data), 0);
+    if Length(Chunk) > 0 then
+      FillChar(Chunk[0], Length(Chunk), 0);
+    FS.Free;
   end;
 end;
 

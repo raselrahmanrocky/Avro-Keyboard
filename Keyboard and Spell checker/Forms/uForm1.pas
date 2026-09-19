@@ -35,7 +35,19 @@ uses
   Vcl.AppEvnts,
   ShellAPI,
   Winapi.CommCtrl,
-  uAvroDirectoryWatcher;
+  uAvroDirectoryWatcher,
+  uAvroEngineStats;
+
+const
+  { How long the user must be idle (no input ANYWHERE on the system) before the
+    idle timer drops the parked ANSI engines and the per-mapping icon bytes.
+
+    Both are regenerable: the engine comes back from its container on the next
+    switch (tens of ms, one time), the icons from the next menu build. Keeping
+    them resident for a user who has walked away is what the 2 MB -> 6 MB
+    report was measuring, so the release is the point - the delay only decides
+    how much instant switching this session gets to keep. }
+  IdleEngineReleaseMinutes = 10;
 
 type
   TMenuItemExtended = class(TMenuItem)
@@ -785,7 +797,20 @@ begin
   GetLastInputInfo(liInfo);
   SecondsIdle := (GetTickCount - liInfo.dwTime) div 1000;
   if SecondsIdle > 30 then
+  begin
+    // Drop the parked engines and the per-mapping icon bytes BEFORE trimming:
+    // the trim only moves pages out of the working set, it does not free the
+    // heap, so releasing has to come first or the app just reports the same
+    // footprint with colder pages. The LIVE engine is untouched - typing keeps
+    // working, and only a later version switch pays for a fresh parse.
+    AnsiEngineManager.ReleaseIdleEngines(IdleEngineReleaseMinutes);
     TrimAppMemorySize;
+    // Idle process: let the OS keep our pages on the block list until the user
+    // comes back. The else branch restores normal priority on the next tick.
+    SetAvroMemoryPriority(ampLow);
+  end
+  else
+    SetAvroMemoryPriority(ampNormal);
 end;
 
 procedure TAvroMainForm1.WMAvroEmit(var Msg: TMessage);
@@ -1122,13 +1147,19 @@ procedure TAvroMainForm1.LoadApp;
 var
   tempLastUIMode: string;
   MappingPath: string;
-  PreloadThread: TAnsiPreloadThread;
   DesiredVersion: string;
 begin
   Set_Process_Priority(HIGH_PRIORITY_CLASS);
+  // The user is here: keep normal memory priority until the idle timer decides
+  // otherwise (it flips to LOW only when nothing has been touched for a while).
+  SetAvroMemoryPriority(ampNormal);
+  LogAvroMemStats('startup: before engine load');
   FAnsiRootIconIndex := -1;
 
-  InitDict;
+  // InitDict is deliberately NOT called here: the auto-correct dictionary is
+  // loaded by the first phonetic keystroke that needs it (see
+  // TryAutoCorrectWord). Nothing else in the process reads it, so parsing it
+  // before the hook is even installed only made the idle footprint bigger.
   LoadKeyboardLayoutNames;
   Initmenu;
   LoadUserHotkeysFromXML;
@@ -1247,66 +1278,43 @@ begin
       (GetAvroEncoProtectionFlag(MappingPath) = AVROENCO_FLAG_USER_PASSWORD) then
       CachedEncoPassword := GetEncoCachedPassword(MappingPath);
   end;
-  // Parse every engine that unlocks without user interaction on a
-  // BACKGROUND thread: cold decrypt + parse of the shipped Shield
-  // containers is the heaviest startup work, and doing all of it on this
-  // thread would block the message loop - the splash would freeze instead
-  // of closing after its normal 2 s. (v2 containers use an instant
-  // HKDF-based schedule - no slow KDF remains anywhere in the project.)
-  // The keyboard hook is paused while the worker builds the engine globals
-  // (typing must never read a half-built engine), and the pump below keeps
-  // the splash painting and its 2 s timer running, so the splash behaves
-  // exactly as before while the heavy work happens off the UI thread.
-  PreloadThread := TAnsiPreloadThread.Create(AnsiEngineManager.CapturePreloadList);
-  PreloadThread.Start;
-  WindowCheck.Enabled := False; // never re-install the hook mid-preload
+  // Build the engine the user actually selected - and NOTHING else.
+  //
+  // This used to preload every engine that could unlock without a password and
+  // then warm all of them, which is where the idle footprint went: a keyboard
+  // utility only ever types through ONE engine, so every other mapping sat in
+  // RAM as a complete parsed state until the process exited. Switching to a
+  // cold mapping now costs one decrypt + parse on the click (tens of ms,
+  // cached on disk afterwards), and the warm-limit/LRU release keeps that
+  // bounded for the rest of the session.
+  //
+  // The hook stays removed while the engine globals are (re)built: a parse
+  // resets and rebuilds them, and typing must never read a half-built engine.
+  WindowCheck.Enabled := False; // never re-install the hook mid-parse
   RemoveHook;
   try
-    while (not PreloadThread.Finished) and (not Application.Terminated) do
-    begin
-      Application.ProcessMessages;
-      Sleep(5);
-    end;
-    FreeAndNil(PreloadThread);
-    // O(1): the worker parked every engine; restore the saved version. If it
-    // is missing (its decrypt failed on the first pass - possible right
-    // after wiping %AppData%\AvroKeyboard\Cache, when every container
-    // decrypts at once and the largest mapping, Ansi V3, is most exposed),
-    // run ONE more
-    // background pass for just the missing engines while the hook is still
-    // removed (typing can never read a half-built engine), then switch again.
     // DesiredVersion is captured BEFORE the Default fallback, because the
     // fallback itself overwrites the AnsiVersion global.
     DesiredVersion := AnsiVersion;
-    if (not Application.Terminated) and
-      (not AnsiEngineManager.SwitchEngine(DesiredVersion)) then
-    begin
-      AnsiEngineManager.SwitchEngine('Default');
-      if (not Application.Terminated) and
-        (Length(AnsiEngineManager.CapturePreloadList) > 0) then
+    if not Application.Terminated then
+      if (not AnsiEngineManager.SwitchEngine(DesiredVersion)) and
+        (not AnsiEngineManager.SwitchEngine(DesiredVersion)) then
       begin
-        PreloadThread := TAnsiPreloadThread.Create(
-          AnsiEngineManager.CapturePreloadList);
-        PreloadThread.Start;
-        while (not PreloadThread.Finished) and (not Application.Terminated) do
-        begin
-          Application.ProcessMessages;
-          Sleep(5);
-        end;
-        FreeAndNil(PreloadThread);
-        if not AnsiEngineManager.SwitchEngine(DesiredVersion) then
-          AnsiEngineManager.SwitchEngine('Default');
+        // Two attempts, then Default: the retry covers the first-run case
+        // (cache directory missing, container just installed and still being
+        // written) without ever leaving the app without a usable engine.
+        Log('Startup: could not activate "' + DesiredVersion +
+          '" - falling back to Default');
+        AnsiEngineManager.SwitchEngine('Default');
       end;
-    end;
-    // Warm every cached engine while hook is still removed. This pays all
-    // first-use allocations/page faults before the user can open the picker.
-    AnsiEngineManager.WarmAllEngines(AnsiVersion);
     SyncActiveMappingTimestamp(AnsiVersion);
   finally
-    FreeAndNil(PreloadThread);
     Sethook;
     WindowCheck.Enabled := True;
   end;
+  // The switch above parsed exactly one engine; the sweep that used to cache
+  // every layout's icon here is gone with it (see uAvroEncoManager).
+  LogAvroMemStats('startup: engines ready');
   BuildAnsiVersionMenus;
 
   // The preload block above is what caches every layout's icon, and the tray
@@ -1954,6 +1962,12 @@ end;
 
 procedure TAvroMainForm1.PopupToolsPopup(Sender: TObject);
 begin
+  // The badges this menu is about to draw come from the mapping payloads.
+  // They are resolved on the FIRST popup rather than at startup, and again
+  // after an idle release dropped them (IdleTimerTimer) - the menu just opened
+  // is exactly the moment the work is wanted, so it is paid here.
+  EnsureMappingIcons;
+  EnsureMappingIcon(AnsiVersion);
   // Only update checkmarks on existing items -- do NOT Clear/rebuild during popup
   SyncAnsiVersionChecks(AnsiVersionSubmenu1);
   // The TopBar's tools menu holds its OWN "Select ANSI Encoding" parent item
@@ -1964,6 +1978,10 @@ end;
 
 procedure TAvroMainForm1.PopupTrayPopup(Sender: TObject);
 begin
+  // See PopupToolsPopup: the icon bytes are resolved lazily, when a menu that
+  // draws badges is actually opened.
+  EnsureMappingIcons;
+  EnsureMappingIcon(AnsiVersion);
   SyncAnsiVersionChecks(mnuTraySelectAnsiEncoding);
   ReplaceAnsiMenuParentIcon;
 end;
@@ -2171,6 +2189,11 @@ var
   Slot: Integer;
 begin
   if not Assigned(ImageList1) then Exit;
+
+  // The active layout's own bytes: normally already cached by the parse that
+  // activated it, resolved on demand after an idle release cleared the cache.
+  // Guarded for '' and 'Default', which carry no icon by design.
+  EnsureMappingIcon(AnsiVersion);
 
   Slot := AnsiRootIconSlot(AnsiVersion);
   if Slot < 0 then
@@ -2598,16 +2621,19 @@ begin
 end;
 
 procedure TAvroMainForm1.TrimAppMemorySize;
-var
-  MainHandle: THandle;
 begin
-  try
-    MainHandle := OpenProcess(PROCESS_ALL_ACCESS, False, GetCurrentProcessID);
-    SetProcessWorkingSetSize(MainHandle, $FFFFFFFF, $FFFFFFFF);
-    CloseHandle(MainHandle);
-  except
-  end;
-  Application.ProcessMessages;
+  { Kept as the form-level entry point for the existing callers (word database
+    load, auto-correct dictionary reload), but the body is now one syscall on
+    the current process:
+
+    - OpenProcess(PROCESS_ALL_ACCESS) for our OWN process was pure overhead:
+      GetCurrentProcess needs no handle, no access mask, and cannot fail.
+    - Application.ProcessMessages does not belong here at all. This routine is
+      called from a TTimer handler (IdleTimerTimer) and from inside the word
+      database load, so pumping the message queue here re-entered the timer,
+      the hook's deferred emit path and every paint handler in the middle of a
+      memory operation. }
+  TrimProcessWorkingSet;
 end;
 
 procedure TAvroMainForm1.TypeJoNuktawithShiftJ1Click(Sender: TObject);
@@ -2833,7 +2859,20 @@ begin
   if SameText(SelectedVersion, 'Default') then
   begin
     if not AnsiEngineManager.TrySwitchCached('Default') then
-      Exit;
+    begin
+      Screen.Cursor := crHourGlass;
+      ErrorLog := TStringList.Create;
+      try
+        if not AnsiEngineManager.SwitchEngine('Default', ErrorLog) then
+        begin
+          ShowAnsiToastNotification('ANSI encoding failed to load - try again');
+          Exit;
+        end;
+      finally
+        ErrorLog.Free;
+        Screen.Cursor := crDefault;
+      end;
+    end;
     AnsiVersion := 'Default';
     SyncActiveMappingTimestamp('Default');
     SaveAnsiVersionOnly;

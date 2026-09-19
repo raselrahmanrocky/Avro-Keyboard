@@ -58,6 +58,28 @@ procedure StoreMappingIcon(const ADisplayName: string; const AIconBytes: TBytes)
   been decrypted yet. }
 function GetMappingIconBytes(const ADisplayName: string): TBytes;
 
+{ True once this name has been looked at (icon found OR the file was read and
+  carries none), so callers can tell "no icon" from "not extracted yet". }
+function MappingIconResolved(const ADisplayName: string): Boolean;
+
+{ Drops every cached icon AND forgets which names were already resolved. The
+  bytes are regenerable from the containers, so the idle-memory release uses
+  this instead of keeping N decrypted icon blobs alive forever. Callers that
+  draw afterwards must call EnsureMappingIcons again. }
+procedure ClearMappingIcons;
+
+{ Resolves the icon of ONE mapping from its file (idempotent: a name that is
+  already resolved - icon or none - is skipped). Used by the switch path so the
+  ACTIVE layout's badge and tray icon always have their bytes without any of
+  the other mappings being touched. }
+procedure EnsureMappingIcon(const ADisplayName: string);
+
+{ Resolves the icon of every mapping the scan knows about. This is what the
+  menus and the version picker call before they draw badges; it replaces the
+  eager sweep that used to run inside ScanAvroEncoFiles, so startup no longer
+  decrypts and JSON-parses every container just to cache its icon. }
+procedure EnsureMappingIcons;
+
 function LoadMappingFromEnco(const AFilePath: string; const APassword: AnsiString; ErrorLog: TStringList = nil): Boolean;
 function ExtractMetadataFromJSON(const AJSONContent: string; const AFilePath: string = ''): string;
 function GetJSONString(const AObj: TJSONValue; const AKey: string): string;
@@ -134,6 +156,11 @@ var
   { Keyed like AvroEncoFiles: Lowercase(DisplayName). Created in this unit's
     initialization, so no caller has to remember to set it up first. }
   MappingIcons: TDictionary<string, TBytes>;
+  { Names whose icon has already been resolved - present in MappingIcons, or
+    read from the file and found to carry none. Without this, every menu
+    rebuild would re-decrypt every icon-less container in the folder. Also
+    keyed by Lowercase(DisplayName). }
+  MappingIconsResolved: TDictionary<string, Byte>;
   MappingIconsLock: TCriticalSection;
 
 procedure StoreMappingIcon(const ADisplayName: string; const AIconBytes: TBytes);
@@ -164,6 +191,32 @@ begin
   end;
 end;
 
+function MappingIconResolved(const ADisplayName: string): Boolean;
+var
+  Dummy: Byte;
+begin
+  Result := False;
+  if ADisplayName = '' then
+    Exit;
+  MappingIconsLock.Enter;
+  try
+    Result := MappingIconsResolved.TryGetValue(Lowercase(ADisplayName), Dummy);
+  finally
+    MappingIconsLock.Leave;
+  end;
+end;
+
+procedure ClearMappingIcons;
+begin
+  MappingIconsLock.Enter;
+  try
+    MappingIcons.Clear;
+    MappingIconsResolved.Clear;
+  finally
+    MappingIconsLock.Leave;
+  end;
+end;
+
 function IsEncoFile(const AFilePath: string): Boolean;
 begin
   // Any file with the .AvroEnco extension is a protected mapping container:
@@ -172,8 +225,6 @@ begin
   // RAM). The crypto layer tells the two formats apart by magic bytes.
   Result := SameText(ExtractFileExt(AFilePath), '.AvroEnco');
 end;
-
-procedure ExtractAndStoreNewFileIcons; forward;
 
 procedure ScanDirHelper(const ADir: string);
 var
@@ -265,62 +316,99 @@ begin
 
     Log('Scanned AvroEnco files: ' + IntToStr(AvroEncoFiles.Count) + ' found');
 
-    // Proactively extract and cache icons for newly discovered files so the
-    // tray menus show icon badges immediately on the first popup.
-    ExtractAndStoreNewFileIcons;
+    // Icons are NOT extracted here any more. The sweep used to run inside the
+    // scan - i.e. on the startup path AND after every folder change - and it
+    // decrypted every container and parsed every mapping document just to
+    // cache a ~10 KB icon. Menus and the picker now call EnsureMappingIcons
+    // when they are about to draw badges, and the switch path calls
+    // EnsureMappingIcon for the active layout only.
   finally
     OldKeys.Free;
   end;
 end;
 
-{ Proactively extracts and caches icons for every file in AvroEncoFiles that
-  does not yet have icon bytes in MappingIcons.  Called at the end of
-  ScanAvroEncoFiles so that newly discovered or renamed files carry their icon
-  badge on the very first tray-menu popup — without waiting for the user to
-  click the item (which would trigger on-demand ParseJSONIntoSlot).
+{ Reads ONE mapping's file, extracts the icon it carries and records the name
+  as resolved either way (so a container without an icon is read once per
+  session, not once per menu rebuild).
 
   Default-key .AvroEnco containers decrypt transparently with an empty
-  password.  Password-protected containers that have no cached password fail
-  decryption here; their icon is extracted on-demand when the user enters the
-  password.  Plain .json mappings are read directly. }
-procedure ExtractAndStoreNewFileIcons;
+  password. Password-protected containers that have no cached password fail
+  decryption here; they are retried on demand when the user enters the
+  password (LoadMappingFromEnco stores the icon of the payload it just
+  decrypted). Plain .json mappings are read directly. }
+procedure ExtractOneFileIcon(const AInfo: TAvroEncoFileInfo);
+var
+  JSONContent: string;
+  Key: string;
+begin
+  Key := Lowercase(AInfo.DisplayName);
+
+  // Mark the name resolved up front: converging through every exit below
+  // (read error, corrupted container, no icon member) is what keeps a failing
+  // mapping from being re-opened by every later menu rebuild.
+  MappingIconsLock.Enter;
+  try
+    MappingIconsResolved.AddOrSetValue(Key, 1);
+  finally
+    MappingIconsLock.Leave;
+  end;
+
+  if AInfo.IsEncoFile then
+  begin
+    try
+      JSONContent := Trim(DecryptAvroEncoToString(AInfo.FilePath, ''));
+      if (JSONContent <> '') and (JSONContent[1] = '{') then
+        StoreMappingIcon(AInfo.DisplayName, ExtractIconSection(JSONContent));
+    except
+      // Corrupted or password-protected file - icon will appear on demand.
+    end;
+  end
+  else
+  begin
+    try
+      if FileExists(AInfo.FilePath) then
+      begin
+        JSONContent := Trim(TFile.ReadAllText(AInfo.FilePath, TEncoding.UTF8));
+        if (JSONContent <> '') and (JSONContent[1] = '{') then
+          StoreMappingIcon(AInfo.DisplayName, ExtractIconSection(JSONContent));
+      end;
+    except
+      // Read error - icon will appear on demand.
+    end;
+  end;
+end;
+
+{ Resolves the icons of every mapping that has not been looked at yet. This is
+  the deferred replacement for the sweep that used to live in
+  ScanAvroEncoFiles: the same work, paid when a badge is actually about to be
+  drawn instead of on the startup path. }
+procedure EnsureMappingIcons;
 var
   Info: TAvroEncoFileInfo;
-  JSONContent: string;
 begin
   if not Assigned(AvroEncoFiles) then
     Exit;
-
   for Info in AvroEncoFiles.Values do
-  begin
-    // Already cached — nothing to do.
-    if GetMappingIconBytes(Info.DisplayName) <> nil then
-      Continue;
+    if not MappingIconResolved(Info.DisplayName) then
+      ExtractOneFileIcon(Info);
+end;
 
-    if Info.IsEncoFile then
-    begin
-      try
-        JSONContent := Trim(DecryptAvroEncoToString(Info.FilePath, ''));
-        if (JSONContent <> '') and (JSONContent[1] = '{') then
-          StoreMappingIcon(Info.DisplayName, ExtractIconSection(JSONContent));
-      except
-        // Corrupted or password-protected file — icon will appear on demand.
-      end;
-    end
-    else
-    begin
-      try
-        if FileExists(Info.FilePath) then
-        begin
-          JSONContent := Trim(TFile.ReadAllText(Info.FilePath, TEncoding.UTF8));
-          if (JSONContent <> '') and (JSONContent[1] = '{') then
-            StoreMappingIcon(Info.DisplayName, ExtractIconSection(JSONContent));
-        end;
-      except
-        // Read error — icon will appear on demand.
-      end;
-    end;
-  end;
+{ Resolves ONE mapping's icon. The name must be a known mapping (the scan owns
+  that knowledge); anything else is ignored rather than guessed by building a
+  path here, because the caller's directory is not this unit's business. }
+procedure EnsureMappingIcon(const ADisplayName: string);
+var
+  Info: TAvroEncoFileInfo;
+begin
+  if (ADisplayName = '') or SameText(ADisplayName, 'Default') then
+    Exit;
+  if not Assigned(AvroEncoFiles) then
+    Exit;
+  if MappingIconResolved(ADisplayName) then
+    Exit;
+  if not AvroEncoFiles.TryGetValue(Lowercase(ADisplayName), Info) then
+    Exit;
+  ExtractOneFileIcon(Info);
 end;
 
 function LoadMappingFromEnco(
@@ -724,10 +812,12 @@ end;
 
 initialization
   MappingIcons := TDictionary<string, TBytes>.Create;
+  MappingIconsResolved := TDictionary<string, Byte>.Create;
   MappingIconsLock := TCriticalSection.Create;
 
 finalization
   FreeAndNil(MappingIcons);
+  FreeAndNil(MappingIconsResolved);
   FreeAndNil(MappingIconsLock);
 
 end.

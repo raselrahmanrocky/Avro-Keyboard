@@ -221,6 +221,9 @@ begin
   OnShow := FormShow;
   OnClose := FormClose;
   OnPaint := FormPaint;
+  // Row badges are drawn from the mapping payloads; resolve them for the rows
+  // this popup is about to paint (idempotent - normally all resolved already).
+  EnsureMappingIcons;
   PopulateVersions;
   AutoSizeForm;
 
@@ -526,10 +529,23 @@ begin
   // End the popup/focus lifetime before any engine/settings operation.
   CloseAndRestoreTarget;
 
-  // Default: fast-path
+  // Default
   if SameText(SelectedVersion, 'Default') then
   begin
-    if AnsiEngineManager.TrySwitchCached('Default') then
+    ErrorMsg := '';
+    if not AnsiEngineManager.TrySwitchCached('Default') then
+    begin
+      Screen.Cursor := crHourGlass;
+      ErrList := TStringList.Create;
+      try
+        if not AnsiEngineManager.SwitchEngine('Default', ErrList) then
+          ErrorMsg := 'Encoding is still being prepared. Please select it again.';
+      finally
+        ErrList.Free;
+        Screen.Cursor := crDefault;
+      end;
+    end;
+    if ErrorMsg = '' then
     begin
       AvroMainForm1.SyncActiveMappingTimestamp('Default');
       SaveAnsiVersionOnly;
@@ -537,7 +553,9 @@ begin
       AvroMainForm1.UpdateTrayIcon;
       if ShowAnsiSwitchNotification = 'YES' then
         ShowAnsiToastNotification('ANSI Version: Default');
-    end;
+    end
+    else
+      ShowAnsiToastNotification(ErrorMsg);
     Exit;
   end;
 
@@ -564,10 +582,15 @@ begin
     CachedEncoPassword := Password;
     RememberEncoPassword(TargetPath, Password);
     SaveSettings;
-    // Build this newly unlocked engine away from the UI. The first click
-    // returns immediately; a subsequent click performs a RAM-only switch.
+    // Build exactly THIS newly unlocked engine away from the UI.
+    //
+    // It used to warm the whole folder (CapturePreloadList), which is the
+    // startup bloat this branch removed: one unlock is one layout, and every
+    // other container was being parsed just for the privilege of sitting in
+    // RAM. CapturePreloadItem returns a single item - the one the user is
+    // about to select.
     PreloadThread := TAnsiPreloadThread.Create(
-      AnsiEngineManager.CapturePreloadList);
+      AnsiEngineManager.CapturePreloadItem(SelectedVersion));
     PreloadThread.FreeOnTerminate := True;
     PreloadThread.Start;
   end;

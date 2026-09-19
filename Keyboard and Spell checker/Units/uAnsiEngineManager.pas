@@ -61,15 +61,45 @@ uses
   clsUnicodeToBijoy2000,
   uAvroEncoIconSection;
 
+const
+  { Slot key of the compiled-in default engine (FCurrentKey / AddOrSetValue
+    compare against this lowercase form). }
+  DefaultEngineSlotKey = 'default';
+
+  { Parked (non-active) engines allowed to stay in RAM beside the live one.
+
+    1 keeps exactly the layout you just left - usually Default - switchable in
+    O(1) and parses everything else on first switch instead of preloading it.
+    That is the whole idle-footprint fix: the live engine is the only one
+    typing ever reads, so nothing else needs to be resident. Raise it to trade
+    RAM back for instant switching between more layouts.
+
+    Declared before the class because EvictToLimit uses it as a default
+    argument value. }
+  MaxWarmEngines = 1;
+
 type
   { One cached engine: the parked parser state plus the file it was parsed
     from and its last write time (used to detect external file changes so the
-    directory watcher can re-parse just that engine). }
+    directory watcher can re-parse just that engine).
+
+    LastUseStamp is a per-process sequence number assigned whenever this slot
+    is parked or restored, and it drives LRU eviction: a parked engine can be
+    dropped when the warm set is over its limit or when the app has gone idle -
+    the whole point of not keeping every mapping resident.
+
+    A monotonic counter, NOT GetTickCount: a cold preload parses several engines
+    inside one 15.6 ms clock granule, so tick-based ordering ties constantly and
+    a tie made the victim depend on dictionary iteration order - a preload that
+    had just filled the cache could evict the engine the user had literally just
+    switched away from. Stamps are unique, so the least recently USED engine is
+    always the one dropped. }
   TEngineSlot = class
   public
     DisplayName: string;
     FilePath: string;
     LastWriteTime: TDateTime;
+    LastUseStamp: Cardinal;
     State: TAnsiEngineState;
     destructor Destroy; override;
   end;
@@ -101,6 +131,11 @@ type
     FCache: TDictionary<string, TEngineSlot>; // key: Lowercase(DisplayName)
     FCurrentKey: string;
     FLock: TCriticalSection; // serializes every engine-state mutation
+    { Last value handed out by NextUseStamp; see TEngineSlot.LastUseStamp. }
+    FUseStamp: Cardinal;
+    { Hands out the next unique LRU stamp. Caller must hold FLock (every caller
+      is already inside it). }
+    function NextUseStamp: Cardinal;
     function SlotKey(const AName: string): string;
     { True while the unit globals actually hold a parsed engine. Invariant the
       whole cache rests on: either the globals own the active engine's
@@ -150,6 +185,9 @@ type
     procedure DropSlot(const AKey: string);
     { Lock-free core of InvalidateEngine. Caller must hold FLock. }
     procedure DoInvalidateEngine(const AName: string);
+    { Stamps AKey's slot as used now. Every park/restore path calls this, so LRU
+      eviction reflects what the user actually switched between. }
+    procedure TouchSlot(const AKey: string);
   public
     constructor Create;
     destructor Destroy; override;
@@ -166,10 +204,23 @@ type
       the worker from the AvroEncoFiles dictionary, which the folder-change
       timers clear/refill while the worker runs. }
     function CapturePreloadList: TArray<TPreloadItem>;
+    { Same snapshot, narrowed to ONE mapping: zero items when it is already
+      cached, is not a known file, or is a password container that was never
+      unlocked. This is what an explicit single-layout action (unlock in the
+      picker, import) warms before the user clicks it - warming the whole
+      folder for one unlock is the eager behaviour the cache no longer does. }
+    function CapturePreloadItem(const AName: string): TArray<TPreloadItem>;
     { Parses the built-in Default engine (if missing) and every decrypted
       snapshot result into the cache. Runs on the preload thread; takes
       FLock, so it can never interleave with a main-thread switch. Returns
-      the number of engines committed. }
+      the number of engines committed.
+
+      The warm limit is NOT applied here: a batch commits exactly what it was
+      asked for, and the LRU release is what keeps the ordinary session
+      bounded (the app no longer batches at startup - the version picker
+      commits the ONE engine a password unlock just made available, and
+      CapturePreloadItem is what it snapshots with). The next switch or the
+      idle release then trims whatever is left over. }
     function CommitPreload(const AResults: TArray<TPreloadResult>): Integer;
     { Makes AName the active engine. For cached engines this is O(1) pointer
       moves with zero disk/crypto/parse work. Uncached engines (password
@@ -192,6 +243,23 @@ type
     procedure RefreshFromDisk;
     { Removes a non-active engine from the cache (mapping deleted by user). }
     procedure RemoveEngine(const AName: string);
+    { Parked engines currently held in RAM (the live one does not count). }
+    function WarmEngineCount: Integer;
+    { Drops least-recently-used parked engines until at most ALimit remain.
+      Never touches the live engine (its slot is empty by design, so it cannot
+      be a candidate anyway). Returns how many were dropped. }
+    function EvictToLimit(ALimit: Integer = MaxWarmEngines): Integer;
+    { Drops every parked engine and clears the per-mapping icon cache, then
+      returns the working set to the OS. Unconditional core of
+      ReleaseIdleEngines, exposed separately so the memory gate can exercise it
+      without waiting for the real system to go idle. The LIVE engine is
+      untouched: typing keeps working, and only a later version switch pays for
+      a fresh parse. Returns the number of engines dropped. }
+    function ReleaseWarmEngines: Integer;
+    { Idle wrapper around ReleaseWarmEngines: does nothing until the user has
+      been idle (system-wide, see uAvroEngineStats.GetSystemIdleSeconds) for at
+      least AMinIdleMinutes. Returns 0 when it declined to release. }
+    function ReleaseIdleEngines(AMinIdleMinutes: Integer): Integer;
   end;
 
   { Startup preload worker. Decrypts every snapshot item in parallel and
@@ -214,21 +282,18 @@ type
     destructor Destroy; override;
   end;
 
-const
-  { Slot key of the compiled-in default engine (FCurrentKey / AddOrSetValue
-    compare against this lowercase form). }
-  DefaultEngineSlotKey = 'default';
-
 var
   AnsiEngineManager: TAnsiEngineManager;
 
 implementation
 
 uses
+  Winapi.Windows,
   uAvroEncoManager,
   uAvroEncoCrypto,
   uAnsiPersistentCache,
   uRegistrySettings,
+  uAvroEngineStats,
   System.IOUtils,
   System.Math,
   DebugLog;
@@ -245,6 +310,7 @@ begin
   FCache := TDictionary<string, TEngineSlot>.Create;
   FLock := TCriticalSection.Create;
   FCurrentKey := '';
+  FUseStamp := 0;
 end;
 
 destructor TAnsiEngineManager.Destroy;
@@ -267,6 +333,101 @@ end;
 function TAnsiEngineManager.SlotKey(const AName: string): string;
 begin
   Result := Lowercase(Trim(AName));
+end;
+
+{ Stamps a slot as used now. Every park/restore path calls this, so LRU
+  eviction reflects what the user actually switched between - not the order the
+  cache happened to be filled in. }
+procedure TAnsiEngineManager.TouchSlot(const AKey: string);
+var
+  Slot: TEngineSlot;
+begin
+  if FCache.TryGetValue(AKey, Slot) then
+    Slot.LastUseStamp := NextUseStamp;
+end;
+
+function TAnsiEngineManager.NextUseStamp: Cardinal;
+begin
+  Inc(FUseStamp);
+  Result := FUseStamp;
+end;
+
+function TAnsiEngineManager.WarmEngineCount: Integer;
+var
+  Key: string;
+begin
+  // A slot holds a PARKED engine only while that engine is not the live one:
+  // when it is live, its own slot is explicitly empty (the globals own the
+  // containers). Hollow slots therefore cost no engine RAM and are not counted.
+  Result := 0;
+  for Key in FCache.Keys do
+    if not IsSlotHollow(Key) then
+      Inc(Result);
+end;
+
+function TAnsiEngineManager.EvictToLimit(ALimit: Integer): Integer;
+var
+  Key, Victim: string;
+  Oldest: Cardinal;
+  Slot: TEngineSlot;
+begin
+  Result := 0;
+  if ALimit < 0 then
+    ALimit := 0;
+  while WarmEngineCount > ALimit do
+  begin
+    Victim := '';
+    Oldest := High(Cardinal);
+    for Key in FCache.Keys do
+    begin
+      if IsSlotHollow(Key) then
+        Continue; // nothing to free
+      if Key = FCurrentKey then
+        Continue; // never the live engine's name
+      Slot := FCache[Key];
+      if Slot.LastUseStamp <= Oldest then
+      begin
+        Oldest := Slot.LastUseStamp;
+        Victim := Key;
+      end;
+    end;
+    if Victim = '' then
+      Exit; // nothing evictable (only the live engine is resident)
+    DropSlot(Victim);
+    Inc(Result);
+    Log('Engine cache: evicted "' + Victim + '" (warm limit ' +
+      IntToStr(ALimit) + ')');
+  end;
+end;
+
+function TAnsiEngineManager.ReleaseWarmEngines: Integer;
+begin
+  FLock.Enter;
+  try
+    Result := EvictToLimit(0);
+  finally
+    FLock.Leave;
+  end;
+
+  // The icon bytes live INSIDE the mapping payloads, so keeping them is
+  // keeping a copy of every decrypted layout icon alive forever. They are
+  // regenerable: the next menu build (or the next version switch, for the
+  // active layout) resolves them again.
+  ClearMappingIcons;
+  TrimProcessWorkingSet;
+  LogAvroMemStats('idle release (engines dropped: ' + IntToStr(Result) + ')');
+end;
+
+function TAnsiEngineManager.ReleaseIdleEngines(AMinIdleMinutes: Integer): Integer;
+begin
+  if AMinIdleMinutes <= 0 then
+    Exit(0);
+  // Idle means the USER is idle system-wide, not that this process did
+  // nothing: a keyboard utility that trims while the user types in another
+  // window would only buy itself the page faults back on the next keystroke.
+  if Integer(GetSystemIdleSeconds) < AMinIdleMinutes * 60 then
+    Exit(0);
+  Result := ReleaseWarmEngines;
 end;
 
 function TAnsiEngineManager.GlobalsHoldEngine: Boolean;
@@ -309,6 +470,7 @@ begin
   if (FCurrentKey <> '') and FCache.TryGetValue(FCurrentKey, Slot) then
   begin
     CaptureEngineState(Slot.State); // globals -> slot; globals become empty
+    Slot.LastUseStamp := NextUseStamp;
     Result := True;
     Exit;
   end;
@@ -335,6 +497,7 @@ begin
     Exit;
   RestoreEngineState(Slot.State);
   FCurrentKey := AKey;
+  Slot.LastUseStamp := NextUseStamp;
   Result := True;
 end;
 
@@ -371,9 +534,16 @@ begin
     Exit;
   end;
 
-  // Nothing usable to restore: Default always exists and always renders, so
-  // the app can never be left with no engine at all.
-  if RestoreSlotState(DefaultEngineSlotKey) then
+  // Nothing usable to restore: Default always renders, so the app can never be
+  // left with no engine at all. Its slot may legitimately be missing - the LRU
+  // release drops parked engines - but Default is compiled in, so it can be
+  // rebuilt here without touching a file or the crypto stack. (The globals are
+  // empty on this path, so the parse cannot park anything.)
+  if (not RestoreSlotState(DefaultEngineSlotKey)) and
+    ParseIntoSlot('Default', '', nil) then
+    RestoreSlotState(DefaultEngineSlotKey);
+
+  if GlobalsHoldEngine then
   begin
     if PrevKey <> '' then
       Log('WARNING: live engine "' + PrevKey +
@@ -453,6 +623,7 @@ begin
   Slot.DisplayName := AName;
   Slot.FilePath := AFilePath;
   Slot.LastWriteTime := 0;
+  Slot.LastUseStamp := NextUseStamp;
   if AFilePath <> '' then
     try
       Slot.LastWriteTime := TFile.GetLastWriteTime(AFilePath);
@@ -494,6 +665,7 @@ begin
   begin
     Slot := TEngineSlot.Create;
     Slot.DisplayName := AName;
+    Slot.LastUseStamp := NextUseStamp;
     ParkLive; // same quarantine as the JSON path: never reset over a live engine
     ResetAnsiToDefaults;
     CaptureEngineState(Slot.State);
@@ -608,6 +780,46 @@ begin
   end;
 end;
 
+function TAnsiEngineManager.CapturePreloadItem(
+  const AName: string): TArray<TPreloadItem>;
+var
+  Info: TAvroEncoFileInfo;
+  Item: TPreloadItem;
+  Flag: Byte;
+begin
+  SetLength(Result, 0);
+  if (AName = '') or SameText(AName, 'Default') then
+    Exit;
+
+  FLock.Enter;
+  try
+    if FCache.ContainsKey(SlotKey(AName)) then
+      Exit; // already cached: nothing to warm
+    if (not Assigned(AvroEncoFiles)) or
+      (not AvroEncoFiles.TryGetValue(SlotKey(AName), Info)) then
+      Exit; // not a mapping this process knows about
+  finally
+    FLock.Leave;
+  end;
+
+  Item.DisplayName := Info.DisplayName;
+  Item.FilePath := Info.FilePath;
+  Item.Password := '';
+  if Info.IsEncoFile then
+  begin
+    Flag := GetAvroEncoProtectionFlag(Info.FilePath);
+    if Flag = AVROENCO_FLAG_USER_PASSWORD then
+    begin
+      Item.Password := GetEncoCachedPassword(Info.FilePath);
+      if Item.Password = '' then
+        Exit; // never unlocked on this computer: stays lazy until it is
+    end;
+  end;
+
+  SetLength(Result, 1);
+  Result[0] := Item;
+end;
+
 function TAnsiEngineManager.CommitPreload(
   const AResults: TArray<TPreloadResult>): Integer;
 var
@@ -656,6 +868,7 @@ begin
   finally
     FLock.Leave;
   end;
+  LogAvroMemStats('preload commit (' + IntToStr(Result) + ' engine(s))');
 end;
 
 function TAnsiEngineManager.SwitchEngine(const AName: string;
@@ -729,18 +942,28 @@ begin
       EnsureLiveEngine;
       Exit;
     end;
-    Log('Engine switch: "' + PrevKey + '" -> "' + Key + '"');
     Result := True;
+    // The engine just left is parked; anything beyond the warm limit is RAM
+    // this app has no use for (typing only ever reads the live one).
+    EvictToLimit;
   finally
     FLock.Leave;
     if OwnErr then
       ErrorLog.Free;
   end;
+  // NOTHING is logged on a successful switch, here or in TrySwitchCached.
+  // DebugLog opens, appends and closes a file per line, which measured at
+  // ~8.5 ms - an order of magnitude more than the O(1) pointer moves a warm
+  // switch actually costs, and this is the path a menu click or a picker
+  // selection takes. What the log keeps is every SHAPE change: parses,
+  // evictions, releases, repairs (the Log calls above) and the preload batch.
+  // Measured by kat_enginecache: 200 warm switches were 1702 ms with the
+  // transition line and a few ms without it.
 end;
 
 function TAnsiEngineManager.TrySwitchCached(const AName: string): Boolean;
 var
-  Key, PrevKey: string;
+  Key: string;
 begin
   Result := False;
   Key := SlotKey(AName);
@@ -757,7 +980,6 @@ begin
     // the healthy case.
     if (Key = FCurrentKey) and GlobalsHoldEngine then Exit(True);
 
-    PrevKey := FCurrentKey;
     if Key = FCurrentKey then
     begin
       // Active name but empty globals: the slot may still be valid (restore
@@ -788,8 +1010,8 @@ begin
       Log('Engine switch (fast path) failed: "' + AName + '"');
       Exit;
     end;
-    Log('Engine switch: "' + PrevKey + '" -> "' + Key + '" (fast path)');
     Result := True;
+    EvictToLimit;
   finally
     FLock.Leave;
   end;
