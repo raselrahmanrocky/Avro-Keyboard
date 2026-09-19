@@ -87,10 +87,6 @@ type
     AvroMouseClicknType2: TMenuItem;
     Jumptosystemtray1: TMenuItem;
     Exit1: TMenuItem;
-    Configuringyoursystem1: TMenuItem;
-    OTFBanglaFontscamewithAvroKeyboard1: TMenuItem;
-    Helponhelp1: TMenuItem;
-    N9: TMenuItem;
     BeforeYouStart1: TMenuItem;
     Overview1: TMenuItem;
     CustomizingAvroKeyboard1: TMenuItem;
@@ -101,8 +97,6 @@ type
     N10: TMenuItem;
     CreatingEditingFixedKeyboardLayouts1: TMenuItem;
     N11: TMenuItem;
-    Moredocumentsontheweb1: TMenuItem;
-    N15: TMenuItem;
     Aboutcurrentkeyboardlayout1: TMenuItem;
     AboutAvroKeyboard1: TMenuItem;
     ogglekeyboardmode1: TMenuItem;
@@ -129,10 +123,6 @@ type
     CustomizeAvroKeyboard1: TMenuItem;
     N21: TMenuItem;
     Helpfiles1: TMenuItem;
-    Configuringyoursystem2: TMenuItem;
-    OTFBanglaFontscamewithAvroKeyboard2: TMenuItem;
-    Helponhelp2: TMenuItem;
-    N22: TMenuItem;
     BeforeYouStart2: TMenuItem;
     Overview2: TMenuItem;
     CustomizingAvroKeyboard2: TMenuItem;
@@ -150,9 +140,6 @@ type
     HowtoDevelopBanglaWebPage2: TMenuItem;
     HowtoEmbedBanglaFontinWebPages2: TMenuItem;
     N26: TMenuItem;
-    Moredocumentsontheweb2: TMenuItem;
-    FreeOnlineSupport2: TMenuItem;
-    N27: TMenuItem;
     GetAcrobatReader2: TMenuItem;
     AboutAvroKeyboard2: TMenuItem;
     N28: TMenuItem;
@@ -180,7 +167,6 @@ type
     Spellcheck4: TMenuItem;
     N43: TMenuItem;
     IdleTimer: TTimer;
-    AboutCurrentskin1: TMenuItem;
     UnicodetoBijoytextconverter1: TMenuItem;
     ools1: TMenuItem;
     N46: TMenuItem;
@@ -191,10 +177,6 @@ type
     SkinDesignerDesignyourownskin2: TMenuItem;
     N48: TMenuItem;
     Helpfiles2: TMenuItem;
-    Configuringyoursystem3: TMenuItem;
-    OTFBanglaFontscamewithAvroKeyboard3: TMenuItem;
-    Helponhelp3: TMenuItem;
-    N35: TMenuItem;
     BeforeYouStart3: TMenuItem;
     Overview3: TMenuItem;
     CustomizingAvroKeyboard3: TMenuItem;
@@ -204,13 +186,9 @@ type
     N36: TMenuItem;
     CreatingEditingFixedKeyboardLayouts3: TMenuItem;
     N39: TMenuItem;
-    Moredocumentsontheweb3: TMenuItem;
-    FreeOnlineSupport3: TMenuItem;
-    N40: TMenuItem;
     GetAcrobatReader3: TMenuItem;
     N2: TMenuItem;
     Aboutcurrentkeyboardlayout2: TMenuItem;
-    Aboutcurrentskin2: TMenuItem;
     Options2: TMenuItem;
     FixedKeyboardLayout1: TMenuItem;
     UseModernStyleTyping1: TMenuItem;
@@ -281,9 +259,6 @@ type
     procedure UsefultoolsforBangla1Click(Sender: TObject);
     procedure Jumptosystemtray1Click(Sender: TObject);
     procedure Options1Click(Sender: TObject);
-    procedure Configuringyoursystem1Click(Sender: TObject);
-    procedure OTFBanglaFontscamewithAvroKeyboard1Click(Sender: TObject);
-    procedure Helponhelp1Click(Sender: TObject);
     procedure BeforeYouStart1Click(Sender: TObject);
     procedure Overview1Click(Sender: TObject);
     procedure CustomizingAvroKeyboard1Click(Sender: TObject);
@@ -292,8 +267,7 @@ type
     procedure BanglaTypingwithAvroMouse1Click(Sender: TObject);
     procedure FrequentlyAskedQuestionsFAQ1Click(Sender: TObject);
     procedure CreatingEditingFixedKeyboardLayouts1Click(Sender: TObject);
-    procedure Moredocumentsontheweb1Click(Sender: TObject);
-    procedure GetAcrobatReader1Click(Sender: TObject);
+    procedure JoinTelegramCommunity(Sender: TObject);
     procedure Aboutcurrentkeyboardlayout1Click(Sender: TObject);
     procedure AboutAvroKeyboard1Click(Sender: TObject);
     procedure RestoreAvroTopBar1Click(Sender: TObject);
@@ -315,7 +289,6 @@ type
     procedure Spellcheck1Click(Sender: TObject);
     procedure IdleTimerTimer(Sender: TObject);
     procedure WMAvroEmit(var Msg: TMessage); message WM_APP + 10;
-    procedure AboutCurrentskin1Click(Sender: TObject);
     procedure UnicodetoBijoytextconverter1Click(Sender: TObject);
     procedure FormCloseQuery(Sender: TObject; var CanClose: Boolean);
     procedure ShowPreviewWindow1Click(Sender: TObject);
@@ -350,18 +323,22 @@ type
         The tray needs its own HICON at the metric Windows asks for, and that
         metric changes with the display DPI, so AnsiIconHandles is keyed
         'name@size' - a DPI change then builds a second handle at the new size
-        instead of handing the shell a stale one to rescale. The menus need an
-        image-list slot instead, which every item can share.
+        instead of handing the shell a stale one to rescale.
+
+        The two "Select ANSI Encoding" parent items need an ImageList1 slot
+        instead, and that slot is built at ImageList1's OWN metric rather than
+        at the DPI-scaled tray metric - a 20/24/32 px handle does not belong in
+        a 16x16 list, and the fallback it used to trigger is what drew the
+        generic icon. See AnsiRootIconSlot.
 
         Handles here are handed to the tray through CopyIcon, so the tray owns a
         private copy and this cache stays valid across tray updates. Everything
         is released by ReleaseAnsiIconCache. }
-      AnsiIconImages:  TImageList;
       AnsiIconHandles: TDictionary<string, HICON>;
-      AnsiIconIndexes: TDictionary<string, Integer>;
       FAnsiRootIconIndex: Integer; // ImageList1 slot appended for the active layout icon (-1 = none yet)
+      FAnsiRootIconName:  string;  // the layout whose artwork occupies that slot ('' = unused)
 
-      function EnsureAnsiIconIndex(const AName: string): Integer;
+      function AnsiRootIconSlot(const AName: string): Integer;
       procedure ReleaseAnsiIconCache;
       procedure ReplaceAnsiMenuParentIcon;
 
@@ -525,18 +502,6 @@ begin
   ShowLayoutDescription(KeyboardLayoutPath);
 end;
 
-procedure TAvroMainForm1.AboutCurrentskin1Click(Sender: TObject);
-var
-  SkinPath: string;
-begin
-  if Lowercase(InterfaceSkin) = 'internalskin*' then
-    SkinPath := InterfaceSkin
-  else
-    SkinPath := GetAvroDataDir + 'Skin\' + InterfaceSkin + '.avroskin';
-
-  GetSkinDescription(SkinPath);
-end;
-
 procedure TAvroMainForm1.AppEventsSettingChange(Sender: TObject; Flag: Integer; const Section: string; var Result: LongInt);
 begin
   if SameText('ImmersiveColorSet', string(Section)) then
@@ -621,11 +586,6 @@ begin
   RefreshSettings;
 end;
 
-procedure TAvroMainForm1.Configuringyoursystem1Click(Sender: TObject);
-begin
-  Execute_Something(ExtractFilePath(Application.ExeName) + 'Configuring_system.htm');
-end;
-
 procedure TAvroMainForm1.CreateParams(var Params: TCreateParams);
 begin
   inherited CreateParams(Params);
@@ -699,7 +659,6 @@ begin
   // The caches themselves go too - ReleaseAnsiIconCache only empties them,
   // because a re-scan reuses the same dictionaries.
   FreeAndNil(AnsiIconHandles);
-  FreeAndNil(AnsiIconIndexes);
   Log('ReleaseAnsiIconCache');
 
   FreeAndNil(WindowDict);
@@ -769,7 +728,6 @@ begin
 
   AnsiMappingNames := TStringList.Create;
   AnsiIconHandles := TDictionary<string, HICON>.Create;
-  AnsiIconIndexes := TDictionary<string, Integer>.Create;
   LoadSettings;
   // The call above only covered the built-in default - AppThemeMode is read
   // here, so the stored theme has to be applied once more.
@@ -797,9 +755,9 @@ end;
 
 { =============================================================================== }
 
-procedure TAvroMainForm1.GetAcrobatReader1Click(Sender: TObject);
+procedure TAvroMainForm1.JoinTelegramCommunity(Sender: TObject);
 begin
-  Execute_Something('https://www.omicronlab.com/go.php?id=13');
+  ShellExecute(0, 'open', PChar('https://t.me/AvroUsersCommunity'), nil, nil, SW_SHOWNORMAL);
 end;
 
 function TAvroMainForm1.GetMyCurrentKeyboardMode: enumMode;
@@ -812,11 +770,6 @@ end;
 function TAvroMainForm1.GetMyCurrentLayout: string;
 begin
   Result := MyCurrentLayout;
-end;
-
-procedure TAvroMainForm1.Helponhelp1Click(Sender: TObject);
-begin
-  Execute_Something(ExtractFilePath(Application.ExeName) + 'help_on_help.htm');
 end;
 
 { =============================================================================== }
@@ -1499,11 +1452,6 @@ begin
   KeyLayout.CurrentKeyboardLayout := (Sender as TMenuItemExtended).Value;
 end;
 
-procedure TAvroMainForm1.Moredocumentsontheweb1Click(Sender: TObject);
-begin
-  Execute_Something('https://www.omicronlab.com/go.php?id=12');
-end;
-
 procedure TAvroMainForm1.ogglekeyboardmode2Click(Sender: TObject);
 begin
   KeyLayout.ToggleMode;
@@ -1568,11 +1516,6 @@ procedure TAvroMainForm1.Options1Click(Sender: TObject);
 begin
   CheckCreateForm(TfrmOptions, frmOptions, 'frmOptions');
   frmOptions.Show;
-end;
-
-procedure TAvroMainForm1.OTFBanglaFontscamewithAvroKeyboard1Click(Sender: TObject);
-begin
-  Execute_Something(ExtractFilePath(Application.ExeName) + 'open_type_font_list.htm');
 end;
 
 procedure TAvroMainForm1.OutputasANSIAreyousure1Click(Sender: TObject);
@@ -2013,6 +1956,10 @@ procedure TAvroMainForm1.PopupToolsPopup(Sender: TObject);
 begin
   // Only update checkmarks on existing items -- do NOT Clear/rebuild during popup
   SyncAnsiVersionChecks(AnsiVersionSubmenu1);
+  // The TopBar's tools menu holds its OWN "Select ANSI Encoding" parent item
+  // (AnsiVersionSubmenu1), so its left-gutter badge has to be refreshed here
+  // too - this popup used to sync only the checkmarks.
+  ReplaceAnsiMenuParentIcon;
 end;
 
 procedure TAvroMainForm1.PopupTrayPopup(Sender: TObject);
@@ -2025,64 +1972,111 @@ end;
 { Per-layout icons (system tray + encoding menus)                               }
 { =============================================================================== }
 
-{ The image-list slot for AName, adding that layout's icon on first use.
-  -1 means the mapping carries no icon (a legacy container, a plain .json, or a
-  damaged one), and the caller then leaves the item's ImageIndex alone.
+{ The ImageList1 slot holding AName's layout badge, adding it on first use and
+  overwriting it in place when the active layout changes.
 
-  A shared 32bpp TImageList rather than a per-item TBitmap: the menu renderer
-  draws an image-list entry with correct alpha and keeps the radio check in its
-  own gutter, whereas assigning a TBitmap to TMenuItem.Bitmap is what left a
-  dark background behind the transparent pixels of an icon. }
-function TAvroMainForm1.EnsureAnsiIconIndex(const AName: string): Integer;
+  -1 means "no badge for this name": an empty name, 'Default', an unassigned
+  list, or a mapping that carries no icon (a legacy container, a plain .json, a
+  damaged one, or a password-protected container that has not been unlocked
+  yet). The caller then falls back to the built-in ANSI icon deliberately -
+  never by accident.
+
+  The frame is decoded at ImageList1's OWN metric, not at the tray's
+  SM_CXSMICON one. GetAnsiTrayIcon answers with a 20/24/32 px handle on a
+  scaled display, and ImageList1 is a 16x16 list: TImageList.AddIcon wants a
+  bitmap matching the list, so putting the tray handle in there returned -1,
+  FAnsiRootIconIndex stayed -1, and the parent item drew built-in slot 30 while
+  the very same layout's badge looked right in the submenu (DrawIconEx on the
+  raw HICON) and in the tray (handed to TIcon directly). CreateHIconAtSize
+  picks a frame the container really carries, so this is the authored artwork
+  at its own size rather than a rescaled copy.
+
+  An image-list entry rather than a per-item TBitmap for the same reason the
+  submenu rows use one: the renderer draws it with correct alpha, whereas a
+  TBitmap assigned to TMenuItem.Bitmap left a dark background behind the
+  transparent pixels.
+
+  Exactly one slot is appended, on first use, and reused from then on: the list
+  grows by one entry however often the user switches layouts, and slot 30 keeps
+  its meaning as the built-in ANSI icon. }
+function TAvroMainForm1.AnsiRootIconSlot(const AName: string): Integer;
 var
   IconBytes: TBytes;
   H: HICON;
   Ico: TIcon;
-  Key: string;
+  Cols, Rows, R: Integer;
 begin
   Result := -1;
   if (AName = '') or SameText(AName, 'Default') then
     Exit;
-  if not Assigned(AnsiIconIndexes) then
+  if not Assigned(ImageList1) then
     Exit;
 
-  Key := Lowercase(AName);
-  if AnsiIconIndexes.TryGetValue(Key, Result) then
+  Cols := ImageList1.Width;
+  Rows := ImageList1.Height;
+  if (Cols <= 0) or (Rows <= 0) then
     Exit;
-  Result := -1; // TryGetValue leaves 0 behind on a miss
 
+  // A cached slot describes the layout that put it there, so it is only reused
+  // for that same name - and only while the list still holds it, because a
+  // recreated image-list handle drops the appended entry.
+  if SameText(AName, FAnsiRootIconName) and (FAnsiRootIconIndex >= 0) and
+    (FAnsiRootIconIndex < ImageList1.Count) then
+  begin
+    Result := FAnsiRootIconIndex;
+    Exit;
+  end;
+
+  // The one lookup the submenu badges resolve through as well: the icon cache
+  // is keyed by the mapping's display name, which is what the menu item's Hint
+  // carries and what AnsiVersion holds.
   IconBytes := GetMappingIconBytes(AName);
   if Length(IconBytes) = 0 then
     Exit;
 
-  if not Assigned(AnsiIconImages) then
+  H := CreateHIconAtSize(IconBytes, Cols, Rows);
+  if H = 0 then
   begin
-    AnsiIconImages := TImageList.Create(Self);
-    AnsiIconImages.Width := 16;
-    AnsiIconImages.Height := 16;
-    AnsiIconImages.ColorDepth := cd32Bit;
-    AnsiIconImages.Masked := False;
-    AnsiIconImages.DrawingStyle := dsTransparent;
+    Log('AnsiRootIconSlot: could not decode a ' + IntToStr(Cols) + 'x' +
+      IntToStr(Rows) + ' frame for the layout icon of "' + AName + '"');
+    Exit;
   end;
 
-  // 16 px is a frame the shipped icons really carry, so this is the authored
-  // artwork at its own size rather than a rescaled copy.
-  H := CreateHIconAtSize(IconBytes, 16, 16);
-  if H = 0 then
-    Exit;
   Ico := TIcon.Create;
   try
-    // TIcon adopts the handle, so freeing the wrapper releases H - and AddIcon
-    // has already copied the image into the list's own bitmap by then.
+    // TIcon adopts the handle, and the list copies the image into its own
+    // bitmap during AddIcon / ReplaceIcon, so freeing the wrapper is safe.
     Ico.Handle := H;
     H := 0;
-    Result := AnsiIconImages.AddIcon(Ico);
-    AnsiIconIndexes.AddOrSetValue(Key, Result);
+
+    if (FAnsiRootIconIndex >= 0) and (FAnsiRootIconIndex < ImageList1.Count) then
+    begin
+      if ImageList_ReplaceIcon(ImageList1.Handle, FAnsiRootIconIndex, Ico.Handle) >= 0 then
+        Result := FAnsiRootIconIndex
+      else
+        FAnsiRootIconIndex := -1;
+    end;
+
+    if (Result < 0) and (FAnsiRootIconIndex < 0) then
+    begin
+      R := ImageList1.AddIcon(Ico);
+      if R >= 0 then
+      begin
+        FAnsiRootIconIndex := R;
+        Result := R;
+      end;
+    end;
   finally
     Ico.Free;
     if H <> 0 then
       DestroyIcon(H);
   end;
+
+  if Result >= 0 then
+    FAnsiRootIconName := AName
+  else
+    Log('AnsiRootIconSlot: ImageList1 refused the ' + IntToStr(Cols) + 'x' +
+      IntToStr(Rows) + ' icon of "' + AName + '"');
 end;
 
 { A cached HICON for the tray at the CURRENT small-icon metric, or 0 when this
@@ -2123,15 +2117,20 @@ begin
     AnsiIconHandles.AddOrSetValue(Key, Result);
 end;
 
-{ Frees every cached handle and the shared image list. Called when the mapping
-  folders are re-scanned (the icons belong to files that may be gone) and on the
-  way out. The menu objects are left pointing at no image list, so a rebuild
-  cannot draw from a freed one. }
+{ Frees every cached tray handle and invalidates the parent-badge slot. Called
+  when the mapping folders are re-scanned (the icons belong to files that may be
+  gone) and on the way out. The menu objects are left pointing at no image list,
+  so a rebuild cannot draw from a freed one. }
 procedure TAvroMainForm1.ReleaseAnsiIconCache;
 var
   H: HICON;
 begin
-  FAnsiRootIconIndex := -1;
+  // The appended ImageList1 slot itself is kept - appending a fresh one per
+  // re-scan would grow the list without bound - but FAnsiRootIconName is
+  // cleared so the next resolve rewrites that slot: the icon bytes behind it
+  // are gone, and a renamed or deleted mapping must not keep drawing its old
+  // badge.
+  FAnsiRootIconName := '';
   // SubMenuImages, not Images: TMenuItem has no Images. VCL resolves an
   // item's image list by walking its parents for SubMenuImages and only then
   // falling back to the owning TMenu's Images, so setting it on these two
@@ -2149,51 +2148,38 @@ begin
         DestroyIcon(H);
     AnsiIconHandles.Clear;
   end;
-  if Assigned(AnsiIconIndexes) then
-    AnsiIconIndexes.Clear;
-  FreeAndNil(AnsiIconImages);
 end;
 
-{ Appends or updates a dedicated ImageList1 slot for the active layout icon,
-  and assigns it to mnuTraySelectAnsiEncoding so the parent menu item shows
-  the current layout in its left gutter. When no ANSI layout is active, falls
-  back to the built-in ANSI icon at slot 30. }
+{ Gives BOTH "Select ANSI Encoding" parent items the badge of the active
+  layout, so the root item's gutter and the checked submenu row can never
+  disagree.
+
+  There are two items with that caption - mnuTraySelectAnsiEncoding in
+  Popup_Tray and AnsiVersionSubmenu1 in Popup_Tools - and only the tray one was
+  assigned here, so the TopBar's tools menu showed no badge at all. A single
+  slot serves both, because each popup carries Images = ImageList1.
+
+  The badge follows AnsiVersion alone, exactly like the checkmark
+  SyncAnsiVersionChecks draws: it identifies WHICH encoding is selected, not
+  whether ANSI output happens to be switched on right now. Slot 30, the
+  built-in ANSI icon, is the deliberate fallback when nothing is selected (an
+  empty name or 'Default') or when the mapping carries no icon. }
 procedure TAvroMainForm1.ReplaceAnsiMenuParentIcon;
+const
+  ANSI_ROOT_IMAGE_INDEX = 30;
 var
-  AnsiHIcon: HICON;
-  Ico: TIcon;
+  Slot: Integer;
 begin
   if not Assigned(ImageList1) then Exit;
-  if not Assigned(mnuTraySelectAnsiEncoding) then Exit;
 
-  if (AnsiVersion <> '') and
-     (not SameText(AnsiVersion, 'Default')) and
-     (OutputIsBijoy = 'YES') then
-  begin
-    AnsiHIcon := GetAnsiTrayIcon(AnsiVersion);
-    if AnsiHIcon <> 0 then
-    begin
-      Ico := TIcon.Create;
-      try
-        Ico.Handle := CopyIcon(AnsiHIcon);
-        if Ico.Handle <> 0 then
-        begin
-          if FAnsiRootIconIndex < 0 then
-            FAnsiRootIconIndex := ImageList1.AddIcon(Ico)
-          else
-            ImageList_ReplaceIcon(ImageList1.Handle, FAnsiRootIconIndex, Ico.Handle);
-        end;
-      finally
-        Ico.Free;
-      end;
-    end;
-    if FAnsiRootIconIndex >= 0 then
-      mnuTraySelectAnsiEncoding.ImageIndex := FAnsiRootIconIndex
-    else
-      mnuTraySelectAnsiEncoding.ImageIndex := 30;
-  end
-  else
-    mnuTraySelectAnsiEncoding.ImageIndex := 30;
+  Slot := AnsiRootIconSlot(AnsiVersion);
+  if Slot < 0 then
+    Slot := ANSI_ROOT_IMAGE_INDEX;
+
+  if Assigned(mnuTraySelectAnsiEncoding) then
+    mnuTraySelectAnsiEncoding.ImageIndex := Slot;
+  if Assigned(AnsiVersionSubmenu1) then
+    AnsiVersionSubmenu1.ImageIndex := Slot;
 end;
 
 { Owner-draw handler for ANSI version submenu items.  Renders the gutter
@@ -2297,6 +2283,11 @@ var
   ICN: TIcon;
   AnsiHIcon, IconCopy: HICON;
 begin
+  // Both parent "Select ANSI Encoding" items are refreshed here, ABOVE the tray
+  // / TopBar split: those menus are reachable while the TopBar is visible too,
+  // and that branch used to return without touching the badge at all.
+  ReplaceAnsiMenuParentIcon;
+
   if IsFormVisible('TopBar') = False then
   begin
     // try/finally: this runs on every mode change and on startup, so a failure
@@ -2342,7 +2333,6 @@ begin
 
         Tray.Hint := 'Avro Keyboard.' + #13 + 'Running System default Keyboard Mode.' + #13 + 'Press ' + ModeSwitchKey + ' to switch to Bangla.';
       end;
-      ReplaceAnsiMenuParentIcon;
       Tray.Icon := ICN;
     finally
       ICN.Free;
@@ -2849,7 +2839,10 @@ begin
     SaveAnsiVersionOnly;
     UpdateAnsiVersionMenuChecks('Default');
     // 'Default' has no container of its own, so this restores the built-in
-    // icon rather than a layout's.
+    // icon rather than a layout's. AnsiVersion is committed above, so the
+    // parent badge is resolved from it in this same event cycle instead of
+    // lagging one click behind the checkmark.
+    ReplaceAnsiMenuParentIcon;
     UpdateTrayIcon;
     if ShowAnsiSwitchNotification = 'YES' then
       ShowAnsiToastNotification('ANSI Encoding: Default');
@@ -2904,7 +2897,10 @@ begin
     SyncActiveMappingTimestamp(SelectedVersion);
     SaveAnsiVersionOnly;
     UpdateAnsiVersionMenuChecks(SelectedVersion);
-    // The tray shows the icon of the layout that is now in force.
+    // AnsiVersion now holds the new selection, so the parent item's badge is
+    // re-resolved right here, and the tray shows the icon of the layout that
+    // is now in force.
+    ReplaceAnsiMenuParentIcon;
     UpdateTrayIcon;
     if ShowAnsiSwitchNotification = 'YES' then
       ShowAnsiToastNotification('ANSI Encoding: ' + SelectedVersion);
@@ -3234,8 +3230,8 @@ begin
     FAnsiMappingSnapshot := Snap;
     CleanupDuplicateMappings;
     // ScanAvroEncoFiles drops the per-mapping icon bytes; the GDI handles and
-    // image-list slots derived from them have to go with them, or a renamed or
-    // deleted mapping would keep drawing its old icon.
+    // the parent-badge slot derived from them have to be invalidated with them,
+    // or a renamed or deleted mapping would keep drawing its old icon.
     ReleaseAnsiIconCache;
     ScanAvroEncoFiles(AnsiMappingDir);
   end;
@@ -3244,9 +3240,9 @@ begin
   BuildSingleMenu(mnuTraySelectAnsiEncoding);
 
   // Child items now use OnAdvancedDrawItem for trailing icon badges, so
-  // SubMenuImages is no longer needed for them.  The root parent item
-  // mnuTraySelectAnsiEncoding still gets its left-gutter icon via
-  // ImageList1 in ReplaceAnsiMenuParentIcon.
+  // SubMenuImages is no longer needed for them.  Both root parent items -
+  // mnuTraySelectAnsiEncoding and AnsiVersionSubmenu1 - get their left-gutter
+  // icon from ImageList1 in ReplaceAnsiMenuParentIcon.
 end;
 
 end.

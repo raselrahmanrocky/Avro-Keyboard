@@ -1295,24 +1295,6 @@ object AvroMainForm1: TAvroMainForm1
     Images = ImageList1
     Left = 408
     Top = 72
-    object Configuringyoursystem1: TMenuItem
-      Caption = 'Configuring your system'
-      ImageIndex = 16
-      OnClick = Configuringyoursystem1Click
-    end
-    object OTFBanglaFontscamewithAvroKeyboard1: TMenuItem
-      Caption = 'Bangla Fonts came with Avro Keyboard'
-      ImageIndex = 16
-      OnClick = OTFBanglaFontscamewithAvroKeyboard1Click
-    end
-    object Helponhelp1: TMenuItem
-      Caption = 'Help on help...'
-      ImageIndex = 16
-      OnClick = Helponhelp1Click
-    end
-    object N9: TMenuItem
-      Caption = '-'
-    end
     object BeforeYouStart1: TMenuItem
       Caption = 'Before You Start'
       ImageIndex = 7
@@ -1360,21 +1342,9 @@ object AvroMainForm1: TAvroMainForm1
     object N11: TMenuItem
       Caption = '-'
     end
-    object Moredocumentsontheweb1: TMenuItem
-      Caption = 'More documents on the web...'
-      ImageIndex = 17
-      OnClick = Moredocumentsontheweb1Click
-    end
-    object N15: TMenuItem
-      Caption = '-'
-    end
     object Aboutcurrentkeyboardlayout1: TMenuItem
       Caption = 'About current keyboard layout...'
       OnClick = Aboutcurrentkeyboardlayout1Click
-    end
-    object AboutCurrentskin1: TMenuItem
-      Caption = 'About current skin...'
-      OnClick = AboutCurrentskin1Click
     end
     object AboutAvroKeyboard1: TMenuItem
       Caption = 'About Avro Keyboard...'
@@ -1508,24 +1478,6 @@ object AvroMainForm1: TAvroMainForm1
     object Helpfiles1: TMenuItem
       Caption = 'Help files'
       ImageIndex = 18
-      object Configuringyoursystem2: TMenuItem
-        Caption = 'Configuring your system'
-        ImageIndex = 16
-        OnClick = Configuringyoursystem1Click
-      end
-      object OTFBanglaFontscamewithAvroKeyboard2: TMenuItem
-        Caption = 'Bangla Fonts came with Avro Keyboard'
-        ImageIndex = 16
-        OnClick = OTFBanglaFontscamewithAvroKeyboard1Click
-      end
-      object Helponhelp2: TMenuItem
-        Caption = 'Help on help...'
-        ImageIndex = 16
-        OnClick = Helponhelp1Click
-      end
-      object N22: TMenuItem
-        Caption = '-'
-      end
       object BeforeYouStart2: TMenuItem
         Caption = 'Before You Start'
         ImageIndex = 7
@@ -1606,22 +1558,9 @@ object AvroMainForm1: TAvroMainForm1
       object N26: TMenuItem
         Caption = '-'
       end
-      object Moredocumentsontheweb2: TMenuItem
-        Caption = 'More documents on the web...'
-        ImageIndex = 17
-        OnClick = Moredocumentsontheweb1Click
-      end
-      object FreeOnlineSupport2: TMenuItem
-        Caption = 'Report an issue'
-        ImageIndex = 10
-        OnClick = UserForum1Click
-      end
-      object N27: TMenuItem
-        Caption = '-'
-      end
       object GetAcrobatReader2: TMenuItem
-        Caption = 'Get Acrobat Reader...'
-        OnClick = GetAcrobatReader1Click
+        Caption = 'Join Avro Community on Telegram'
+        OnClick = JoinTelegramCommunity
       end
     end
     object AboutAvroKeyboard2: TMenuItem
@@ -1823,6 +1762,10 @@ object AvroMainForm1: TAvroMainForm1
         ImageIndex = 22
         OnClick = Showactivekeyboardlayout1Click
       end
+      object Aboutcurrentkeyboardlayout2: TMenuItem
+        Caption = 'About current keyboard layout...'
+        OnClick = Aboutcurrentkeyboardlayout1Click
+      end
     end
     object mnuTraySelectAnsiEncoding: TMenuItem
       Caption = 'Select ANSI Encoding'
@@ -1877,24 +1820,6 @@ object AvroMainForm1: TAvroMainForm1
       object Helpfiles2: TMenuItem
         Caption = 'Help files'
         ImageIndex = 18
-        object Configuringyoursystem3: TMenuItem
-          Caption = 'Configuring your system'
-          ImageIndex = 16
-          OnClick = Configuringyoursystem1Click
-        end
-        object OTFBanglaFontscamewithAvroKeyboard3: TMenuItem
-          Caption = 'Bangla Fonts came with Avro Keyboard'
-          ImageIndex = 16
-          OnClick = OTFBanglaFontscamewithAvroKeyboard1Click
-        end
-        object Helponhelp3: TMenuItem
-          Caption = 'Help on help...'
-          ImageIndex = 16
-          OnClick = Helponhelp1Click
-        end
-        object N35: TMenuItem
-          Caption = '-'
-        end
         object BeforeYouStart3: TMenuItem
           Caption = 'Before You Start'
           ImageIndex = 7
@@ -1936,33 +1861,9 @@ object AvroMainForm1: TAvroMainForm1
         object N39: TMenuItem
           Caption = '-'
         end
-        object Moredocumentsontheweb3: TMenuItem
-          Caption = 'More documents on the web...'
-          ImageIndex = 17
-          OnClick = Moredocumentsontheweb1Click
-        end
-        object FreeOnlineSupport3: TMenuItem
-          Caption = 'Report an issue'
-          ImageIndex = 10
-          OnClick = UserForum1Click
-        end
-        object N40: TMenuItem
-          Caption = '-'
-        end
         object GetAcrobatReader3: TMenuItem
-          Caption = 'Get Acrobat Reader...'
-          OnClick = GetAcrobatReader1Click
-        end
-        object N2: TMenuItem
-          Caption = '-'
-        end
-        object Aboutcurrentkeyboardlayout2: TMenuItem
-          Caption = 'About current keyboard layout...'
-          OnClick = Aboutcurrentkeyboardlayout1Click
-        end
-        object Aboutcurrentskin2: TMenuItem
-          Caption = 'About current skin...'
-          OnClick = AboutCurrentskin1Click
+          Caption = 'Join Avro Community on Telegram'
+          OnClick = JoinTelegramCommunity
         end
       end
       object N48: TMenuItem
