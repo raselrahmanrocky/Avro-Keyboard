@@ -38,10 +38,14 @@ unit uCaretWatch;
 
   3. INSTALL ITSELF. AnsiCaretWatchStart/Stop are idempotent and safe to call
      from the form's startup and shutdown. With the feature switched off
-     (AnsiBackspaceHostErase <> 'YES') the watch still runs - it is cheap - but
-     uAnsiBackspace answers "not ours" before it looks at the cache, so the
-     press path is the pre-feature one. Stopping is what a shutdown must do:
-     both hooks belong to this process only.
+     (uAnsiBackspace.AnsiBackspaceEnabled = False) the two hooks still install -
+     they are two OS callbacks that set a flag, and that part is cheap - but the
+     TICK then does nothing at all: no burst, no provider, and above all no
+     reading. That distinction is the point of this unit: the clipboard layer
+     injects keys into whatever application is in the foreground and rewrites
+     the user's clipboard, and doing that for a description the press path will
+     discard is not acceptable, whatever it costs. Stopping is what a shutdown
+     must do: both hooks belong to this process only.
   ============================================================================= }
 
 interface
@@ -98,7 +102,8 @@ uses
   uCaretContextCache,
   uCaretContextSniffer,
   uRegistrySettings,
-  uUIAText;
+  uUIAText,
+  uAnsiBackspace; // AnsiBackspaceEnabled: the master switch the tick honours
 
 const
   { How much text one reading may hold. Wider than any glyph the shipped
@@ -142,6 +147,7 @@ var
   FEvents:        Integer;
   FRefreshes:     Integer;
   FHostReadable:  Boolean;
+  FOffTraced:     Boolean; // the "switched off" line is written once, not per tick
 
 { ------------------------------------------------------------------------------ }
 { the cheap caret probe: one local API call, no cross-process message, no wait.
@@ -206,8 +212,12 @@ begin
     and simply falls through. The reader itself caches the element of the focused
     control (with its pattern and its password verdict) and budgets its probes,
     so neither a blinking caret nor a host with no text to offer can turn this
-    into a stream of cross-process calls. }
-  if AnsiBackspaceUIA = 'YES' then
+    into a stream of cross-process calls.
+
+    The master switch is asked here as well as in the tick: a reader that is
+    switched off is not INSTALLED - the UI Automation client is never created,
+    nothing is probed, and no clipboard round-trip can start. }
+  if AnsiBackspaceEnabled and (AnsiBackspaceUIA = 'YES') then
   begin
     if FUia = nil then
       FUia := TUiaTextReader.Create;
@@ -223,7 +233,7 @@ begin
 
   { LAYER C - the clipboard round-trip, the most invasive layer: only when it is
     switched on, and only after A and B both came back empty. }
-  if AnsiBackspaceClipboard = 'YES' then
+  if AnsiBackspaceEnabled and (AnsiBackspaceClipboard = 'YES') then
     if SniffTextViaClipboard(AMaxChars, Text) and (Text <> '') then
     begin
       Result.Ok := True;
@@ -438,6 +448,23 @@ begin
 
   FPending := False;
 
+  { Switched off: the feature takes no reading at all. The hooks stay installed -
+    they only set a flag - but nothing below this line runs, so a user who turned
+    smart backspace off cannot have keys injected into the application they are
+    typing in, and cannot have their clipboard rewritten, for a reading that
+    uAnsiBackspace would discard unread. Traced once per off period, not per
+    tick: the log says why there is nothing to see instead of flooding it. }
+  if not AnsiBackspaceEnabled then
+  begin
+    if not FOffTraced then
+    begin
+      FOffTraced := True;
+      AnsiTrace('watch: smart backspace is switched off, so nothing is read');
+    end;
+    Exit;
+  end;
+  FOffTraced := False; // a later switch-on reads again
+
   NoteHostIdentity;
 
   { One burst, one reading: the budget in the cache makes a second ask in the
@@ -474,6 +501,7 @@ initialization
   FEvents := 0;
   FRefreshes := 0;
   FHostReadable := False;
+  FOffTraced := False;
 
 finalization
   AnsiCaretWatchStop;

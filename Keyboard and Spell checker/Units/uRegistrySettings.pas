@@ -99,6 +99,13 @@ var
   // the reph's letter survives, and ZWJ/ZWNJ + hasanta + consonant are erased
   // without their base, i.e. those two tails cost one extra press.
   AnsiBackspaceLegacy:   string;
+  // MASTER switch for the whole host-text erase below: NO means no reading is
+  // taken at all (no UI Automation, no clipboard round-trip), i.e. exactly the
+  // press path that shipped before this feature. '' - the value an installation
+  // that has never seen this key reports - means the documented default, YES.
+  // (uAnsiBackspace.AnsiBackspaceEnabled is the function that reads it; a
+  // global cannot be named that, the function already owns the identifier.)
+  AnsiSmartBackspace:    string;
   // Host text (text the engines did not type, so their ledger cannot describe
   // it) is erased one VISIBLE character per press, using the caret-context
   // reading and the active mapping's glyph table. NO restores the pre-feature
@@ -371,6 +378,9 @@ begin
   OutputIsBijoy := UpperCase(XML.GetValue('OutputIsBijoy', 'No'));
   AnsiBackspaceLegacy := UpperCase(XML.GetValue('AnsiBackspaceLegacy', 'NO'));
   AnsiBackspaceHostErase := UpperCase(XML.GetValue('AnsiBackspaceHostErase', 'YES'));
+  // Migrated from the key it replaced: an installation that had the feature off
+  // must stay off, and a fresh one gets YES.
+  AnsiSmartBackspace := UpperCase(XML.GetValue('AnsiSmartBackspace', AnsiBackspaceHostErase));
   AnsiBackspaceUnitCap := UpperCase(XML.GetValue('AnsiBackspaceUnitCap', '8'));
   AnsiBackspaceUIA := UpperCase(XML.GetValue('AnsiBackspaceUIA', 'YES'));
   AnsiBackspaceClipboard := UpperCase(XML.GetValue('AnsiBackspaceClipboard', 'NO'));
@@ -469,6 +479,7 @@ begin
   XML.SetValue('OutputIsBijoy', OutputIsBijoy);
   XML.SetValue('AnsiBackspaceLegacy', AnsiBackspaceLegacy);
   XML.SetValue('AnsiBackspaceHostErase', AnsiBackspaceHostErase);
+  XML.SetValue('AnsiSmartBackspace', AnsiSmartBackspace);
   XML.SetValue('AnsiBackspaceUnitCap', AnsiBackspaceUnitCap);
   XML.SetValue('AnsiBackspaceUIA', AnsiBackspaceUIA);
   XML.SetValue('AnsiBackspaceClipboard', AnsiBackspaceClipboard);
@@ -573,6 +584,9 @@ begin
     OutputIsBijoy := UpperCase(Reg.ReadStringDef('OutputIsBijoy', 'No'));
     AnsiBackspaceLegacy := UpperCase(Reg.ReadStringDef('AnsiBackspaceLegacy', 'NO'));
     AnsiBackspaceHostErase := UpperCase(Reg.ReadStringDef('AnsiBackspaceHostErase', 'YES'));
+    { Same migration as the XML path: the previous key decides what an install
+      that has never seen this one gets. }
+    AnsiSmartBackspace := UpperCase(Reg.ReadStringDef('AnsiSmartBackspace', AnsiBackspaceHostErase));
     AnsiBackspaceUnitCap := UpperCase(Reg.ReadStringDef('AnsiBackspaceUnitCap', '8'));
   AnsiBackspaceUIA := UpperCase(Reg.ReadStringDef('AnsiBackspaceUIA', 'YES'));
   AnsiBackspaceClipboard := UpperCase(Reg.ReadStringDef('AnsiBackspaceClipboard', 'NO'));
@@ -676,6 +690,7 @@ begin
     Reg.WriteString('OutputIsBijoy', OutputIsBijoy);
     Reg.WriteString('AnsiBackspaceLegacy', AnsiBackspaceLegacy);
     Reg.WriteString('AnsiBackspaceHostErase', AnsiBackspaceHostErase);
+    Reg.WriteString('AnsiSmartBackspace', AnsiSmartBackspace);
     Reg.WriteString('AnsiBackspaceUnitCap', AnsiBackspaceUnitCap);
   Reg.WriteString('AnsiBackspaceUIA', AnsiBackspaceUIA);
   Reg.WriteString('AnsiBackspaceClipboard', AnsiBackspaceClipboard);
@@ -852,6 +867,8 @@ begin
     AnsiBackspaceLegacy := 'NO';
   if not((AnsiBackspaceHostErase = 'YES') or (AnsiBackspaceHostErase = 'NO')) then
     AnsiBackspaceHostErase := 'YES';
+  if not((AnsiSmartBackspace = 'YES') or (AnsiSmartBackspace = 'NO')) then
+    AnsiSmartBackspace := 'YES';
   if (StrToIntDef(AnsiBackspaceUnitCap, 0) < 1) or (StrToIntDef(AnsiBackspaceUnitCap, 0) > 64) then
     AnsiBackspaceUnitCap := '8';
   if not((AnsiBackspaceUIA = 'YES') or (AnsiBackspaceUIA = 'NO')) then

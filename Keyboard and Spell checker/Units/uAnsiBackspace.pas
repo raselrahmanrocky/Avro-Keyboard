@@ -19,8 +19,11 @@ unit uAnsiBackspace;
   letter of an ANSI mapping is often several characters. This unit is the
   decision point for that case:
 
-    1. kill switch      - uRegistrySettings.AnsiBackspaceEnabled. Off means the
-                          press behaves exactly as it did before this feature.
+    1. kill switch      - uRegistrySettings.AnsiSmartBackspace (plus the key it
+                          replaced, AnsiBackspaceHostErase). Off means the
+                          press behaves exactly as it did before this feature,
+                          and - since 26f1507's follow-up - that no reading is
+                          taken either: the timer does nothing at all.
     2. a reading        - uCaretContextCache's cached text before the caret,
                           filled by uCaretWatch outside every hook: the
                           message path first (uCaretContextSniffer), then UI
@@ -66,6 +69,17 @@ type
 
 { ---- configuration (read from the registry settings by the callers) -------- }
 
+{ The master answer: is the host-text erase on at all? Two keys decide, and both
+  follow the "an empty string is the documented default" rule:
+
+    * AnsiSmartBackspace     - the user-facing master switch;
+    * AnsiBackspaceHostErase - the key it replaced, kept because it is what older
+      builds, the harnesses and the Options dialog write, and because its name
+      still says something true (host-side erase permitted).
+
+  An empty value means YES for either of them, so a caller that only ever set the
+  old key - every harness case written before the master switch existed - keeps
+  the feature ON instead of switching it off by accident. }
 function AnsiBackspaceEnabled: Boolean;
 function AnsiBackspaceMaxUnits: Integer;
 procedure AnsiBackspaceConfigureForTest(const AEnabled: Boolean; const AMaxUnits: Integer);
@@ -137,11 +151,19 @@ var
   FOverride: Boolean; // a test configured the unit directly
 
 function AnsiBackspaceEnabled: Boolean;
+
+  { '' is not "off": it is a key that was never written, and its documented
+    default is YES. }
+  function SettingOn(const AValue: string): Boolean;
+  begin
+    Result := (AValue = '') or (AValue = 'YES');
+  end;
+
 begin
   if FOverride then
     Result := FEnabled
   else
-    Result := AnsiBackspaceHostErase = 'YES';
+    Result := SettingOn(AnsiSmartBackspace) and SettingOn(AnsiBackspaceHostErase);
 end;
 
 function AnsiBackspaceMaxUnits: Integer;

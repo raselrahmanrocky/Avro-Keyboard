@@ -111,6 +111,7 @@ uses
   System.SysUtils,
   System.Classes,
   Vcl.Clipbrd,
+  Vcl.Graphics, // TBitmap: the non-text content the clipboard case puts there
   uRegistrySettings,
   uAnsiEngineManager,
   clsUnicodeToBijoy2000,
@@ -889,6 +890,13 @@ begin
 
   SetText(ACtl, HOST_TEXT);
   SetCaret(ACtl, 6);
+  { The FIRST control after the child was created was measured once answering no
+    reading at all: the parent's messages had been queued but the child's message
+    loop had not drained them yet, so its own probe read the text while the reader
+    that followed saw an empty control. One pump removes that startup race - a
+    check that fails on a cold start and passes on a rerun is worse than no
+    check. }
+  Pump(60);
   SayHostState(AName, ACtl);
 
   Reading.Window := 0;
@@ -899,6 +907,7 @@ begin
     Format('window=%x want %x, caret=%d, length=%d', [Reading.Window, NativeUInt(ACtl), Reading.CaretIndex, Reading.TextLength]));
 
   SetCaret(ACtl, 4);
+  Pump(30);
   Check(Format('%s: the characters read are the ones IMMEDIATELY before the caret', [AName]),
     SniffTextBeforeCaret(3, Text, Reading) and (Text = 'bcd'),
     Format('tail=[%s] want [bcd] (the first three characters of the text would be [abc])', [Text]));
@@ -1070,6 +1079,53 @@ begin
   end;
 end;
 
+{ The same, for content that is NOT text: what a screenshot or a copied file puts
+  on the clipboard, and exactly what a "restore" that can only write text would
+  destroy. }
+function TrySetClipBitmap(const ABitmap: TBitmap): Boolean;
+var
+  Attempt: Integer;
+begin
+  Result := False;
+  for Attempt := 1 to 5 do
+  begin
+    try
+      Clipboard.Assign(ABitmap);
+      Exit(True);
+    except
+      on E: Exception do
+        Sleep(20);
+    end;
+  end;
+end;
+
+{ How many key lines the CHILD has written so far. The child subclasses its
+  control and logs every key it receives, so this count is the harness's only
+  view from inside the target process - and the only honest way to assert that
+  something DID NOT PRESS A KEY. }
+function ChildKeyLines: Integer;
+var
+  Lines: TStringList;
+  I:     Integer;
+begin
+  Result := 0;
+  Lines := TStringList.Create;
+  try
+    if not FileExists(LogPath) then
+      Exit;
+    try
+      Lines.LoadFromFile(LogPath);
+    except
+      Exit; // a writer holds it momentarily: report no lines rather than raise
+    end;
+    for I := 0 to Lines.Count - 1 do
+      if (Lines[I] <> '') and (Lines[I][1] = '[') then
+        Inc(Result);
+  finally
+    Lines.Free;
+  end;
+end;
+
 function ClipAsText(out AText: string): Boolean;
 begin
   AText := '';
@@ -1164,6 +1220,97 @@ begin
     Format('reading=[%s] after %d ms, with the sentinel still on the clipboard', [Text, GetTickCount - T0]));
   Check('clipboard: the caret is still where it was after that refusal', SelectionStartOf(FEdit) = 0,
     Format('caret=%d want 0', [SelectionStartOf(FEdit)]));
+end;
+
+{ A clipboard that holds something this layer cannot put back.
+
+  A screenshot (Win+Shift+S) or a file list from Explorer has NO text format at
+  all, and TClipboard.SetAsText empties the clipboard before writing one - so the
+  "restore" would destroy it, silently: Clipboard.AsText answers '' for a bitmap
+  WITHOUT raising, so no caller could even tell. The layer therefore has to look
+  at the FORMATS and refuse before pressing or reading anything. Runs on any
+  desktop: the refusal is the whole point, and a half-executed round-trip is most
+  likely exactly where injected keys do not work. }
+procedure ClipboardJobNonText;
+var
+  Bmp:    TBitmap;
+  Text:   string;
+  Before: string;
+  Keys:   Integer;
+begin
+  SetText(FEdit, HOST_TEXT);
+  SetCaret(FEdit, 6);
+  Pump(60);
+  Before := TextOf(FEdit);
+
+  Bmp := TBitmap.Create;
+  try
+    Bmp.Width := 1;
+    Bmp.Height := 1;
+    Bmp.Canvas.Pixels[0, 0] := clRed;
+    if not TrySetClipBitmap(Bmp) then
+    begin
+      Skip('clipboard: the clipboard could not be given a bitmap (another application holds it)');
+      Exit;
+    end;
+
+    Keys := ChildKeyLines;
+    Check('clipboard: a non-text clipboard is refused', not SniffTextViaClipboard(3, Text),
+      Format('reading=[%s]', [Text]));
+    Check('clipboard: the refusal left the document and the caret alone',
+      (TextOf(FEdit) = Before) and (SelectionStartOf(FEdit) = 6) and (SelectionEndOf(FEdit) = 6),
+      Format('text=[%s] want [%s]; caret=%d..%d want 6..6', [TextOf(FEdit), Before, SelectionStartOf(FEdit), SelectionEndOf(FEdit)]));
+    Check('clipboard: the refusal pressed no key at all', ChildKeyLines = Keys,
+      Format('the control received %d key messages during the refusal', [ChildKeyLines - Keys]));
+    Check('clipboard: the non-text content is still on the clipboard', Clipboard.HasFormat(CF_BITMAP),
+      'CF_BITMAP is gone: the refusal did not come before the restore');
+  finally
+    Bmp.Free;
+  end;
+
+  TrySetClip(CLIP_SENTINEL); // leave the clipboard as the cases after this one expect
+end;
+
+{ The quarantine: what happens when a modifier cannot be released.
+
+  A desktop cannot be asked to hold a Shift down on demand, so the state is
+  declared through the unit's own test hook - the same shape
+  AnsiBackspaceConfigureForTest already uses in uAnsiBackspace. What the case
+  judges is the CONTRACT: while the latch is set and the desktop reports Shift
+  held, nothing at all happens; and the latch clears ITSELF as soon as the
+  keyboard is clean, so a one-off glitch does not disable the layer for the
+  session (which it would if the sniffer were switched off instead). }
+procedure ClipboardJobQuarantine;
+var
+  Text:   string;
+  Before: string;
+  Keys:   Integer;
+begin
+  SetText(FEdit, HOST_TEXT);
+  SetCaret(FEdit, 6);
+  TrySetClip(CLIP_SENTINEL);
+  Pump(60);
+  Before := TextOf(FEdit);
+
+  AnsiClipboardConfigureForTest(True, True);
+  try
+    Keys := ChildKeyLines;
+    Check('clipboard: while quarantined and Shift is held, an attempt refuses', not SniffTextViaClipboard(3, Text),
+      Format('reading=[%s]', [Text]));
+    Check('clipboard: the quarantine pressed nothing and moved nothing',
+      (ChildKeyLines = Keys) and (TextOf(FEdit) = Before) and (SelectionStartOf(FEdit) = 6) and (SelectionEndOf(FEdit) = 6),
+      Format('keys=%d (was %d) text=[%s] caret=%d..%d want 6..6', [ChildKeyLines, Keys, TextOf(FEdit), SelectionStartOf(FEdit),
+        SelectionEndOf(FEdit)]));
+    Check('clipboard: the quarantine is still in force', AnsiClipboardQuarantined, 'the latch cleared while Shift was held');
+
+    { A clean keyboard lifts it by itself, and the layer is usable again. }
+    AnsiClipboardConfigureForTest(True, False);
+    SniffTextViaClipboard(3, Text);
+    Check('clipboard: a clean keyboard clears the quarantine by itself', not AnsiClipboardQuarantined,
+      'the latch survived a clean keyboard');
+  finally
+    AnsiClipboardConfigureForTest(False, False);
+  end;
 end;
 
 { A password field refuses to copy, so the same guard has to answer for it. }
@@ -1336,6 +1483,8 @@ begin
     happens when they do NOT - so they run on any desktop. }
   RunJob('clipboard: an attempted read', ClipboardJobNoSideEffects);
   RunJob('clipboard: the refusals', ClipboardJobRefusals);
+  RunJob('clipboard: a non-text clipboard', ClipboardJobNonText);
+  RunJob('clipboard: the quarantine', ClipboardJobQuarantine);
 
   { The round-trip reading itself does need them. }
   if not SelectionMechanismWorks(FEdit, EDIT_ID, Why) then
@@ -1375,14 +1524,16 @@ end;
 
 procedure HookChecks;
 var
-  Text:    string;
-  Wide:    string;
-  Tail:    string;
-  Events:  Integer;
-  Refs:    Integer;
-  Base:    Integer;
-  T0:      Cardinal;
-  Watched: Boolean;
+  Text:     string;
+  Wide:     string;
+  Tail:     string;
+  Events:   Integer;
+  Refs:     Integer;
+  RefsBase: Integer;
+  KeyLines: Integer;
+  Base:     Integer;
+  T0:       Cardinal;
+  Watched:  Boolean;
 begin
   if not TakeFocus(FEdit, EDIT_ID) then
   begin
@@ -1416,6 +1567,48 @@ begin
       'the reading does not name the window-text layer');
     Check('hooks: the reading the watch took is fresh enough to erase behind', AnsiCaretContextVerify,
       'verify refused the reading the watch had just taken');
+
+    { ---- the MASTER SWITCH ------------------------------------------------ }
+
+    { The hooks are live, the provider is installed and the most invasive layer
+      is switched ON here, so a reading taken with the master switch off would
+      inject keys into the foreground window and the child would log them. The
+      master switch must therefore stop the READING, not just the erase: a user
+      who turns smart backspace off must not have their clipboard rewritten and
+      their document typed into for a description the press path discards. }
+    AnsiCaretWatchStats(Events, RefsBase);
+    AnsiSmartBackspace := 'NO';
+    AnsiBackspaceClipboard := 'YES';
+    try
+      Check('hooks: the master switch really turns the feature off', not AnsiBackspaceEnabled,
+        'AnsiBackspaceEnabled still reports on');
+
+      SetText(FEdit, HOST_TEXT);
+      SetCaret(FEdit, 6);
+      Pump(60);
+      KeyLines := ChildKeyLines;
+
+      AnsiCaretWatchNoteCaretEvent('harness: a caret event while the feature is switched off');
+      AnsiCaretWatchTick;
+      Check('hooks: with the master switch off the tick takes no reading', not AnsiCaretContextTail(Tail),
+        Format('tail=[%s] was cached even though the feature is off', [HexUnits(Tail)]));
+      AnsiCaretWatchStats(Events, Refs);
+      Check('hooks: ... so it counted no refresh either', Refs = RefsBase, Format('refreshes=%d (was %d)', [Refs, RefsBase]));
+      Check('hooks: ... and no key reached the application, so the clipboard layer never ran', ChildKeyLines = KeyLines,
+        Format('the control received %d key messages while the feature was off', [ChildKeyLines - KeyLines]));
+
+      { ... and it is the switch that did that: the same tick reads again the
+        moment it goes back on, with the same settings and the same layer. }
+      AnsiSmartBackspace := 'YES';
+      AnsiCaretWatchNoteCaretEvent('harness: a caret event after the feature came back');
+      AnsiCaretWatchTick;
+      AnsiCaretWatchStats(Events, Refs);
+      Check('hooks: switching it back on reads again', (Refs > RefsBase) and AnsiCaretContextTail(Tail) and (Tail = HOST_TEXT),
+        Format('refreshes=%d (was %d) tail=[%s] want [%s]', [Refs, RefsBase, HexUnits(Tail), HexUnits(HOST_TEXT)]));
+    finally
+      AnsiSmartBackspace := 'YES';
+      AnsiBackspaceClipboard := 'NO';
+    end;
 
     { ONE REAL KEY PRESS: injected the way a user's key arrives, seen by a real
       low-level hook, which does what the shipped hook does - open a burst and
@@ -1566,6 +1759,7 @@ begin
     ShowPrevWindow := 'NO';
     EnableCaretSniffer := 'YES';
     AnsiBackspaceLegacy := 'NO';
+    AnsiSmartBackspace := 'YES';
     AnsiBackspaceHostErase := 'YES';
     AnsiBackspaceUnitCap := '8';
     AnsiBackspaceUIA := 'YES';

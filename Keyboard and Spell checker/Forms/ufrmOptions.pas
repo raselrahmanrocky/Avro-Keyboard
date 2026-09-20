@@ -160,13 +160,16 @@ type
         and a broken one fails at run time, in the dialog, for the user. Built
         once, at the top of LoadSettings, and remembered in these fields so the
         same dialog instance can be reopened. }
+      chkAnsiSmart:     TCheckBox;
       chkAnsiHostErase: TCheckBox;
       chkAnsiUIA:       TCheckBox;
       chkAnsiClipboard: TCheckBox;
+      chkAnsiLegacy:    TCheckBox;
       chkAnsiDebugLog:  TCheckBox;
       edAnsiUnitCap:    TEdit;
       edAnsiApps:       TEdit;
 
+      procedure edAnsiUnitCapKeyPress(Sender: TObject; var Key: Char);
       procedure LoadSettings;
       procedure SaveSettings;
       function GetListIndex(List: TStrings; SearchS: string): Integer;
@@ -740,8 +743,27 @@ var
     Inc(RowY, 30);
   end;
 
+  { A wrapped line of prose under the row above. The per-application list needs
+    one: its parser ignores a bare class name silently, so a label that does not
+    state the grammar teaches a format that does nothing at all. }
+  procedure AddNote(const ACaption: string);
+  begin
+    Lbl := TLabel.Create(Self);
+    Lbl.Parent := Box;
+    Lbl.Left := 16;
+    Lbl.Top := RowY;
+    Lbl.Width := Box.Width - 32;
+    Lbl.Height := 34;
+    Lbl.AutoSize := False;
+    Lbl.WordWrap := True;
+    Lbl.Anchors := [akLeft, akTop, akRight];
+    Lbl.Caption := ACaption;
+    Lbl.ParentFont := True;
+    Inc(RowY, 38);
+  end;
+
 begin
-  if Assigned(chkAnsiHostErase) then
+  if Assigned(chkAnsiSmart) then
     Exit; // built already: this dialog instance is reused
 
   Box := TGroupBox.Create(Self);
@@ -754,14 +776,25 @@ begin
   Box.Caption := 'ANSI backspace (smart erase)';
 
   RowY := 24;
-  chkAnsiHostErase := AddCheck('Erase the whole glyph the application printed, not one ANSI unit');
+  { The master switch comes first, because everything below it is a reading
+    layer that only matters while it is on. }
+  chkAnsiSmart := AddCheck('Enable smart ANSI backspace (one press erases one whole Bengali glyph)');
+  chkAnsiHostErase := AddCheck('Erase whole glyphs in the application (off: one ANSI unit per press, as before this feature)');
   chkAnsiUIA := AddCheck('Read the text in front of the caret with UI Automation (Word, Chrome, editors)');
-  chkAnsiClipboard := AddCheck('Clipboard round-trip as a last resort (experimental; it moves the caret)');
+  chkAnsiClipboard := AddCheck('Clipboard round-trip as a last resort (experimental; it moves the caret and touches the clipboard)');
+  chkAnsiLegacy := AddCheck('Use the older erase rule (compatibility: the pre-feature cluster boundary)');
   chkAnsiDebugLog := AddCheck('Log the caret decisions for troubleshooting (OutputDebugString)');
-  edAnsiUnitCap := AddEdit('Never erase more than (ANSI units):', 40);
+  edAnsiUnitCap := AddEdit('Never erase more than (ANSI units, 1-64):', 40);
+  { The cap is a number: letters are refused as they are typed, so a typo cannot
+    be saved and then silently corrected at the next launch, out of sight. }
+  edAnsiUnitCap.MaxLength := 2;
+  edAnsiUnitCap.OnKeyPress := edAnsiUnitCapKeyPress;
   { The application list gets the rest of the row: a class-name list is long. }
-  edAnsiApps := AddEdit('Leave these applications alone (window classes, '';'' separated):', 200);
+  edAnsiApps := AddEdit('Per-application override (class=off to leave an app alone, class=on to keep it):', 200);
   edAnsiApps.Width := Box.Width - edAnsiApps.Left - 16;
+  AddNote(''';''-separated class=value pairs. A partial class name matches, case-insensitively; the LAST matching entry wins; ' +
+    'an unlisted application stays ON. Any value other than on / yes / 1 / all / default / cluster counts as OFF. ' +
+    'Example: Chrome_RenderWidgetHostHWND=off;wordpad=off');
 
   Box.Height := RowY + 14;
   if GlobalOutput_Panel.Height < Box.Top + Box.Height + 12 then
@@ -769,6 +802,15 @@ begin
 end;
 
 { =============================================================================== }
+
+{ Digits only: everything below #32 is an editing key (Backspace, Delete,
+  arrows) and stays allowed. }
+procedure TfrmOptions.edAnsiUnitCapKeyPress(Sender: TObject; var Key: Char);
+begin
+  if (Key < #32) or ((Key >= '0') and (Key <= '9')) then
+    Exit;
+  Key := #0;
+end;
 
 procedure TfrmOptions.LoadSettings;
 var
@@ -1045,10 +1087,19 @@ begin
     CheckIgnoreCapsLockShortcut.Checked := False;
 
   // ANSI caret-context settings (built in BuildAnsiContextOptions).
+  { '' is what an installation that has never seen this key reports: it means the
+    documented default, ON. }
+  chkAnsiSmart.Checked := AnsiSmartBackspace <> 'NO';
+
   if AnsiBackspaceHostErase = 'YES' then
     chkAnsiHostErase.Checked := True
   else
     chkAnsiHostErase.Checked := False;
+
+  if AnsiBackspaceLegacy = 'YES' then
+    chkAnsiLegacy.Checked := True
+  else
+    chkAnsiLegacy.Checked := False;
 
   if AnsiBackspaceUIA = 'YES' then
     chkAnsiUIA.Checked := True
@@ -1118,6 +1169,8 @@ end;
 { =============================================================================== }
 
 procedure TfrmOptions.SaveSettings;
+var
+  Cap: Integer;
 begin
   // =========================================================
   // General Settings
@@ -1303,13 +1356,21 @@ begin
   else
     IgnoreCapsLock := 'NO';
 
-  // ANSI caret-context settings (built in BuildAnsiContextOptions). The unit cap
-  // is free text: anything that is not a number falls back to the built-in
-  // default where it is read, so a typo cannot make the eraser guess a width.
+  // ANSI caret-context settings (built in BuildAnsiContextOptions).
+  if chkAnsiSmart.Checked = True then
+    AnsiSmartBackspace := 'YES'
+  else
+    AnsiSmartBackspace := 'NO';
+
   if chkAnsiHostErase.Checked = True then
     AnsiBackspaceHostErase := 'YES'
   else
     AnsiBackspaceHostErase := 'NO';
+
+  if chkAnsiLegacy.Checked = True then
+    AnsiBackspaceLegacy := 'YES'
+  else
+    AnsiBackspaceLegacy := 'NO';
 
   if chkAnsiUIA.Checked = True then
     AnsiBackspaceUIA := 'YES'
@@ -1326,7 +1387,18 @@ begin
   else
     AnsiBackspaceLog := 'NO';
 
-  AnsiBackspaceUnitCap := Trim(edAnsiUnitCap.Text);
+  { The cap is corrected HERE, in front of the user, and the field shows the
+    correction: leaving it to the loader turned a typo into the built-in default
+    on the NEXT launch, where nobody sees it happen. }
+  Cap := StrToIntDef(Trim(edAnsiUnitCap.Text), 0);
+  if (Cap < 1) or (Cap > 64) then
+  begin
+    Cap := StrToIntDef(AnsiBackspaceUnitCap, 0); // the value this dialog opened with
+    if (Cap < 1) or (Cap > 64) then
+      Cap := 8;
+    edAnsiUnitCap.Text := IntToStr(Cap);
+  end;
+  AnsiBackspaceUnitCap := IntToStr(Cap);
   AnsiBackspaceApps := Trim(edAnsiApps.Text);
 
   // Application theme (Interface Settings). The combo items are in

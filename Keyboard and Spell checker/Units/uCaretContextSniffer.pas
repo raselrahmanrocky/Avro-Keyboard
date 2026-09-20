@@ -21,7 +21,10 @@ unit uCaretContextSniffer;
   RichEdit controls. Zero side effects.
   B) Clipboard round-trip fallback - select one char left (Shift+Left),
   copy (Ctrl+C), read CF_UNICODETEXT, restore caret (Right), restore the
-  previous clipboard text. Used for Word/browsers/custom controls.
+  previous clipboard text. Used for Word/browsers/custom controls. It refuses
+  outright unless the clipboard holds text and nothing but text: the restore can
+  only write text back, so anything else (an image, a file list, formatted text)
+  would be destroyed by the attempt.
 
   Every synthetic key event is stamped with AVRO_SNIFF_TAG in dwExtraInfo so
   our own WH_KEYBOARD_LL hook passes them straight through without layout
@@ -91,8 +94,24 @@ function SniffTextBeforeCaret(const AMaxChars: Integer; out AText: string; out A
   This is the most invasive layer, so it is used only when the caller asks for it
   (AnsiBackspaceClipboard = 'YES', default NO) and only after the message path and
   UI Automation both came back empty. AText is '' when nothing could be read;
-  that is a normal answer. }
+  that is a normal answer.
+
+  It also refuses outright - without touching anything - unless the clipboard
+  holds text and nothing but text, because restores are text-only and an image or
+  a file list would be destroyed by the attempt (see ClipboardIsTextOnly). }
 function SniffTextViaClipboard(const AMaxChars: Integer; out AText: string): Boolean;
+
+{ TEST HOOK for the quarantine. The shipped application never calls it; the host
+  harness does, because no desktop can be asked to hold a modifier down on
+  demand. AQuarantined puts the layer into the state a stuck modifier leaves it
+  in, and AHoldShift declares what the desktop reports for Shift while the test
+  runs - the only thing the quarantine waits for. }
+procedure AnsiClipboardConfigureForTest(const AQuarantined, AHoldShift: Boolean);
+
+{ True while a stuck modifier left a selection standing and this layer refuses to
+  press anything more. It clears itself as soon as the desktop reports a clean
+  keyboard. }
+function AnsiClipboardQuarantined: Boolean;
 
 implementation
 
@@ -109,6 +128,21 @@ const
   SNIFF_MAX_TEXTLEN = $F000; // above this EM_GETSEL lo/hi contract is unsafe
   SNIFF_COPY_DELAY  = 25;    // ms wait after Ctrl+C
   SNIFF_SEL_DELAY   = 12;    // ms wait after Shift+Left
+
+  { The formats an ordinary TEXT copy reports - and nothing else. Windows
+    synthesises CF_OEMTEXT and CF_LOCALE for text, so a stricter list would refuse
+    most real text copies and make the layer useless; anything outside this list
+    (a bitmap, a file list, HTML + RTF + a preview from a browser copy) is content
+    this layer cannot put back. }
+  TEXT_CLIP_FORMATS: array [0 .. 3] of UINT = (CF_TEXT, CF_UNICODETEXT, CF_OEMTEXT, CF_LOCALE);
+
+var
+  { The quarantine: a round-trip that could not release the injected Shift left
+    its selection standing in the user's document, and until the desktop reports a
+    clean keyboard nothing may be pressed again. }
+  FQuarantined:   Boolean;
+  FTestDeclared:  Boolean; // a test declared what the desktop reports for Shift
+  FTestHoldShift: Boolean;
 
   { =============================================================================== }
 
@@ -185,6 +219,17 @@ begin
   Result := (GetAsyncKeyState(AVk) and $8000) <> 0;
 end;
 
+{ Is any Shift held? Both physical keys AND the generic one, because a stack that
+  reshapes modifiers does not always report them consistently. A test may declare
+  the answer instead (AnsiClipboardConfigureForTest). }
+function DesktopHoldsShift: Boolean;
+begin
+  if FTestDeclared then
+    Result := FTestHoldShift
+  else
+    Result := KeyHeld(VK_SHIFT) or KeyHeld(VK_LSHIFT) or KeyHeld(VK_RSHIFT);
+end;
+
 { Presses a modifier and waits for the desktop to agree that it is down. False
   means it never took effect (or was taken away again at once), and the caller
   must NOT press the key that depends on it. }
@@ -228,6 +273,20 @@ begin
     if (not KeyHeld(AVk)) and ((AAlso = 0) or (not KeyHeld(AAlso))) then
       Exit(True);
   end;
+end;
+
+{ The Shift, released as thoroughly as this unit can: the named left key, then
+  the physical right one (a stack may know only one of them), and finally a
+  re-read of the DESKTOP's own state. False means the keyboard is no longer ours
+  to command - pressing anything else would arrive modified, and the selection a
+  round-trip made would only grow. }
+function ReleaseShift: Boolean;
+begin
+  Result := ModifierUp(VK_SHIFT, VK_LSHIFT);
+  if Result then
+    Exit;
+  ModifierUp(VK_RSHIFT, VK_LSHIFT);
+  Result := not DesktopHoldsShift;
 end;
 
 { Ctrl+C. False = the Ctrl never took effect, in which case 'C' was NOT pressed:
@@ -359,6 +418,9 @@ end;
   promise by trusting its own input, so it asks the CONTROL what happened and
   undoes exactly that:
 
+    0. the clipboard is inspected before anything else and the round-trip is
+       refused unless it holds text and nothing but text, because the restore
+       below can only write text back (ClipboardIsTextOnly);
     1. the caret/selection is read before anything is pressed (EM_GETSEL - a
        standard EDIT/RICHEDIT is the only kind of control that can answer);
     2. the modifier is confirmed against the desktop before its key is pressed,
@@ -370,11 +432,99 @@ end;
            -> the caret is walked back to where it started, key by key, and
               NOTHING is copied - there is nothing to copy;
     4. the collapse only ever happens when a selection was really made, and the
-       caret is re-read afterwards so a mis-undo is visible instead of silent.
+       caret is re-read afterwards so a mis-undo is visible instead of silent;
+    5. when even a second attempt cannot release the Shift, the selection the
+       keys created stays standing - so the layer LATCHES, refuses to press
+       anything until the desktop reports a clean keyboard, and says so.
 
   A host that cannot answer (Chrome, Office and everything else this layer exists
   for) keeps the older best-effort shape: select, copy, collapse with one Right -
   there is nothing else to go on there, and the layer stays off by default. }
+
+{ What is ON the clipboard decides whether this layer may run at all: putting it
+  back means WRITING it again, and the only thing this unit can write is text.
+  TClipboard.SetAsText empties the clipboard first, so:
+
+    * a screenshot (Win+Shift+S) or a file list from Explorer - no text formats at
+      all - would be wiped by the "restore", and silently: Clipboard.AsText
+      answers '' for a bitmap WITHOUT raising, so the previous code could not even
+      tell that it had lost something;
+    * formatted text from Word, Chrome or WordPad comes back as plain text only.
+
+  Enumerated raw (the VCL wrapper exposes neither the format list nor any promise
+  that reading it does not force a render), and refused BEFORE a key is pressed or
+  the clipboard is read. True only when there is no format to object to. }
+function ClipboardIsTextOnly(out AOffending: UINT): Boolean;
+var
+  Fmt:     UINT;
+  I:       Integer;
+  Allowed: Boolean;
+begin
+  Result := False;
+  AOffending := 0;
+  if not OpenClipboard(0) then
+    Exit; // somebody else holds it open: refuse rather than gamble with their data
+
+  try
+    Fmt := EnumClipboardFormats(0);
+    while Fmt <> 0 do
+    begin
+      Allowed := False;
+      for I := Low(TEXT_CLIP_FORMATS) to High(TEXT_CLIP_FORMATS) do
+        if Fmt = TEXT_CLIP_FORMATS[I] then
+        begin
+          Allowed := True;
+          Break;
+        end;
+      if not Allowed then
+      begin
+        AOffending := Fmt;
+        Exit(False); // the finally block still closes the clipboard
+      end;
+      Fmt := EnumClipboardFormats(Fmt);
+    end;
+    Result := True;
+  finally
+    CloseClipboard;
+  end;
+end;
+
+{ Putting the previous clipboard text back, with patience.
+
+  The clipboard belongs to the whole desktop and any application can hold it open
+  for a moment - including the one whose answer to our own Ctrl+C is still being
+  rendered. A restore that gives up on the first exception is a restore that did
+  not happen: the user's clipboard is left holding whatever the copy produced (or
+  nothing at all), which is precisely the loss this layer must never cause. Five
+  attempts, then it says so in the trace instead of pretending. }
+function RestoreClipboardText(const AText: string): Boolean;
+var
+  I: Integer;
+begin
+  Result := False;
+  for I := 1 to 5 do
+  begin
+    try
+      Clipboard.AsText := AText;
+      Exit(True);
+    except
+      on E: Exception do
+        Sleep(20);
+    end;
+  end;
+end;
+
+procedure AnsiClipboardConfigureForTest(const AQuarantined, AHoldShift: Boolean);
+begin
+  FQuarantined := AQuarantined;
+  FTestDeclared := True;
+  FTestHoldShift := AHoldShift;
+end;
+
+function AnsiClipboardQuarantined: Boolean;
+begin
+  Result := FQuarantined;
+end;
 
 { The whole round-trip for ACount characters. False - with an empty AText - means
   no reading, and every path that answers False leaves the document, the caret
@@ -388,6 +538,7 @@ var
   Selected:         Boolean;
   Releasable:       Boolean;
   I:                Integer;
+  BadFormat:        UINT;
   SavedClip:        string;
   HadClip:          Boolean;
   Copied:           string;
@@ -398,6 +549,35 @@ begin
   Releasable := True;
   SelStart := 0;
   SelEnd := 0;
+
+  { A previous round-trip could not release the injected Shift and had to leave
+    its selection standing (step 2b). Nothing is pressed again until the desktop
+    reports a clean keyboard - and the latch clears ITSELF the moment it does, so
+    a one-off glitch cannot switch this layer off for the rest of the session
+    (which disabling the sniffer outright would do, and would take the
+    side-effect-free message path down with it). }
+  if FQuarantined then
+  begin
+    if DesktopHoldsShift then
+    begin
+      AnsiTrace('clipboard: quarantined - the desktop still holds Shift, so nothing is pressed');
+      Exit;
+    end;
+    FQuarantined := False;
+    AnsiTrace('clipboard: the keyboard is clean again; the quarantine is lifted');
+  end;
+
+  { Nothing is touched before the clipboard is known to be something this layer
+    can put back. }
+  if not ClipboardIsTextOnly(BadFormat) then
+  begin
+    if BadFormat <> 0 then
+      AnsiTrace(Format('clipboard: refused - the clipboard holds a non-text format (%d), which this layer cannot put back',
+        [BadFormat]))
+    else
+      AnsiTrace('clipboard: refused - the clipboard could not be opened (another process holds it)');
+    Exit;
+  end;
 
   hEdit := GetFocusedEditHandle;
 
@@ -433,13 +613,19 @@ begin
     end;
     Sleep(SNIFF_SEL_DELAY);
 
-    Releasable := ModifierUp(VK_SHIFT, VK_LSHIFT);
-    if not Releasable then
-      AnsiTrace('clipboard: the desktop kept the injected Shift down; the keyboard is left alone');
+    Releasable := ReleaseShift;
 
-    { ---- 2. what did the control actually do? --------------------------- }
+    { ---- 2. what did the control ACTUALLY do? --------------------------- }
     Selected := True; // a host that cannot answer keeps the best-effort shape
-    if Measured then
+
+    { A stuck modifier ends the round-trip here: with the Shift still down, a
+      Right EXTENDS the selection instead of collapsing it, so nothing more is
+      pressed. Reading the control costs nothing and lets the trace below name
+      what was left where. }
+    if Measured and (not Releasable) then
+      TargetSelection(hEdit, SelStart, SelEnd);
+
+    if Measured and Releasable then
     begin
       if not (TargetSelection(hEdit, SelStart, SelEnd) and (SelStart = Before - ACount) and (SelEnd = Before)) then
       begin
@@ -463,8 +649,24 @@ begin
       end;
     end;
 
+    { ---- 2b. a modifier that will not release --------------------------- }
     if not Releasable then
-      Exit; // a stuck modifier: pressing anything more would make it worse
+    begin
+      { Rare, and the one failure this layer cannot undo: the Shift+Left keys
+        really did move the selection, so that selection is standing in the
+        user's document - and the next keystroke THEY make would replace it. No
+        further key is pressed (with a Shift stuck, a Right would EXTEND the
+        selection, and a collapse is impossible), the state is latched so the
+        next attempt refuses too, and the log names what was left where. }
+      FQuarantined := True;
+      if Measured then
+        AnsiTrace(Format('clipboard: the desktop kept the injected Shift down; a selection at %d..%d is left standing ' +
+          'and this layer is quarantined until the keyboard is clean', [SelStart, SelEnd]))
+      else
+        AnsiTrace('clipboard: the desktop kept the injected Shift down; this control cannot report what was left ' +
+          'selected, and this layer is quarantined until the keyboard is clean');
+      Exit;
+    end;
     if not Selected then
       Exit;
 
@@ -497,11 +699,15 @@ begin
         AnsiTrace(Format('clipboard: the collapse left the caret at %d..%d instead of %d', [SelStart, SelEnd, Before]));
     end;
 
-    if HadClip then
-      try
-        Clipboard.AsText := SavedClip;
-      except
-      end;
+    { Text and nothing but text can be written back (the format gate at the top is
+      what makes this true), and only when there was something to disturb: an
+      empty SavedClip means the clipboard was empty, so writing '' would rewrite
+      something this layer never touched. }
+    if HadClip and (SavedClip <> '') then
+    begin
+      if not RestoreClipboardText(SavedClip) then
+        AnsiTrace('clipboard: the previous clipboard content could not be put back');
+    end;
   end;
 end;
 
