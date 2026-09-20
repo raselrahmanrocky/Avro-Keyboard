@@ -34,6 +34,10 @@ type
       function ProcessVKeyDown(const KeyCode: Integer; var Block: Boolean): string;
       procedure ProcessVKeyUP(const KeyCode: Integer; var Block: Boolean);
       procedure ResetDeadKey;
+      { Forwards to the character engine: the text in front of the caret is no
+        longer this engine's to describe. Avro Phonetic itself keeps no ANSI
+        ledger; the call is for its ANSI/CharBased half. }
+      procedure InvalidateAnsiTail;
       procedure SelectCandidate(const Item: string); // For Avro Phonetic
       // Published
       property AutoCorrectEnabled: Boolean read GetAutoCorrectEnabled write SetAutoCorrectEnabled;
@@ -84,6 +88,13 @@ end;
 procedure TAvroPhonetic.ResetDeadKey;
 begin
   CharBased.ResetDeadKey;
+end;
+
+{ =============================================================================== }
+
+procedure TAvroPhonetic.InvalidateAnsiTail;
+begin
+  CharBased.InvalidateAnsiTail;
 end;
 
 { =============================================================================== }

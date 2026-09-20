@@ -33,6 +33,11 @@ type
     Results: TStringList;
   end;
 
+  { TEST / EMBEDDING HOOK: one sink for everything this engine writes to the
+    host, so a head-less harness can capture the exact (EraseCount, Text)
+    stream. Nil in production. }
+  TE2BHostEditEvent = procedure(const EraseCount: Integer; const Text: string) of object;
+
   // Skeleton of Class TE2BCharBased
 type
   TE2BCharBased = class
@@ -53,12 +58,17 @@ type
       DetermineZWNJ_ZWJ:         string;
       PhoneticCache:             array [1 .. Max_EnglishLength] of TPhoneticCache;
 
+      // TEST / EMBEDDING HOOK: nil in production, so the engine always talks to
+      // the real host unless a caller replaces it.
+      FOnRawEmit: TE2BHostEditEvent;
+
       procedure Fix_ZWNJ_ZWJ(var rList: TStringList);
       procedure ProcessSpace(var Block: boolean);
       procedure ParseAndSend;
       procedure ParseAndSendNow;
       procedure ProcessEnter(var Block: boolean);
       procedure DoBackspace(var Block: boolean);
+      procedure RawSend(const EraseCount: Integer; const Text: string);
       procedure MyProcessVKeyDown(const KeyCode: Integer; var Block: boolean; const var_IsLogicalShift: boolean; const var_IsTrueShift: boolean);
       procedure AddStr(const Str: string);
 
@@ -84,6 +94,27 @@ type
       procedure ProcessVKeyUP(const KeyCode: Integer; var Block: boolean);
       procedure ResetDeadKey;
       procedure SelectCandidate(const Item: string);
+
+      { The text in front of the caret is no longer this engine's to describe:
+        the caret left the window, or the layout / mode changed under it. Drops
+        the committed ledger so the next Backspace can never erase text of a
+        document this ledger did not type into. }
+      procedure InvalidateAnsiTail;
+
+      { TEST / EMBEDDING HOOKS - assigning OnRawEmit replaces the real host for
+        the duration; the ledger is private, so a harness seeds and reads it
+        through these two as well. No production path calls SeedCommitted. }
+      property OnRawEmit: TE2BHostEditEvent read FOnRawEmit write FOnRawEmit;
+      procedure SeedCommittedForTest(const S: string);
+      property CommittedForTest: string read CommittedBanglaT;
+      { The backspace path itself, so a harness does not have to build the key
+        plumbing, and the engine's own converter, so it can predict the screen
+        from the ledger (Convert carries per-instance toggle state, so a
+        second instance is not necessarily equivalent). No production path
+        calls either of them. }
+      procedure BackspaceForTest(var Block: Boolean);
+      property ConverterForTest: TUnicodeToBijoy2000 read Bijoy;
+
       // Published
       property AutoCorrectEnabled: boolean read GetAutoCorrectEnabled write SetAutoCorrectEnabled;
   end;
@@ -96,15 +127,58 @@ uses
   uForm1,
   clsLayout,
   uRegistrySettings,
+  uAnsiBackspace,
   ufrmPrevW,
   uSimilarSort,
   uRegExPhoneticSearch,
   uFileFolderHandling,
   BanglaChars,
+  clsAnsiGrapheme,
   uDBase,
   WindowsVersion;
 
 { TE2BCharBased }
+
+{ =============================================================================== }
+{
+  The single place this engine writes to the host. One erase, then one type,
+  so the test sink and the real injection can never diverge.
+}
+procedure TE2BCharBased.RawSend(const EraseCount: Integer; const Text: string);
+begin
+  if Assigned(FOnRawEmit) then
+    FOnRawEmit(EraseCount, Text)
+  else
+  begin
+    if EraseCount > 0 then
+      Backspace(EraseCount);
+    if Text <> '' then
+      SendKey_Char(Text);
+  end;
+end;
+
+{
+  TEST / EMBEDDING HOOK: leaves the ledger exactly as a committed word leaves
+  it - nothing live behind the text - so a head-less harness reaches the
+  committed-text branch of DoBackspace directly.
+}
+procedure TE2BCharBased.SeedCommittedForTest(const S: string);
+begin
+  CommittedBanglaT := S;
+  PrevBanglaT := '';
+  NewBanglaText := '';
+  EnglishT := '';
+end;
+
+{
+  TEST / EMBEDDING HOOK: drives the backspace path directly, so a head-less
+  harness does not need the main form, a keyboard mode or a host window (this
+  engine's key handler reads the main form for the mode).
+}
+procedure TE2BCharBased.BackspaceForTest(var Block: Boolean);
+begin
+  DoBackspace(Block);
+end;
 
 { =============================================================================== }
 
@@ -332,6 +406,9 @@ var
   SavedConsonant:     string;
   L:                  Integer;
   SavedCommitted:     string;
+  PrevAnsi, NewAnsi:  string;
+  NewCommitted:       string;
+  Matched:            Integer;
 begin
 
   if (Length(EnglishT) - 1) <= 0 then
@@ -369,9 +446,38 @@ begin
       BijoyNewBanglaText := Bijoy.Convert(NewBanglaText);
       if Length(BijoyNewBanglaText) >= 1 then
       begin
-        Backspace(Length(BijoyNewBanglaText));
+        RawSend(Length(BijoyNewBanglaText), '');
         Block := True;
       end
+      else if CommittedBanglaT <> '' then
+      begin
+        { Nothing live behind the caret: the word sitting there was committed
+          by this engine. ONE press erases ONE grapheme cluster of it - the
+          same shared rule the other engines use, so every mapping behaves the
+          same - and the screen is re-synced with the smallest ANSI diff.
+          Handing the press to the host removed a single character and left
+          the rest of the glyph on screen. }
+        if not DropLastGraphemeCluster(CommittedBanglaT, NewCommitted, AnsiBackspaceLegacy = 'YES') then
+        begin
+          Block := False;
+        end
+        else
+        begin
+          PrevAnsi := Bijoy.Convert(CommittedBanglaT);
+          NewAnsi := Bijoy.Convert(NewCommitted);
+          CommittedBanglaT := NewCommitted;
+          Matched := CommonPrefixLen(PrevAnsi, NewAnsi);
+          RawSend(Length(PrevAnsi) - Matched, Copy(NewAnsi, Matched + 1, MaxInt));
+          Block := True;
+        end;
+      end
+      else if AnsiEraseHostCluster(RawSend) then
+        { Not ours: the text behind the caret was not typed by this engine. The
+          caret-context reading and the active mapping's glyph table say how
+          many ANSI units its last visible character occupies, and the engine's
+          own RawSend erases exactly those. Returns False on every doubt, so
+          the host's single-character backspace stays in place. }
+        Block := True
       else
         Block := False;
     end;
@@ -408,15 +514,18 @@ begin
   // TODO: Move this settings based logic to the preview window,
   // it should be able to decide itself if the windows should be visible or not
   // then make HidePreview private there
-  if ShowPrevWindow = 'YES' then
+  //
+  // The preview is part of the UI, not of the typed text, and the engine is
+  // driven without one in a head-less harness (and could outlive it at
+  // shutdown), so the form is dereferenced only when it exists. Same behaviour
+  // whenever it does.
+  if Assigned(frmPrevW) then
   begin
-    if EnglishT <> '' then
+    if (ShowPrevWindow = 'YES') and (EnglishT <> '') then
       frmPrevW.UpdatePreviewCaption(EnglishT)
     else
       frmPrevW.HidePreview;
-  end
-  else
-    frmPrevW.HidePreview;
+  end;
 
 end;
 
@@ -1560,6 +1669,16 @@ begin
   if ShowPrevWindow = 'YES' then
     frmPrevW.HidePreview;
 
+end;
+
+{ =============================================================================== }
+
+{ A foreground change is not a reason to drop the live buffer (the typed word is
+  still ours), but it is a reason to stop describing what sits behind the caret:
+  the ledger was built for another document. }
+procedure TE2BCharBased.InvalidateAnsiTail;
+begin
+  CommittedBanglaT := '';
 end;
 
 { =============================================================================== }

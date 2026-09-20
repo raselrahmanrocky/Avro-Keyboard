@@ -138,6 +138,8 @@
             <Form>Form1</Form>
         </DCCReference>
         <DCCReference Include="clsUnicodeToBijoy2000.pas"/>
+        <DCCReference Include="clsAnsiGrapheme.pas"/>
+        <DCCReference Include="clsAnsiAtomMap.pas"/>
         <DCCReference Include="..\Keyboard and Spell checker\Units\BanglaChars.pas"/>
         <DCCReference Include="..\Keyboard and Spell checker\Units\uFileFolderHandling.pas"/>
         <DCCReference Include="..\Keyboard and Spell checker\Units\WindowsDarkMode.pas"/>

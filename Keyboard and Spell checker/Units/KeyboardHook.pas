@@ -48,7 +48,8 @@ uses
   clsLayout,
   uRegistrySettings,
   uWindowHandlers,
-  uKeyboardMacro;
+  uKeyboardMacro,
+  uCaretContextCache;
 
 { =============================================================================== }
 
@@ -218,6 +219,26 @@ begin
       TrackedAlt := False;
       TrackedWin := False;
       RecordingFinalized := False;
+    end;
+
+    // ----------------------------------------------
+    // Caret-context budget (ANSI host text). Every real key opens one burst,
+    // and the reading of the text in front of the caret is dropped for every
+    // key EXCEPT Backspace - the press that needs that reading. Both calls are
+    // O(1): no host call, no allocation, nothing that can block a hook. The
+    // reading itself is taken by the application timer (uCaretWatch), never
+    // here.
+    // ----------------------------------------------
+    if (wParam = 256) or (wParam = 260) then // KeyDown
+    begin
+      AnsiCaretBurstBegin;
+      if kbdllhs.vkCode <> VK_BACK then
+        AnsiCaretContextDrop('another key is about to change the text');
+    end
+    else if (wParam = 257) or (wParam = 261) then // KeyUp
+    begin
+      AnsiCaretContextDrop('the press was processed');
+      AnsiCaretBurstEnd;
     end;
 
     // ----------------------------------------------

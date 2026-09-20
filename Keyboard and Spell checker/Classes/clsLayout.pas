@@ -72,6 +72,12 @@ type
       function ProcessVKeyDown(const KeyCode: Integer; var Block: Boolean): string;
       procedure ProcessVKeyUP(const KeyCode: Integer; var Block: Boolean);
       procedure ResetDeadKey;
+      { Tells every engine that the text in front of the caret is no longer
+        theirs to describe (a foreground change, a layout or mode switch, the
+        engine being parked): their committed ledgers are dropped and the cached
+        caret reading is dropped with them, so the next Backspace reads again
+        instead of erasing in a document the ledger never typed into. }
+      procedure InvalidateAnsiTail;
       procedure FlushEmit; // Deferred output: drains the old-style layout emit queue
       procedure ToggleMode;
       procedure BanglaMode;
@@ -99,6 +105,7 @@ implementation
 uses
   KeyboardHook,
   KeyboardLayoutLoader,
+  uAnsiBackspace,
   uRegistrySettings;
 
 { TLayout }
@@ -209,6 +216,30 @@ begin
   AvroPhonetic.ResetDeadKey;
   GenericModernFixed.ResetDeadKey;
   GenericOldFixed.ResetDeadKey;
+
+  { A layout / mode switch or a foreground change reaches the engines here, so
+    the tail that no longer describes the caret goes with it - the next
+    Backspace reads again instead of trusting a ledger from another window. }
+  InvalidateAnsiTail;
+end;
+
+{ =============================================================================== }
+
+procedure TLayout.InvalidateAnsiTail;
+begin
+  { Every engine gets the message, whether or not it currently answers keys -
+    the engine that was active a moment ago is exactly the one whose ledger
+    would be stale. }
+  if Assigned(GenericModernFixed) then
+    GenericModernFixed.InvalidateAnsiTail;
+  if Assigned(GenericOldFixed) then
+    GenericOldFixed.InvalidateAnsiTail;
+  if Assigned(AvroPhonetic) then
+    AvroPhonetic.InvalidateAnsiTail;
+
+  { The cached reading of the host text goes too: it described a document the
+    press may no longer be looking at. }
+  AnsiBackspaceInvalidate;
 end;
 
 { =============================================================================== }

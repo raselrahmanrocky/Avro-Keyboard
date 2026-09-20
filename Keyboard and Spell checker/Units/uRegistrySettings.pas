@@ -93,6 +93,39 @@ var
 
   // Global Output settings
   OutputIsBijoy:         string;
+  // ANSI backspace width. NO (default) erases ONE grapheme cluster like
+  // Unicode does - ka + hasanta + ssa, ka + i-kar, reph + hasanta + consonant
+  // all go in a single press. YES keeps the pre-existing behaviour instead:
+  // the reph's letter survives, and ZWJ/ZWNJ + hasanta + consonant are erased
+  // without their base, i.e. those two tails cost one extra press.
+  AnsiBackspaceLegacy:   string;
+  // Host text (text the engines did not type, so their ledger cannot describe
+  // it) is erased one VISIBLE character per press, using the caret-context
+  // reading and the active mapping's glyph table. NO restores the pre-feature
+  // behaviour exactly: the host erases one character.
+  AnsiBackspaceHostErase: string;
+  // Safety bound for that erase: a reading that claims more units than this is
+  // not believed. A single glyph is far narrower, so the cap only fires on a
+  // corrupt reading.
+  AnsiBackspaceUnitCap:  string;
+  // Reading layers for that host text. The message path (EDIT / RICHEDIT) is
+  // always tried; UIA adds Word, Excel, the browsers, VS Code and LibreOffice
+  // (no clipboard, no injected keys). NO keeps UI Automation out of the process
+  // entirely.
+  AnsiBackspaceUIA:      string;
+  // The clipboard round-trip, the last and most invasive layer: it moves the
+  // caret and the selection to read, then puts both back. NO (default) keeps it
+  // out of this path.
+  AnsiBackspaceClipboard: string;
+  // Per-application override, ';'-separated 'class-name=on|off' pairs, e.g.
+  //   'Chrome_WidgetWin_1=off;wordpad=off'
+  // A class that is not listed - and an empty setting - means ON. A partial
+  // class name matches. OFF answers every press with one unit for that
+  // application, i.e. exactly the behaviour that shipped before this feature.
+  AnsiBackspaceApps:     string;
+  // Debug trace of every host-erase decision (DebugView). Off by default and
+  // never on a hot path.
+  AnsiBackspaceLog:      string;
   ShowOutputwarning:     string;
   UnicodeToggleShortcut: string;
   ANSIToggleShortcut:    string;
@@ -336,6 +369,13 @@ begin
 
   // Global Output settings
   OutputIsBijoy := UpperCase(XML.GetValue('OutputIsBijoy', 'No'));
+  AnsiBackspaceLegacy := UpperCase(XML.GetValue('AnsiBackspaceLegacy', 'NO'));
+  AnsiBackspaceHostErase := UpperCase(XML.GetValue('AnsiBackspaceHostErase', 'YES'));
+  AnsiBackspaceUnitCap := UpperCase(XML.GetValue('AnsiBackspaceUnitCap', '8'));
+  AnsiBackspaceUIA := UpperCase(XML.GetValue('AnsiBackspaceUIA', 'YES'));
+  AnsiBackspaceClipboard := UpperCase(XML.GetValue('AnsiBackspaceClipboard', 'NO'));
+  AnsiBackspaceApps := XML.GetValue('AnsiBackspaceApps', '');
+  AnsiBackspaceLog := UpperCase(XML.GetValue('AnsiBackspaceLog', 'NO'));
   ShowOutputwarning := UpperCase(XML.GetValue('ShowOutputwarning', 'Yes'));
   UnicodeToggleShortcut := UpperCase(XML.GetValue('UnicodeToggleShortcut', 'YES'));
   ANSIToggleShortcut := UpperCase(XML.GetValue('ANSIToggleShortcut', 'YES'));
@@ -427,6 +467,13 @@ begin
 
   // Global Output settings
   XML.SetValue('OutputIsBijoy', OutputIsBijoy);
+  XML.SetValue('AnsiBackspaceLegacy', AnsiBackspaceLegacy);
+  XML.SetValue('AnsiBackspaceHostErase', AnsiBackspaceHostErase);
+  XML.SetValue('AnsiBackspaceUnitCap', AnsiBackspaceUnitCap);
+  XML.SetValue('AnsiBackspaceUIA', AnsiBackspaceUIA);
+  XML.SetValue('AnsiBackspaceClipboard', AnsiBackspaceClipboard);
+  XML.SetValue('AnsiBackspaceApps', AnsiBackspaceApps);
+  XML.SetValue('AnsiBackspaceLog', AnsiBackspaceLog);
   XML.SetValue('ShowOutputwarning', ShowOutputwarning);
   XML.SetValue('UnicodeToggleShortcut', UnicodeToggleShortcut);
   XML.SetValue('ANSIToggleShortcut', ANSIToggleShortcut);
@@ -524,6 +571,13 @@ begin
 
     // Global Output settings
     OutputIsBijoy := UpperCase(Reg.ReadStringDef('OutputIsBijoy', 'No'));
+    AnsiBackspaceLegacy := UpperCase(Reg.ReadStringDef('AnsiBackspaceLegacy', 'NO'));
+    AnsiBackspaceHostErase := UpperCase(Reg.ReadStringDef('AnsiBackspaceHostErase', 'YES'));
+    AnsiBackspaceUnitCap := UpperCase(Reg.ReadStringDef('AnsiBackspaceUnitCap', '8'));
+  AnsiBackspaceUIA := UpperCase(Reg.ReadStringDef('AnsiBackspaceUIA', 'YES'));
+  AnsiBackspaceClipboard := UpperCase(Reg.ReadStringDef('AnsiBackspaceClipboard', 'NO'));
+  AnsiBackspaceApps := Reg.ReadStringDef('AnsiBackspaceApps', '');
+  AnsiBackspaceLog := UpperCase(Reg.ReadStringDef('AnsiBackspaceLog', 'NO'));
     ShowOutputwarning := UpperCase(Reg.ReadStringDef('ShowOutputwarning', 'Yes'));
     UnicodeToggleShortcut := UpperCase(Reg.ReadStringDef('UnicodeToggleShortcut', 'YES'));
     ANSIToggleShortcut := UpperCase(Reg.ReadStringDef('ANSIToggleShortcut', 'YES'));
@@ -620,6 +674,13 @@ begin
 
     // Global Output settings
     Reg.WriteString('OutputIsBijoy', OutputIsBijoy);
+    Reg.WriteString('AnsiBackspaceLegacy', AnsiBackspaceLegacy);
+    Reg.WriteString('AnsiBackspaceHostErase', AnsiBackspaceHostErase);
+    Reg.WriteString('AnsiBackspaceUnitCap', AnsiBackspaceUnitCap);
+  Reg.WriteString('AnsiBackspaceUIA', AnsiBackspaceUIA);
+  Reg.WriteString('AnsiBackspaceClipboard', AnsiBackspaceClipboard);
+  Reg.WriteString('AnsiBackspaceApps', AnsiBackspaceApps);
+  Reg.WriteString('AnsiBackspaceLog', AnsiBackspaceLog);
     Reg.WriteString('ShowOutputwarning', ShowOutputwarning);
     Reg.WriteString('UnicodeToggleShortcut', UnicodeToggleShortcut);
     Reg.WriteString('ANSIToggleShortcut', ANSIToggleShortcut);
@@ -787,6 +848,18 @@ begin
   // Global Output settings
   if not((OutputIsBijoy = 'YES') or (OutputIsBijoy = 'NO')) then
     OutputIsBijoy := 'NO';
+  if not((AnsiBackspaceLegacy = 'YES') or (AnsiBackspaceLegacy = 'NO')) then
+    AnsiBackspaceLegacy := 'NO';
+  if not((AnsiBackspaceHostErase = 'YES') or (AnsiBackspaceHostErase = 'NO')) then
+    AnsiBackspaceHostErase := 'YES';
+  if (StrToIntDef(AnsiBackspaceUnitCap, 0) < 1) or (StrToIntDef(AnsiBackspaceUnitCap, 0) > 64) then
+    AnsiBackspaceUnitCap := '8';
+  if not((AnsiBackspaceUIA = 'YES') or (AnsiBackspaceUIA = 'NO')) then
+    AnsiBackspaceUIA := 'YES';
+  if not((AnsiBackspaceClipboard = 'YES') or (AnsiBackspaceClipboard = 'NO')) then
+    AnsiBackspaceClipboard := 'NO';
+  if not((AnsiBackspaceLog = 'YES') or (AnsiBackspaceLog = 'NO')) then
+    AnsiBackspaceLog := 'NO';
   if not((ShowOutputwarning = 'YES') or (ShowOutputwarning = 'NO')) then
     ShowOutputwarning := 'YES';
   if not((UnicodeToggleShortcut = 'YES') or (UnicodeToggleShortcut = 'NO')) then

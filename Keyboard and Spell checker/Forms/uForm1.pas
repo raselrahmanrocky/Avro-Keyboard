@@ -448,6 +448,7 @@ implementation
 
 uses
   uRegistrySettings,
+  uCaretWatch,
   ufrmAnsiVersionPicker,
   ufrmLayoutPicker,
   uAvroPasswordDlg,
@@ -673,6 +674,11 @@ begin
   Log('FreeAndNil: WindowDict, KeyLayout');
   RemoveHook;
   Log('RemoveHook');
+  // The caret watch owns a WinEvent hook and a low-level mouse hook: both must
+  // go before the form (and its message queue) does, or the OS keeps calling
+  // into a dying process. Idempotent, and safe if start never ran.
+  AnsiCaretWatchStop;
+  Log('AnsiCaretWatchStop');
   FreeAndNil(Updater);
   Log('FreeAndNil: Updater');
 
@@ -1304,6 +1310,10 @@ begin
     SyncActiveMappingTimestamp(AnsiVersion);
   finally
     Sethook;
+    // The watch reads the text in front of the caret for the ANSI host-text
+    // path. Started only now, with the hook installed and the engine ready;
+    // from here on the timer keeps its reading fresh.
+    AnsiCaretWatchStart;
     WindowCheck.Enabled := True;
   end;
   // The switch above parsed exactly one engine; the sweep that used to cache
@@ -2683,6 +2693,13 @@ var
   MapPath:      string;    // cached: this path used to be rebuilt 3x per tick
   MapWriteTime: TDateTime; // one disk stat per throttled tick
 begin
+  // The one place the text in front of the caret is READ for the ANSI host-text
+  // path: a caret-move / focus / click event only raised a flag (uCaretWatch),
+  // and reading it here - on the main thread, outside every hook - is what keeps
+  // the keyboard hook free of window calls. It does nothing when no event asked
+  // for a reading.
+  AnsiCaretWatchTick;
+
   if (AnsiVersion <> 'Default') and (AnsiMappingDir <> '') then
   begin
     Dec(FMappingCheckCountdown);

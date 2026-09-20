@@ -90,15 +90,42 @@ type
       procedure ProcessVKeyUP(const KeyCode: Integer; var Block: Boolean);
       procedure ResetDeadKey;
 
+      { The text in front of the caret is no longer this engine's to describe:
+        the caret left the window (a foreground change the timer noticed), the
+        layout or the mode changed under it, or the engine was parked. Drops the
+        ledger and the pending-host-char count so the next Backspace can never
+        erase text of a document this ledger does not describe. }
+      procedure InvalidateAnsiTail;
+
       property OnRawEmit: TModernHostEditEvent read FOnRawEmit write FOnRawEmit;
       procedure SetKeyboardModeOverride(const Enabled: Boolean; const Mode: Integer);
+
+      // TEST / EMBEDDING HOOKS: the ledger is private in production, so a
+      // head-less harness needs to seed it exactly as a typed word leaves it
+      // (nothing live, the caret behind the committed text) and to read it
+      // back. No production path calls either of them.
+      procedure SeedCommittedForTest(const S: string; const APendingHostChars: Integer = 0);
+      property CommittedForTest: string read CommittedBanglaT;
+      { Host characters the host inserted between the caret and the ledger: the
+        presses behind the caret are handed over to the host one per character,
+        so a harness can count them off. No production path reads it. }
+      property PendingHostCharsForTest: Integer read PendingHostChars;
+      { The backspace path itself, so a harness does not have to build the key
+        plumbing, and the engine's own converter, so it can predict the screen
+        from the ledger (Convert carries per-instance toggle state, so a
+        second instance is not necessarily equivalent). No production path
+        calls either of them. }
+      procedure BackspaceForTest(var Block: Boolean);
+      property ConverterForTest: TUnicodeToBijoy2000 read Bijoy;
   end;
 
 implementation
 
 uses
   uRegistrySettings,
+  uAnsiBackspace,
   Banglachars,
+  clsAnsiGrapheme,
   KeyboardFunctions,
   uForm1,
   KeyboardLayoutLoader,
@@ -200,7 +227,6 @@ var
   IsRephTail:         Boolean;
   PrevAnsi, NewAnsi:  string;
   NewCommitted:       string;
-  L:                  Integer;
 begin
 
   { --- Reph / Phala tail detection --- }
@@ -246,21 +272,21 @@ begin
       hook of the letter behind (Ansi V3: ই = '\xA3z' -> only 'z' went and a
       second press was needed). The unit boundaries are the ones the live
       buffer uses above (a plain letter/kar, a phala, a reph - where the
-      letter itself survives -, ZWJ/ZWNJ + hasanta + Z), and SendAnsiDiff
+      letter itself survives -, ZWJ/ZWNJ + hasanta + Z) is now ONE shared
+      grapheme rule (clsAnsiGrapheme), so it holds for every mapping - the
+      four shipped today and any mapping added later - and SendAnsiDiff
       erases the mismatched tail and retypes what survives a re-shaping. }
     if (OutputIsBijoy = 'YES') and (CommittedBanglaT <> '') and (PrevBanglaT = '') then
     begin
-      L := Length(CommittedBanglaT);
-      if (L >= 3) and (CommittedBanglaT[L - 2] = b_R) and (CommittedBanglaT[L - 1] = b_Hasanta) and IsPureConsonent(CommittedBanglaT[L]) then
-        NewCommitted := LeftStr(CommittedBanglaT, L - 3) + CommittedBanglaT[L]
-      else if (L >= 4) and ((CommittedBanglaT[L - 3] = ZWJ) or (CommittedBanglaT[L - 3] = ZWNJ)) and (CommittedBanglaT[L - 2] = b_Hasanta) and
-        (CommittedBanglaT[L - 1] = b_Z) then
-        NewCommitted := LeftStr(CommittedBanglaT, L - 3)
-      else if (L >= 2) and (CommittedBanglaT[L - 1] = b_Hasanta) and ((CommittedBanglaT[L] = b_Z) or (CommittedBanglaT[L] = b_R)) and
-        (CommittedBanglaT[L - 2] <> b_R) then
-        NewCommitted := LeftStr(CommittedBanglaT, L - 2)
-      else
-        NewCommitted := LeftStr(CommittedBanglaT, L - 1);
+      { ONE press erases ONE grapheme cluster: ka + hasanta + ssa, ka + i-kar
+        and an anusvara all go in a single press, while every letter starts a
+        new cluster. ARephSurvives keeps the pre-existing reph behaviour (the
+        letter survives, two presses) for the registry setting. }
+      if not DropLastGraphemeCluster(CommittedBanglaT, NewCommitted, AnsiBackspaceLegacy = 'YES') then
+      begin
+        Block := False;
+        Exit;
+      end;
 
       PrevAnsi := Bijoy.Convert(CommittedBanglaT);
       NewAnsi := Bijoy.Convert(NewCommitted);
@@ -283,6 +309,22 @@ begin
       BijoyNewBanglaText := Bijoy.Convert(NewBanglaText);
       if (Length(BijoyNewBanglaText) - 1) >= 1 then
         RawSend(Length(BijoyNewBanglaText) - 1, '');
+    end;
+
+    { (4) ANSI output only: what sits behind the caret is not ours - the
+      ledger cannot describe it (a mouse click, an arrow key, another
+      application, text that was there before Avro). The caret-context cache
+      holds the text before the caret and the ACTIVE mapping's own glyph table
+      says how wide its last visible character is, so the press can erase the
+      whole character with our own emission instead of one unit of it. Every
+      doubt (feature off, no reading, stale caret, unknown glyph, above the
+      cap) leaves the press exactly as it was: the host erases one character,
+      which is what it did before this feature existed. }
+    if (OutputIsBijoy = 'YES') and AnsiEraseHostCluster(RawSend) then
+    begin
+      ResetDeadKey;
+      Block := True;
+      Exit;
     end;
 
     ResetDeadKey;
@@ -1152,6 +1194,17 @@ begin
   ResetLastChar;
 end;
 
+{ A caret move or a foreground change is NOT a reason to clear the live buffer
+  (the typed word is still ours), but it is a reason to stop describing what sits
+  behind the caret: after another window was in front, the ledger would erase in
+  a document it never typed into. The kar-run and dead-key state keep their own
+  documented rules. }
+procedure TGenericLayoutModern.InvalidateAnsiTail;
+begin
+  CommittedBanglaT := '';
+  PendingHostChars := 0;
+end;
+
 { =============================================================================== }
 
 {
@@ -1174,6 +1227,31 @@ begin
   FModeOverride := Enabled;
   if Enabled then
     FModeValue := Mode;
+end;
+
+{
+  TEST / EMBEDDING HOOK: leaves the ledger in exactly the state a committed
+  word leaves it in - nothing live behind it, the caret right behind the text -
+  so a head-less harness can drive the backspace path without a host window, a
+  keyboard layout or injected keys.
+}
+procedure TGenericLayoutModern.SeedCommittedForTest(const S: string; const APendingHostChars: Integer = 0);
+begin
+  CommittedBanglaT := S;
+  PendingHostChars := APendingHostChars;
+  PrevBanglaT := '';
+  NewBanglaText := '';
+  ResetLastChar;
+end;
+
+{
+  TEST / EMBEDDING HOOK: drives the backspace path directly, so a head-less
+  harness does not need the main form, a keyboard mode or a host window (the
+  E2B engine's key handler reads the main form for the mode).
+}
+procedure TGenericLayoutModern.BackspaceForTest(var Block: Boolean);
+begin
+  DoBackspace(Block);
 end;
 
 {

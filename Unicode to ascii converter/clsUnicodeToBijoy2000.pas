@@ -14,7 +14,8 @@ interface
 
 uses
   System.Classes,
-  System.Generics.Collections;
+  System.Generics.Collections,
+  clsAnsiAtomMap;
 
 type
   TVowelRuleMapping = record
@@ -204,6 +205,13 @@ type
     ConsonantGroupRawMap: TDictionary<string, TArray<string>>;
     AnsiSequenceLookup: TAnsiSequenceMap;
     AnsiToUniMap: TAnsiToUniMap;
+    // Compiled grapheme-cluster table of this mapping (clsAnsiAtomMap): which
+    // ANSI glyphs the mapping can emit and how they merge into one visible
+    // character, for the presses that have to work from the raw text in front
+    // of the caret. DERIVED data - rebuilt whenever the mapping is parsed, and
+    // moved between the parked slot and the active globals by pointer just
+    // like the containers above (never deep-copied).
+    AnsiAtomMap: TAnsiAtomMap;
     procedure Clear;
   end;
 
@@ -249,6 +257,7 @@ var
   ConsonantGroupRawMap:     TDictionary<string, TArray<string>>;
   AnsiSequenceLookup:       TAnsiSequenceMap;
   AnsiToUniMap:             TAnsiToUniMap; // ANSI glyph -> Unicode cluster candidates (sniffer reverse map)
+  AnsiAtomMap:              TAnsiAtomMap;  // active mapping's glyph/cluster table (see clsAnsiAtomMap)
 
 type
   TLoadEncoMappingFunc = function(const AFilePath: string): Boolean;
@@ -257,6 +266,30 @@ var
   OnLoadEncoMapping: TLoadEncoMappingFunc; // ANSI glyph -> Unicode cluster candidates (sniffer reverse map)
 
 procedure ResetAnsiToDefaults;
+
+{ Compiles the active mapping's ANSI atom table (clsAnsiAtomMap) from the
+  in-memory globals - never from the JSON files, so a user-installed or
+  password-protected container behaves exactly like the shipped ones. Called
+  after every parse, so the table always describes the mapping that is active.
+  Normally reached through RebuildAnsiDerivedTables, which compiles the table
+  the atom build reads first. }
+procedure RebuildAnsiAtomMap;
+
+{ How many ANSI units at the tail of AText form the LAST visible character:
+  the width one press has to erase when the text in front of the caret did not
+  come from the engines' own ledger. 0 for empty text. Never more than the
+  longest glyph (clsAnsiAtomMap.MAX_ATOM_UNITS) and 1 whenever the table is
+  missing or the glyph is not recognised: under-deleting costs one keypress,
+  over-deleting costs text. }
+function AnsiTailClusterUnits(const AText: string): Integer;
+
+{ Rebuilds BOTH tables the engine derives from a mapping: the reverse table
+  (ANSI rendering -> Unicode candidates) and then the atom table (glyph ->
+  cluster), which consults the reverse one for renderings only the ANSI side
+  names. This is the hook the load paths call - never a table on its own, so
+  the two can never describe different mappings. }
+procedure RebuildAnsiDerivedTables;
+
 procedure LoadAnsiMapping(const Path: string; ErrorLog: TStringList = nil);
 procedure LoadAnsiMappingFromJSON(const AJSONContent: string; ErrorLog: TStringList = nil);
 procedure ExportAnsiMapping(const Path: string);
@@ -273,6 +306,7 @@ uses
   Windows,
   Strutils,
   clsAnsiSequenceLookup,
+  clsAnsiGrapheme,
   BanglaChars,
   System.SysUtils,
   System.Generics.Defaults,
@@ -3026,6 +3060,341 @@ begin
     ConsonantGroupRawMap.Clear;
   PrepareActiveReplacements;
   CompileAnsiSequenceMap;
+  RebuildAnsiDerivedTables;
+end;
+
+{ =============================================================================== }
+
+{ The ANSI value a constant holds right now; an override wins, because a
+  constant declared as a single character can carry a whole glyph. Shared by
+  the reverse table below and the atom table after it, so both read the same
+  text the screen shows. }
+function AnsiConstantUnits(const ARec: TAnsiVarRec): string;
+begin
+  if (AnsiOverrides <> nil) and AnsiOverrides.TryGetValue(ARec.Name, Result) then
+    Exit;
+  if ARec.VarType = avChar then
+    Result := string(PChar(ARec.Ptr)^)
+  else
+    Result := PString(ARec.Ptr)^;
+end;
+
+{ Compiles the mapping's REVERSE table - ANSI rendering -> every Unicode cluster
+  that rendering can mean - from the pairs the mapping itself carries.
+
+  Two consumers want it:
+  * UnicodeCandidatesOfAnsi: the caret sniffer turns the raw text in front of the
+    caret back into clusters, so it needs ALL candidates, not the first;
+  * the atom table after it: a rule that exists only in ANSI (a pre/post
+    replacement) cannot say which cluster it draws, and this table vouches for
+    it - but only through a candidate that is exactly ONE cluster.
+
+  The sources mirror the atom table's own sections on purpose, and so does the
+  convention that the mapping's Raw* fields carry the Unicode form. When one of
+  the two tables learns a source, teach the other as well.
+
+  Values are read from the globals, never from a file: a constant the parse
+  overrode is registered as it is on screen. Empty sides are skipped, and a
+  cluster already recorded for a rendering is not recorded twice. A failed
+  build leaves the previous (possibly nil) table in place: every consumer of
+  this table is nil-safe and falls back to one unit per press. }
+procedure RebuildAnsiToUniMap;
+var
+  NewMap:   TAnsiToUniMap;
+  Rec:      TAnsiVarRec;
+  VRule:    TVowelRule;
+  VMapping: TVowelRuleMapping;
+  RRule:    TRfolaRule;
+  KCorr:    TKarCorrection;
+  I, J:     Integer;
+  Uni:      string;
+  Built:    Boolean;
+
+  { Records one candidate for one rendering. The dictionary owns the array by
+    value, so it is read, extended and written back; a duplicate is dropped,
+    because the sniffer scans these linearly and the same cluster arrives
+    through several sources (a constant and the table that renders it). }
+  procedure AddCandidate(const AUnits, AUni: string);
+  var
+    Cand: TAnsiUniCandidates;
+    Uni:  string;
+    N:    Integer;
+  begin
+    // The mapping's constant fields hold prose beside the key ("ra (reph)"),
+    // so only the leading Bengali run is a cluster: the atom table trims the
+    // same text, and the two tables must name the same cluster or the sniffer
+    // and the backspace path disagree.
+    Uni := TrimToUnicodeSource(AUni);
+    if (AUnits = '') or (Uni = '') then
+      Exit;
+    Cand := nil;
+    NewMap.TryGetValue(AUnits, Cand);
+    for N := 0 to high(Cand) do
+      if Cand[N] = Uni then
+        Exit;
+    SetLength(Cand, Length(Cand) + 1);
+    Cand[high(Cand)] := Uni;
+    NewMap.AddOrSetValue(AUnits, Cand);
+  end;
+
+begin
+  NewMap := TAnsiToUniMap.Create;
+  Built := False;
+  try
+    // 1. every constant, as it is on screen right now
+    if AnsiRegistry <> nil then
+      for I := 0 to AnsiRegistry.Count - 1 do
+      begin
+        Rec := AnsiRegistry[I];
+        AddCandidate(AnsiConstantUnits(Rec), ResolveValue(CleanBengaliChar(Rec.BengaliChar)));
+      end;
+
+    // 2. Unicode-keyed replacement tables: the key IS one visible cluster
+    for I := 0 to Length(ActiveReplacements) - 1 do
+      AddCandidate(ActiveReplacements[I].Value, ActiveReplacements[I].Key);
+    for I := 0 to Length(KarInclusiveReplacements) - 1 do
+      AddCandidate(KarInclusiveReplacements[I].Value, KarInclusiveReplacements[I].Key);
+    for I := 0 to Length(CustomFullForms) - 1 do
+      AddCandidate(CustomFullForms[I].Value, CustomFullForms[I].Key);
+
+    // 3. vowel rules: a consonant and its kar render as ONE character
+    for I := 0 to high(VowelRules) do
+    begin
+      VRule := VowelRules[I];
+      for J := 0 to high(VRule.Mappings) do
+      begin
+        VMapping := VRule.Mappings[J];
+        Uni := VMapping.Consonants;
+        if FirstBengaliCodePoint(Uni) = #0 then
+          Uni := VRule.KarChar; // a bare kar: Unicode decides what it binds to
+        AddCandidate(ResolveValue(VMapping.Value), Uni);
+        AddCandidate(ResolveValue(VMapping.Alt), Uni);
+      end;
+      AddCandidate(ResolveValue(VRule.DefaultVal), VRule.KarChar);
+    end;
+
+    // 4. ra-phala rules: a reph rides on the consonant, still ONE character
+    for I := 0 to high(RfolaRules) do
+    begin
+      RRule := RfolaRules[I];
+      Uni := b_R + string(b_Hasanta) + RRule.Consonants;
+      AddCandidate(RRule.Value, Uni);
+      AddCandidate(RRule.HalfValue, Uni);
+      AddCandidate(RRule.ContextValue, Uni);
+    end;
+
+    // 5. kar corrections: the mapping's Raw* field carries the Unicode form
+    for I := 0 to high(KarCorrections) do
+    begin
+      KCorr := KarCorrections[I];
+      AddCandidate(KCorr.ToKar, KCorr.RawToKar);
+      AddCandidate(KCorr.CharStr, KCorr.RawCharStr);
+    end;
+
+    Built := True;
+  except
+    on E: Exception do
+      OutputDebugString(PChar(Format('[AvroEnco] reverse map build failed (%s: %s); a rendering the mapping cannot name keeps its fail-safe one-unit press',
+        [E.ClassName, E.Message])));
+  end;
+
+  if Built then
+  begin
+    // The atom table reads this table, so the previous one is replaced only
+    // once the new one is complete.
+    FreeAndNil(AnsiToUniMap);
+    AnsiToUniMap := NewMap;
+  end
+  else
+    NewMap.Free;
+end;
+
+{ =============================================================================== }
+
+{
+  Compiles the ACTIVE mapping's glyph table (clsAnsiAtomMap): every ANSI glyph
+  the mapping can emit becomes one atom, so a press that has to work from the
+  raw text in front of the caret still erases exactly one visible character -
+  for any mapping, including one added after this code was written.
+
+  Sources, all of them in-memory globals (a user-installed or even
+  password-protected container is decrypted once and parsed into these):
+
+  * every A_* constant, through the value it holds RIGHT NOW - the parse may
+    override a constant declared as a single character with a longer glyph, and
+    that override is what the screen shows;
+  * the Unicode-keyed replacement tables (the derived active replacements, the
+    kar inclusive ones and the custom full forms), whose key is one cluster;
+  * the ANSI-only repair tables (pre/post replacements), whose result the
+    sniffer reverse map has to vouch for;
+  * the vowel rules, the ra-phala rules and the kar corrections, whose output
+    Convert is not the only producer of.
+
+  Role derivation (Unicode first, then the mapping's own group and name) and
+  the ambiguity tie-break live in clsAnsiAtomMap, together with the rules that
+  decide which atoms merge into one cluster.
+
+  The table is DERIVED data: a build failure never fails a mapping load (the
+  press then falls back to one unit, see AnsiTailClusterUnits), it drops the
+  table and leaves a debug-traced note instead.
+}
+procedure RebuildAnsiAtomMap;
+var
+  NewMap:     TAnsiAtomMap;
+  Rec:        TAnsiVarRec;
+  VRule:      TVowelRule;
+  VMapping:   TVowelRuleMapping;
+  RRule:      TRfolaRule;
+  KCorr:      TKarCorrection;
+  GCorr:      TGroupKarCorrection;
+  I, J:       Integer;
+  Uni:        string;
+  Built:      Boolean;
+
+  { The Unicode side of a rendering the mapping describes only in ANSI (a
+    pre/post replacement, a kar correction): the sniffer reverse map knows
+    which clusters that rendering can mean. Only a candidate that is ONE
+    grapheme cluster is taken - a rendering that could mean a longer run stays
+    unregistered, so its units are still erased one at a time. }
+  function UnicodeSideOf(const AAnsi: string): string;
+  var
+    Candidates: TAnsiUniCandidates;
+    N:          Integer;
+  begin
+    Result := '';
+    if (AnsiToUniMap = nil) or (AAnsi = '') then
+      Exit;
+    if not AnsiToUniMap.TryGetValue(AAnsi, Candidates) then
+      Exit;
+    for N := 0 to high(Candidates) do
+      if GraphemeClusterCount(Candidates[N]) = 1 then
+      begin
+        Result := Candidates[N];
+        Exit;
+      end;
+  end;
+
+  procedure AddAnsi(const AUnits, ACategory, AName, ASrc: string);
+  begin
+    NewMap.Add(AUnits, UnicodeSideOf(AUnits), ACategory, AName, ASrc);
+  end;
+
+begin
+  NewMap := TAnsiAtomMap.Create;
+  Built := False;
+  try
+    // 1. every constant of the mapping, as it is on screen right now
+    if AnsiRegistry <> nil then
+      for I := 0 to AnsiRegistry.Count - 1 do
+      begin
+        Rec := AnsiRegistry[I];
+        // CleanBengaliChar is the mapping's own cleaner: an A_* constant stores
+        // "taka (taka sign)" style DESCRIPTIONS beside its key, and only the
+        // key is the Unicode side of the glyph. ResolveValue then expands a key
+        // that is itself written as a reference ('#{A_UUKar2}').
+        NewMap.Add(AnsiConstantUnits(Rec), ResolveValue(CleanBengaliChar(Rec.BengaliChar)), Rec.Category, Rec.Name,
+          'Constant.' + Rec.Category);
+      end;
+
+    // 2. Unicode-keyed replacement tables: the key IS one visible cluster
+    for I := 0 to Length(ActiveReplacements) - 1 do
+      NewMap.Add(ActiveReplacements[I].Value, ActiveReplacements[I].Key, 'FullForms', ActiveReplacements[I].Key, 'ActiveReplacements');
+    for I := 0 to Length(KarInclusiveReplacements) - 1 do
+      NewMap.Add(KarInclusiveReplacements[I].Value, KarInclusiveReplacements[I].Key, 'FullForms', KarInclusiveReplacements[I].Key,
+        'KarInclusiveReplacements');
+    for I := 0 to Length(CustomFullForms) - 1 do
+      NewMap.Add(CustomFullForms[I].Value, CustomFullForms[I].Key, 'FullForms', CustomFullForms[I].Key, 'FullFormReplacements');
+
+    // 3. ANSI-only repair tables (no Unicode key exists in the format)
+    for I := 0 to Length(CustomPreReplacements) - 1 do
+      AddAnsi(CustomPreReplacements[I].Value, 'PreReplacements', CustomPreReplacements[I].Key, 'PreReplacements');
+    for I := 0 to Length(CustomPostReplacements) - 1 do
+      AddAnsi(CustomPostReplacements[I].Value, 'PostReplacements', CustomPostReplacements[I].Key, 'PostReplacements');
+
+    // 4. vowel rules: a consonant and its kar render as ONE character
+    for I := 0 to high(VowelRules) do
+    begin
+      VRule := VowelRules[I];
+      for J := 0 to high(VRule.Mappings) do
+      begin
+        VMapping := VRule.Mappings[J];
+        Uni := VMapping.Consonants;
+        if FirstBengaliCodePoint(Uni) = #0 then
+          Uni := VRule.KarChar; // a bare kar: Unicode decides what it binds to
+        NewMap.Add(ResolveValue(VMapping.Value), Uni, 'VowelRules', VRule.KarChar, 'VowelRules.Value');
+        NewMap.Add(ResolveValue(VMapping.Alt), Uni, 'VowelRules', VRule.KarChar, 'VowelRules.Alt');
+      end;
+      NewMap.Add(ResolveValue(VRule.DefaultVal), VRule.KarChar, 'VowelRules', VRule.KarChar, 'VowelRules.DefaultVal');
+    end;
+
+    // 5. ra-phala rules: a reph rides on the consonant, still ONE character
+    for I := 0 to high(RfolaRules) do
+    begin
+      RRule := RfolaRules[I];
+      Uni := b_R + string(b_Hasanta) + RRule.Consonants;
+      NewMap.Add(RRule.Value, Uni, 'RaPhalaGroups', RRule.Consonants, 'RfolaRules.Value');
+      NewMap.Add(RRule.HalfValue, Uni, 'RaPhalaGroups', RRule.Consonants, 'RfolaRules.HalfValue');
+      NewMap.Add(RRule.ContextValue, Uni, 'RaPhalaGroups', RRule.Consonants, 'RfolaRules.ContextValue');
+    end;
+
+    // 6. kar corrections and grouped kar corrections
+    for I := 0 to high(KarCorrections) do
+    begin
+      KCorr := KarCorrections[I];
+      NewMap.Add(KCorr.ToKar, KCorr.RawToKar, 'KarCorrections', KCorr.FromKar, 'KarCorrections.ToKar');
+      NewMap.Add(KCorr.CharStr, KCorr.RawCharStr, 'KarCorrections', KCorr.FromKar, 'KarCorrections.CharStr');
+    end;
+    for I := 0 to high(GroupKarCorrections) do
+    begin
+      GCorr := GroupKarCorrections[I];
+      AddAnsi(GCorr.To_, 'GroupKarCorrections', GCorr.Group, 'GroupKarCorrections.To_');
+    end;
+
+    NewMap.Index;
+    Built := True;
+  except
+    on E: Exception do
+      OutputDebugString(PChar(Format('[AvroEnco] atom map build failed (%s: %s); a press behind text it does not know falls back to one unit',
+        [E.ClassName, E.Message])));
+  end;
+
+  FreeAndNil(AnsiAtomMap);
+  if Built then
+    AnsiAtomMap := NewMap
+  else
+    NewMap.Free;
+end;
+
+{ Rebuilds both derived tables in the one order that works: the reverse table
+  first, because the atom table consults it for renderings that only the ANSI
+  side of the mapping names. Called after every parse - ResetAnsiToDefaults,
+  the JSON/container load path, and a state restore that arrived without a
+  table - so the active mapping and its tables can never disagree. }
+procedure RebuildAnsiDerivedTables;
+begin
+  RebuildAnsiToUniMap;
+  RebuildAnsiAtomMap;
+end;
+
+function AnsiTailClusterUnits(const AText: string): Integer;
+begin
+  if AText = '' then
+  begin
+    Result := 0;
+    Exit;
+  end;
+
+  if AnsiAtomMap = nil then
+  begin
+    // No table (a state captured before the table existed, or a build that
+    // failed): one unit is the only answer that can never lose text.
+    Result := 1;
+    Exit;
+  end;
+
+  Result := AnsiAtomMap.TailClusterUnits(AText);
+  if Result < 1 then
+    Result := 1;
 end;
 
 { =============================================================================== }
@@ -3279,8 +3648,14 @@ begin
   FreeAndNil(ConsonantGroupRawMap);
   FreeAndNil(AnsiSequenceLookup);
   FreeAndNil(AnsiToUniMap);
+  FreeAndNil(AnsiAtomMap);
 end;
 
+{ True when a state carries nothing worth restoring. The compiled atom table is
+  DERIVED from the registry (RebuildAnsiAtomMap reads the very globals the state
+  owns), so it deliberately does not take part in this test: a state with a
+  registry is restorable even when its table was dropped, and RestoreEngineState
+  rebuilds it in that case. Only a missing/empty registry is hollow. }
 function IsEngineStateHollow(const AState: TAnsiEngineState): Boolean;
 begin
   Result := (AState.AnsiRegistry = nil) or (AState.AnsiRegistry.Count = 0);
@@ -3308,6 +3683,7 @@ begin
   AState.ConsonantGroupRawMap := nil;
   AState.AnsiSequenceLookup := nil;
   AState.AnsiToUniMap := nil;
+  AState.AnsiAtomMap := nil;
 end;
 
 { Moves the engine's global containers (and the A_* scalar values, captured
@@ -3376,6 +3752,8 @@ begin
   AnsiSequenceLookup := nil;
   AState.AnsiToUniMap := AnsiToUniMap;
   AnsiToUniMap := nil;
+  AState.AnsiAtomMap := AnsiAtomMap;
+  AnsiAtomMap := nil;
 end;
 
 { Inverse of CaptureEngineState: moves AState's containers back into the unit
@@ -3425,6 +3803,8 @@ begin
   AState.AnsiSequenceLookup := nil;
   AnsiToUniMap := AState.AnsiToUniMap;
   AState.AnsiToUniMap := nil;
+  AnsiAtomMap := AState.AnsiAtomMap;
+  AState.AnsiAtomMap := nil;
 
   // Scalars: write the captured values back through the stable registry Ptrs,
   // positionally. The count guard is the correctness condition of the flat
@@ -3449,6 +3829,15 @@ begin
     OutputDebugString(PChar(Format('[AvroEnco] engine state scalar mismatch: captured=%d registry=%d; ' + 'scalars left at defaults',
       [Length(AState.ScalarValues), AnsiRegistry.Count])));
   AState.ScalarValues := nil;
+
+  // The derived tables travel with the state, so a state captured after its
+  // mapping was loaded restores them for free. They can legitimately arrive nil
+  // though - a state TAnsiEngineState.Clear ran on, or one captured before the
+  // first load - and they are DERIVED data: rebuild both from the globals we
+  // just restored rather than leaving the engine on the fail-safe "one press =
+  // one unit" path, with no reverse table for the sniffer either.
+  if ((AnsiAtomMap = nil) or (AnsiToUniMap = nil)) and (AnsiRegistry <> nil) and (AnsiRegistry.Count > 0) then
+    RebuildAnsiDerivedTables;
 end;
 
 { =============================================================================== }
@@ -4634,6 +5023,7 @@ begin
 
   PrepareActiveReplacements;
   CompileAnsiSequenceMap;
+  RebuildAnsiDerivedTables;
   JSON := '';
   OptimizeMemoryUsage;
 end;
@@ -5357,6 +5747,7 @@ finalization
 
 AnsiSequenceLookup.Free;
 AnsiToUniMap.Free;
+AnsiAtomMap.Free;
 AnsiRegistry.Free;
 AnsiRegistryMap.Free;
 AnsiOverrides.Free;
