@@ -49,9 +49,11 @@
   default, the pre-existing two-press behaviour under AnsiBackspaceLegacy),
   8 (delimiters and commit points), 9 (repeated presses over one reading),
   10 (caret moves: the ledger and the reading go stale), 11 (host characters
-  between the caret and the ledger - Modern engine only). Rows 12 and up are
-  the hook/host layers themselves (the OS hook's own delivery, the UIA and
-  clipboard reading layers) and still need a real desktop instead.
+  between the caret and the ledger - Modern engine only), 12 (the mapping's own
+  atom table), 13 (the host-text eraser over the cached reading) and 14 (English
+  mode: the press stays the host's, and a layout / mode switch takes the ledger
+  and the reading with it). The hook/host layers themselves (the OS hook's own
+  delivery, the UIA and clipboard reading layers) still need a real desktop.
 
   Usage: kat_grapheme <mapping-dir> [quiet] [trace]
   Exit code: 0 all PASS, 1 FAIL.
@@ -73,6 +75,7 @@ uses
   BanglaChars,
   clsAnsiGrapheme,
   clsAnsiAtomMap,
+  clsLayout,
   clsGenericLayoutModern,
   clsGenericLayoutOld,
   clsE2BCharBased,
@@ -134,15 +137,17 @@ const
     them, all proven head-lessly by GateLayerChecks: the delimiters that commit
     a word, repeated presses over one reading, the caret moves that make the
     ledger and the reading stale, and the host characters that sit between the
-    caret and the ledger. The mapping-derived atom table (chunk 3) and the
-    host-text gate (chunk 4) are reported under their own names. }
-  MAX_ROW     = 13;
+    caret and the ledger. The mapping-derived atom table (chunk 3), the
+    host-text gate (chunk 4) and English mode are reported under their own
+    names. }
+  MAX_ROW     = 14;
   DELIM_ROW   = 8;  // delimiters and commit points
   REPEAT_ROW  = 9;  // repeated presses: one reading, one erase, then the host
   CARET_ROW   = 10; // the caret moved: the ledger and the reading go stale
   PENDING_ROW = 11; // host characters between the caret and the ledger
   ATOM_ROW    = 12;
   HOST_ROW    = 13;
+  ENGLISH_ROW = 14; // English mode: the host keeps the press
 
   { Representative SINGLE clusters: every shape one press has to erase - a plain
     letter, the letters whose rendering is several ANSI units, conjuncts typed
@@ -180,6 +185,7 @@ var
   TraceUnits:    Integer;
   TraceDecision: TAnsiEraseDecision;
   TraceText:     string;
+  TraceCalls:    Integer; // how often the decision point ran at all (English mode: never)
 
   // the caret watch's own counters
   WatchEvents:    Integer;
@@ -274,6 +280,7 @@ end;
 procedure TTraceSink.Backspace(const AMapping: string; const AUnits: Integer; const ADecision: TAnsiEraseDecision;
   const AReason: string);
 begin
+  Inc(TraceCalls);
   TraceUnits := AUnits;
   TraceDecision := ADecision;
   TraceText := Format('%s: %d units, %s (%s)', [AMapping, AUnits, AnsiDecisionName(ADecision), AReason]);
@@ -489,6 +496,47 @@ begin
     ekOld: Old.BackspaceForTest(Block);
     ekE2B: CharBased.BackspaceForTest(Block);
   end;
+end;
+
+{ The engine's REAL entry point - the one the low-level hook reaches through
+  TLayout.ProcessVKeyDown (clsLayout.pas:184). The keyboard-mode gate lives
+  there and not in DoBackspace (clsGenericLayoutModern.pas:616,
+  clsGenericLayoutOld.pas:1791, clsE2BCharBased.pas:1605), so a harness that
+  only ever calls BackspaceForTest cannot see it: this is that gate's probe. }
+procedure DriveKey(const AKind: TEngineKind; const AKey: Integer; var Block: Boolean);
+begin
+  case AKind of
+    ekModern: Modern.ProcessVKeyDown(AKey, Block);
+    ekOld: Old.ProcessVKeyDown(AKey, Block);
+    ekE2B: CharBased.ProcessVKeyDown(AKey, Block);
+  end;
+end;
+
+{ Pins one engine's keyboard mode through its own test/embedding hook. The
+  engines read AvroMainForm1 when no override is set and a harness has no main
+  form, so with the override OFF every engine answers as English (SysDefault) -
+  which is exactly the production fallback for a nil form. }
+procedure SetEngineMode(const AKind: TEngineKind; const AEnglish: Boolean);
+var
+  Mode: Integer;
+begin
+  if AEnglish then
+    Mode := Ord(SysDefault)
+  else
+    Mode := Ord(bangla);
+
+  case AKind of
+    ekModern: Modern.SetKeyboardModeOverride(True, Mode);
+    ekOld: Old.SetKeyboardModeOverride(True, Mode);
+    ekE2B: CharBased.SetKeyboardModeOverride(True, Mode);
+  end;
+end;
+
+procedure ClearEngineModes;
+begin
+  Modern.SetKeyboardModeOverride(False, Ord(SysDefault));
+  Old.SetKeyboardModeOverride(False, Ord(SysDefault));
+  CharBased.SetKeyboardModeOverride(False, Ord(SysDefault));
 end;
 
 procedure RunCases(const AMapping, AEngineName: string; const AKind: TEngineKind);
@@ -1659,9 +1707,259 @@ begin
   end;
 end;
 
+{ ============================================================================== }
+{ G1 row 14: English mode                                                        }
+{ ============================================================================== }
+
+{
+  What happens when the user is NOT in Bangla mode. The invariant is that the
+  press stays the host's: nothing of ours is emitted, the ledger is not fed, no
+  reading is taken and the eraser is never even asked - for Backspace and for a
+  typing key alike. The gate that keeps it that way sits at each engine's ENTRY
+  point (see DriveKey), not in DoBackspace, which is why these cases drive
+  ProcessVKeyDown and not BackspaceForTest.
+
+  The gate also has to survive a mode switch. A reading taken while English was
+  active describes a document the next Bangla press may not be looking at, so
+  the switch - TLayout.ResetDeadKey -> InvalidateAnsiTail -> AnsiBackspaceInvalidate
+  (clsLayout.pas:242) - drops the ledger and the reading together, and the first
+  Bangla press after it measures fresh instead of answering from the English-era
+  cache. One reading taken at the NEW caret is all the press after that needs.
+}
+procedure EnglishModeChecks(const AMapping: string);
+const
+  { The typing key a harness can really press. A LETTER goes through
+    KeyboardLayoutLoader.GetCharForKey, which reads the loaded keyboard layout's
+    key table - something a head-less container has no reason to load, and which
+    is why the letter path is probed on a real desktop instead. The space key is
+    handled by the engines themselves, and it passes the very same mode gate. }
+  TYPING_KEY = VK_SPACE;
+var
+  Reader:     TFakeCaretReader;
+  Sink:       TTraceSink;
+  Conv:       TUnicodeToBijoy2000;
+  Block:      Boolean;
+  Wide, Word: string;
+  Name, Tail: string;
+  FP:         TCaretFingerprint;
+  Kind:       TEngineKind;
+  Atoms:      TArray<TAnsiAtom>;
+  I:          Integer;
+
+  function KindName(const AKind: TEngineKind): string;
+  begin
+    case AKind of
+      ekOld: Result := 'Old';
+      ekE2B: Result := 'E2B';
+    else
+      Result := 'Modern';
+    end;
+  end;
+
+  { A reading that is there for the taking: if any engine consulted the eraser
+    in English mode, THIS is the glyph the press would have erased. }
+  procedure ArmReading;
+  begin
+    AnsiCaretContextInjectForTest(Wide, FP);
+    Reader.Calls := 0;
+  end;
+
+begin
+  Say('');
+  Say('=== ' + AMapping + ' / English mode (row 14)');
+
+  Conv := Modern.ConverterForTest;
+  Word := #$09AC#$09BE#$0982#$09B2#$09BE; // "bangla": two clusters, one word
+
+  { The widest glyph this mapping can put on screen that STARTS a cluster - the
+    same probe the host-text row uses, so a mapping that draws every cluster
+    with one unit still gets a reading wide enough to matter. }
+  Wide := '';
+  Atoms := AnsiAtomMap.Atoms;
+  for I := 0 to high(Atoms) do
+    if (Atoms[I].Bind = abSelf) and (Length(Atoms[I].Units) > 1) and ((Wide = '') or (Length(Atoms[I].Units) > Length(Wide))) then
+      Wide := Atoms[I].Units;
+  if Wide = '' then
+    Wide := Conv.Convert(#$0995 + string(b_Hasanta) + #$0995);
+
+  FillChar(FP, SizeOf(FP), 0);
+  FP.Window := HWND($1234);
+  FP.CaretX := 100;
+  FP.CaretY := 200;
+  FP.TextLength := Length(Wide);
+
+  Reader := TFakeCaretReader.Create;
+  Sink := TTraceSink.Create;
+  try
+    Reader.Tail := Wide;
+    Reader.Fingerprint := FP;
+    Reader.Now := FP;
+
+    AnsiBackspaceHostErase := 'YES';
+    AnsiBackspaceUnitCap := '8';
+    AnsiBackspaceSetTrace(Sink.Backspace);
+    AnsiCaretSnifferConfigure(True, False);
+    AnsiCaretSnifferSetProvider(Reader.Provide, Reader.Current);
+
+    // ---- English: the press is the host's, in every engine ----------------
+    for Kind in [ekModern, ekOld, ekE2B] do
+    begin
+      Name := KindName(Kind);
+
+      SeedEngine(Kind, Word);
+      SetEngineMode(Kind, True);
+      ArmReading;
+      TraceCalls := 0;
+      Recorder.Reset;
+      Block := True; // deliberately wrong: the engine has to set it
+
+      DriveKey(Kind, VK_BACK, Block);
+
+      Check(ENGLISH_ROW, Format('%s: %s Backspace in English mode stays the host''s press', [AMapping, Name]),
+        (not Block) and (Recorder.Emits = 0),
+        Format('Block=%s emits=%d (%s)', [BoolToStr(Block, True), Recorder.Emits, TraceText]));
+      Check(ENGLISH_ROW, Format('%s: %s English mode never feeds the ledger', [AMapping, Name]), EngineLedger(Kind) = Word,
+        Format('ledger=[%s] want [%s]', [HexUnits(EngineLedger(Kind)), HexUnits(Word)]));
+      Check(ENGLISH_ROW, Format('%s: %s English mode never asks the eraser', [AMapping, Name]), TraceCalls = 0,
+        Format('the decision point ran %d time(s) (%s)', [TraceCalls, TraceText]));
+      Check(ENGLISH_ROW, Format('%s: %s English mode leaves the reading alone', [AMapping, Name]),
+        AnsiCaretContextTail(Tail) and (Tail = Wide) and (Reader.Calls = 0),
+        Format('tail=[%s] want [%s], reading layers asked %d time(s)', [HexUnits(Tail), HexUnits(Wide), Reader.Calls]));
+
+      // ---- the same press in Bangla mode: the control -----------------------
+      SeedEngine(Kind, Word);
+      SetEngineMode(Kind, False);
+      AnsiCaretContextDrop('the control case starts with no reading');
+      TraceCalls := 0;
+      Recorder.Reset;
+      Block := False;
+
+      DriveKey(Kind, VK_BACK, Block);
+
+      Check(ENGLISH_ROW, Format('%s: %s in Bangla mode the same press takes the word (control)', [AMapping, Name]),
+        Block and (Recorder.Emits >= 1) and (EngineLedger(Kind) <> Word),
+        Format('Block=%s emits=%d ledger=[%s] want shorter than [%s]', [BoolToStr(Block, True), Recorder.Emits,
+          HexUnits(EngineLedger(Kind)), HexUnits(Word)]));
+
+      // ---- a typing key: English does not reach the tracker either ---------
+      SeedEngine(Kind, '');
+      SetEngineMode(Kind, True);
+      TraceCalls := 0;
+      Recorder.Reset;
+      Block := True;
+
+      DriveKey(Kind, TYPING_KEY, Block);
+
+      Check(ENGLISH_ROW, Format('%s: %s a typing key in English mode types nothing of ours', [AMapping, Name]),
+        (not Block) and (Recorder.Emits = 0), Format('Block=%s emits=%d', [BoolToStr(Block, True), Recorder.Emits]));
+      Check(ENGLISH_ROW, Format('%s: %s a typing key in English mode leaves no ledger and no decision', [AMapping, Name]),
+        (EngineLedger(Kind) = '') and (TraceCalls = 0),
+        Format('ledger=[%s] decisions=%d', [HexUnits(EngineLedger(Kind)), TraceCalls]));
+
+      { The control: in Bangla mode the SAME key does reach the tracker, so the
+        assertion above cannot pass by the typing path being dead. Only the
+        Modern engine can be driven here - the other two route a space through
+        the preview form (E2B) or keep their delimiter state private (Old). }
+      if Kind = ekModern then
+      begin
+        SeedEngine(Kind, '');
+        SetEngineMode(Kind, False);
+        Recorder.Reset;
+        Block := False;
+
+        DriveKey(Kind, TYPING_KEY, Block);
+
+        Check(ENGLISH_ROW, Format('%s: %s the same key in Bangla mode IS ours (control)', [AMapping, Name]),
+          EngineLedger(Kind) <> '', Format('ledger=[%s] after the key, want the committed tail', [HexUnits(EngineLedger(Kind))]));
+      end
+      else
+        Say('    note: ' + Name + '''s typing path needs the preview form or keeps its state private; it passes the same mode gate Modern is probed on');
+    end;
+
+    // ---- the switch: the ledger and the reading go together ---------------
+    SeedEngine(ekModern, Word);
+    SetEngineMode(ekModern, True);
+    ArmReading;
+    Modern.InvalidateAnsiTail; // TLayout.InvalidateAnsiTail does this for all three engines
+    AnsiBackspaceInvalidate;   // ... and this for the reading (clsLayout.pas:242)
+
+    Check(ENGLISH_ROW, AMapping + ': the switch drops the ledger', Modern.CommittedForTest = '',
+      Format('ledger=[%s] after the switch', [HexUnits(Modern.CommittedForTest)]));
+    Check(ENGLISH_ROW, AMapping + ': the switch drops the reading', not AnsiCaretContextTail(Tail),
+      Format('tail=[%s] after the switch', [HexUnits(Tail)]));
+
+    SetEngineMode(ekModern, False);
+    TraceCalls := 0;
+    Recorder.Reset;
+    Block := False;
+
+    DriveKey(ekModern, VK_BACK, Block); // the first Bangla press after the switch
+
+    Check(ENGLISH_ROW, AMapping + ': the first press after the switch measures fresh, never the English-era cache',
+      (not Block) and (Recorder.Emits = 0) and (TraceCalls = 1) and (TraceDecision = edNotMine),
+      Format('Block=%s emits=%d decisions=%d decision=%s (%s)', [BoolToStr(Block, True), Recorder.Emits, TraceCalls,
+        AnsiDecisionName(TraceDecision), TraceText]));
+
+    { ... and one reading taken at the NEW caret is all the press after it needs:
+      the switch costs one press, it does not disable the eraser. }
+    ArmReading;
+    Recorder.Reset;
+    Block := False;
+    DriveKey(ekModern, VK_BACK, Block);
+    Check(ENGLISH_ROW, AMapping + ': a reading taken after the switch erases at the new caret',
+      Block and (Recorder.EraseCount = AnsiTailClusterUnits(Wide)) and (TraceDecision = edCluster),
+      Format('Block=%s erase=%d want %d (%s)', [BoolToStr(Block, True), Recorder.EraseCount, AnsiTailClusterUnits(Wide), TraceText]));
+
+    // ---- back to English: the host gets the press again -------------------
+    SeedEngine(ekModern, Word);
+    SetEngineMode(ekModern, True);
+    ArmReading;
+    TraceCalls := 0;
+    Recorder.Reset;
+    Block := True;
+
+    DriveKey(ekModern, VK_BACK, Block);
+
+    Check(ENGLISH_ROW, AMapping + ': switching back to English restores the host''s press',
+      (not Block) and (Recorder.Emits = 0) and (TraceCalls = 0) and (Modern.CommittedForTest = Word),
+      Format('Block=%s emits=%d decisions=%d ledger=[%s]', [BoolToStr(Block, True), Recorder.Emits, TraceCalls,
+        HexUnits(Modern.CommittedForTest)]));
+
+    // ---- no override and no form: the production fallback is English ------ 
+    ClearEngineModes;
+    for Kind in [ekModern, ekOld, ekE2B] do
+    begin
+      SeedEngine(Kind, Word);
+      ArmReading;
+      TraceCalls := 0;
+      Recorder.Reset;
+      Block := True;
+
+      DriveKey(Kind, VK_BACK, Block);
+
+      Check(ENGLISH_ROW, Format('%s: %s with no form and no override answers as English (the production fallback)',
+        [AMapping, KindName(Kind)]), (not Block) and (Recorder.Emits = 0) and (TraceCalls = 0),
+        Format('Block=%s emits=%d decisions=%d', [BoolToStr(Block, True), Recorder.Emits, TraceCalls]));
+    end;
+  finally
+    ClearEngineModes;
+    SeedEngine(ekModern, '');
+    SeedEngine(ekOld, '');
+    SeedEngine(ekE2B, '');
+    AnsiCaretContextDrop('row 14 done');
+    AnsiCaretSnifferClearProvider;
+    AnsiCaretSnifferConfigure(False, False);
+    AnsiBackspaceSetTrace(nil);
+    AnsiBackspaceHostErase := 'YES';
+    AnsiBackspaceUnitCap := '8';
+    Sink.Free;
+    Reader.Free;
+  end;
+end;
+
 { The name of one row in the summary. Rows 1..7 are the width rows of the G1
-  plan, rows 8..11 the layers above, and the last two are the chunk 3 / chunk 4
-  sections reported under their own names. }
+  plan, rows 8..11 the layers above, and the last three are the chunk 3 / chunk
+  4 / English-mode sections, reported under their own names. }
 function RowLabel(const ARow: Integer): string;
 begin
   case ARow of
@@ -1677,6 +1975,8 @@ begin
       Result := 'atom map (chunk 3)';
     HOST_ROW:
       Result := 'host text (chunk 4)';
+    ENGLISH_ROW:
+      Result := 'G1 row 14 (English mode and the mode switch)';
   else
     Result := Format('G1 row %d (one press, one visible character)', [ARow]);
   end;
@@ -1773,6 +2073,7 @@ begin
       StateLifecycleChecks('Default');
       HostTextChecks('Default');
       GateLayerChecks('Default');
+      EnglishModeChecks('Default');
 
       Loaded := 1;
       for I := 0 to Names.Count - 1 do
@@ -1795,6 +2096,7 @@ begin
         StateLifecycleChecks(Names[I]);
         HostTextChecks(Names[I]);
         GateLayerChecks(Names[I]);
+        EnglishModeChecks(Names[I]);
       end;
     finally
       CharBased.Free;

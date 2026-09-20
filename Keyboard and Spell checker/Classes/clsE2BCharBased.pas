@@ -58,6 +58,13 @@ type
       DetermineZWNJ_ZWJ:         string;
       PhoneticCache:             array [1 .. Max_EnglishLength] of TPhoneticCache;
 
+      { The keyboard mode this engine works with: the override when a test /
+        embedding caller set one (the same hook the other two engines have),
+        the real form otherwise - so the engine is never reachable through a
+        nil form, and its English-mode gate is reachable without one. }
+      FModeOverride: Boolean;
+      FModeValue:    Integer;
+
       // TEST / EMBEDDING HOOK: nil in production, so the engine always talks to
       // the real host unless a caller replaces it.
       FOnRawEmit: TE2BHostEditEvent;
@@ -69,6 +76,7 @@ type
       procedure ProcessEnter(var Block: boolean);
       procedure DoBackspace(var Block: boolean);
       procedure RawSend(const EraseCount: Integer; const Text: string);
+      function CurrentKeyboardMode: Integer;
       procedure MyProcessVKeyDown(const KeyCode: Integer; var Block: boolean; const var_IsLogicalShift: boolean; const var_IsTrueShift: boolean);
       procedure AddStr(const Str: string);
 
@@ -100,6 +108,11 @@ type
         the committed ledger so the next Backspace can never erase text of a
         document this ledger did not type into. }
       procedure InvalidateAnsiTail;
+
+      { TEST / EMBEDDING HOOK: pins the keyboard mode for a caller that has no
+        main form (a harness). Switched off, the engine reads the real form,
+        exactly as production does. }
+      procedure SetKeyboardModeOverride(const Enabled: Boolean; const Mode: Integer);
 
       { TEST / EMBEDDING HOOKS - assigning OnRawEmit replaces the real host for
         the duration; the ledger is private, so a harness seeds and reads it
@@ -270,6 +283,8 @@ var
   I: Integer;
 begin
   inherited;
+  FModeOverride := False;
+  FModeValue := Ord(SysDefault);
   Parser := TEnglishToBangla.Create;
   Abbreviation := TAbbreviation.Create;
   Bijoy := TUnicodeToBijoy2000.Create;
@@ -1541,6 +1556,28 @@ end;
 
 { =============================================================================== }
 
+{
+  The keyboard mode the gate below reads: the override when a test/embedding
+  caller set one, the real form otherwise - so the engine is never reachable
+  through a nil form.
+}
+function TE2BCharBased.CurrentKeyboardMode: Integer;
+begin
+  if FModeOverride then
+    Result := FModeValue
+  else if Assigned(AvroMainForm1) then
+    Result := Ord(AvroMainForm1.GetMyCurrentKeyboardMode)
+  else
+    Result := Ord(SysDefault);
+end;
+
+procedure TE2BCharBased.SetKeyboardModeOverride(const Enabled: Boolean; const Mode: Integer);
+begin
+  FModeOverride := Enabled;
+  if Enabled then
+    FModeValue := Mode;
+end;
+
 function TE2BCharBased.ProcessVKeyDown(const KeyCode: Integer; var Block: boolean): string;
 var
   m_Block: boolean;
@@ -1565,14 +1602,14 @@ begin
     Exit;
   end;
 
-  if AvroMainForm1.GetMyCurrentKeyboardMode = SysDefault then
+  if CurrentKeyboardMode = Ord(SysDefault) then
   begin
     Block := False;
     BlockLast := False;
     ProcessVKeyDown := '';
     Exit;
   end
-  else if AvroMainForm1.GetMyCurrentKeyboardMode = bangla then
+  else if CurrentKeyboardMode = Ord(bangla) then
   begin
     if KeyCode = VK_SPACE then
     begin
@@ -1637,12 +1674,12 @@ begin
     Exit;
   end;
 
-  if AvroMainForm1.GetMyCurrentKeyboardMode = SysDefault then
+  if CurrentKeyboardMode = Ord(SysDefault) then
   begin
     Block := False;
     BlockLast := False;
   end
-  else if AvroMainForm1.GetMyCurrentKeyboardMode = bangla then
+  else if CurrentKeyboardMode = Ord(bangla) then
   begin
     if BlockLast = True then
       Block := True;
