@@ -46,6 +46,25 @@ unit uCaretWatch;
      the user's clipboard, and doing that for a description the press path will
      discard is not acceptable, whatever it costs. Stopping is what a shutdown
      must do: both hooks belong to this process only.
+
+     The same argument gates the tick on the OUTPUT MODE: only an ANSI press can
+     use a reading, so in Unicode and English modes the tick takes none - no
+     window call, no UIA element (which means no COM: the reader's client is
+     created on its first read, not when the provider is installed), no clipboard
+     round-trip. The request is left PENDING while the mode is not ANSI, so a
+     switch back needs neither a restart nor a caret event: the next tick reads.
+
+  4. FINISH THE JOB. A request is not spent until it produced a reading. A
+     refresh that answers nothing (the new window is still activating, UIA has no
+     element for it yet, the host is busy) keeps the request pending and is
+     retried on the following ticks, up to WATCH_RETRY_LIMIT; a reading - and any
+     new caret event - refills the budget, and the give-up is traced once with the
+     count, so a host that never answers cannot make the timer hammer.
+     AnsiCaretWatchForegroundChanged is what the application's window-check timer
+     runs when the foreground window changes: the mode / dead-key work that
+     handler does drops the reading its tick had just taken, and a foreground
+     change with no click raises no further caret event, so the request is
+     re-armed and read again in that same handler.
   ============================================================================= }
 
 interface
@@ -90,6 +109,15 @@ procedure AnsiCaretWatchTick;
   request the hooks raise. O(1). }
 procedure AnsiCaretWatchNoteCaretEvent(const AWhat: string);
 
+{ The foreground window changed AND the application has finished the work it
+  does for it (the per-window keyboard mode, TLayout.ResetDeadKey ->
+  InvalidateAnsiTail -> AnsiBackspaceInvalidate). That work drops whatever this
+  interval's tick read, and an Alt-Tab back with no click raises no further
+  caret event, so the request is re-armed and the reading of the NEW window is
+  taken again here, in the same handler. Production calls this from the
+  window-check timer; a harness calls the same entry point. }
+procedure AnsiCaretWatchForegroundChanged;
+
 { How many events were seen and how many refreshes were taken. Diagnostics. }
 procedure AnsiCaretWatchStats(out AEvents, ARefreshes: Integer);
 function AnsiCaretWatchHostReadable: Boolean; // the message-path reader found a standard edit
@@ -110,6 +138,13 @@ const
     mappings draw (Ansi V3 reaches four units), narrow enough to stay a single
     short copy out of the control. }
   WATCH_PROBE_CHARS = 32;
+
+  { F9: how many consecutive ticks a request that produced no reading is retried
+    before it is given up. Five ticks at the timer's 100 ms is ~500 ms - enough
+    for a window that is still activating or for a UIA probe the 60 ms interval
+    declined, short enough that a host that never answers cannot make the timer
+    probe forever. }
+  WATCH_RETRY_LIMIT = 5;
 
   { LLMHF_INJECTED: set in MSLLHOOKSTRUCT.flags for input this process (or any
     automation) injected. This Delphi's Winapi.Windows declares no such
@@ -148,6 +183,8 @@ var
   FRefreshes:     Integer;
   FHostReadable:  Boolean;
   FOffTraced:     Boolean; // the "switched off" line is written once, not per tick
+  FRetries:       Integer; // F9: consecutive refused refreshes since the last event
+  FModeTraced:    Boolean; // F11: the "not ANSI output" line is written once
 
 { ------------------------------------------------------------------------------ }
 { the cheap caret probe: one local API call, no cross-process message, no wait.
@@ -256,6 +293,20 @@ begin
   Inc(FEvents);
   AnsiCaretContextDrop(AWhat);
   FPending := True;
+  FRetries := 0; // a new event is a fresh request: the retry budget restarts
+end;
+
+{ F8: what the window-check timer runs when the foreground window changed. The
+  mode / dead-key work the timer does for that change has just dropped the
+  reading (TLayout.ResetDeadKey -> InvalidateAnsiTail -> AnsiBackspaceInvalidate),
+  and a foreground change with no click raises no further caret event, so the
+  same handler re-arms the request and reads the new window again. If that read
+  cannot answer yet (the UIA probe interval, a host still activating) the F9
+  retry keeps the request pending for the following ticks. }
+procedure AnsiCaretWatchForegroundChanged;
+begin
+  AnsiCaretWatchNoteCaretEvent('foreground change');
+  AnsiCaretWatchTick;
 end;
 
 procedure WinEventProc(hWinEventHook: THandle; event: DWORD; hwnd: HWND; idObject: LongInt; idChild: LongInt;
@@ -374,6 +425,7 @@ begin
 
   FMouseHook := SetWindowsHookEx(WH_MOUSE_LL, @MouseHookProc, hInstance, 0);
   FPending := True; // take one reading right away
+  FRetries := 0;    // a fresh start has a full retry budget
 
   FActive := False;
   for I := Low(WATCH_EVENTS) to High(WATCH_EVENTS) do
@@ -393,6 +445,7 @@ begin
 
   InstallReader;
   FPending := True;
+  FRetries := 0; // a fresh start has a full retry budget
   FActive := True; // the tick path, without any OS hook
 end;
 
@@ -416,6 +469,7 @@ begin
   AnsiCaretSnifferClearProvider;
   AnsiCaretSnifferConfigure(False, False);
   FPending := False;
+  FRetries := 0;
   FActive := False;
 end;
 
@@ -440,13 +494,31 @@ begin
 end;
 
 procedure AnsiCaretWatchTick;
+var
+  Got: Boolean;
 begin
   if not FActive then
     Exit;
   if not FPending then
     Exit;
 
-  FPending := False;
+  { F11: the erase this reading feeds is gated on ANSI output, so the machinery
+    is gated on it too. Nothing below this line runs in Unicode or in English
+    output mode: no window call, no UIA client, no clipboard round-trip. The
+    request is left PENDING rather than consumed, so a mode change back to ANSI
+    only has to wait for the next tick - no restart and no event - and the
+    per-window keyboard-mode change the timer re-arms reaches the same tick.
+    Traced once per off period, not per tick. }
+  if OutputIsBijoy <> 'YES' then
+  begin
+    if not FModeTraced then
+    begin
+      FModeTraced := True;
+      AnsiTrace('watch: the output mode is not ANSI, so nothing is read');
+    end;
+    Exit;
+  end;
+  FModeTraced := False; // a later switch to ANSI output reads again
 
   { Switched off: the feature takes no reading at all. The hooks stay installed -
     they only set a flag - but nothing below this line runs, so a user who turned
@@ -456,6 +528,7 @@ begin
     tick: the log says why there is nothing to see instead of flooding it. }
   if not AnsiBackspaceEnabled then
   begin
+    FPending := False;
     if not FOffTraced then
     begin
       FOffTraced := True;
@@ -465,6 +538,8 @@ begin
   end;
   FOffTraced := False; // a later switch-on reads again
 
+  FPending := False;
+
   NoteHostIdentity;
 
   { One burst, one reading: the budget in the cache makes a second ask in the
@@ -472,11 +547,33 @@ begin
     into a stream of probes. }
   AnsiCaretBurstBegin;
   try
-    if AnsiCaretContextRefresh(WATCH_PROBE_CHARS) then
-      Inc(FRefreshes);
+    Got := AnsiCaretContextRefresh(WATCH_PROBE_CHARS);
   finally
     AnsiCaretBurstEnd;
   end;
+
+  if Got then
+  begin
+    Inc(FRefreshes);
+    FRetries := 0; // a reading was taken: the retry budget is full again
+    Exit;
+  end;
+
+  { F9: a refresh that came back empty (the new window is still activating, UIA
+    has no element for it yet, the host is busy) must not consume the request,
+    or nothing retries until an unrelated caret event arrives. It is retried on
+    the next ticks - and only a bounded number of them, so a host that never
+    answers cannot make the timer hammer. The 100 ms tick is wider than the UIA
+    probe interval (60 ms, uUIAText), so each retry can genuinely probe; the
+    give-up is one line in the log, with the count. }
+  Inc(FRetries);
+  if FRetries >= WATCH_RETRY_LIMIT then
+  begin
+    AnsiTrace(Format('watch: no reading after %d attempts; waiting for the next caret event', [FRetries]));
+    FRetries := 0;
+  end
+  else
+    FPending := True;
 end;
 
 procedure AnsiCaretWatchStats(out AEvents, ARefreshes: Integer);
@@ -502,6 +599,8 @@ initialization
   FRefreshes := 0;
   FHostReadable := False;
   FOffTraced := False;
+  FRetries := 0;
+  FModeTraced := False;
 
 finalization
   AnsiCaretWatchStop;

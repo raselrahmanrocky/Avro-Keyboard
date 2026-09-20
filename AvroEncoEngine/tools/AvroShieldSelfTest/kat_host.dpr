@@ -134,8 +134,19 @@ uses
   uAnsiBackspace;
 
 const
+  { How many timer ticks a switch case gives the watch to produce a reading. The
+    product's tick is 100 ms and uCaretWatch retries a request that came back
+    empty up to WATCH_RETRY_LIMIT (5) times, so this is that bound: a real host
+    that is still activating answers within it, and the case does not flake on a
+    single declined read. }
+  SWITCH_TICKS = 5;
+
   HOST_CLASS  = 'AvroKatHostWindow';
   HOST_TITLE  = 'kat_host - Avro host-layer self test (safe to close)';
+  { A window of THIS process for the switch case. A CI desktop has no console
+    window (and a mintty-launched run has none either), so the hand-off needs a
+    real window that always exists - and it must not be the host window. }
+  AWAY_CLASS  = 'AvroKatHostAwayWindow';
   EDIT_ID     = 101;
   MULTI_ID    = 102;
   RICH_ID     = 103;
@@ -210,6 +221,7 @@ var
   FPass:    HWND;
   FRichCls: string;
   FHostTitle: string; // unique per run: the child's window is found by it
+  FAway:     HWND;    // the "other application" the switch case hands the front to
 
   FChild:        THandle; // the started copy (--serve), and its thread handle
   FChildThread:  THandle;
@@ -633,6 +645,12 @@ begin
   begin
     CloseHandle(FChildThread);
     FChildThread := 0;
+  end;
+
+  if FAway <> 0 then
+  begin
+    DestroyWindow(FAway);
+    FAway := 0;
   end;
 end;
 
@@ -1941,6 +1959,172 @@ begin
     Format('tail=[%s] after the stop', [HexUnits(Tail)]));
 end;
 
+function AwayWndProc(hWnd: HWND; Msg: UINT; wParam: WPARAM; lParam: LPARAM): LRESULT; stdcall;
+begin
+  Result := DefWindowProc(hWnd, Msg, wParam, lParam);
+end;
+
+{ Creates (once) the window the foreground is handed to during the switch case. }
+function MakeAwayWindow: HWND;
+var
+  Wc: TWndClass;
+begin
+  if FAway = 0 then
+  begin
+    FillChar(Wc, SizeOf(Wc), 0);
+    Wc.lpfnWndProc := @AwayWndProc;
+    Wc.hInstance := HInstance;
+    Wc.hbrBackground := HBRUSH(COLOR_WINDOW + 1);
+    Wc.lpszClassName := PChar(AWAY_CLASS);
+    Winapi.Windows.RegisterClass(Wc); // 0 == already registered; fine either way
+    FAway := CreateWindowEx(0, PChar(AWAY_CLASS), 'kat_host: another application', WS_OVERLAPPEDWINDOW or WS_VISIBLE,
+      40, 40, 320, 120, 0, 0, HInstance, nil);
+  end;
+  Result := FAway;
+end;
+
+{ ============================================================================== }
+{ D2. the reported switch: foreground away and back, no click, one Backspace       }
+{ ============================================================================== }
+
+{ The report this case exists for: switch away from the application and back
+  (an Alt-Tab), do NOT click anywhere, then press Backspace once. The caret is
+  already where the user wants it, so no further caret event arrives. In the
+  product the window-check timer's tick has already read the new window by then,
+  and the mode / dead-key work it does for the change drops that reading
+  (TLayout.ResetDeadKey -> InvalidateAnsiTail -> AnsiBackspaceInvalidate), so the
+  same handler has to re-arm and read again (AnsiCaretWatchForegroundChanged,
+  uForm1.WindowCheckTimer). Without that call the cache stays empty, the first
+  press answers "not ours", and the host erases ONE ANSI unit - the defect.
+
+  This drives that exact order against the real child control with the real
+  message-path reader: the forearm goes AWAY and BACK for real, nothing is
+  clicked, the tick reads, the drop happens, the re-arm reads again, and then one
+  press has to take the whole visible cluster. }
+procedure ForegroundRoundTripChecks;
+var
+  Wide:   string;
+  Tail:   string;
+  Want:   string;
+  Before: string;
+  Keys:   Integer;
+  Away:   HWND;
+
+  { TRUE when the watch produces the reading the press needs, within the ticks a
+    real timer would take. A read that comes back empty is retried by the watch
+    on the NEXT tick (F9), so a warm-up here measures what the product does
+    instead of asserting on one read the way a flaky case would. It stays a
+    regression: nothing below injects a reading, and without the re-arm in
+    uForm1.WindowCheckTimer there is no pending request at all, so no number of
+    ticks produces one. }
+  function ReadingAppears: Boolean;
+  var
+    I: Integer;
+  begin
+    for I := 1 to SWITCH_TICKS do
+    begin
+      if AnsiCaretContextVerify and AnsiCaretContextTail(Tail) and (Tail = Want) then
+        Exit(True);
+      AnsiCaretWatchTick;
+    end;
+    Result := AnsiCaretContextVerify and AnsiCaretContextTail(Tail) and (Tail = Want);
+  end;
+begin
+  if not TakeFocus(FEdit, EDIT_ID) then
+  begin
+    Skip('switch: the test window could not take the foreground');
+    Exit;
+  end;
+
+  AnsiSmartBackspace := 'YES';
+  AnsiBackspaceHostErase := 'YES';
+  AnsiBackspaceUIA := 'YES';
+  AnsiBackspaceClipboard := 'NO';
+  AnsiBackspaceSurgical := 'AUTO';
+
+  Wide := WidestCluster;
+  if (Wide = '') or (AnsiAtomMap = nil) or (AnsiTailClusterUnits(Wide) < 2) then
+  begin
+    Skip('switch: no multi-unit ANSI cluster in the active mapping to erase');
+    Exit;
+  end;
+
+  { Where the foreground goes while the user is "in another application": the
+    console that runs this harness. A head-less watch keeps the live desktop's
+    own carets out of the measurement; the events are raised through the same
+    entry point the WinEvent hook uses. }
+  Away := GetConsoleWindow;
+  if Away = 0 then
+    Away := MakeAwayWindow;
+  if Away = 0 then
+  begin
+    Skip('switch: no window to hand the foreground to');
+    Exit;
+  end;
+
+  Want := 'xy' + Wide;
+  AnsiCaretWatchStartHeadless;
+  try
+    SetText(FEdit, 'xy' + Wide);
+    SetCaret(FEdit, Length('xy' + Wide));
+    Pump(80);
+
+    { The reading the timer takes before the switch: the control really holds
+      the mapping's own glyph. }
+    AnsiCaretWatchNoteCaretEvent('harness: the reading before the switch');
+    Check('switch: the watch reads the control before the switch', ReadingAppears,
+      Format('tail=[%s] want [%s]', [HexUnits(Tail), HexUnits(Want)]));
+
+    { ---- the user's sequence ------------------------------------------------- }
+    ForceForeground(Away); // ... away ...
+    Pump(80);
+    Check('switch: the foreground really left the host', GetForegroundWindow <> FHost,
+      Format('the foreground is still %s', [Described(GetForegroundWindow)]));
+    if not TakeFocus(FEdit, EDIT_ID) then // ... and back, without a click
+    begin
+      Skip('switch: the host could not take the foreground back');
+      Exit;
+    end;
+    Pump(80);
+
+    { The timer interval that notices the change: its tick reads the window in
+      front, and then the mode / dead-key work the same handler does for the
+      change drops what it read. }
+    AnsiCaretWatchNoteCaretEvent('harness: the interval that notices the change');
+    Check('switch: the tick that notices the change reads the window in front', ReadingAppears,
+      Format('tail=[%s] want [%s]', [HexUnits(Tail), HexUnits(Want)]));
+    AnsiBackspaceInvalidate; // == TLayout.ResetDeadKey, for the reading
+    Check('switch: the switch handling dropped the reading that tick had taken',
+      not AnsiCaretContextTail(Tail), Format('tail=[%s] survived the drop', [HexUnits(Tail)]));
+
+    { ... and the same handler re-arms the request and reads a second time. THIS is
+      the fix; a reading is REQUIRED here, and nothing below injects one. }
+    AnsiCaretWatchForegroundChanged;
+    Check('switch: the re-armed tick leaves a usable reading without a click', ReadingAppears,
+      Format('tail=[%s] want [%s]: the first press would answer "not ours"', [HexUnits(Tail), HexUnits(Want)]));
+    Check('switch: ... and the reading is fresh enough for the press to accept it', AnsiCaretContextVerify,
+      Format('tail=[%s]: a stale or absent reading means the press answers "not ours"', [HexUnits(Tail)]));
+
+    { ---- ONE press, the whole cluster --------------------------------------- }
+    Before := TextOf(FEdit);
+    Keys := ChildKeyLines;
+    FSink.EraseCount := 0;
+    FSink.Text := '';
+    FSink.Emits := 0;
+    Check('switch: the first Backspace erases the whole cluster in one action',
+      AnsiEraseHostCluster(FSink.Emit) and (TextOf(FEdit) = 'xy') and (SelectionStartOf(FEdit) = 2) and
+      (SelectionEndOf(FEdit) = 2),
+      Format('text [%s] -> [%s] caret=%d..%d', [HexUnits(Before), HexUnits(TextOf(FEdit)), SelectionStartOf(FEdit),
+      SelectionEndOf(FEdit)]));
+    Check('switch: the text in front of the cluster is untouched', TextOf(FEdit) = Copy(Before, 1, 2),
+      Format('text=[%s] want [%s]', [HexUnits(TextOf(FEdit)), HexUnits(Copy(Before, 1, 2))]));
+    Check('switch: and no key message was needed for it', ChildKeyLines = Keys,
+      Format('the control received %d key messages', [ChildKeyLines - Keys]));
+  finally
+    AnsiCaretWatchStop;
+  end;
+end;
+
 { ============================================================================== }
 { E. the host matrix: what each host answers, what it costs, what it touches      }
 { ============================================================================== }
@@ -2550,6 +2734,10 @@ begin
     Say('');
     Say('=== D. the watch, a real key press and one emission');
     HookChecks;
+
+    Say('');
+    Say('=== D2. the reported switch: foreground away and back, no click, one Backspace');
+    ForegroundRoundTripChecks;
 
     if FMatrix then
     begin

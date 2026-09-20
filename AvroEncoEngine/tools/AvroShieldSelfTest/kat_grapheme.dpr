@@ -1446,6 +1446,7 @@ var
   FP:      TCaretFingerprint;
   Moved:   TCaretFingerprint;
   I:       Integer;
+  CallsAfterBound: Integer;
 
   { One press of the Modern engine. Our side of it: ABlocked means the press
     was ours, AErase what our own emission erased (0 when the host took it). }
@@ -1650,6 +1651,97 @@ begin
         TraceText]));
     Reader.Now := FP;
     AnsiCaretSnifferClearProvider;
+
+    { ---- row 10b: the REAL path - the reading is PRODUCED, not injected ----
+      Everything above INJECTS the fresh reading, which proves the eraser works
+      after a move but says nothing about a move producing a reading. These
+      cases drive the watch's own entry points instead, with the reading layer
+      still a fake:
+
+        * the F8 order - a tick reads, the mode / dead-key work drops what it
+          read (TLayout.ResetDeadKey -> InvalidateAnsiTail ->
+          AnsiBackspaceInvalidate), and the same handler re-arms and reads the
+          new window again (AnsiCaretWatchForegroundChanged, what uForm1's
+          window-check timer now calls). Before that call existed the first
+          press after an Alt-Tab back with no click answered "not ours" and the
+          host erased one ANSI unit;
+        * the F9 retry - a read that comes back EMPTY leaves the request
+          pending, so the next tick asks again (pre-fix the request was already
+          consumed and the assertion below fails on the first tick alone);
+        * the bound - a host that never answers is probed a few ticks and then
+          left alone, instead of the timer hammering it forever. }
+    AnsiCaretWatchStartHeadless;
+    try
+      AnsiCaretSnifferSetProvider(Reader.Provide, Reader.Current);
+      Reader.Fingerprint := FP;
+      Reader.Now := FP;
+
+      Reader.Tail := Wide;
+      Reader.Calls := 0;
+      AnsiCaretWatchNoteCaretEvent('row 10b: the foreground changed');
+      AnsiCaretWatchTick;
+      Check(CARET_ROW, AMapping + ': the tick reads the window in front before the switch handling',
+        (Reader.Calls = 1) and AnsiCaretContextTail(Tail) and (Tail = Wide),
+        Format('calls=%d tail=[%s] want [%s]', [Reader.Calls, HexUnits(Tail), HexUnits(Wide)]));
+
+      AnsiBackspaceInvalidate; // == TLayout.ResetDeadKey, for the reading
+      Check(CARET_ROW, AMapping + ': the mode / dead-key work drops the reading that tick took',
+        not AnsiCaretContextTail(Tail), Format('tail=[%s] survived the invalidate', [HexUnits(Tail)]));
+
+      AnsiCaretWatchForegroundChanged; // the form re-arms and reads in the same handler
+      Check(CARET_ROW, AMapping + ': the re-armed tick leaves a usable reading of the new window',
+        (Reader.Calls = 2) and AnsiCaretContextTail(Tail) and (Tail = Wide),
+        Format('calls=%d tail=[%s] want [%s]', [Reader.Calls, HexUnits(Tail), HexUnits(Wide)]));
+
+      Want := AnsiTailClusterUnits(Wide);
+      if Want > 1 then
+      begin
+        SeedEngine(ekModern, '');
+        Press(Got, Block);
+        Check(CARET_ROW, AMapping + ': a foreground change with no click still erases at the first press',
+          Block and (Got = Want),
+          Format('Block=%s erase=%d want %d (%s)', [BoolToStr(Block, True), Got, Want, TraceText]));
+      end
+      else
+        Say('    note: this mapping draws every cluster with one unit - the foreground-change press is the host''s');
+
+      { F9: a read that comes back empty is retried on the NEXT tick. Pre-fix the
+        request was consumed by the empty read, so the second tick did nothing
+        and the reading never appeared. }
+      Reader.Tail := '';
+      Reader.Fingerprint := FP;
+      Reader.Now := FP;
+      Reader.Calls := 0;
+      AnsiCaretWatchNoteCaretEvent('row 10b: a read that will fail');
+      AnsiCaretWatchTick;
+      Check(CARET_ROW, AMapping + ': a read that comes back empty is attempted again',
+        Reader.Calls = 1, Format('calls=%d after the first (empty) read', [Reader.Calls]));
+      Reader.Tail := Wide;
+      AnsiCaretWatchTick;
+      Check(CARET_ROW, AMapping + ': the retry answers and leaves a usable reading',
+        (Reader.Calls = 2) and AnsiCaretContextTail(Tail) and (Tail = Wide),
+        Format('calls=%d tail=[%s] want [%s]', [Reader.Calls, HexUnits(Tail), HexUnits(Wide)]));
+
+      { ... and a host that never answers is given up on, not probed forever. }
+      Reader.Tail := '';
+      Reader.Calls := 0;
+      AnsiCaretWatchNoteCaretEvent('row 10b: a host that never answers');
+      for I := 1 to 10 do
+        AnsiCaretWatchTick;
+      CallsAfterBound := Reader.Calls;
+      Check(CARET_ROW, AMapping + ': a host that never answers is retried, then given up on',
+        (CallsAfterBound >= 2) and (CallsAfterBound < 10),
+        Format('%d probes over 10 ticks: the request must be retried but bounded', [CallsAfterBound]));
+      AnsiCaretWatchTick;
+      AnsiCaretWatchTick;
+      Check(CARET_ROW, AMapping + ': after giving up, the timer stops probing it',
+        Reader.Calls = CallsAfterBound,
+        Format('probes went %d -> %d after the bound', [CallsAfterBound, Reader.Calls]));
+    finally
+      AnsiCaretWatchStop;
+      // the rows below use injected readings, so the cache has to stay enabled
+      AnsiCaretSnifferConfigure(True, False);
+    end;
 
     // ---- row 11: host characters between the caret and the ledger ----------
     SeedEngine(ekModern, Glyph, 1);
@@ -2185,6 +2277,37 @@ begin
         (AnsiCaretContextRefreshes = RefreshesBefore) and (Reader.Calls = 0) and AnsiCaretContextTail(Tail) and (Tail = Wide),
         Format('refreshes %d -> %d, layers asked %d time(s), tail=[%s] want [%s]', [RefreshesBefore, AnsiCaretContextRefreshes,
         Reader.Calls, HexUnits(Tail), HexUnits(Wide)]));
+
+      { F11: "ANSI only" must be true of the MACHINERY, not just of the erase.
+        The watch's tick itself must take no reading while the output mode is not
+        ANSI, and it must start reading on the very next tick after a switch back
+        to ANSI - no restart, no settings save. The layer behind the tick would
+        answer here; nothing must ever ask it. }
+      AnsiCaretSnifferClearProvider;
+      AnsiCaretSnifferConfigure(True, False);
+      AnsiCaretWatchStartHeadless;
+      try
+        AnsiCaretSnifferSetProvider(Reader.Provide, Reader.Current);
+        Reader.Calls := 0;
+        AnsiCaretWatchNoteCaretEvent('row 15: a caret event in Unicode output mode');
+        AnsiCaretWatchTick;
+        Check(UNICODE_ROW, AMapping + ': the watch takes no reading in Unicode output mode',
+          (Reader.Calls = 0) and (AnsiCaretContextRefreshes = RefreshesBefore),
+          Format('the reading layer was asked %d time(s), refreshes %d -> %d', [Reader.Calls, RefreshesBefore,
+          AnsiCaretContextRefreshes]));
+
+        OutputIsBijoy := 'YES';
+        Reader.Tail := Wide;
+        Reader.Fingerprint := FP;
+        Reader.Now := FP;
+        AnsiCaretWatchTick;
+        Check(UNICODE_ROW, AMapping + ': switching the output mode to ANSI re-arms it without a restart',
+          (Reader.Calls = 1) and AnsiCaretContextTail(Tail) and (Tail = Wide),
+          Format('layers asked %d time(s), tail=[%s] want [%s]', [Reader.Calls, HexUnits(Tail), HexUnits(Wide)]));
+      finally
+        OutputIsBijoy := 'NO';
+        AnsiCaretWatchStop;
+      end;
     finally
       OutputIsBijoy := 'YES'; // every row after this one is ANSI
     end;

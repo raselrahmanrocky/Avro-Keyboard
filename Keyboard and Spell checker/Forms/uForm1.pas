@@ -2770,6 +2770,16 @@ begin
   end;
   KeyLayout.ResetDeadKey;
   LastWindow := hforewnd;
+
+  // F8: the mode / dead-key work above ran AFTER this interval's tick had read
+  // the new window (ResetDeadKey -> InvalidateAnsiTail -> AnsiBackspaceInvalidate
+  // drops whatever it read). A foreground change with no click - an Alt-Tab back
+  // - raises no further caret event, so the request is re-armed and the reading
+  // taken again here, in this same handler: without it the first Backspace
+  // answers "not ours" and the host erases one ANSI unit. uCaretWatch keeps the
+  // request pending when the immediate read cannot answer (the UIA probe
+  // interval, a host that is still activating).
+  AnsiCaretWatchForegroundChanged;
 end;
 
 procedure TAvroMainForm1.WMShowAnsiPicker(var Msg: TMessage);
