@@ -39,8 +39,7 @@ uses
 procedure Log(const Msg: string);
 begin
   {$IFDEF DebugLog}
-  OutputDebugString(PChar(Format('[%d.%03d T%d] %s',
-    [GetTickCount div 1000, GetTickCount mod 1000, GetCurrentThreadId, Msg])));
+  OutputDebugString(PChar(Format('[%d.%03d T%d] %s', [GetTickCount div 1000, GetTickCount mod 1000, GetCurrentThreadId, Msg])));
   {$ENDIF}
 end;
 

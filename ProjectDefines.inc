@@ -1,5 +1,5 @@
-{$Define BetaVersion}
-{.$Define PortableOn}
+{$DEFINE BetaVersion}
+// {$Define PortableOn}
 {
   DebugLog is OFF: no component writes a log file any more. DebugLog.Log()
   emits to the debugger only (OutputDebugString) and even that is compiled
@@ -7,4 +7,4 @@
   attach DebugView to see the diagnostics live. Nothing is written to disk
   either way.
 }
-{.$Define DebugLog}
+// {$Define DebugLog}

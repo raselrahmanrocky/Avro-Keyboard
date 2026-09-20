@@ -7,7 +7,6 @@
 }
 
 {$INCLUDE ../../ProjectDefines.inc}
-
 unit uAvroEngineStats;
 
 { =============================================================================
@@ -15,15 +14,15 @@ unit uAvroEngineStats;
 
   Three numbers that must never be confused with each other:
 
-    Heap     - bytes the RTL allocator has handed out, summed over its small,
-               medium and large block classes (GetMemoryManagerState). This is
-               the number the lazy-loading / arena / dedup work actually moves.
-    Private  - committed private bytes of the process (GetProcessMemoryInfo).
-               Heap + thread stacks + the image's own writable data.
-    Working  - the physical working set. It also contains file-backed image
-               pages (.text/.rsrc), which a working-set trim can drop but
-               private bytes cannot. A "2 MB -> 6 MB" report is usually this
-               number, so it must be read next to Private, never instead of it.
+  Heap     - bytes the RTL allocator has handed out, summed over its small,
+  medium and large block classes (GetMemoryManagerState). This is
+  the number the lazy-loading / arena / dedup work actually moves.
+  Private  - committed private bytes of the process (GetProcessMemoryInfo).
+  Heap + thread stacks + the image's own writable data.
+  Working  - the physical working set. It also contains file-backed image
+  pages (.text/.rsrc), which a working-set trim can drop but
+  private bytes cannot. A "2 MB -> 6 MB" report is usually this
+  number, so it must be read next to Private, never instead of it.
 
   Deliberately free of VCL and of DebugLog: the GUI application and every
   console gate can link it, and callers decide where the line goes (a global
@@ -52,19 +51,17 @@ type
     PeakWorkingSetBytes: Int64;
   end;
 
-{ Snapshot of the current process. Never raises: a failed query reports 0. }
+  { Snapshot of the current process. Never raises: a failed query reports 0. }
 function GetAvroMemStats: TAvroMemStats;
 
 { One log line, e.g.
-    MEM [startup] heap=812 KB (reserved 1.4 MB, 9k blocks) private=3.1 MB working=5.8 MB (peak 7.2 MB) }
+  MEM [startup] heap=812 KB (reserved 1.4 MB, 9k blocks) private=3.1 MB working=5.8 MB (peak 7.2 MB) }
 function AvroMemStatsText(const ATag: string): string; overload;
-function AvroMemStatsText(const ATag: string;
-  const AStats: TAvroMemStats): string; overload;
+function AvroMemStatsText(const ATag: string; const AStats: TAvroMemStats): string; overload;
 
 { Same line shape, plus the delta against ABefore for the numbers that a
   load/release burst is supposed to move. }
-function AvroMemDeltaText(const ATag: string; const ABefore,
-  AAfter: TAvroMemStats): string;
+function AvroMemDeltaText(const ATag: string; const ABefore, AAfter: TAvroMemStats): string;
 
 { Formats + forwards to OnAvroMemLog. Cheap no-op when no hook is installed,
   so call sites can sit on hot-ish paths without a DebugLog dependency. }
@@ -76,9 +73,9 @@ type
     on a timer; NORMAL is what a keyboard hook's responsiveness wants. }
   TAvroMemoryPriority = (ampLow, ampNormal);
 
-{ Seconds since the last input anywhere on the system (GetLastInputInfo).
-  This is the definition the idle release needs: a keyboard utility is used
-  from other windows, so "no input in this process" would be wrong. }
+  { Seconds since the last input anywhere on the system (GetLastInputInfo).
+    This is the definition the idle release needs: a keyboard utility is used
+    from other windows, so "no input in this process" would be wrong. }
 function GetSystemIdleSeconds: Cardinal;
 
 { Returns the process's working set to the OS. One syscall on the current
@@ -108,8 +105,8 @@ uses
 function GetAvroMemStats: TAvroMemStats;
 var
   MM: TMemoryManagerState;
-  I: Integer;
-  C: TProcessMemoryCounters;
+  I:  Integer;
+  C:  TProcessMemoryCounters;
 begin
   Result.HeapBytes := 0;
   Result.HeapReservedBytes := 0;
@@ -122,24 +119,15 @@ begin
     {$WARN SYMBOL_PLATFORM OFF} // the whole unit is a Win32 census by design
     GetMemoryManagerState(MM);
     {$WARN SYMBOL_PLATFORM ON}
-    for I := Low(MM.SmallBlockTypeStates) to High(MM.SmallBlockTypeStates) do
+    for I := low(MM.SmallBlockTypeStates) to high(MM.SmallBlockTypeStates) do
     begin
-      Result.HeapBytes := Result.HeapBytes +
-        Int64(MM.SmallBlockTypeStates[I].AllocatedBlockCount) *
-        Int64(MM.SmallBlockTypeStates[I].InternalBlockSize);
-      Result.HeapReservedBytes := Result.HeapReservedBytes +
-        Int64(MM.SmallBlockTypeStates[I].ReservedAddressSpace);
-      Result.BlockCount := Result.BlockCount +
-        Int64(MM.SmallBlockTypeStates[I].AllocatedBlockCount);
+      Result.HeapBytes := Result.HeapBytes + Int64(MM.SmallBlockTypeStates[I].AllocatedBlockCount) * Int64(MM.SmallBlockTypeStates[I].InternalBlockSize);
+      Result.HeapReservedBytes := Result.HeapReservedBytes + Int64(MM.SmallBlockTypeStates[I].ReservedAddressSpace);
+      Result.BlockCount := Result.BlockCount + Int64(MM.SmallBlockTypeStates[I].AllocatedBlockCount);
     end;
-    Result.HeapBytes := Result.HeapBytes +
-      Int64(MM.TotalAllocatedMediumBlockSize) +
-      Int64(MM.TotalAllocatedLargeBlockSize);
-    Result.HeapReservedBytes := Result.HeapReservedBytes +
-      Int64(MM.ReservedMediumBlockAddressSpace) +
-      Int64(MM.ReservedLargeBlockAddressSpace);
-    Result.BlockCount := Result.BlockCount +
-      Int64(MM.AllocatedMediumBlockCount) + Int64(MM.AllocatedLargeBlockCount);
+    Result.HeapBytes := Result.HeapBytes + Int64(MM.TotalAllocatedMediumBlockSize) + Int64(MM.TotalAllocatedLargeBlockSize);
+    Result.HeapReservedBytes := Result.HeapReservedBytes + Int64(MM.ReservedMediumBlockAddressSpace) + Int64(MM.ReservedLargeBlockAddressSpace);
+    Result.BlockCount := Result.BlockCount + Int64(MM.AllocatedMediumBlockCount) + Int64(MM.AllocatedLargeBlockCount);
   except
     // A memory-manager census must never be able to break a load path.
   end;
@@ -167,15 +155,11 @@ begin
     Result := IntToStr(ABytes) + ' B';
 end;
 
-function AvroMemStatsText(const ATag: string;
-  const AStats: TAvroMemStats): string;
+function AvroMemStatsText(const ATag: string; const AStats: TAvroMemStats): string;
 begin
-  Result := 'MEM [' + ATag + '] heap=' + BytesToText(AStats.HeapBytes) +
-    ' (reserved ' + BytesToText(AStats.HeapReservedBytes) + ', ' +
-    IntToStr(AStats.BlockCount) + ' blocks)' +
-    ' private=' + BytesToText(AStats.PrivateBytes) +
-    ' working=' + BytesToText(AStats.WorkingSetBytes) +
-    ' (peak ' + BytesToText(AStats.PeakWorkingSetBytes) + ')';
+  Result := 'MEM [' + ATag + '] heap=' + BytesToText(AStats.HeapBytes) + ' (reserved ' + BytesToText(AStats.HeapReservedBytes) + ', ' +
+    IntToStr(AStats.BlockCount) + ' blocks)' + ' private=' + BytesToText(AStats.PrivateBytes) + ' working=' + BytesToText(AStats.WorkingSetBytes) + ' (peak ' +
+    BytesToText(AStats.PeakWorkingSetBytes) + ')';
 end;
 
 function AvroMemStatsText(const ATag: string): string;
@@ -191,13 +175,10 @@ begin
     Result := '-' + BytesToText(-ABytes);
 end;
 
-function AvroMemDeltaText(const ATag: string; const ABefore,
-  AAfter: TAvroMemStats): string;
+function AvroMemDeltaText(const ATag: string; const ABefore, AAfter: TAvroMemStats): string;
 begin
-  Result := AvroMemStatsText(ATag, AAfter) +
-    ' | delta heap=' + SignedBytesToText(AAfter.HeapBytes - ABefore.HeapBytes) +
-    ' private=' + SignedBytesToText(AAfter.PrivateBytes - ABefore.PrivateBytes) +
-    ' working=' + SignedBytesToText(AAfter.WorkingSetBytes - ABefore.WorkingSetBytes);
+  Result := AvroMemStatsText(ATag, AAfter) + ' | delta heap=' + SignedBytesToText(AAfter.HeapBytes - ABefore.HeapBytes) + ' private=' +
+    SignedBytesToText(AAfter.PrivateBytes - ABefore.PrivateBytes) + ' working=' + SignedBytesToText(AAfter.WorkingSetBytes - ABefore.WorkingSetBytes);
 end;
 
 procedure LogAvroMemStats(const ATag: string);
@@ -238,14 +219,14 @@ begin
       Info.MemoryPriority := MEMORY_PRIORITY_LOW
     else
       Info.MemoryPriority := MEMORY_PRIORITY_NORMAL;
-    SetProcessInformation(GetCurrentProcess, ProcessMemoryPriority, @Info,
-      SizeOf(Info));
+    SetProcessInformation(GetCurrentProcess, ProcessMemoryPriority, @Info, SizeOf(Info));
   except
     // Pre-Windows-8 (or a locked-down process): keep the default priority.
   end;
 end;
 
 initialization
-  OnAvroMemLog := nil;
+
+OnAvroMemLog := nil;
 
 end.

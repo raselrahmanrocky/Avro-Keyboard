@@ -15,11 +15,11 @@
   pointer walk for non-Windows targets.
 
   WIPE DISCIPLINE - the two mistakes this unit exists to prevent:
-    1. Wiping a Buffer via FillChar on a dead local: eliminated by the compiler.
-    2. Zeroing PChar(S)^ without UniqueString: a Delphi string is a shared,
-       reference-counted buffer, so writing into it corrupts every other
-       variable holding the same value. AvroWipeString breaks the sharing
-       first.
+  1. Wiping a Buffer via FillChar on a dead local: eliminated by the compiler.
+  2. Zeroing PChar(S)^ without UniqueString: a Delphi string is a shared,
+  reference-counted buffer, so writing into it corrupts every other
+  variable holding the same value. AvroWipeString breaks the sharing
+  first.
 
   THE FUSED GATE - what it does and does not buy
   ----------------------------------------------
@@ -77,8 +77,8 @@ const
     at run time by kat_shieldsecret so the two cannot drift apart. }
   AVRO_FUSE_OPEN: Cardinal = $1BDCB3DA;
 
-{ Maps a correctness verdict onto a value that must equal AVRO_FUSE_OPEN for
-  the operation to be allowed to continue. }
+  { Maps a correctness verdict onto a value that must equal AVRO_FUSE_OPEN for
+    the operation to be allowed to continue. }
 function AvroFuse(AOk: Boolean): Cardinal;
 
 { The single place the fused value is judged. }
@@ -97,8 +97,7 @@ implementation
   Delphi optimizer cannot prove anything about the destination and cannot
   eliminate the stores - which is the entire property being relied on here.
   Declared locally, following this codebase's existing RtlGenRandom pattern. }
-procedure AvroRtlZeroMemory(ADest: Pointer; ACount: NativeUInt); stdcall;
-  external 'kernel32.dll' name 'RtlZeroMemory';
+procedure AvroRtlZeroMemory(ADest: Pointer; ACount: NativeUInt); stdcall; external 'kernel32.dll' name 'RtlZeroMemory';
 {$ENDIF}
 
 procedure AvroSecureZero(const ABuf; ACount: NativeUInt);
@@ -108,16 +107,16 @@ begin
   if ACount = 0 then
     Exit;
   P := PByte(@ABuf);
-{$IFDEF MSWINDOWS}
+  {$IFDEF MSWINDOWS}
   AvroRtlZeroMemory(P, ACount);
-{$ELSE}
+  {$ELSE}
   while ACount > 0 do
   begin
     P^ := 0;
     Inc(P);
     Dec(ACount);
   end;
-{$ENDIF}
+  {$ENDIF}
 end;
 
 procedure AvroWipeBytes(const AData: TBytes);

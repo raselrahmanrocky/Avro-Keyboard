@@ -854,13 +854,13 @@ procedure TTopBar.WMDROPFILES(var msg: TWMDropFiles);
   var
     ErrMsg: string;
   begin
-    Result := False;
+    result := False;
     if not FileExists(FileName) then
-      Exit;
-    if Uppercase(ExtractFileExt(FileName)) = '.AVROENCO' then
+      exit;
+    if uppercase(ExtractFileExt(FileName)) = '.AVROENCO' then
     begin
-      Result := ImportEncoFile(FileName, ErrMsg);
-      if not Result and (ErrMsg <> '') then
+      result := ImportEncoFile(FileName, ErrMsg);
+      if not result and (ErrMsg <> '') then
         Application.MessageBox(PChar(ErrMsg), 'Import Error', MB_ICONERROR or MB_OK);
       AvroMainForm1.BuildAnsiVersionMenus;
     end;

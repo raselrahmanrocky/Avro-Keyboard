@@ -45,7 +45,7 @@ var
   TopHintShowTimes:        string;
   // Application theme: 'SYSTEM' (follow Windows), 'LIGHT' or 'DARK'. Drives
   // both the VCL style and the hand-painted flyout palettes (uThemeManager).
-  AppThemeMode:            string;
+  AppThemeMode: string;
 
   // Webbuddy Options
   AvroUpdateCheck:     string;
@@ -134,12 +134,12 @@ uses
   uThemeManager;
 
 { =============================================================================== }
-{ Per-encoding password memory (helpers)                                        }
+{ Per-encoding password memory (helpers) }
 { =============================================================================== }
 
 const
   EncoCacheSep = #9; // TAB separates file path from password (never typed in a
-                     // single-line edit, and never part of an NTFS file name)
+  // single-line edit, and never part of an NTFS file name)
 
 procedure InitEncoPasswordCache;
 begin
@@ -166,16 +166,15 @@ begin
   begin
     if I > 0 then
       Result := Result + #13#10;
-    Result := Result + EncoPasswordCache.Names[I] + EncoCacheSep +
-      EncoPasswordCache.ValueFromIndex[I];
+    Result := Result + EncoPasswordCache.Names[I] + EncoCacheSep + EncoPasswordCache.ValueFromIndex[I];
   end;
 end;
 
 procedure DecodeEncoCache(const ABlob: string);
 var
-  Lines: TStringList;
+  Lines:  TStringList;
   I, Sep: Integer;
-  Line: string;
+  Line:   string;
 begin
   InitEncoPasswordCache;
   EncoPasswordCache.Clear;
@@ -201,7 +200,7 @@ end;
 function GetEncoCachedPassword(const AFilePath: string): AnsiString;
 var
   Key: string;
-  I: Integer;
+  I:   Integer;
 begin
   Result := '';
   Key := LowerCase(Trim(AFilePath));
@@ -218,8 +217,8 @@ end;
 
 procedure RememberEncoPassword(const AFilePath: string; const APassword: AnsiString);
 var
-  Key: string;
-  I: Integer;
+  Key:   string;
+  I:     Integer;
   Found: Boolean;
 begin
   if (Trim(AFilePath) = '') or (APassword = '') then
@@ -241,7 +240,7 @@ end;
 procedure ForgetEncoPassword(const AFilePath: string);
 var
   Key: string;
-  I: Integer;
+  I:   Integer;
 begin
   if not Assigned(EncoPasswordCache) then
     Exit;
@@ -258,7 +257,7 @@ var
   Reg: TMyRegistry;
   XML: TXMLSetting;
 begin
-  Reg := TMyRegistry.create;
+  Reg := TMyRegistry.Create;
   Reg.RootKey := HKEY_CURRENT_USER;
 
   if Reg.OpenKey('Control Panel\Desktop', True) = True then
@@ -268,7 +267,7 @@ begin
 
   Reg.Free;
 
-  XML := TXMLSetting.create;
+  XML := TXMLSetting.Create;
   XML.LoadXMLData;
 
   DontShowComplexLNotification := UpperCase(XML.GetValue('DontShowComplexLNotification', 'NO'));
@@ -358,7 +357,7 @@ procedure SaveSettingsInXML;
 var
   XML: TXMLSetting;
 begin
-  XML := TXMLSetting.create;
+  XML := TXMLSetting.Create;
   XML.CreateNewXMLData;
 
   XML.SetValue('DontShowComplexLNotification', DontShowComplexLNotification);
@@ -449,7 +448,7 @@ procedure LoadSettingsFromRegistry;
 var
   Reg: TMyRegistry;
 begin
-  Reg := TMyRegistry.create;
+  Reg := TMyRegistry.Create;
   Reg.RootKey := HKEY_CURRENT_USER;
 
   if Reg.OpenKey('Control Panel\Desktop', True) = True then
@@ -547,7 +546,7 @@ procedure SaveSettingsInRegistry;
 var
   Reg: TMyRegistry;
 begin
-  Reg := TMyRegistry.create;
+  Reg := TMyRegistry.Create;
   Reg.RootKey := HKEY_CURRENT_USER;
 
   if Reg.OpenKey('Software\OmicronLab\Avro Keyboard', True) = True then
@@ -727,8 +726,7 @@ begin
     TopBarTransparent := 'YES';
 
   // Application theme: anything unexpected falls back to following Windows.
-  if not((AppThemeMode = APP_THEME_SETTING_SYSTEM) or (AppThemeMode = APP_THEME_SETTING_LIGHT) or
-    (AppThemeMode = APP_THEME_SETTING_DARK)) then
+  if not((AppThemeMode = APP_THEME_SETTING_SYSTEM) or (AppThemeMode = APP_THEME_SETTING_LIGHT) or (AppThemeMode = APP_THEME_SETTING_DARK)) then
     AppThemeMode := APP_THEME_SETTING_SYSTEM;
 
   // Keyboard Mode settings
@@ -829,7 +827,7 @@ procedure SaveAnsiVersionOnly;
 {$IFNDEF PortableOn}
 var
   Reg: TMyRegistry;
-{$ENDIF}
+  {$ENDIF}
 begin
   {$IFDEF PortableOn}
   // Portable settings share one XML file; keep compatibility.
@@ -847,7 +845,9 @@ begin
 end;
 
 initialization
+
 finalization
-  FreeEncoPasswordCache;
+
+FreeEncoPasswordCache;
 
 end.

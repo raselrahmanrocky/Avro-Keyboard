@@ -342,7 +342,7 @@ type
         Handles here are handed to the tray through CopyIcon, so the tray owns a
         private copy and this cache stays valid across tray updates. Everything
         is released by ReleaseAnsiIconCache. }
-      AnsiIconHandles: TDictionary<string, HICON>;
+      AnsiIconHandles:    TDictionary<string, HICON>;
       FAnsiRootIconIndex: Integer; // ImageList1 slot appended for the active layout icon (-1 = none yet)
       FAnsiRootIconName:  string;  // the layout whose artwork occupies that slot ('' = unused)
 
@@ -385,19 +385,17 @@ type
       { Cached, sorted list of mapping display names (excluding 'Default'),
         kept fresh by the directory watcher / periodic poll. The ANSI picker
         opens from this list with zero disk I/O. }
-      AnsiMappingNames:    TStringList;
-      IgnoreCapsLock1:     TMenuItem;
-      IgnoreCapsLock2:     TMenuItem;
+      AnsiMappingNames: TStringList;
+      IgnoreCapsLock1:  TMenuItem;
+      IgnoreCapsLock2:  TMenuItem;
       procedure AnsiVersionMenuClick(Sender: TObject);
       procedure ReadAnsiDescriptionClick(Sender: TObject);
       procedure ExportSpecificMappingClick(Sender: TObject);
       procedure DeleteAnsiMappingClick(Sender: TObject);
       procedure ImportAnsiMappingClick(Sender: TObject);
       procedure OpenAnsiMappingDirClick(Sender: TObject);
-      procedure AnsiVersionItemAdvancedDrawItem(Sender: TObject;
-        ACanvas: TCanvas; ARect: TRect; AState: TOwnerDrawState);
-      procedure AnsiVersionItemMeasureItem(Sender: TObject;
-        ACanvas: TCanvas; var Width, Height: Integer);
+      procedure AnsiVersionItemAdvancedDrawItem(Sender: TObject; ACanvas: TCanvas; ARect: TRect; AState: TOwnerDrawState);
+      procedure AnsiVersionItemMeasureItem(Sender: TObject; ACanvas: TCanvas; var Width, Height: Integer);
       { The cached HICON for a mapping at the CURRENT small-icon metric, or 0
         when that mapping carries no icon ('Default', a legacy container, a
         plain .json, or one whose icon failed to decode).
@@ -824,27 +822,32 @@ var
   ClsName: string;
 begin
   Result := False;
-  if lngHWND = 0 then Exit(True);
-
-  // ১. নিজস্ব ফর্ম ও সিস্টেম ট্রে
-  if (lngHWND = FindWindow('Shell_TrayWnd', nil)) or
-     (lngHWND = FindWindowEx(FindWindow('Shell_TrayWnd', nil), 0, 'TrayNotifyWnd', nil)) or
-     (lngHWND = Self.Handle) then
+  if lngHWND = 0 then
     Exit(True);
 
-  if IsFormLoaded('TopBar') and (lngHWND = Topbar.Handle) then Exit(True);
-  if IsFormLoaded('frmEncodingWarning') and (lngHWND = frmEncodingWarning.Handle) then Exit(True);
-  if (CurrentPicker <> nil) and (lngHWND = CurrentPicker.Handle) then Exit(True);
-  if (CurrentLayoutPicker <> nil) and (lngHWND = CurrentLayoutPicker.Handle) then Exit(True);
-  if IsFormLoaded('frmAvroPasswordDlg') and (frmAvroPasswordDlg <> nil) and (lngHWND = frmAvroPasswordDlg.Handle) then Exit(True);
-  if IsFormLoaded('TfrmAnsiToast') or IsFormLoaded('TfrmLayoutToast') then Exit(True);
+  // ১. নিজস্ব ফর্ম ও সিস্টেম ট্রে
+  if (lngHWND = FindWindow('Shell_TrayWnd', nil)) or (lngHWND = FindWindowEx(FindWindow('Shell_TrayWnd', nil), 0, 'TrayNotifyWnd', nil)) or
+    (lngHWND = Self.Handle) then
+    Exit(True);
+
+  if IsFormLoaded('TopBar') and (lngHWND = Topbar.Handle) then
+    Exit(True);
+  if IsFormLoaded('frmEncodingWarning') and (lngHWND = frmEncodingWarning.Handle) then
+    Exit(True);
+  if (CurrentPicker <> nil) and (lngHWND = CurrentPicker.Handle) then
+    Exit(True);
+  if (CurrentLayoutPicker <> nil) and (lngHWND = CurrentLayoutPicker.Handle) then
+    Exit(True);
+  if IsFormLoaded('frmAvroPasswordDlg') and (frmAvroPasswordDlg <> nil) and (lngHWND = frmAvroPasswordDlg.Handle) then
+    Exit(True);
+  if IsFormLoaded('TfrmAnsiToast') or IsFormLoaded('TfrmLayoutToast') then
+    Exit(True);
 
   // ২. 🛡️ অত্যন্ত গুরুত্বপূর্ণ: মেনু এবং পপআপ ক্লাস (#32768) যাতে টপবারকে সামনে এনে ক্লিক ব্লক না করে
   ClsName := GetWindowClassName(lngHWND);
   if (ClsName = '#32768') or (ClsName = 'PSDocDragFeedback') or (ClsName = 'ComboLBox') then
     Exit(True);
 end;
-
 
 {$HINTS ON}
 { =============================================================================== }
@@ -948,7 +951,7 @@ var
 begin
   HowMayDay := 0;
   if AvroUpdateCheck <> 'YES' then
-    exit;
+    Exit;
 
   try
     HowMayDay := DaysBetween(Now, AvroUpdateLastCheck);
@@ -959,7 +962,7 @@ begin
   if HowMayDay >= 7 then
   begin
     if Updater.IsConnected = False then
-      exit;
+      Exit;
 
     Updater.CheckSilent;
     AvroUpdateLastCheck := Now;
@@ -1035,10 +1038,10 @@ begin
   hforewnd := GetForegroundWindow;
 
   if hforewnd = 0 then
-    exit;
+    Exit;
   { Experimental use }
   if IsWindow(hforewnd) = False then
-    exit;
+    Exit;
 
   if IgnorableWindow(hforewnd) then
   begin
@@ -1107,8 +1110,7 @@ begin
     // Only password-protected files (flag $01 / legacy v1) ever prompt:
     // default-key files (flag $00) decrypt transparently, so a failure there
     // means the file itself is corrupt and a password prompt would be wrong.
-    if (not Result) and IsEncoFile(AFilePath) and
-      (GetAvroEncoProtectionFlag(AFilePath) = AVROENCO_FLAG_USER_PASSWORD) then
+    if (not Result) and IsEncoFile(AFilePath) and (GetAvroEncoProtectionFlag(AFilePath) = AVROENCO_FLAG_USER_PASSWORD) then
     begin
       CachedEncoPassword := '';
       ForgetEncoPassword(AFilePath);
@@ -1124,8 +1126,7 @@ begin
 
     if not Result then
     begin
-      if IsEncoFile(AFilePath) and
-        (GetAvroEncoProtectionFlag(AFilePath) = AVROENCO_FLAG_USER_PASSWORD) then
+      if IsEncoFile(AFilePath) and (GetAvroEncoProtectionFlag(AFilePath) = AVROENCO_FLAG_USER_PASSWORD) then
       begin
         CachedEncoPassword := '';
         ForgetEncoPassword(AFilePath);
@@ -1142,7 +1143,7 @@ end;
 procedure TAvroMainForm1.LoadApp;
 var
   tempLastUIMode: string;
-  MappingPath: string;
+  MappingPath:    string;
   DesiredVersion: string;
 begin
   Set_Process_Priority(HIGH_PRIORITY_CLASS);
@@ -1270,8 +1271,7 @@ begin
   if (AnsiVersion <> 'Default') and (AnsiMappingDir <> '') then
   begin
     MappingPath := GetActiveEncoFilePath(AnsiVersion, AnsiMappingDir);
-    if (MappingPath <> '') and IsEncoFile(MappingPath) and
-      (GetAvroEncoProtectionFlag(MappingPath) = AVROENCO_FLAG_USER_PASSWORD) then
+    if (MappingPath <> '') and IsEncoFile(MappingPath) and (GetAvroEncoProtectionFlag(MappingPath) = AVROENCO_FLAG_USER_PASSWORD) then
       CachedEncoPassword := GetEncoCachedPassword(MappingPath);
   end;
   // Build the engine the user actually selected - and NOTHING else.
@@ -1293,14 +1293,12 @@ begin
     // fallback itself overwrites the AnsiVersion global.
     DesiredVersion := AnsiVersion;
     if not Application.Terminated then
-      if (not AnsiEngineManager.SwitchEngine(DesiredVersion)) and
-        (not AnsiEngineManager.SwitchEngine(DesiredVersion)) then
+      if (not AnsiEngineManager.SwitchEngine(DesiredVersion)) and (not AnsiEngineManager.SwitchEngine(DesiredVersion)) then
       begin
         // Two attempts, then Default: the retry covers the first-run case
         // (cache directory missing, container just installed and still being
         // written) without ever leaving the app without a usable engine.
-        Log('Startup: could not activate "' + DesiredVersion +
-          '" - falling back to Default');
+        Log('Startup: could not activate "' + DesiredVersion + '" - falling back to Default');
         AnsiEngineManager.SwitchEngine('Default');
       end;
     SyncActiveMappingTimestamp(AnsiVersion);
@@ -1348,8 +1346,7 @@ begin
       // engine stays fresh AND later switches keep using the cached copy.
       if IsEncoFile(TargetPath) then
       begin
-        if (GetAvroEncoProtectionFlag(TargetPath) = AVROENCO_FLAG_DEFAULT_KEY) or
-          (GetEncoCachedPassword(TargetPath) <> '') then
+        if (GetAvroEncoProtectionFlag(TargetPath) = AVROENCO_FLAG_DEFAULT_KEY) or (GetEncoCachedPassword(TargetPath) <> '') then
           AnsiEngineManager.InvalidateEngine(AnsiVersion);
       end
       else
@@ -1378,7 +1375,7 @@ end;
 function TAvroMainForm1.BuildAnsiMappingFolderList: string;
 var
   NameList: TStringList;
-  SR: TSearchRec;
+  SR:       TSearchRec;
 begin
   Result := '';
   if (AnsiMappingDir = '') or (not DirectoryExists(AnsiMappingDir)) then
@@ -1983,7 +1980,7 @@ begin
 end;
 
 { =============================================================================== }
-{ Per-layout icons (system tray + encoding menus)                               }
+{ Per-layout icons (system tray + encoding menus) }
 { =============================================================================== }
 
 { The ImageList1 slot holding AName's layout badge, adding it on first use and
@@ -2015,9 +2012,9 @@ end;
   its meaning as the built-in ANSI icon. }
 function TAvroMainForm1.AnsiRootIconSlot(const AName: string): Integer;
 var
-  IconBytes: TBytes;
-  H: HICON;
-  Ico: TIcon;
+  IconBytes:     TBytes;
+  H:             HICON;
+  Ico:           TIcon;
   Cols, Rows, R: Integer;
 begin
   Result := -1;
@@ -2034,8 +2031,7 @@ begin
   // A cached slot describes the layout that put it there, so it is only reused
   // for that same name - and only while the list still holds it, because a
   // recreated image-list handle drops the appended entry.
-  if SameText(AName, FAnsiRootIconName) and (FAnsiRootIconIndex >= 0) and
-    (FAnsiRootIconIndex < ImageList1.Count) then
+  if SameText(AName, FAnsiRootIconName) and (FAnsiRootIconIndex >= 0) and (FAnsiRootIconIndex < ImageList1.Count) then
   begin
     Result := FAnsiRootIconIndex;
     Exit;
@@ -2051,8 +2047,7 @@ begin
   H := CreateHIconAtSize(IconBytes, Cols, Rows);
   if H = 0 then
   begin
-    Log('AnsiRootIconSlot: could not decode a ' + IntToStr(Cols) + 'x' +
-      IntToStr(Rows) + ' frame for the layout icon of "' + AName + '"');
+    Log('AnsiRootIconSlot: could not decode a ' + IntToStr(Cols) + 'x' + IntToStr(Rows) + ' frame for the layout icon of "' + AName + '"');
     Exit;
   end;
 
@@ -2089,8 +2084,7 @@ begin
   if Result >= 0 then
     FAnsiRootIconName := AName
   else
-    Log('AnsiRootIconSlot: ImageList1 refused the ' + IntToStr(Cols) + 'x' +
-      IntToStr(Rows) + ' icon of "' + AName + '"');
+    Log('AnsiRootIconSlot: ImageList1 refused the ' + IntToStr(Cols) + 'x' + IntToStr(Rows) + ' icon of "' + AName + '"');
 end;
 
 { A cached HICON for the tray at the CURRENT small-icon metric, or 0 when this
@@ -2103,8 +2097,8 @@ end;
 function TAvroMainForm1.GetAnsiTrayIcon(const AName: string): HICON;
 var
   IconBytes: TBytes;
-  Cx, Cy: Integer;
-  Key: string;
+  Cx, Cy:    Integer;
+  Key:       string;
 begin
   Result := 0;
   if (AName = '') or SameText(AName, 'Default') then
@@ -2184,7 +2178,8 @@ const
 var
   Slot: Integer;
 begin
-  if not Assigned(ImageList1) then Exit;
+  if not Assigned(ImageList1) then
+    Exit;
 
   // The active layout's own bytes: normally already cached by the parse that
   // activated it, resolved on demand after an idle release cleared the cache.
@@ -2204,14 +2199,13 @@ end;
 { Owner-draw handler for ANSI version submenu items.  Renders the gutter
   checkmark matching the AnsiVersionPicker style and the layout icon badge
   on the right side. }
-procedure TAvroMainForm1.AnsiVersionItemAdvancedDrawItem(Sender: TObject;
-  ACanvas: TCanvas; ARect: TRect; AState: TOwnerDrawState);
+procedure TAvroMainForm1.AnsiVersionItemAdvancedDrawItem(Sender: TObject; ACanvas: TCanvas; ARect: TRect; AState: TOwnerDrawState);
 var
-  Item: TMenuItem;
-  IconHandle: HICON;
-  X, Y: Integer;
-  CapStr: string;
-  TextH: Integer;
+  Item:                 TMenuItem;
+  IconHandle:           HICON;
+  X, Y:                 Integer;
+  CapStr:               string;
+  TextH:                Integer;
   GutterRect, TextRect: TRect;
 const
   GUTTER_W = 26;
@@ -2248,8 +2242,7 @@ begin
     ACanvas.Brush.Color := CurrentPalette.SelectionFill;
     ACanvas.Font.Color := CurrentPalette.SelectionText;
     ACanvas.Font.Style := [fsBold];
-    DrawText(ACanvas.Handle, #$2713, -1, GutterRect,
-      DT_CENTER or DT_VCENTER or DT_SINGLELINE);
+    DrawText(ACanvas.Handle, #$2713, -1, GutterRect, DT_CENTER or DT_VCENTER or DT_SINGLELINE);
     ACanvas.Font.Style := [];
 
     ACanvas.Font.Color := CurrentPalette.Text;
@@ -2261,8 +2254,7 @@ begin
   CapStr := Item.Caption;
   TextH := ACanvas.TextHeight(CapStr);
   ACanvas.Brush.Style := bsClear;
-  ACanvas.TextOut(ARect.Left + GUTTER_W + 4,
-    ARect.Top + ((ARect.Bottom - ARect.Top - TextH) div 2), CapStr);
+  ACanvas.TextOut(ARect.Left + GUTTER_W + 4, ARect.Top + ((ARect.Bottom - ARect.Top - TextH) div 2), CapStr);
   ACanvas.Brush.Style := bsSolid;
 
   { 5. Right-side icon badge }
@@ -2278,14 +2270,13 @@ begin
 end;
 
 { Owner-draw measure handler: accounts for the trailing icon badge width. }
-procedure TAvroMainForm1.AnsiVersionItemMeasureItem(Sender: TObject;
-  ACanvas: TCanvas; var Width, Height: Integer);
+procedure TAvroMainForm1.AnsiVersionItemMeasureItem(Sender: TObject; ACanvas: TCanvas; var Width, Height: Integer);
 const
   GUTTER_W = 26;
   ICON_SZ  = 16;
   ICON_PAD = 4;
 var
-  Item: TMenuItem;
+  Item:    TMenuItem;
   HasIcon: Boolean;
 begin
   Item := Sender as TMenuItem;
@@ -2299,7 +2290,7 @@ end;
 
 procedure TAvroMainForm1.UpdateTrayIcon;
 var
-  ICN: TIcon;
+  ICN:                 TIcon;
   AnsiHIcon, IconCopy: HICON;
 begin
   // Both parent "Select ANSI Encoding" items are refreshed here, ABOVE the tray
@@ -2339,7 +2330,8 @@ begin
         end;
 
         if OutputIsBijoy = 'YES' then
-          Tray.Hint := 'Avro Keyboard.' + #13 + 'Running Bangla Keyboard Mode (ANSI Version).' + #13 + 'Press ' + ModeSwitchKey + ' to switch to System default.'
+          Tray.Hint := 'Avro Keyboard.' + #13 + 'Running Bangla Keyboard Mode (ANSI Version).' + #13 + 'Press ' + ModeSwitchKey +
+            ' to switch to System default.'
         else
           Tray.Hint := 'Avro Keyboard.' + #13 + 'Running Bangla Keyboard Mode.' + #13 + 'Press ' + ModeSwitchKey + ' to switch to System default.';
       end
@@ -2518,7 +2510,7 @@ end;
 procedure TAvroMainForm1.ApplyPendingANSISwitchRevert;
 begin
   if not PendingANSISwitch then
-    exit;
+    Exit;
   PendingANSISwitch := False;
 
   if KeyLayout.KeyboardMode <> PreviousModeBeforeANSISwitch then
@@ -2559,7 +2551,7 @@ end;
 procedure TAvroMainForm1.ToggleOutputEncoding;
 begin
   if KeyLayout.KeyboardMode = SysDefault then
-    exit;
+    Exit;
   if OutputIsBijoy = 'YES' then
     OutputasUnicodeRecommended1Click(nil)
   else
@@ -2623,12 +2615,12 @@ begin
     the current process:
 
     - OpenProcess(PROCESS_ALL_ACCESS) for our OWN process was pure overhead:
-      GetCurrentProcess needs no handle, no access mask, and cannot fail.
+    GetCurrentProcess needs no handle, no access mask, and cannot fail.
     - Application.ProcessMessages does not belong here at all. This routine is
-      called from a TTimer handler (IdleTimerTimer) and from inside the word
-      database load, so pumping the message queue here re-entered the timer,
-      the hook's deferred emit path and every paint handler in the middle of a
-      memory operation. }
+    called from a TTimer handler (IdleTimerTimer) and from inside the word
+    database load, so pumping the message queue here re-entered the timer,
+    the hook's deferred emit path and every paint handler in the middle of a
+    memory operation. }
   TrimProcessWorkingSet;
 end;
 
@@ -2728,14 +2720,14 @@ begin
 
   hforewnd := GetForegroundWindow;
   if hforewnd = 0 then
-    exit;
+    Exit;
   if IsWindow(hforewnd) = False then
-    exit; { Experimental use }
+    Exit; { Experimental use }
 
   if IgnorableWindow(hforewnd) = True then
-    exit;
+    Exit;
   if hforewnd = LastWindow then
-    exit;
+    Exit;
 
   // window z-order has been changed
   // ==================================
@@ -2836,12 +2828,13 @@ end;
 
 procedure TAvroMainForm1.AnsiVersionMenuClick(Sender: TObject);
 var
-  ClickedItem: TMenuItem;
+  ClickedItem:                           TMenuItem;
   SelectedVersion, ErrorMsg, TargetPath: string;
-  Password: AnsiString;
-  ErrorLog: TStringList;
+  Password:                              AnsiString;
+  ErrorLog:                              TStringList;
 begin
-  if not (Sender is TMenuItem) then Exit;
+  if not(Sender is TMenuItem) then
+    Exit;
   ClickedItem := TMenuItem(Sender);
 
   SelectedVersion := ClickedItem.Hint;
@@ -2887,8 +2880,7 @@ begin
   TargetPath := GetActiveEncoFilePath(SelectedVersion, AnsiMappingDir);
   if TargetPath = '' then
   begin
-    Application.MessageBox(PChar('Mapping file not found: ' + SelectedVersion), 'Error',
-      MB_ICONWARNING or MB_OK or MB_TOPMOST or MB_SETFOREGROUND);
+    Application.MessageBox(PChar('Mapping file not found: ' + SelectedVersion), 'Error', MB_ICONWARNING or MB_OK or MB_TOPMOST or MB_SETFOREGROUND);
     Exit;
   end;
 
@@ -2899,8 +2891,7 @@ begin
   // Ask only when THIS encoding was never unlocked on this computer; the
   // per-file cache then unlocks every later switch silently (even after a
   // full restart). Default-key files never prompt.
-  if IsEncoFile(TargetPath) and (GetEncoCachedPassword(TargetPath) = '') and
-    (GetAvroEncoProtectionFlag(TargetPath) = AVROENCO_FLAG_USER_PASSWORD) then
+  if IsEncoFile(TargetPath) and (GetEncoCachedPassword(TargetPath) = '') and (GetAvroEncoProtectionFlag(TargetPath) = AVROENCO_FLAG_USER_PASSWORD) then
   begin
     if not PromptForPasswordAndValidate(TargetPath, Password) then
       Exit;
@@ -2955,7 +2946,8 @@ procedure TAvroMainForm1.ReadAnsiDescriptionClick(Sender: TObject);
 var
   MapName: string;
 begin
-  if not (Sender is TMenuItem) then Exit;
+  if not(Sender is TMenuItem) then
+    Exit;
   MapName := (Sender as TMenuItem).Hint;
   if MapName = '' then
     MapName := (Sender as TMenuItem).Caption;
@@ -2969,7 +2961,8 @@ procedure TAvroMainForm1.ExportSpecificMappingClick(Sender: TObject);
 var
   MapName: string;
 begin
-  if not (Sender is TMenuItem) then Exit;
+  if not(Sender is TMenuItem) then
+    Exit;
   MapName := (Sender as TMenuItem).Hint;
   if MapName = '' then
     MapName := (Sender as TMenuItem).Caption;
@@ -2980,9 +2973,9 @@ end;
 
 procedure TAvroMainForm1.ImportAnsiMappingClick(Sender: TObject);
 var
-  OpenDialog: TOpenDialog;
+  OpenDialog:            TOpenDialog;
   ErrMsg, ErrorMessages: string;
-  I: Integer;
+  I:                     Integer;
 
   procedure AddError(const AFileName, AMessage: string);
   begin
@@ -3077,7 +3070,7 @@ var
   FileTitle: string;
 begin
   if not DirectoryExists(AnsiMappingDir) then
-    exit;
+    Exit;
   NameMap := TDictionary<string, string>.Create;
   try
     if FindFirst(AnsiMappingDir + '*.json', faAnyFile, SearchRec) = 0 then
@@ -3105,9 +3098,11 @@ var
   P: string;
 begin
   FActiveMappingLastWriteTime := 0;
-  if SameText(AName, 'Default') or (AnsiMappingDir = '') then Exit;
+  if SameText(AName, 'Default') or (AnsiMappingDir = '') then
+    Exit;
   P := GetActiveEncoFilePath(AName, AnsiMappingDir);
-  if P = '' then Exit;
+  if P = '' then
+    Exit;
   try
     FActiveMappingLastWriteTime := TFile.GetLastWriteTime(P);
   except
@@ -3121,7 +3116,8 @@ procedure TAvroMainForm1.UpdateAnsiVersionMenuChecks(const AName: string);
     I: Integer;
     M: TMenuItem;
   begin
-    if not Assigned(AMenu) then Exit;
+    if not Assigned(AMenu) then
+      Exit;
     for I := 0 to AMenu.Count - 1 do
     begin
       M := AMenu.Items[I];
@@ -3129,6 +3125,7 @@ procedure TAvroMainForm1.UpdateAnsiVersionMenuChecks(const AName: string);
         M.Checked := SameText(M.Hint, AName);
     end;
   end;
+
 begin
   UpdateOne(AnsiVersionSubmenu1);
   UpdateOne(mnuTraySelectAnsiEncoding);
@@ -3141,7 +3138,7 @@ end;
 procedure TAvroMainForm1.BuildAnsiVersionMenus;
 var
   Sep, MoreOptMenu, Item: TMenuItem;
-  Snap: string;
+  Snap:                   string;
 
   procedure AddDirectItem(ParentMenu: TMenuItem; const AName: string; AChecked: Boolean);
   var
@@ -3194,10 +3191,11 @@ var
 
   procedure BuildSingleMenu(AMenu: TMenuItem);
   var
-    I: Integer;
+    I:           Integer;
     DisplayName: string;
   begin
-    if not Assigned(AMenu) then Exit;
+    if not Assigned(AMenu) then
+      Exit;
     AMenu.Clear;
 
     // ১. Default

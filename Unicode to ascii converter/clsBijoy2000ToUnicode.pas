@@ -791,9 +791,9 @@ end;
 // string rebuild per entry.
 function SweepReplace(const S: string; const Lookup: TDictionary<string, string>; MaxLen: Integer): string;
 var
-  SB: TStringBuilder;
+  SB:      TStringBuilder;
   N, I, L: Integer;
-  V:  string;
+  V:       string;
 begin
   if (S = '') or (Lookup = nil) or (Lookup.Count = 0) then
     Exit(S);

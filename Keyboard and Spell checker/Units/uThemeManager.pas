@@ -13,13 +13,13 @@ unit uThemeManager;
 
   "Theme" covers two things here, and they must never disagree:
 
-    1. the VCL style (APP_STYLE_LIGHT / APP_STYLE_DARK). The top bar popup
-       menus, every dialog and the Customize window are not owner-drawn: their
-       dark look comes entirely from the active VCL style. That is why the
-       theme setting has to drive the style, not only our own painted surfaces.
-    2. the palette (TAppThemePalette) for the hand-painted flyouts that do not
-       use VCL controls for their visuals - the ANSI version picker and the
-       layout picker draw every row themselves and used to be hardcoded light.
+  1. the VCL style (APP_STYLE_LIGHT / APP_STYLE_DARK). The top bar popup
+  menus, every dialog and the Customize window are not owner-drawn: their
+  dark look comes entirely from the active VCL style. That is why the
+  theme setting has to drive the style, not only our own painted surfaces.
+  2. the palette (TAppThemePalette) for the hand-painted flyouts that do not
+  use VCL controls for their visuals - the ANSI version picker and the
+  layout picker draw every row themselves and used to be hardcoded light.
 
   The stored mode is the source of truth: atmSystemDefault follows Windows
   (AppsUseLightTheme), while atmLight / atmDark force the theme even when
@@ -32,8 +32,8 @@ unit uThemeManager;
 interface
 
 uses
-  Winapi.Windows,   // HWND, RGB()
-  System.UITypes;   // TColor
+  Winapi.Windows, // HWND, RGB()
+  System.UITypes; // TColor
 
 type
   TAppThemeMode = (atmSystemDefault, atmLight, atmDark);
@@ -42,13 +42,13 @@ type
     documented theme contract (and are asserted literally by kat_engineswitch);
     HoverFill is the row tint the flyouts use and has no system equivalent. }
   TAppThemePalette = record
-    IsDark:        Boolean;
-    Background:    TColor;
-    Text:          TColor;
+    IsDark: Boolean;
+    Background: TColor;
+    Text: TColor;
     SelectionFill: TColor;
     SelectionText: TColor;
-    Border:        TColor;
-    HoverFill:     TColor;
+    Border: TColor;
+    HoverFill: TColor;
   end;
 
 const
@@ -60,10 +60,10 @@ const
   APP_THEME_SETTING_LIGHT  = 'LIGHT';
   APP_THEME_SETTING_DARK   = 'DARK';
 
-{ True when Windows itself uses light application mode. Reads
-  HKCU\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize\
-  AppsUseLightTheme (0 = dark); a missing value means light, which is also
-  Windows' own default. }
+  { True when Windows itself uses light application mode. Reads
+    HKCU\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize\
+    AppsUseLightTheme (0 = dark); a missing value means light, which is also
+    Windows' own default. }
 function WindowsAppsUseLightTheme: Boolean;
 
 { The effective theme for a mode. atmSystemDefault follows
@@ -117,16 +117,16 @@ const
 
 var
   // The resolved theme in force; light until ApplyAppTheme says otherwise.
-  FResolvedMode:  TAppThemeMode = atmLight;
+  FResolvedMode: TAppThemeMode = atmLight;
   // False until the first ApplyAppTheme, so the very first call always applies
   // even when its resolved theme happens to be the default light one.
-  FApplied:       Boolean = False;
+  FApplied: Boolean = False;
   // Attribute id that worked last, so the legacy fallback is probed once.
   FImmersiveAttr: DWORD = DWMWA_USE_IMMERSIVE_DARK_MODE;
 
-{ =============================================================================== }
-{ Detection and resolution                                                       }
-{ =============================================================================== }
+  { =============================================================================== }
+  { Detection and resolution }
+  { =============================================================================== }
 
 function WindowsAppsUseLightTheme: Boolean;
 var
@@ -158,11 +158,11 @@ begin
       Result := atmLight; // forced, whatever Windows is set to
     atmDark:
       Result := atmDark;
-  else
-    if ASystemUsesLightTheme then
-      Result := atmLight
     else
-      Result := atmDark;
+      if ASystemUsesLightTheme then
+        Result := atmLight
+      else
+        Result := atmDark;
   end;
 end;
 
@@ -183,8 +183,8 @@ begin
       Result := APP_THEME_SETTING_LIGHT;
     atmDark:
       Result := APP_THEME_SETTING_DARK;
-  else
-    Result := APP_THEME_SETTING_SYSTEM;
+    else
+      Result := APP_THEME_SETTING_SYSTEM;
   end;
 end;
 
@@ -195,13 +195,13 @@ begin
       Result := 'Light Theme';
     atmDark:
       Result := 'Dark Theme';
-  else
-    Result := 'System Default';
+    else
+      Result := 'System Default';
   end;
 end;
 
 { =============================================================================== }
-{ Palettes                                                                       }
+{ Palettes }
 { =============================================================================== }
 
 function GetAppThemePalette(AResolved: TAppThemeMode): TAppThemePalette;
@@ -245,7 +245,7 @@ begin
 end;
 
 { =============================================================================== }
-{ Application                                                                    }
+{ Application }
 { =============================================================================== }
 
 function ApplyImmersiveDarkMode(AHandle: HWND; AEnabled: Boolean): Boolean;

@@ -30,7 +30,7 @@ type
 
 var
   CachedEncoPassword: AnsiString;
-  AvroEncoFiles: TDictionary<string, TAvroEncoFileInfo>;
+  AvroEncoFiles:      TDictionary<string, TAvroEncoFileInfo>;
 
 procedure InitializeEncoManager;
 procedure FinalizeEncoManager;
@@ -161,7 +161,7 @@ var
     rebuild would re-decrypt every icon-less container in the folder. Also
     keyed by Lowercase(DisplayName). }
   MappingIconsResolved: TDictionary<string, Byte>;
-  MappingIconsLock: TCriticalSection;
+  MappingIconsLock:     TCriticalSection;
 
 procedure StoreMappingIcon(const ADisplayName: string; const AIconBytes: TBytes);
 begin
@@ -228,11 +228,12 @@ end;
 
 procedure ScanDirHelper(const ADir: string);
 var
-  SR: TSearchRec;
+  SR:                     TSearchRec;
   FoundPath, DisplayName: string;
-  Info: TAvroEncoFileInfo;
+  Info:                   TAvroEncoFileInfo;
 begin
-  if not DirectoryExists(ADir) then Exit;
+  if not DirectoryExists(ADir) then
+    Exit;
 
   // Scan .AvroEnco
   if FindFirst(ADir + '*.AvroEnco', faAnyFile, SR) = 0 then
@@ -282,9 +283,9 @@ end;
 
 procedure ScanAvroEncoFiles(const ADirectory: string);
 var
-  AppDir: string;
+  AppDir:  string;
   OldKeys: TList<string>;
-  Key: string;
+  Key:     string;
 begin
   InitializeEncoManager;
 
@@ -339,7 +340,7 @@ end;
 procedure ExtractOneFileIcon(const AInfo: TAvroEncoFileInfo);
 var
   JSONContent: string;
-  Key: string;
+  Key:         string;
 begin
   Key := Lowercase(AInfo.DisplayName);
 
@@ -411,11 +412,7 @@ begin
   ExtractOneFileIcon(Info);
 end;
 
-function LoadMappingFromEnco(
-  const AFilePath: string;
-  const APassword: AnsiString;
-  ErrorLog: TStringList = nil
-): Boolean;
+function LoadMappingFromEnco(const AFilePath: string; const APassword: AnsiString; ErrorLog: TStringList = nil): Boolean;
 var
   JSONContent: string;
 begin
@@ -480,9 +477,9 @@ end;
 
 function ExtractMetadataFromJSON(const AJSONContent: string; const AFilePath: string): string;
 var
-  LContent: string;
-  LJSON: TJSONValue;
-  LMeta: TJSONValue;
+  LContent:                                                                        string;
+  LJSON:                                                                           TJSONValue;
+  LMeta:                                                                           TJSONValue;
   LFileName, LEncoding, LType, LVersion, LCompany, LDeveloper, LModifiedBy, LFont: string;
 begin
   Result := '';
@@ -504,7 +501,7 @@ begin
     try
       if LJSON is TJSONObject then
         LMeta := TJSONObject(LJSON).Values['Metadata'];
-      if not Assigned(LMeta) or not (LMeta is TJSONObject) then
+      if not Assigned(LMeta) or not(LMeta is TJSONObject) then
         Exit;
       // New metadata schema; fall back to the legacy keys (Name/Font) so old
       // .AvroEnco containers and third-party files still render.
@@ -520,12 +517,12 @@ begin
       LEncoding := GetJSONString(LMeta, 'Encoding');
       if LEncoding = '' then
         LEncoding := GetJSONString(LMeta, 'Name');
-      LType      := GetJSONString(LMeta, 'Type');
-      LVersion   := GetJSONString(LMeta, 'Version');
-      LCompany   := GetJSONString(LMeta, 'Company');
+      LType := GetJSONString(LMeta, 'Type');
+      LVersion := GetJSONString(LMeta, 'Version');
+      LCompany := GetJSONString(LMeta, 'Company');
       LDeveloper := GetJSONString(LMeta, 'Developer');
       LModifiedBy := GetJSONString(LMeta, 'Modified By');
-      LFont      := GetJSONString(LMeta, 'Suggested Font');
+      LFont := GetJSONString(LMeta, 'Suggested Font');
       if LFont = '' then
         LFont := GetJSONString(LMeta, 'Font');
     finally
@@ -558,8 +555,7 @@ begin
     // .AvroEnco file. Say so in the card instead of letting the file take the
     // blame.
     if not IsFontFamilyInstalled(LFont) then
-      Result := Result + 'Note: this font was not found on this computer - ' +
-        'text encoded with this mapping reads correctly only in ' + LFont + '.' +
+      Result := Result + 'Note: this font was not found on this computer - ' + 'text encoded with this mapping reads correctly only in ' + LFont + '.' +
         sLineBreak;
   end;
   // Escape '&' for VCL display (MessageDlg treats '&' as accelerator prefix).
@@ -575,8 +571,8 @@ begin
   for I := 1 to Length(S) do
   begin
     C := S[I];
-    if CharInSet(C, ['A'..'Z', 'a'..'z', '0'..'9']) then
-      Result := Result + LowerCase(C);
+    if CharInSet(C, ['A' .. 'Z', 'a' .. 'z', '0' .. '9']) then
+      Result := Result + Lowercase(C);
   end;
 end;
 
@@ -586,21 +582,19 @@ var
 begin
   LRegistered := NormalizeFontName(ARegistered);
   LWanted := NormalizeFontName(AWanted);
-  Result := (LRegistered <> '') and (LWanted <> '') and
-    ((LRegistered = LWanted) or (Pos(LWanted, LRegistered) = 1) or
-     (Pos(LRegistered, LWanted) = 1));
+  Result := (LRegistered <> '') and (LWanted <> '') and ((LRegistered = LWanted) or (Pos(LWanted, LRegistered) = 1) or (Pos(LRegistered, LWanted) = 1));
 end;
 
 const
   FONT_REGISTRY_KEY = 'SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts';
 
-// Windows registers every installed face as a value whose name is the font's
-// display name ("Family (TrueType)" or "Family Style (TrueType)").
+  // Windows registers every installed face as a value whose name is the font's
+  // display name ("Family (TrueType)" or "Family Style (TrueType)").
 function FontKeyHasFamily(ARoot: HKEY; const AWanted: string): Boolean;
 var
-  Reg: TRegistry;
-  Names: TStringList;
-  I, Cut: Integer;
+  Reg:     TRegistry;
+  Names:   TStringList;
+  I, Cut:  Integer;
   RegName: string;
 begin
   Result := False;
@@ -631,9 +625,7 @@ end;
 
 function IsFontFamilyInstalled(const AFontName: string): Boolean;
 begin
-  Result := (Trim(AFontName) <> '') and
-    (FontKeyHasFamily(HKEY_CURRENT_USER, AFontName) or
-     FontKeyHasFamily(HKEY_LOCAL_MACHINE, AFontName));
+  Result := (Trim(AFontName) <> '') and (FontKeyHasFamily(HKEY_CURRENT_USER, AFontName) or FontKeyHasFamily(HKEY_LOCAL_MACHINE, AFontName));
 end;
 
 function GetJSONString(const AObj: TJSONValue; const AKey: string): string;
@@ -641,7 +633,7 @@ var
   LVal: TJSONValue;
 begin
   Result := '';
-  if not Assigned(AObj) or not (AObj is TJSONObject) then
+  if not Assigned(AObj) or not(AObj is TJSONObject) then
     Exit;
   LVal := TJSONObject(AObj).Values[AKey];
   if Assigned(LVal) then
@@ -654,9 +646,10 @@ begin
       Result := LVal.Value;
   end;
 end;
+
 function GetActiveEncoFilePath(const ADisplayName: string; const ADirectory: string): string;
 var
-  Info: TAvroEncoFileInfo;
+  Info:   TAvroEncoFileInfo;
   AppDir: string;
 begin
   Result := '';
@@ -670,14 +663,20 @@ begin
   AppDir := ExtractFilePath(ParamStr(0));
 
   // 2. Check .AvroEnco in all directories (covers both the legacy CBC and
-  //    the Shield container format), then .json.
-  if FileExists(ADirectory + ADisplayName + '.AvroEnco') then Exit(ADirectory + ADisplayName + '.AvroEnco');
-  if FileExists(AppDir + 'assets\' + ADisplayName + '.AvroEnco') then Exit(AppDir + 'assets\' + ADisplayName + '.AvroEnco');
-  if FileExists(AppDir + 'AnsiMapping\' + ADisplayName + '.AvroEnco') then Exit(AppDir + 'AnsiMapping\' + ADisplayName + '.AvroEnco');
-  if (AppDir <> ADirectory) and FileExists(AppDir + ADisplayName + '.AvroEnco') then Exit(AppDir + ADisplayName + '.AvroEnco');
+  // the Shield container format), then .json.
+  if FileExists(ADirectory + ADisplayName + '.AvroEnco') then
+    Exit(ADirectory + ADisplayName + '.AvroEnco');
+  if FileExists(AppDir + 'assets\' + ADisplayName + '.AvroEnco') then
+    Exit(AppDir + 'assets\' + ADisplayName + '.AvroEnco');
+  if FileExists(AppDir + 'AnsiMapping\' + ADisplayName + '.AvroEnco') then
+    Exit(AppDir + 'AnsiMapping\' + ADisplayName + '.AvroEnco');
+  if (AppDir <> ADirectory) and FileExists(AppDir + ADisplayName + '.AvroEnco') then
+    Exit(AppDir + ADisplayName + '.AvroEnco');
   // 3. Fallback to .json files
-  if FileExists(ADirectory + ADisplayName + '.json') then Exit(ADirectory + ADisplayName + '.json');
-  if FileExists(AppDir + 'assets\' + ADisplayName + '.json') then Exit(AppDir + 'assets\' + ADisplayName + '.json');
+  if FileExists(ADirectory + ADisplayName + '.json') then
+    Exit(ADirectory + ADisplayName + '.json');
+  if FileExists(AppDir + 'assets\' + ADisplayName + '.json') then
+    Exit(AppDir + 'assets\' + ADisplayName + '.json');
 end;
 
 { Returns the first existing, same-named .json for ADisplayName, used as a
@@ -720,15 +719,15 @@ begin
   J := 1;
   while (I <= Length(ALeft)) and (J <= Length(ARight)) do
   begin
-    if CharInSet(ALeft[I], ['0'..'9']) and CharInSet(ARight[J], ['0'..'9']) then
+    if CharInSet(ALeft[I], ['0' .. '9']) and CharInSet(ARight[J], ['0' .. '9']) then
     begin
       // Compare the whole digit run numerically: "V2" must come before
       // "V10", which plain ordinal comparison gets backwards.
       L1 := I;
-      while (L1 <= Length(ALeft)) and CharInSet(ALeft[L1], ['0'..'9']) do
+      while (L1 <= Length(ALeft)) and CharInSet(ALeft[L1], ['0' .. '9']) do
         Inc(L1);
       L2 := J;
-      while (L2 <= Length(ARight)) and CharInSet(ARight[L2], ['0'..'9']) do
+      while (L2 <= Length(ARight)) and CharInSet(ARight[L2], ['0' .. '9']) do
         Inc(L2);
       S1 := DigitRunStart(ALeft, I, L1);
       S2 := DigitRunStart(ARight, J, L2);
@@ -811,13 +810,15 @@ begin
 end;
 
 initialization
-  MappingIcons := TDictionary<string, TBytes>.Create;
-  MappingIconsResolved := TDictionary<string, Byte>.Create;
-  MappingIconsLock := TCriticalSection.Create;
+
+MappingIcons := TDictionary<string, TBytes>.Create;
+MappingIconsResolved := TDictionary<string, Byte>.Create;
+MappingIconsLock := TCriticalSection.Create;
 
 finalization
-  FreeAndNil(MappingIcons);
-  FreeAndNil(MappingIconsResolved);
-  FreeAndNil(MappingIconsLock);
+
+FreeAndNil(MappingIcons);
+FreeAndNil(MappingIconsResolved);
+FreeAndNil(MappingIconsLock);
 
 end.

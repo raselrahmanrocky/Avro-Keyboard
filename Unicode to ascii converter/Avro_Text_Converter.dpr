@@ -21,8 +21,10 @@ uses
   uAvroSecureMem in '..\Keyboard and Spell checker\Units\uAvroSecureMem.pas',
   uAvroShieldVM in '..\Keyboard and Spell checker\Units\uAvroShieldVM.pas',
   uAvroShieldSecret in '..\Keyboard and Spell checker\Units\uAvroShieldSecret.pas',
+  uAvroShield in '..\Keyboard and Spell checker\Units\uAvroShield.pas',
   uAvroEncoCrypto in '..\Keyboard and Spell checker\Units\uAvroEncoCrypto.pas',
   uAvroEncoManager in '..\Keyboard and Spell checker\Units\uAvroEncoManager.pas',
+  uAvroEncoIconSection in '..\Keyboard and Spell checker\Units\uAvroEncoIconSection.pas',
   DebugLog in '..\Keyboard and Spell checker\Units\DebugLog.pas',
   Vcl.Themes,
   Vcl.Styles;
