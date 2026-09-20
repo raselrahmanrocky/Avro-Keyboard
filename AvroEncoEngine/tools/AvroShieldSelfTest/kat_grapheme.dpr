@@ -140,7 +140,7 @@ const
     caret and the ledger. The mapping-derived atom table (chunk 3), the
     host-text gate (chunk 4) and English mode are reported under their own
     names. }
-  MAX_ROW     = 14;
+  MAX_ROW     = 15;
   DELIM_ROW   = 8;  // delimiters and commit points
   REPEAT_ROW  = 9;  // repeated presses: one reading, one erase, then the host
   CARET_ROW   = 10; // the caret moved: the ledger and the reading go stale
@@ -148,6 +148,7 @@ const
   ATOM_ROW    = 12;
   HOST_ROW    = 13;
   ENGLISH_ROW = 14; // English mode: the host keeps the press
+  UNICODE_ROW = 15; // Unicode output mode: the feature must not be reached at all
 
   { Representative SINGLE clusters: every shape one press has to erase - a plain
     letter, the letters whose rendering is several ANSI units, conjuncts typed
@@ -1957,9 +1958,256 @@ begin
   end;
 end;
 
+{ ============================================================================== }
+{ G1 row 15: Unicode output mode                                                 }
+{ ============================================================================== }
+
+{
+  The whole ANSI host-text path is gated on OutputIsBijoy = 'YES' - at each
+  engine's call site and again inside AnsiHostClusterUnits - so Unicode output
+  mode has to behave exactly as it did before the feature existed. That is the
+  invariant worth pinning, because it is the one a reordered mode check breaks
+  silently: a reading taken, a UIA client created or a clipboard round-trip
+  started here would be invisible to every other row in this file.
+
+  The expectations are LITERALS - the golden stream, stored below - and not
+  values computed from the code under test. They were recorded with a throwaway
+  probe (kg_golden) that drives the same seeds and the same backspace path.
+  Two further pieces of evidence say the recorded stream IS the pre-feature one:
+
+    * the feature has exactly one way into the press path, AnsiEraseHostCluster,
+      and it is called under `OutputIsBijoy = 'YES'` in all three engines - so
+      this row asserts TraceCalls = 0 for every press: the decision point never
+      runs in Unicode mode at all;
+    * the grapheme-cluster erase rule (DropLastGraphemeCluster) sits in each
+      engine's ANSI branch only (clsGenericLayoutModern.pas:285,
+      clsGenericLayoutOld.pas:1298, clsE2BCharBased.pas:475), never in the
+      Unicode branch that answers here;
+    * kg_old - the same source built against BOTH this tree and 34deb37, the tree
+      from before the feature - printed
+      `unicode modern empty ledger block=False emits=0 erase=0 text=[]` and
+      `unicode old empty ledger block=False emits=0 erase=0 text=[]`
+      identically on both. That probe can only create the EMPTY-ledger state in
+      both trees (the seeding hooks arrived with the feature), so it is the
+      entry-point half of the comparison; the seeded corpus below is the half
+      that only this tree can drive.
+
+  What the recorded stream contains: per engine, per item, per press, exactly
+
+      block | captured emissions | erase count | text | ledger afterwards
+
+  as `|`-separated fields with the text and the ledger in hex units. The state
+  seeded here is the one a committed word leaves behind (the text is on screen,
+  nothing is live), which is what SeedCommittedForTest creates.
+
+  NOTE on the E2B column: its Unicode branch injects through its own Backspace()
+  rather than through the capture hook, so `captured emissions` is always 0
+  there - the LEDGER transition is what that engine's golden actually pins.
+  Modern hands the press to the host (block 0, nothing emitted, ledger intact);
+  Old consumes it and emits its own diff. All three are the pre-feature shapes.
+
+  The eleven items are the shapes the feature's glyph table deals with: letters,
+  conjuncts, a reph, ZWJ and ZWNJ forms, kar runs, the `কি + র` case the
+  old-layout KarRunCommitted fix exists for, and a word followed by a space.
+  Each is pressed three times because a held Backspace (auto-repeat) must be
+  just as untouched as the first press.
+}
+procedure UnicodeModeChecks(const AMapping: string);
+const
+  UNI_CORPUS: array [0 .. 10] of string = (#$0987, #$0989, #$0995#$09CD#$0995, #$09B0#$09CD#$0995, #$0995#$09CD#$09B7,
+    #$09B9#$09CD#$09B0, #$0995#$09CD#$200D#$09B7, #$0995#$09CD#$200C#$09B7, #$0995#$09BF, #$0995#$09BF#$09B0,
+    #$0995#$09BF' ');
+  UNI_NAMES: array [0 .. 10] of string = ('i', 'u', 'kka', 'rka', 'kssa', 'hra', 'ka+ZWJ+ssa', 'ka+ZWNJ+ssa', 'ki',
+    'ki+ra', 'ki + space');
+  UNI_PRESSES = 3; // a held Backspace: every repeat must behave the same
+  { THE GOLDEN. Read-only data: it is compared against, never derived from, the
+    engines. One row per engine (ekModern, ekOld, ekE2B), then per corpus item,
+    then per press, as `block|captured-emits|erase|text-hex|ledger-hex`. }
+  UNI_GOLDEN: array [0 .. 2, 0 .. 10, 1 .. UNI_PRESSES] of string = (
+    // ekModern - the press is handed to the host, nothing of ours changes
+    (('0|0|0||0987', '0|0|0||0987', '0|0|0||0987'),
+    ('0|0|0||0989', '0|0|0||0989', '0|0|0||0989'),
+    ('0|0|0||0995 09CD 0995', '0|0|0||0995 09CD 0995', '0|0|0||0995 09CD 0995'),
+    ('0|0|0||09B0 09CD 0995', '0|0|0||09B0 09CD 0995', '0|0|0||09B0 09CD 0995'),
+    ('0|0|0||0995 09CD 09B7', '0|0|0||0995 09CD 09B7', '0|0|0||0995 09CD 09B7'),
+    ('0|0|0||09B9 09CD 09B0', '0|0|0||09B9 09CD 09B0', '0|0|0||09B9 09CD 09B0'),
+    ('0|0|0||0995 09CD 200D 09B7', '0|0|0||0995 09CD 200D 09B7', '0|0|0||0995 09CD 200D 09B7'),
+    ('0|0|0||0995 09CD 200C 09B7', '0|0|0||0995 09CD 200C 09B7', '0|0|0||0995 09CD 200C 09B7'),
+    ('0|0|0||0995 09BF', '0|0|0||0995 09BF', '0|0|0||0995 09BF'),
+    ('0|0|0||0995 09BF 09B0', '0|0|0||0995 09BF 09B0', '0|0|0||0995 09BF 09B0'),
+    ('0|0|0||0995 09BF 0020', '0|0|0||0995 09BF 0020', '0|0|0||0995 09BF 0020')),
+    // ekOld - the press is consumed and its own diff is emitted
+    (('1|1|1||', '0|0|0||', '0|0|0||'),
+    ('1|1|1||', '0|0|0||', '0|0|0||'),
+    ('1|1|1||0995 09CD', '1|1|1||0995', '1|1|1||'),
+    ('1|1|3|0995|0995', '1|1|1||', '0|0|0||'),
+    ('1|1|1||0995 09CD', '1|1|1||0995', '1|1|1||'),
+    ('1|1|2||09B9', '1|1|1||', '0|0|0||'),
+    ('1|1|1||0995 09CD 200D', '1|1|1||0995 09CD', '1|1|1||0995'),
+    ('1|1|1||0995 09CD 200C', '1|1|1||0995 09CD', '1|1|1||0995'),
+    ('1|1|1||0995', '1|1|1||', '0|0|0||'),
+    ('1|1|1||0995 09BF', '1|1|1||0995', '1|1|1||'),
+    ('1|1|1||0995 09BF', '1|1|1||0995', '1|1|1||')),
+    // ekE2B - consumed, injected through its own Backspace (see the note above)
+    (('1|0|0||', '0|0|0||', '0|0|0||'),
+    ('1|0|0||', '0|0|0||', '0|0|0||'),
+    ('1|0|0||0995 09CD', '1|0|0||0995', '1|0|0||'),
+    ('1|0|0||0995', '1|0|0||', '0|0|0||'),
+    ('1|0|0||0995 09CD', '1|0|0||0995', '1|0|0||'),
+    ('1|0|0||09B9 09CD', '1|0|0||09B9', '1|0|0||'),
+    ('1|0|0||0995 09CD 200D', '1|0|0||0995 09CD', '1|0|0||0995'),
+    ('1|0|0||0995 09CD 200C', '1|0|0||0995 09CD', '1|0|0||0995'),
+    ('1|0|0||0995', '1|0|0||', '0|0|0||'),
+    ('1|0|0||0995 09BF', '1|0|0||0995', '1|0|0||'),
+    ('1|0|0||0995 09BF', '1|0|0||0995', '1|0|0||')));
+var
+  Reader:          TFakeCaretReader;
+  Sink:            TTraceSink;
+  Conv:            TUnicodeToBijoy2000;
+  Block:           Boolean;
+  Wide:            string;
+  Name:            string;
+  Item:            string;
+  Tail:            string;
+  FP:              TCaretFingerprint;
+  Kind:            TEngineKind;
+  Atoms:           TArray<TAnsiAtom>;
+  I, P:            Integer;
+  RefreshesBefore: Integer;
+
+  function KindName(const AKind: TEngineKind): string;
+  begin
+    case AKind of
+      ekOld: Result := 'Old';
+      ekE2B: Result := 'E2B';
+    else
+      Result := 'Modern';
+    end;
+  end;
+
+  { A multi-unit reading is placed in the cache for every case: if any engine
+    consulted the eraser in Unicode mode, THIS is the glyph it would have erased,
+    and the press would stop being the host's. }
+  procedure ArmReading;
+  begin
+    AnsiCaretContextInjectForTest(Wide, FP);
+    Reader.Calls := 0;
+  end;
+
+  { This press's stream, in the golden's own format. }
+  function Stream: string;
+  begin
+    Result := IfThen(Block, '1', '0') + '|' + IntToStr(Recorder.Emits) + '|' + IntToStr(Recorder.EraseCount) + '|' +
+      Trim(HexUnits(Recorder.Text)) + '|' + Trim(HexUnits(EngineLedger(Kind)));
+  end;
+
+begin
+  Say('');
+  Say('=== ' + AMapping + ' / Unicode output mode (row 15)');
+
+  { The widest glyph of the active mapping - the same probe the English and
+    host-text rows use, so a mapping whose clusters are all one unit deep still
+    gets a reading wide enough to matter. }
+  Conv := Modern.ConverterForTest;
+  Wide := '';
+  Atoms := AnsiAtomMap.Atoms;
+  for I := 0 to high(Atoms) do
+    if (Atoms[I].Bind = abSelf) and (Length(Atoms[I].Units) > 1) and ((Wide = '') or (Length(Atoms[I].Units) > Length(Wide))) then
+      Wide := Atoms[I].Units;
+  if Wide = '' then
+    Wide := Conv.Convert(#$0995 + string(b_Hasanta) + #$0995);
+
+  FillChar(FP, SizeOf(FP), 0);
+  FP.Window := HWND($5678);
+  FP.CaretX := 100;
+  FP.CaretY := 200;
+  FP.TextLength := Length(Wide);
+
+  Reader := TFakeCaretReader.Create;
+  Sink := TTraceSink.Create;
+  try
+    Reader.Tail := Wide;
+    Reader.Fingerprint := FP;
+    Reader.Now := FP;
+
+    AnsiBackspaceHostErase := 'YES';
+    AnsiBackspaceUnitCap := '8';
+    AnsiBackspaceSetTrace(Sink.Backspace);
+    AnsiCaretSnifferConfigure(True, False);
+    AnsiCaretSnifferSetProvider(Reader.Provide, Reader.Current);
+
+    RefreshesBefore := AnsiCaretContextRefreshes;
+    OutputIsBijoy := 'NO'; // Unicode output mode
+    try
+      for Kind in [ekModern, ekOld, ekE2B] do
+      begin
+        Name := KindName(Kind);
+        SetEngineMode(Kind, False); // Bangla: the press is ours, the OUTPUT is not
+
+        for I := 0 to high(UNI_CORPUS) do
+        begin
+          Item := UNI_CORPUS[I];
+          SeedEngine(Kind, Item);
+          ArmReading;
+          TraceCalls := 0;
+
+          for P := 1 to UNI_PRESSES do
+          begin
+            Recorder.Reset;
+            Block := True; // deliberately wrong: the engine has to set it
+            DriveBackspace(Kind, Block);
+
+            Check(UNICODE_ROW, Format('%s/%s %s press %d: the emitted stream is the recorded golden one',
+              [AMapping, Name, UNI_NAMES[I], P]), Stream = UNI_GOLDEN[Ord(Kind), I, P],
+              Format('stream=[%s] golden=[%s] (block|emits|erase|text|ledger)', [Stream, UNI_GOLDEN[Ord(Kind), I, P]]));
+          end;
+
+          Check(UNICODE_ROW, Format('%s/%s %s: Unicode mode never asks the eraser', [AMapping, Name, UNI_NAMES[I]]),
+            TraceCalls = 0, Format('the decision point ran %d time(s) (%s)', [TraceCalls, TraceText]));
+        end;
+      end;
+
+      { The real ENTRY point as well, for the engine both trees can drive: that is
+        the path kg_old compared across the two revisions. }
+      SeedEngine(ekModern, '');
+      ArmReading;
+      TraceCalls := 0;
+      Recorder.Reset;
+      Block := True;
+      DriveKey(ekModern, VK_BACK, Block);
+      Check(UNICODE_ROW, AMapping + ': the entry point emits the recorded pre-feature stream too',
+        (not Block) and (Recorder.Emits = 0) and (TraceCalls = 0),
+        Format('Block=%s emits=%d decisions=%d (%s): kg_old recorded block=False emits=0 for 34deb37 and for this tree',
+        [BoolToStr(Block, True), Recorder.Emits, TraceCalls, TraceText]));
+
+      { ... and the machinery itself never woke up during any of it. }
+      Check(UNICODE_ROW, AMapping + ': no reading was taken, refreshed or consulted in Unicode mode',
+        (AnsiCaretContextRefreshes = RefreshesBefore) and (Reader.Calls = 0) and AnsiCaretContextTail(Tail) and (Tail = Wide),
+        Format('refreshes %d -> %d, layers asked %d time(s), tail=[%s] want [%s]', [RefreshesBefore, AnsiCaretContextRefreshes,
+        Reader.Calls, HexUnits(Tail), HexUnits(Wide)]));
+    finally
+      OutputIsBijoy := 'YES'; // every row after this one is ANSI
+    end;
+  finally
+    ClearEngineModes;
+    SeedEngine(ekModern, '');
+    SeedEngine(ekOld, '');
+    SeedEngine(ekE2B, '');
+    AnsiCaretContextDrop('row 15 done');
+    AnsiCaretSnifferClearProvider;
+    AnsiCaretSnifferConfigure(False, False);
+    AnsiBackspaceSetTrace(nil);
+    AnsiBackspaceHostErase := 'YES';
+    AnsiBackspaceUnitCap := '8';
+    OutputIsBijoy := 'YES';
+    Sink.Free;
+    Reader.Free;
+  end;
+end;
+
 { The name of one row in the summary. Rows 1..7 are the width rows of the G1
-  plan, rows 8..11 the layers above, and the last three are the chunk 3 / chunk
-  4 / English-mode sections, reported under their own names. }
+  plan, rows 8..11 the layers above, and the last four are the chunk 3 / chunk
+  4 / English-mode / Unicode-mode sections, reported under their own names. }
 function RowLabel(const ARow: Integer): string;
 begin
   case ARow of
@@ -1977,6 +2225,8 @@ begin
       Result := 'host text (chunk 4)';
     ENGLISH_ROW:
       Result := 'G1 row 14 (English mode and the mode switch)';
+    UNICODE_ROW:
+      Result := 'G1 row 15 (Unicode output mode non-regression)';
   else
     Result := Format('G1 row %d (one press, one visible character)', [ARow]);
   end;
@@ -2074,6 +2324,7 @@ begin
       HostTextChecks('Default');
       GateLayerChecks('Default');
       EnglishModeChecks('Default');
+      UnicodeModeChecks('Default');
 
       Loaded := 1;
       for I := 0 to Names.Count - 1 do
@@ -2097,6 +2348,7 @@ begin
         HostTextChecks(Names[I]);
         GateLayerChecks(Names[I]);
         EnglishModeChecks(Names[I]);
+        UnicodeModeChecks(Names[I]);
       end;
     finally
       CharBased.Free;

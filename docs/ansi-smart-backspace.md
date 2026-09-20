@@ -265,10 +265,21 @@ kat_grapheme "<repo>\assets"
 
 Drives every mapping in `assets` (Default + Ansi V1…V4) through the real engine
 path with the host replaced by `OnRawEmit`, and checks the surviving ledger, the
-width and the emitted diff after every press. **Baseline: 5298 checks, 0 failures**
-(rows: mapping/atom/state/host-text/delimiters/caret moves/pending host
-characters/atom table/host-text eraser/English mode). Bengali literals are written
-as `#$XXXX`, so the file stays ASCII.
+width and the emitted diff after every press. **Baseline: 5968 checks, 0 failures**
+(rows: width, mapping/atom/state, host text, delimiters, repeated presses, caret
+moves, pending host characters, atom table, host-text eraser, English mode,
+Unicode output mode). Bengali literals are written as `#$XXXX`, so the file stays
+ASCII.
+
+### `kg_golden` and `kg_old` — the Unicode-mode golden
+
+Row 15 asserts the Unicode-mode stream against a table of literals
+(`UNI_GOLDEN`). `kg_golden` prints that stream for the whole corpus, so a
+*deliberate* change to an engine's Unicode path is re-recorded on purpose rather
+than by editing the table from memory. `kg_old` is the same measurement written
+to compile against **any** revision: build it in a worktree of the pre-feature
+tree (`git worktree add /tmp/base34 34deb37`) and in this one, and diff the two
+outputs — on the machine this was written on they were identical.
 
 ### `kat_host` — the real controls
 
