@@ -1,4 +1,4 @@
-{
+﻿{
   =============================================================================
   This Source Code Form is subject to the terms of the Mozilla Public
   License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -199,7 +199,6 @@ type
     CreatingEditingFixedKeyboardLayouts3: TMenuItem;
     N39: TMenuItem;
     GetAcrobatReader3: TMenuItem;
-    N2: TMenuItem;
     Aboutcurrentkeyboardlayout2: TMenuItem;
     Options2: TMenuItem;
     FixedKeyboardLayout1: TMenuItem;
@@ -247,9 +246,6 @@ type
     N52: TMenuItem;
     AvroKeyboardonFacebook1: TMenuItem;
     OmicronLabonTwitter1: TMenuItem;
-    N53: TMenuItem;
-    AvroKeyboardonFacebook2: TMenuItem;
-    OmicronLabonTwitter2: TMenuItem;
     N54: TMenuItem;
     AvroKeyboardonFacebook3: TMenuItem;
     OmicronLabonTwitter3: TMenuItem;
