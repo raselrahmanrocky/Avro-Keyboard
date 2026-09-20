@@ -704,6 +704,21 @@ begin
   SendMessage(ACtl, WM_SETTEXT, 0, LPARAM(PChar(AText)));
 end;
 
+{ How long the control thinks its text is, without asking for the TEXT.
+
+  This is the only way to measure a PASSWORD field from here: Windows answers
+  WM_GETTEXTLENGTH for a password edit but deliberately hands out no characters
+  to a caller from another process, so TextOf returns whatever was in the buffer
+  (measured: the length is right and the text comes back empty). }
+function TextLenOf(const ACtl: HWND): Integer;
+var
+  Res: LRESULT;
+begin
+  Res := 0;
+  SendMessageTimeout(ACtl, WM_GETTEXTLENGTH, 0, 0, SMTO_ABORTIFHUNG, 250, @Res);
+  Result := Integer(Res);
+end;
+
 function TextOf(const ACtl: HWND): string;
 var
   Len: Integer;
@@ -1503,6 +1518,174 @@ begin
 end;
 
 { ============================================================================== }
+{ C2. the surgical erase: one edit instead of N backspaces                        }
+{ ============================================================================== }
+
+{ What a reading of THIS control looks like: the case has to hold a FRESH one, or
+  the erase would be refused for the wrong reason and prove nothing. }
+procedure ReadHere(const AWhat: string);
+begin
+  AnsiCaretWatchNoteCaretEvent('harness: ' + AWhat);
+  AnsiCaretWatchTick;
+end;
+
+{ One control, three units, one edit.
+
+  The three cases differ only in the control: a standard single-line EDIT, a
+  multi-line EDIT and a RICHEDIT - the classes that answer EM_GETSEL / EM_SETSEL /
+  WM_CLEAR. Each asserts the TEXT and the CARET, not just the return value, and
+  then that the control received no key message at all: the whole point of the
+  surgical route is that nothing is injected. }
+procedure SurgicalControlJob(const AName: string; const ACtl: HWND; const AId: Integer);
+var
+  Remaining: Integer;
+  Reason:    string;
+  Keys:      Integer;
+begin
+  if not TakeFocus(ACtl, AId) then
+  begin
+    Skip('surgical: ' + AName + ' could not take the foreground');
+    Exit;
+  end;
+
+  SetText(ACtl, HOST_TEXT);
+  SetCaret(ACtl, 6);
+  Pump(60);
+  ReadHere('the surgical case starts with a fresh reading');
+  Keys := ChildKeyLines;
+
+  Check(Format('surgical: %s: one edit erases the cluster', [AName]),
+    AnsiSurgicalHostErase(3, Remaining, Reason) and (Remaining = 0),
+    Format('remaining=%d (%s)', [Remaining, Reason]));
+  Check(Format('surgical: %s: exactly the three characters are gone', [AName]), TextOf(ACtl) = 'abc',
+    Format('text=[%s] want [abc]', [TextOf(ACtl)]));
+  Check(Format('surgical: %s: the caret sits where the cluster started', [AName]),
+    (SelectionStartOf(ACtl) = 3) and (SelectionEndOf(ACtl) = 3),
+    Format('caret=%d..%d want 3..3', [SelectionStartOf(ACtl), SelectionEndOf(ACtl)]));
+  Check(Format('surgical: %s: not one key was injected', [AName]), ChildKeyLines = Keys,
+    Format('the control received %d key messages', [ChildKeyLines - Keys]));
+end;
+
+{ The refusals. Each one is asserted by the REASON it gives, so a case cannot
+  pass for the wrong guard: `selection` is the user's own selection, `stand
+  before` is a cluster longer than the text in front of the caret, and the last
+  one is the window the reading describes. }
+procedure SurgicalRefusalChecks;
+var
+  Remaining: Integer;
+  Reason:    string;
+  Text:      string;
+  Keys:      Integer;
+  LenBefore: Integer;
+begin
+  { A selection the user made is never the surgery's target. The reading is
+    taken FIRST (the message path refuses to read over a selection, so the
+    fingerprint must exist before the selection does) and then the user's
+    selection is created. }
+  if TakeFocus(FEdit, EDIT_ID) then
+  begin
+    SetText(FEdit, HOST_TEXT);
+    SetCaret(FEdit, 6);
+    Pump(60);
+    ReadHere('the refusal cases start with a fresh reading');
+    SetSelection(FEdit, 2, 4);
+    Text := TextOf(FEdit);
+    Keys := ChildKeyLines;
+
+    Check('surgical: an active selection is refused, by name', (not AnsiSurgicalHostErase(3, Remaining, Reason)) and
+      (Remaining = 3) and (Pos('selection', Reason) > 0), Format('remaining=%d reason=[%s] want the selection refusal', [Remaining, Reason]));
+    Check('surgical: ... and the selection is left exactly where it was',
+      (TextOf(FEdit) = Text) and (SelectionStartOf(FEdit) = 2) and (SelectionEndOf(FEdit) = 4) and (ChildKeyLines = Keys),
+      Format('text=[%s] selection=%d..%d keys=%d', [TextOf(FEdit), SelectionStartOf(FEdit), SelectionEndOf(FEdit),
+      ChildKeyLines - Keys]));
+
+    { Wider than the text in front of the caret: the cap above the text length. }
+    SetCaret(FEdit, 2);
+    Pump(40);
+    Check('surgical: a cluster longer than the text before the caret is refused',
+      (not AnsiSurgicalHostErase(5, Remaining, Reason)) and (Remaining = 5) and (Pos('stand before', Reason) > 0),
+      Format('remaining=%d reason=[%s] want the length refusal', [Remaining, Reason]));
+    Check('surgical: ... and the text is untouched by that refusal', TextOf(FEdit) = Text,
+      Format('text=[%s] want [%s]', [TextOf(FEdit), Text]));
+  end
+  else
+    Skip('surgical: the edit control could not take the foreground');
+
+  { A password field has no reading at all, so the surgery has nothing that
+    describes it - and it refuses windows the reading does not describe before it
+    looks at anything else. Stated that way rather than as "the password check
+    fired": with this guard in place the password branch is unreachable while the
+    fingerprint is honest, which is defence in depth, not a gap. }
+  if not TakeFocus(FPass, PASS_ID) then
+    Skip('surgical: the password control could not take the foreground')
+  else
+  begin
+    SetText(FPass, 'hunter2');
+    SetCaret(FPass, 7);
+    Pump(40);
+    LenBefore := TextLenOf(FPass);
+    Keys := ChildKeyLines;
+    Check('surgical: a window the reading does not describe is never edited',
+      (not AnsiSurgicalHostErase(3, Remaining, Reason)) and (Remaining = 3) and (Pos('does not describe', Reason) > 0),
+      Format('remaining=%d reason=[%s]', [Remaining, Reason]));
+    { The field's TEXT cannot be read from this process at all (see TextLenOf) -
+      which is the very protection the password branch of every reader leans on -
+      so the assertion here is the length, the caret and the absence of keys. }
+    Check('surgical: ... and the password field is untouched',
+      (LenBefore = 7) and (TextLenOf(FPass) = LenBefore) and (SelectionStartOf(FPass) = 7) and (ChildKeyLines = Keys),
+      Format('length %d -> %d, caret=%d keys=%d', [LenBefore, TextLenOf(FPass), SelectionStartOf(FPass),
+      ChildKeyLines - Keys]));
+  end;
+end;
+
+procedure SurgicalJobEdit;
+begin
+  SurgicalControlJob('edit', FEdit, EDIT_ID);
+end;
+
+procedure SurgicalJobMulti;
+begin
+  SurgicalControlJob('multi-line edit', FMulti, MULTI_ID);
+end;
+
+procedure SurgicalJobRich;
+begin
+  SurgicalControlJob(Format('rich edit (%s)', [FRichCls]), FRich, RICH_ID);
+end;
+
+procedure SurgicalChecks;
+begin
+  if not TakeFocus(FEdit, EDIT_ID) then
+  begin
+    Skip('surgical: the window could not take the foreground');
+    Exit;
+  end;
+
+  { The head-less watch: the real provider chain and the real fingerprint, no OS
+    hooks - the reading is what the surgery is verified against, and the cases
+    must not depend on the desktop's event delivery. }
+  AnsiBackspaceSurgical := 'AUTO';
+  AnsiBackspaceUIA := 'NO';
+  AnsiBackspaceClipboard := 'NO';
+  AnsiCaretWatchStartHeadless;
+  try
+    RunJob('surgical: a standard edit', SurgicalJobEdit);
+    RunJob('surgical: a multi-line edit', SurgicalJobMulti);
+
+    if FRich = 0 then
+      Skip('surgical: no rich edit class on this machine')
+    else
+      RunJob('surgical: a rich edit', SurgicalJobRich);
+
+    RunJob('surgical: the refusals', SurgicalRefusalChecks);
+  finally
+    AnsiCaretWatchStop;
+    AnsiBackspaceSurgical := 'AUTO';
+    AnsiBackspaceUIA := 'YES';
+  end;
+end;
+
+{ ============================================================================== }
 { D. the watch, a real key press and one emission                                }
 { ============================================================================== }
 
@@ -1527,13 +1710,14 @@ var
   Text:     string;
   Wide:     string;
   Tail:     string;
-  Events:   Integer;
-  Refs:     Integer;
-  RefsBase: Integer;
-  KeyLines: Integer;
-  Base:     Integer;
-  T0:       Cardinal;
-  Watched:  Boolean;
+  Events:     Integer;
+  Refs:       Integer;
+  RefsBase:   Integer;
+  KeyLines:   Integer;
+  KeysBefore: Integer;
+  Base:       Integer;
+  T0:         Cardinal;
+  Watched:    Boolean;
 begin
   if not TakeFocus(FEdit, EDIT_ID) then
   begin
@@ -1670,18 +1854,53 @@ begin
       Check('hooks: the probe is a multi-unit character of the active mapping', Length(Wide) > 1,
         Format('the widest cluster [%s] is %d units', [HexUnits(Wide), Length(Wide)]));
 
+      { THE SURGICAL ROUTE, end to end, in the real control: the press erases the
+        whole cluster with ONE edit (no emission at all) and the text and the
+        caret end up exactly where they would after the backspace emission. }
+      KeysBefore := ChildKeyLines;
       FSink.EraseCount := 0;
       FSink.Text := '';
       FSink.Emits := 0;
-      Check('hooks: the press erases the whole character in ONE emission',
-        AnsiEraseHostCluster(FSink.Emit) and (FSink.Emits = 1) and (FSink.EraseCount = AnsiTailClusterUnits(Wide)) and (FSink.Text = ''),
-        Format('emits=%d erase=%d want %d text=[%s]', [FSink.Emits, FSink.EraseCount, AnsiTailClusterUnits(Wide), HexUnits(FSink.Text)]));
+      Check('hooks: the press erases the whole character with ONE edit and nothing emitted',
+        AnsiEraseHostCluster(FSink.Emit) and (FSink.Emits = 0) and (AnsiBackspaceSurgical <> 'NO'),
+        Format('emits=%d erase=%d want 0 emissions through the single-edit route', [FSink.Emits, FSink.EraseCount]));
+      Check('hooks: ... and the control lost exactly the cluster', TextOf(FEdit) = 'xy',
+        Format('text=[%s] want [xy]', [HexUnits(TextOf(FEdit))]));
+      Check('hooks: ... with the caret left where the cluster started',
+        (SelectionStartOf(FEdit) = 2) and (SelectionEndOf(FEdit) = 2),
+        Format('caret=%d..%d want 2..2', [SelectionStartOf(FEdit), SelectionEndOf(FEdit)]));
+      Check('hooks: ... and not one key message reached the control', ChildKeyLines = KeysBefore,
+        Format('the control received %d key messages', [ChildKeyLines - KeysBefore]));
 
       Text := '';
       Check('hooks: the reading that erased it is consumed', not AnsiCaretContextTail(Text),
         Format('tail=[%s] after the press', [HexUnits(Text)]));
       Check('hooks: a second press erases nothing', not AnsiEraseHostCluster(FSink.Emit),
         Format('emits=%d after the second press', [FSink.Emits]));
+
+      { The control: with the single-edit route switched off the SAME press is the
+        one that shipped - one emission of the mapping's own width - so the case
+        above cannot pass by the erase having stopped working altogether. }
+      AnsiBackspaceSurgical := 'NO';
+      try
+        SetText(FEdit, 'xy' + Wide);
+        SetCaret(FEdit, Length('xy' + Wide));
+        AnsiCaretWatchNoteCaretEvent('harness: the text before the caret changed again');
+        AnsiCaretWatchTick;
+        FSink.EraseCount := 0;
+        FSink.Text := '';
+        FSink.Emits := 0;
+        KeysBefore := ChildKeyLines;
+        Check('hooks: with the single-edit route off the press is the emission it was',
+          AnsiEraseHostCluster(FSink.Emit) and (FSink.Emits = 1) and (FSink.EraseCount = AnsiTailClusterUnits(Wide)) and
+          (FSink.Text = ''),
+          Format('emits=%d erase=%d want %d text=[%s]', [FSink.Emits, FSink.EraseCount, AnsiTailClusterUnits(Wide),
+          HexUnits(FSink.Text)]));
+        Check('hooks: ... and the control keeps the whole glyph (nothing was edited)', TextOf(FEdit) = 'xy' + Wide,
+          Format('text=[%s] want [%s]', [HexUnits(TextOf(FEdit)), HexUnits('xy' + Wide)]));
+      finally
+        AnsiBackspaceSurgical := 'AUTO';
+      end;
     end;
   finally
     if FKbHook <> 0 then
@@ -1762,6 +1981,7 @@ begin
     AnsiSmartBackspace := 'YES';
     AnsiBackspaceHostErase := 'YES';
     AnsiBackspaceUnitCap := '8';
+    AnsiBackspaceSurgical := 'AUTO';
     AnsiBackspaceUIA := 'YES';
     AnsiBackspaceClipboard := 'NO';
     AnsiBackspaceApps := '';
@@ -1835,6 +2055,10 @@ begin
     Say('');
     Say('=== B. UI Automation (a real client against the same controls)');
     UiaChecks;
+
+    Say('');
+    Say('=== B2. the surgical erase (one edit, no injected key)');
+    SurgicalChecks;
 
     Say('');
     Say('=== C. the clipboard round-trip (keys injected, clipboard and caret restored)');

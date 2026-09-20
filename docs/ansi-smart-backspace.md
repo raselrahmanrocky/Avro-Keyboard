@@ -31,6 +31,18 @@ If the width cannot be established, the press falls back to exactly the behaviou
 that shipped before this feature: the application deletes one ANSI unit. There is
 no guessing and no over-delete — see the decision table in section 5.
 
+**How the cluster is removed.** In a standard `EDIT`/`RICHEDIT` — the hosts the
+message path can read — the cluster goes in **one verified edit**: the control is
+asked for its text length, `EM_SETSEL(caret − N, caret)` followed by `WM_CLEAR`,
+and then the control is asked again: the text must have shrunk by exactly `N` and
+the caret must sit where the cluster started. Nothing is injected, so there is no
+flicker, nothing for a key remapper to swallow and no dependence on the host
+treating `VK_BACK` as one character. On every other host (and for whatever the
+single edit could not remove) the cluster is erased the way it always was: one
+emitted backspace per unit. The route is `AnsiBackspaceSurgical`; the erase is
+only ever attempted when the cached reading *describes the focused control*,
+which is what keeps a canned or stale reading from editing a window nobody read.
+
 ---
 
 ## 2. The reading layers, and what each one costs
@@ -100,7 +112,7 @@ switches do (`clsLayout.InvalidateAnsiTail` → `AnsiBackspaceInvalidate`).
 
 ## 3. Settings
 
-All eight keys are read from the registry in a normal install
+All nine keys are read from the registry in a normal install
 (`HKCU\Software\OmicronLab\Avro Keyboard`, via `uRegistrySettings.LoadSettingsFromRegistry`)
 and from `Settings.xml` in the Avro data directory in a portable build
 (`LoadSettingsFromFile`; `%COMMONAPPDATA%\Avro Keyboard\Settings.xml`, or next to
@@ -113,6 +125,7 @@ file copied between the two layouts carries every key.
 | `AnsiBackspaceHostErase` | `YES` / `NO` | `YES` | The key the master switch replaced: "the host may erase whole glyphs". Still read, so older builds, the options dialog and the harnesses keep working. `NO` behaves like the master switch being off. | next press (live) |
 | `AnsiBackspaceLegacy` | `YES` / `NO` | `NO` | Erase **policy** for the engine's own ledger: `NO` follows UAX#29 (one cluster per press); `YES` keeps the pre-feature boundary. Example `র্ক`: with `NO` one press removes the whole thing; with `YES` the reph survives and the consonant stays, so it costs a second press. | next press (live) |
 | `AnsiBackspaceUnitCap` | `1` … `64` | `8` | Safety bound: a reading wider than this is not believed and the press falls back. A single glyph is far narrower, so this only fires on a corrupt reading. | next press (live) |
+| `AnsiBackspaceSurgical` | `AUTO` / `YES` / `NO` | `AUTO` (`''` is the same) | How the cluster is removed: the single verified edit described in section 1, or one emitted backspace per unit. `NO` (also `OFF`, `0`) is the only value that switches the single edit off. There is **no control for it in the dialog** — it is a support/advanced key, and the single edit is only ever taken where it can be verified (a standard `EDIT`/`RICHEDIT` whose reading describes it), so the default is the safe one. | next press (live) |
 | `AnsiBackspaceUIA` | `YES` / `NO` | `YES` | Enables layer B (UI Automation). `NO` keeps COM out of the process entirely. | caret-watch start |
 | `AnsiBackspaceClipboard` | `YES` / `NO` | `NO` | Enables layer C (the clipboard round-trip). Experimental: it injects keys into the foreground window. | caret-watch start |
 | `AnsiBackspaceApps` | see below | `''` | Per-application override: which applications keep the pre-feature behaviour. | next press (live) |
@@ -173,6 +186,12 @@ at the bottom of the Global Output page).
 | Never erase more than (ANSI units, 1-64) | `AnsiBackspaceUnitCap`; digits only, and a value outside 1…64 is corrected **in the field, on Save**, not silently at the next launch |
 | Per-application override | `AnsiBackspaceApps`; the grammar of section 3 is printed under the field |
 
+`AnsiBackspaceSurgical` has **no control here** on purpose: it changes how an
+already-decided erase is carried out, its default (`AUTO`) is the verified one,
+and a user has no way to judge the difference from the dialog. It is documented
+in the table above with both storage locations, so a support engineer can still
+set it.
+
 **Saving restarts the caret watch** (`ApplyAnsiContextSettings` →
 `AnsiCaretWatchStop` + `AnsiCaretWatchStart`; called from Apply and OK): `UIA`,
 `Clipboard` and `Log` are read when the watch starts, so the change applies without
@@ -197,7 +216,7 @@ Decision names come from `uAnsiBackspace.AnsiDecisionName`:
 |---|---|---|
 | `not ours` (`edNotMine`) | No reading, or the feature is off: the application handles the press itself | the master switch; `AnsiCaretWatchActive`; is the target a password field? |
 | `one unit` (`edOneUnit`) | The reading is one unit wide — the host deletes it, exactly as before | nothing; this is the correct answer for a Latin letter |
-| `cluster` (`edCluster`) | A multi-unit cluster was erased through the engine's own atomic emission | nothing |
+| `cluster` (`edCluster`) | A multi-unit cluster was erased — the reason line then names the route: `one edit: …`, `backspaces: …`, or `one edit removed k of N …; m emitted as backspaces` | nothing; a route that keeps falling back to backspaces is worth posting in a bug report with the reason text |
 | `above the cap` (`edCapped`) | The reading claimed more units than `AnsiBackspaceUnitCap` | raise the cap only if the glyph really is that wide; otherwise the reading is corrupt |
 | `stale reading` (`edStale`) | The caret moved between the reading and the press | nothing — the next press reads again; a *constant* `edStale` means the host raises no caret events |
 | `unknown glyph` (`edUnknown`) | The active mapping has no compiled glyph table | the mapping failed to load; try another ANSI version |
@@ -217,6 +236,12 @@ host harness prints the same line — see section 7.
   clipboard holds anything but text.
 * **Hosts with no UI Automation text pattern** (or with `GetText` empty) fall back
   to the pre-feature behaviour: one ANSI unit per press.
+* **The single-edit erase is a standard-control facility.** UI Automation hosts
+  (Word, the browsers, editors) keep the emitted backspaces: `IUIAutomationTextRange`
+  has no delete or `SetValue` that would not replace the whole content, so there
+  is nothing to verify a surgical edit against there. A host that answers
+  `EM_GETSEL`/`WM_CLEAR` but is not a standard edit class is refused as well — the
+  messages are the whole mechanism.
 * **Some desktops reshape injected modifiers**: an injected Shift-down can be
   answered by a Shift-up nobody sent, so `Shift+Left` arrives unshifted. The layer
   detects this (it asks the control, not itself), presses nothing further and
@@ -303,9 +328,15 @@ by a real `SendInput` press.
   the desktop does not deliver injected keys (section 6), in which case the
   keyboard-driven clipboard cases cannot judge the layer and are skipped — with the
   failing step printed.
-* **Baseline: 64 checks, 0 failures, 1 skip** on a desktop that reshapes injected
-  modifiers (the skipped case is the keyboard-driven clipboard round-trip; its
-  safety and refusal cases run everywhere).
+* Baselines on a desktop that reshapes injected modifiers (the skipped case is the
+  keyboard-driven clipboard round-trip; its safety and refusal cases run
+  everywhere): **87 checks, 0 failures, 1 skip**. The `B2` section proves the
+  single-edit erase on a real `Edit`, a multi-line `Edit` and a `RICHEDIT50W`
+  (exact text and caret, and not one key message received by the control), its
+  refusals by name (an active selection, a cluster longer than the text before the
+  caret, a window the reading does not describe), and — inside the `D` section —
+  that the whole press path erases the mapping's own glyph with one edit and
+  falls back to the emitted backspace when the route is switched off.
 
 Sibling KATs worth running after a change here: `kat_ansiconvert`,
 `kat_engineswitch`, `kat_enginecache`, `kat_karcall`.

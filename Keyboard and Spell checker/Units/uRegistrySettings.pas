@@ -115,6 +115,14 @@ var
   // not believed. A single glyph is far narrower, so the cap only fires on a
   // corrupt reading.
   AnsiBackspaceUnitCap:  string;
+  // How that erase is CARRIED OUT. AUTO ('' is the same thing: the documented
+  // default) erases the cluster in ONE verified edit (EM_SETSEL + WM_CLEAR) in a
+  // standard EDIT/RICHEDIT control, which sends no simulated key at all; NO
+  // switches that off and emits one backspace per unit, exactly as before.
+  // Anything else counts as on. The single-edit route is only ever taken when
+  // the reading describes the FOCUSED control, so a harness that supplies a
+  // canned reading can never make the product edit a real window.
+  AnsiBackspaceSurgical: string;
   // Reading layers for that host text. The message path (EDIT / RICHEDIT) is
   // always tried; UIA adds Word, Excel, the browsers, VS Code and LibreOffice
   // (no clipboard, no injected keys). NO keeps UI Automation out of the process
@@ -382,6 +390,7 @@ begin
   // must stay off, and a fresh one gets YES.
   AnsiSmartBackspace := UpperCase(XML.GetValue('AnsiSmartBackspace', AnsiBackspaceHostErase));
   AnsiBackspaceUnitCap := UpperCase(XML.GetValue('AnsiBackspaceUnitCap', '8'));
+  AnsiBackspaceSurgical := UpperCase(XML.GetValue('AnsiBackspaceSurgical', 'AUTO'));
   AnsiBackspaceUIA := UpperCase(XML.GetValue('AnsiBackspaceUIA', 'YES'));
   AnsiBackspaceClipboard := UpperCase(XML.GetValue('AnsiBackspaceClipboard', 'NO'));
   AnsiBackspaceApps := XML.GetValue('AnsiBackspaceApps', '');
@@ -481,6 +490,7 @@ begin
   XML.SetValue('AnsiBackspaceHostErase', AnsiBackspaceHostErase);
   XML.SetValue('AnsiSmartBackspace', AnsiSmartBackspace);
   XML.SetValue('AnsiBackspaceUnitCap', AnsiBackspaceUnitCap);
+  XML.SetValue('AnsiBackspaceSurgical', AnsiBackspaceSurgical);
   XML.SetValue('AnsiBackspaceUIA', AnsiBackspaceUIA);
   XML.SetValue('AnsiBackspaceClipboard', AnsiBackspaceClipboard);
   XML.SetValue('AnsiBackspaceApps', AnsiBackspaceApps);
@@ -588,6 +598,7 @@ begin
       that has never seen this one gets. }
     AnsiSmartBackspace := UpperCase(Reg.ReadStringDef('AnsiSmartBackspace', AnsiBackspaceHostErase));
     AnsiBackspaceUnitCap := UpperCase(Reg.ReadStringDef('AnsiBackspaceUnitCap', '8'));
+  AnsiBackspaceSurgical := UpperCase(Reg.ReadStringDef('AnsiBackspaceSurgical', 'AUTO'));
   AnsiBackspaceUIA := UpperCase(Reg.ReadStringDef('AnsiBackspaceUIA', 'YES'));
   AnsiBackspaceClipboard := UpperCase(Reg.ReadStringDef('AnsiBackspaceClipboard', 'NO'));
   AnsiBackspaceApps := Reg.ReadStringDef('AnsiBackspaceApps', '');
@@ -692,6 +703,7 @@ begin
     Reg.WriteString('AnsiBackspaceHostErase', AnsiBackspaceHostErase);
     Reg.WriteString('AnsiSmartBackspace', AnsiSmartBackspace);
     Reg.WriteString('AnsiBackspaceUnitCap', AnsiBackspaceUnitCap);
+  Reg.WriteString('AnsiBackspaceSurgical', AnsiBackspaceSurgical);
   Reg.WriteString('AnsiBackspaceUIA', AnsiBackspaceUIA);
   Reg.WriteString('AnsiBackspaceClipboard', AnsiBackspaceClipboard);
   Reg.WriteString('AnsiBackspaceApps', AnsiBackspaceApps);
@@ -871,6 +883,10 @@ begin
     AnsiSmartBackspace := 'YES';
   if (StrToIntDef(AnsiBackspaceUnitCap, 0) < 1) or (StrToIntDef(AnsiBackspaceUnitCap, 0) > 64) then
     AnsiBackspaceUnitCap := '8';
+  { '' (never written) means AUTO, which is also what any unknown value falls
+    back to: the answer that keeps the feature working. }
+  if (AnsiBackspaceSurgical <> 'AUTO') and (AnsiBackspaceSurgical <> 'YES') and (AnsiBackspaceSurgical <> 'NO') then
+    AnsiBackspaceSurgical := 'AUTO';
   if not((AnsiBackspaceUIA = 'YES') or (AnsiBackspaceUIA = 'NO')) then
     AnsiBackspaceUIA := 'YES';
   if not((AnsiBackspaceClipboard = 'YES') or (AnsiBackspaceClipboard = 'NO')) then

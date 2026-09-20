@@ -82,6 +82,12 @@ type
   the feature ON instead of switching it off by accident. }
 function AnsiBackspaceEnabled: Boolean;
 function AnsiBackspaceMaxUnits: Integer;
+
+{ How a cluster is erased: the single-edit route (AnsiBackspaceSurgical) unless
+  the setting switches it off. '' - a key that was never written - means the
+  documented default, AUTO, which is the single-edit route in a standard
+  EDIT/RICHEDIT and the emitted backspaces everywhere else. }
+function AnsiBackspaceSurgicalWanted: Boolean;
 procedure AnsiBackspaceConfigureForTest(const AEnabled: Boolean; const AMaxUnits: Integer);
 procedure AnsiBackspaceSetTrace(const AProc: TAnsiBackspaceTraceProc);
 
@@ -135,6 +141,7 @@ uses
   System.SysUtils,
   uRegistrySettings,
   uCaretContextCache,
+  uCaretContextSniffer, // AnsiSurgicalHostErase: the single-edit route
   clsUnicodeToBijoy2000;
 
 const
@@ -164,6 +171,16 @@ begin
     Result := FEnabled
   else
     Result := SettingOn(AnsiSmartBackspace) and SettingOn(AnsiBackspaceHostErase);
+end;
+
+function AnsiBackspaceSurgicalWanted: Boolean;
+var
+  V: string;
+begin
+  V := UpperCase(Trim(AnsiBackspaceSurgical));
+  { Only an explicit NO is off: '' has never been written, and anything a user
+    typed by hand that is not one of the documented words counts as the default. }
+  Result := (V <> 'NO') and (V <> 'OFF') and (V <> '0');
 end;
 
 function AnsiBackspaceMaxUnits: Integer;
@@ -368,10 +385,12 @@ end;
 
 function AnsiEraseHostCluster(const AEmit: TAnsiEmitProc): Boolean;
 var
-  Units:    Integer;
-  Decision: TAnsiEraseDecision;
-  Reason:   string;
-  Mapping:  string;
+  Units:     Integer;
+  Decision:  TAnsiEraseDecision;
+  Reason:    string;
+  Mapping:   string;
+  Remaining: Integer;
+  Route:     string;
 begin
   Units := 1;
   Decision := edNotMine;
@@ -394,17 +413,44 @@ begin
   Result := AnsiHostClusterUnits(Units, Decision, Reason);
   Mapping := AnsiVersion;
 
-  if Assigned(FTrace) then
-    FTrace(Mapping, Units, Decision, Reason);
-
   if Result then
   begin
-    AEmit(Units, '');
+    { HOW the cluster goes. The engines have always emitted one backspace per
+      unit; where the host is a standard EDIT/RICHEDIT whose reading describes it
+      (AnsiSurgicalHostErase checks both), ONE verified edit does it instead: no
+      simulated key, so nothing for a remapper or an input stack to swallow, and
+      no flicker from N presses. Whatever the surgical route could not remove is
+      still emitted the old way below, so behaviour on any other host is exactly
+      what it was. }
+    Remaining := Units;
+    Route := '';
+    if AnsiBackspaceSurgicalWanted then
+    begin
+      if AnsiSurgicalHostErase(Units, Remaining, Route) then
+        Route := 'one edit: ' + Route
+      else if Remaining < Units then
+        Route := Format('one edit removed %d of %d (%s); %d emitted as backspaces', [Units - Remaining, Units, Route, Remaining])
+      else
+        Route := 'backspaces: ' + Route;
+    end
+    else
+      Route := Format('%d backspaces (the single-edit route is switched off)', [Units]);
+
+    if Remaining > 0 then
+      AEmit(Remaining, '');
+
+    if Assigned(FTrace) then
+      FTrace(Mapping, Units, Decision, Reason + ' - ' + Route);
+
     { The reading described the text BEFORE this erase, so it is consumed here:
       the next press reads again instead of erasing the same area twice. O(1),
       no host call - the watch takes the next reading on its own tick. }
     AnsiCaretContextDrop('the tail was erased');
+    Exit;
   end;
+
+  if Assigned(FTrace) then
+    FTrace(Mapping, Units, Decision, Reason);
 end;
 
 initialization

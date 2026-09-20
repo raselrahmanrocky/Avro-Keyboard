@@ -113,6 +113,31 @@ procedure AnsiClipboardConfigureForTest(const AQuarantined, AHoldShift: Boolean)
   keyboard. }
 function AnsiClipboardQuarantined: Boolean;
 
+{ THE SURGICAL ERASE: wipes AUnits units immediately before the caret in ONE
+  operation instead of AUnits simulated Backspace presses.
+
+  EM_SETSEL(caret - AUnits, caret) followed by WM_CLEAR, both through SendTimed,
+  and then the CONTROL is asked what happened: the text length must have shrunk
+  by exactly AUnits and the caret must sit where the cluster started. Nothing is
+  guessed and no key is injected, so there is no flicker, no dependence on the
+  application treating VK_BACK as one character, and nothing for a remapper to
+  intercept.
+
+  True means the whole cluster is gone and there is nothing left to emit.
+  False means the caller must still emit ARemaining units itself - 0 when the
+  operation removed everything it could but the caller should not try again,
+  AUnits when nothing was touched. AReason says which, in the words the trace
+  and the debug log use.
+
+  It refuses, without touching anything, unless ALL of this holds: a control is
+  focused; it is a standard EDIT/RICHEDIT (the only classes that answer these
+  messages); it is not a password field; the user has no active selection; there
+  is really a cluster that long before the caret; and the cached reading
+  describes THAT control (fingerprint window = the focused handle). The last one
+  is what keeps a canned reading - a harness, or a reading taken for another
+  window - from making the product edit a window nobody read. }
+function AnsiSurgicalHostErase(const AUnits: Integer; out ARemaining: Integer; out AReason: string): Boolean;
+
 implementation
 
 uses
@@ -454,6 +479,131 @@ end;
   Enumerated raw (the VCL wrapper exposes neither the format list nor any promise
   that reading it does not force a render), and refused BEFORE a key is pressed or
   the clipboard is read. True only when there is no format to object to. }
+function AnsiSurgicalHostErase(const AUnits: Integer; out ARemaining: Integer; out AReason: string): Boolean;
+var
+  hEdit:            HWND;
+  Res:              LRESULT;
+  SelStart, SelEnd: Integer;
+  S1, S2:           Integer;
+  Before, After:    Integer;
+  FP:               TCaretFingerprint;
+begin
+  Result := False;
+  ARemaining := AUnits;
+  AReason := '';
+  if AUnits < 1 then
+    Exit;
+
+  hEdit := GetFocusedEditHandle;
+  if hEdit = 0 then
+  begin
+    AReason := 'no control is focused';
+    Exit;
+  end;
+
+  { The reading has to describe THE control this would edit - and there has to BE
+    a reading: a canned one from a harness, or one taken for another window, must
+    never turn into an edit of a window nobody read. }
+  FillChar(FP, SizeOf(FP), 0);
+  if (not AnsiCaretContextFingerprint(FP)) or (NativeUInt(hEdit) <> FP.Window) then
+  begin
+    AReason := 'the reading does not describe the focused control';
+    Exit;
+  end;
+
+  if IsPasswordEdit(hEdit) then
+  begin
+    AReason := 'a password field is never edited';
+    Exit;
+  end;
+  if not IsStandardEditClass(hEdit) then
+  begin
+    AReason := 'the control is not a standard EDIT/RICHEDIT';
+    Exit;
+  end;
+
+  if not SendTimed(hEdit, WM_GETTEXTLENGTH, 0, 0, Res) then
+  begin
+    AReason := 'the control did not answer WM_GETTEXTLENGTH';
+    Exit;
+  end;
+  Before := Integer(Res);
+
+  if not TargetSelection(hEdit, SelStart, SelEnd) then
+  begin
+    AReason := 'the control did not answer EM_GETSEL';
+    Exit;
+  end;
+  if SelStart <> SelEnd then
+  begin
+    AReason := 'the user has an active selection';
+    Exit;
+  end;
+  if SelStart < AUnits then
+  begin
+    AReason := Format('only %d characters stand before the caret', [SelStart]);
+    Exit;
+  end;
+
+  { One operation: select exactly the cluster, then clear it. }
+  if not SendTimed(hEdit, EM_SETSEL, SelStart - AUnits, SelStart, Res) then
+  begin
+    AReason := 'the control did not answer EM_SETSEL';
+    Exit;
+  end;
+  if not (TargetSelection(hEdit, S1, S2) and (S1 = SelStart - AUnits) and (S2 = SelStart)) then
+  begin
+    SendTimed(hEdit, EM_SETSEL, SelStart, SelStart, Res); // put the caret back
+    AReason := 'the control did not select exactly the cluster';
+    Exit;
+  end;
+
+  if not SendTimed(hEdit, WM_CLEAR, 0, 0, Res) then
+  begin
+    SendTimed(hEdit, EM_SETSEL, SelStart, SelStart, Res);
+    AReason := 'the control did not answer WM_CLEAR';
+    Exit;
+  end;
+
+  { Ask the control, do not assume: it may have removed fewer characters than
+    were selected (a limit, a filter, a read-only region), and emitting the
+    whole width again would then delete text the user never selected. }
+  if not SendTimed(hEdit, WM_GETTEXTLENGTH, 0, 0, Res) then
+  begin
+    AReason := 'the control went quiet after the erase';
+    ARemaining := 0; // something was cleared; do not clear it twice
+    Exit;
+  end;
+  After := Integer(Res);
+
+  if (Before - After) < AUnits then
+  begin
+    if Before - After < 0 then
+      ARemaining := 0 // more text than before: nothing of ours to finish
+    else
+      ARemaining := AUnits - (Before - After);
+    AReason := Format('the control removed %d of the %d characters', [Before - After, AUnits]);
+    Exit;
+  end;
+
+  { ... and the caret really is where the cluster started. A caret that ended
+    elsewhere is not worth a second edit for: the TEXT is what had to be right,
+    and the watch re-measures before the next press anyway. It is traced, so a
+    host that misbehaves this way ends up on the record instead of in a
+    bug report nobody can reproduce. }
+  if TargetSelection(hEdit, S1, S2) then
+  begin
+    if (S1 <> SelStart - AUnits) or (S2 <> S1) then
+      AnsiTrace(Format('surgical: the caret ended at %d..%d instead of %d', [S1, S2, SelStart - AUnits]));
+  end
+  else
+    AnsiTrace('surgical: the control did not report where the caret is');
+
+  ARemaining := 0;
+  AReason := Format('one edit removed %d characters', [Before - After]);
+  Result := True;
+end;
+
 function ClipboardIsTextOnly(out AOffending: UINT): Boolean;
 var
   Fmt:     UINT;
