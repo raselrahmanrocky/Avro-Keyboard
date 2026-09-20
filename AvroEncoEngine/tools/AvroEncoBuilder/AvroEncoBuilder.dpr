@@ -14,17 +14,17 @@ program AvroEncoBuilder;
   Compiles a raw ANSI mapping JSON document into a protected .AvroEnco
   container using the same pure-Pascal crypto stack the runtime loads:
 
-    shield (default):
-      JSON -> obfuscated bytecode -> zlib -> AES-256-GCM -> HMAC-SHA512
-      trailer. Protected either with a user password (-p, prompts once at
-      load time) or with the default-key secret (--default-key, loads
-      transparently - use for shipped built-ins). Default-key builds must
-      pass --secret-file: this tool intentionally embeds no secret of its
-      own, so the only shipped artifact holding one is the runtime.
+  shield (default):
+  JSON -> obfuscated bytecode -> zlib -> AES-256-GCM -> HMAC-SHA512
+  trailer. Protected either with a user password (-p, prompts once at
+  load time) or with the default-key secret (--default-key, loads
+  transparently - use for shipped built-ins). Default-key builds must
+  pass --secret-file: this tool intentionally embeds no secret of its
+  own, so the only shipped artifact holding one is the runtime.
 
-    v2:
-      AES-256-CBC container (legacy runtime format). Empty password selects
-      the default-key mode; -p selects user-password protection.
+  v2:
+  AES-256-CBC container (legacy runtime format). Empty password selects
+  the default-key mode; -p selects user-password protection.
 
   After building, the tool ALWAYS loads the container back through the
   runtime reader and verifies the recovered JSON is semantically identical to
@@ -33,13 +33,13 @@ program AvroEncoBuilder;
   regression cannot ship either.
 
   Pack / unpack round trip:
-    --pack    Authoring JSON (readable Bengali comments) -> .AvroEnco. This is
-              the default mode, spelled out so the pair is symmetric.
-    --unpack  .AvroEnco -> authoring JSON with the comments restored, for
-              developer review and editing. Needs --secret-file for a
-              default-key container and --comments-key-file to recover
-              comment text; without the comment key the comment fields are
-              dropped rather than written out as opaque tokens.
+  --pack    Authoring JSON (readable Bengali comments) -> .AvroEnco. This is
+  the default mode, spelled out so the pair is symmetric.
+  --unpack  .AvroEnco -> authoring JSON with the comments restored, for
+  developer review and editing. Needs --secret-file for a
+  default-key container and --comments-key-file to recover
+  comment text; without the comment key the comment fields are
+  dropped rather than written out as opaque tokens.
 
   The comment key is a developer-side IKM. Comment fields are obfuscated in a
   domain keyed by it, which is never derived from a container key and is never
@@ -47,34 +47,34 @@ program AvroEncoBuilder;
   See AvroEncoEngine\docs\obfuscation-codec.md.
 
   Usage:
-    AvroEncoBuilder <input.json> <output.avroenco> [options]
-    AvroEncoBuilder --unpack <input.avroenco> <output.json> [options]
+  AvroEncoBuilder <input.json> <output.avroenco> [options]
+  AvroEncoBuilder --unpack <input.avroenco> <output.json> [options]
 
   Options:
-    --pack                Shield/v2 build from authoring JSON (default).
-    --unpack              Developer round trip: container -> JSON.
-    -p, --password <pw>   User password protection (prompts at load time).
-    --default-key         Shield: protect with the default-key secret.
-    --secret-file <path>  Raw default-key IKM. Required with --default-key,
-                          and required by --unpack for a default-key
-                          container (the tool embeds no secret of its own).
-    --comments-key-file <path>
-                          Raw developer comment IKM. Encodes comment fields
-                          on build, decodes them on --unpack.
-    --format <fmt>        shield (default) | v2
-    --icon <path>         Embed an .ico inside the payload, so the runtime can
-                          draw the layout's own tray and menu icon.
-    --icon-sizes <list>   Frames to embed, e.g. 16,32,48 (default). Bounded by
-                          the unit's AVRO_ICON_MAX_FRAME_SIZE: the authored
-                          256 px artwork is what made the section necessary.
-    --bind                Shield: bind the container to this machine.
-    --hardware            Shield: add the hardware factor to the KDF.
-    --no-verify           Skip the load-back round-trip verification.
-    --quiet               Only print errors.
+  --pack                Shield/v2 build from authoring JSON (default).
+  --unpack              Developer round trip: container -> JSON.
+  -p, --password <pw>   User password protection (prompts at load time).
+  --default-key         Shield: protect with the default-key secret.
+  --secret-file <path>  Raw default-key IKM. Required with --default-key,
+  and required by --unpack for a default-key
+  container (the tool embeds no secret of its own).
+  --comments-key-file <path>
+  Raw developer comment IKM. Encodes comment fields
+  on build, decodes them on --unpack.
+  --format <fmt>        shield (default) | v2
+  --icon <path>         Embed an .ico inside the payload, so the runtime can
+  draw the layout's own tray and menu icon.
+  --icon-sizes <list>   Frames to embed, e.g. 16,32,48 (default). Bounded by
+  the unit's AVRO_ICON_MAX_FRAME_SIZE: the authored
+  256 px artwork is what made the section necessary.
+  --bind                Shield: bind the container to this machine.
+  --hardware            Shield: add the hardware factor to the KDF.
+  --no-verify           Skip the load-back round-trip verification.
+  --quiet               Only print errors.
 
   Exit codes: 0 OK, 1 usage, 2 input read failure, 3 invalid JSON,
-              4 build failure, 5 output write failure, 6 verification failure,
-              7 secret file missing/empty, 8 unpack failed.
+  4 build failure, 5 output write failure, 6 verification failure,
+  7 secret file missing/empty, 8 unpack failed.
   ============================================================================= }
 
 { The builder is a local offline tool, so it keeps the descriptive parse
@@ -82,7 +82,6 @@ program AvroEncoBuilder;
   policy in uAvroShield). Pass -B when building so this define is not masked
   by a stale DCU of uAvroShield. }
 {$DEFINE AVROSHIELD_VERBOSE_ERRORS}
-
 {$APPTYPE CONSOLE}
 
 uses
@@ -96,15 +95,15 @@ uses
   uAvroShield;
 
 const
-  EXIT_OK       = 0;
-  EXIT_USAGE    = 1;
-  EXIT_READ     = 2;
-  EXIT_PARSE    = 3;
-  EXIT_BUILD    = 4;
-  EXIT_WRITE    = 5;
-  EXIT_VERIFY   = 6;
-  EXIT_KEYFILE  = 7;
-  EXIT_UNPACK   = 8;
+  EXIT_OK      = 0;
+  EXIT_USAGE   = 1;
+  EXIT_READ    = 2;
+  EXIT_PARSE   = 3;
+  EXIT_BUILD   = 4;
+  EXIT_WRITE   = 5;
+  EXIT_VERIFY  = 6;
+  EXIT_KEYFILE = 7;
+  EXIT_UNPACK  = 8;
 
   { The authoring files are UTF-8 with a BOM and LF line breaks. Emitting
     exactly that is what lets the unpack round trip be checked byte for byte
@@ -116,14 +115,14 @@ const
   FORMAT_V2     = 2;
 
 var
-  InputPath, OutputPath, Password, ErrMsg, SecretFilePath: string;
-  CommentsKeyPath, IconPath, IconSizesText, BuildJsonText: string;
-  IconSectionBase64: string;
-  ContainerFormat, IconErrCode: Integer;
+  InputPath, OutputPath, Password, ErrMsg, SecretFilePath:  string;
+  CommentsKeyPath, IconPath, IconSizesText, BuildJsonText:  string;
+  IconSectionBase64:                                        string;
+  ContainerFormat, IconErrCode:                             Integer;
   UseDefaultKey, BindMachine, UseHardware, NoVerify, Quiet: Boolean;
-  UnpackMode, PackMode: Boolean;
-  KeyIKM, CommentsIKM, IconBytes: TBytes;
-  IconSizes: TArray<Integer>;
+  UnpackMode, PackMode:                                     Boolean;
+  KeyIKM, CommentsIKM, IconBytes:                           TBytes;
+  IconSizes:                                                TArray<Integer>;
 
 procedure Usage;
 begin
@@ -138,7 +137,8 @@ begin
   WriteLn('                        with the Bengali comments restored.');
   WriteLn;
   WriteLn('Options:');
-  WriteLn('  -p, --password <pw>   User password protection (prompts at load time).');  WriteLn('    --default-key         Shield: protect with the default-key secret.');
+  WriteLn('  -p, --password <pw>   User password protection (prompts at load time).');
+  WriteLn('    --default-key         Shield: protect with the default-key secret.');
   WriteLn('    --comments-key-file <path>');
   WriteLn('                          Raw developer comment IKM: encodes comment');
   WriteLn('                          fields on build, decodes them on --unpack.');
@@ -169,8 +169,7 @@ begin
     if not FileExists(APath) then
       Exit;
     AText := TFile.ReadAllText(APath, TEncoding.UTF8);
-    if (Length(AText) >= 3) and (AText[1] = #$EF) and (AText[2] = #$BB) and
-      (AText[3] = #$BF) then
+    if (Length(AText) >= 3) and (AText[1] = #$EF) and (AText[2] = #$BB) and (AText[3] = #$BF) then
       Delete(AText, 1, 3);
     Result := Trim(AText) <> '';
   except
@@ -184,7 +183,7 @@ end;
   (string form for integers, double for anything else). }
 function JsonTreesEqual(const A, B: TJSONValue): Boolean;
 var
-  I: Integer;
+  I:          Integer;
   NumA, NumB: Double;
 begin
   Result := False;
@@ -203,7 +202,7 @@ begin
       Exit(True);
     NumA := StrToFloat((A as TJSONNumber).Value, TFormatSettings.Invariant);
     NumB := StrToFloat((B as TJSONNumber).Value, TFormatSettings.Invariant);
-    Exit(Abs(NumA - NumB) < 1e-9);
+    Exit(Abs(NumA - NumB) < 1E-9);
   end;
 
   if (A is TJSONString) and (B is TJSONString) then
@@ -214,8 +213,7 @@ begin
     if (A as TJSONArray).Count <> (B as TJSONArray).Count then
       Exit;
     for I := 0 to (A as TJSONArray).Count - 1 do
-      if not JsonTreesEqual((A as TJSONArray).Items[I],
-        (B as TJSONArray).Items[I]) then
+      if not JsonTreesEqual((A as TJSONArray).Items[I], (B as TJSONArray).Items[I]) then
         Exit;
     Exit(True);
   end;
@@ -226,11 +224,9 @@ begin
       Exit;
     for I := 0 to (A as TJSONObject).Count - 1 do
     begin
-      if (A as TJSONObject).Get(I).JsonString.Value <>
-        (B as TJSONObject).Get(I).JsonString.Value then
+      if (A as TJSONObject).Get(I).JsonString.Value <> (B as TJSONObject).Get(I).JsonString.Value then
         Exit;
-      if not JsonTreesEqual((A as TJSONObject).Get(I).JsonValue,
-        (B as TJSONObject).Get(I).JsonValue) then
+      if not JsonTreesEqual((A as TJSONObject).Get(I).JsonValue, (B as TJSONObject).Get(I).JsonValue) then
         Exit;
     end;
     Exit(True);
@@ -251,7 +247,7 @@ var
   I: Integer;
 begin
   Result := '';
-  for I := 0 to High(ASizes) do
+  for I := 0 to high(ASizes) do
   begin
     if I > 0 then
       Result := Result + ',';
@@ -275,7 +271,7 @@ end;
 function BuildDocumentText(const AJsonText: string; out AText: string): Boolean;
 var
   Root, Repro: TJSONValue;
-  Serialized: string;
+  Serialized:  string;
 begin
   Result := False;
   IconErrCode := EXIT_BUILD;
@@ -306,14 +302,13 @@ begin
   IconSectionBase64 := EncodeIconSection(IconBytes, IconSizes);
   if IconSectionBase64 = '' then
   begin
-    WriteLn('ERROR: no frame of ' + IconPath + ' matches ' + SizesText(IconSizes) +
-      '; allowed frame sizes are 8..' + IntToStr(AVRO_ICON_MAX_FRAME_SIZE) +
-      ' px square');
+    WriteLn('ERROR: no frame of ' + IconPath + ' matches ' + SizesText(IconSizes) + '; allowed frame sizes are 8..' + IntToStr(AVRO_ICON_MAX_FRAME_SIZE) +
+        ' px square');
     Exit;
   end;
 
   Root := TJSONObject.ParseJSONValue(Trim(AJsonText));
-  if (Root = nil) or not (Root is TJSONObject) then
+  if (Root = nil) or not(Root is TJSONObject) then
   begin
     Root.Free;
     WriteLn('ERROR: input is not a valid JSON object: ' + InputPath);
@@ -343,13 +338,12 @@ begin
   Result := True;
 end;
 
-function VerifyRoundTrip(const AJsonText, APassword: string;
-  const ADefaultKey: Boolean; const AOutBytes: TBytes;
-  const AOptions: TAvroShieldLoadOptions; out AErr: string): Boolean;
+function VerifyRoundTrip(const AJsonText, APassword: string; const ADefaultKey: Boolean; const AOutBytes: TBytes; const AOptions: TAvroShieldLoadOptions;
+  out AErr: string): Boolean;
 var
-  Loaded: string;
-  LoadedBytes: TBytes;
-  R: TAvroShieldResult;
+  Loaded:       string;
+  LoadedBytes:  TBytes;
+  R:            TAvroShieldResult;
   JsonA, JsonB: TJSONValue;
 begin
   Result := False;
@@ -391,7 +385,7 @@ end;
 
 function ParseArgs: Boolean;
 var
-  I: Integer;
+  I:   Integer;
   Arg: string;
 begin
   Result := False;
@@ -524,8 +518,7 @@ begin
   // builder is compiled from the same units as the runtime, so without this
   // rule it would carry its own copy of the secret - a second place to
   // extract it from, in a tool that is easy to overlook during a release.
-  if (ContainerFormat = FORMAT_SHIELD) and UseDefaultKey and
-    (SecretFilePath = '') then
+  if (ContainerFormat = FORMAT_SHIELD) and UseDefaultKey and (SecretFilePath = '') then
     Exit;
 
   // --icon embeds a per-layout icon in the payload. The frame list defaults to
@@ -542,7 +535,7 @@ begin
   else
   begin
     SetLength(IconSizes, Length(AVRO_ICON_FRAME_SIZES));
-    for I := 0 to High(AVRO_ICON_FRAME_SIZES) do
+    for I := 0 to high(AVRO_ICON_FRAME_SIZES) do
       IconSizes[I] := AVRO_ICON_FRAME_SIZES[I];
   end;
 
@@ -616,18 +609,25 @@ begin
   begin
     C := S[I];
     case C of
-      '"': Result := Result + '\"';
-      '\': Result := Result + '\\';
-      #8: Result := Result + '\b';
-      #9: Result := Result + '\t';
-      #10: Result := Result + '\n';
-      #12: Result := Result + '\f';
-      #13: Result := Result + '\r';
-    else
-      if Ord(C) < 32 then
-        Result := Result + Format('\u%.4x', [Ord(C)])
+      '"':
+        Result := Result + '\"';
+      '\':
+        Result := Result + '\\';
+      #8:
+        Result := Result + '\b';
+      #9:
+        Result := Result + '\t';
+      #10:
+        Result := Result + '\n';
+      #12:
+        Result := Result + '\f';
+      #13:
+        Result := Result + '\r';
       else
-        Result := Result + C;
+        if Ord(C) < 32 then
+          Result := Result + Format('\u%.4x', [Ord(C)])
+        else
+          Result := Result + C;
     end;
   end;
 end;
@@ -638,10 +638,10 @@ end;
   container can be diffed against them directly. }
 function PrettyJson(const AValue: TJSONValue; AIndent: Integer): string;
 var
-  I: Integer;
+  I:          Integer;
   Pad, Inner: string;
-  Obj: TJSONObject;
-  Arr: TJSONArray;
+  Obj:        TJSONObject;
+  Arr:        TJSONArray;
 begin
   Pad := StringOfChar(' ', AIndent);
   Inner := StringOfChar(' ', AIndent + 4);
@@ -653,8 +653,7 @@ begin
     Result := '{' + JSON_BREAK;
     for I := 0 to Obj.Count - 1 do
     begin
-      Result := Result + Inner + '"' + Obj.Pairs[I].JsonString.Value + '": ' +
-        PrettyJson(Obj.Pairs[I].JsonValue, AIndent + 4);
+      Result := Result + Inner + '"' + Obj.Pairs[I].JsonString.Value + '": ' + PrettyJson(Obj.Pairs[I].JsonValue, AIndent + 4);
       if I < Obj.Count - 1 then
         Result := Result + ',';
       Result := Result + JSON_BREAK;
@@ -708,13 +707,13 @@ end;
   it the comment fields are dropped instead of written out as opaque tokens. }
 function UnpackContainer: Integer;
 var
-  Data: TBytes;
-  Options: TAvroShieldLoadOptions;
-  LoadedBytes: TBytes;
-  R: TAvroShieldResult;
-  Text, Pretty: string;
-  Json: TJSONValue;
-  Version: Byte;
+  Data:                      TBytes;
+  Options:                   TAvroShieldLoadOptions;
+  LoadedBytes:               TBytes;
+  R:                         TAvroShieldResult;
+  Text, Pretty:              string;
+  JSON:                      TJSONValue;
+  Version:                   Byte;
   CommentKeyFailed, HadIcon: Boolean;
 begin
   Result := EXIT_UNPACK;
@@ -735,8 +734,7 @@ begin
   if AvroShieldContainerUsesDefaultKey(InputPath) then
     if not ReadKeyFile(SecretFilePath, KeyIKM) then
     begin
-      WriteLn('ERROR: this is a default-key container and no usable secret ' +
-        'file was given.');
+      WriteLn('ERROR: this is a default-key container and no usable secret ' + 'file was given.');
       WriteLn('       Pass --secret-file <keys\avroenco.key>.');
       Exit(EXIT_KEYFILE);
     end;
@@ -762,16 +760,15 @@ begin
   if R <> asrOk then
   begin
     WriteLn('ERROR: cannot unpack the container (code ' + IntToStr(Ord(R)) + ')');
-    WriteLn('       A wrong --secret-file/--password and a damaged container ' +
-      'are indistinguishable here by design; both fail closed.');
+    WriteLn('       A wrong --secret-file/--password and a damaged container ' + 'are indistinguishable here by design; both fail closed.');
     Exit(EXIT_UNPACK);
   end;
 
   Text := TEncoding.UTF8.GetString(LoadedBytes);
   AvroWipeAndRelease(LoadedBytes);
 
-  Json := TJSONObject.ParseJSONValue(Trim(Text));
-  if Json = nil then
+  JSON := TJSONObject.ParseJSONValue(Trim(Text));
+  if JSON = nil then
   begin
     WriteLn('ERROR: the unpacked payload is not valid JSON');
     Exit(EXIT_UNPACK);
@@ -782,16 +779,17 @@ begin
     // would make it undiffable against the authored sources, which is the only
     // reason --unpack exists. The next build's --icon puts it back.
     HadIcon := False;
-    if Json is TJSONObject then
+    if JSON is TJSONObject then
     begin
-      var IconPair: TJSONPair := TJSONObject(Json).RemovePair(AVRO_ICON_SECTION);
+      var
+        IconPair: TJSONPair := TJSONObject(JSON).RemovePair(AVRO_ICON_SECTION);
       HadIcon := IconPair <> nil;
       // RemovePair hands ownership to the caller.
       IconPair.Free;
     end;
-    Pretty := PrettyJson(Json, 0);
+    Pretty := PrettyJson(JSON, 0);
   finally
-    Json.Free;
+    JSON.Free;
   end;
 
   // No trailing line break: the authoring files end at '}' and the round trip
@@ -812,8 +810,7 @@ begin
     if Options.IncludeComments then
       WriteLn('comments: restored (developer comment key applied)')
     else if CommentKeyFailed then
-      WriteLn('comments: NOT decoded - this comment key does not match the ' +
-        'container (the mapping itself is intact)')
+      WriteLn('comments: NOT decoded - this comment key does not match the ' + 'container (the mapping itself is intact)')
     else
       WriteLn('comments: omitted (no --comments-key-file; add one to see them)');
     if HadIcon then
@@ -825,9 +822,9 @@ begin
 end;
 
 var
-  JsonText: string;
-  OutBytes: TBytes;
-  ExitCode: Integer;
+  JsonText:         string;
+  OutBytes:         TBytes;
+  ExitCode:         Integer;
   SrcSize, OutSize: Integer;
 
 begin
@@ -840,20 +837,16 @@ begin
   end
   else if not ReadCommentsKey then
   begin
-    WriteLn('ERROR: cannot read comment key file (missing or empty): ' +
-      CommentsKeyPath);
+    WriteLn('ERROR: cannot read comment key file (missing or empty): ' + CommentsKeyPath);
     ExitCode := EXIT_KEYFILE;
   end
   else if UnpackMode then
     ExitCode := UnpackContainer
-  else if UseDefaultKey and (ContainerFormat = FORMAT_SHIELD) and
-    (not ReadKeyFile(SecretFilePath, KeyIKM)) then
+  else if UseDefaultKey and (ContainerFormat = FORMAT_SHIELD) and (not ReadKeyFile(SecretFilePath, KeyIKM)) then
   begin
-    WriteLn('ERROR: cannot read secret file (missing or empty): ' +
-      SecretFilePath);
+    WriteLn('ERROR: cannot read secret file (missing or empty): ' + SecretFilePath);
     WriteLn('       Expected the raw default-key IKM bytes. Generate with:');
-    WriteLn('         python AvroEncoEngine\tools\AvroShieldSecretGen\' +
-      'gen_shield_secret.py --secret <phrase> --key-file keys\avroenco.key');
+    WriteLn('         python AvroEncoEngine\tools\AvroShieldSecretGen\' + 'gen_shield_secret.py --secret <phrase> --key-file keys\avroenco.key');
     ExitCode := EXIT_KEYFILE;
   end
   else if not ReadUtf8File(InputPath, JsonText) then
@@ -866,8 +859,9 @@ begin
   else
   begin
     // Validate the input parses as a JSON object before doing any crypto.
-    var RootJson: TJSONValue := TJSONObject.ParseJSONValue(Trim(JsonText));
-    if (RootJson = nil) or not (RootJson is TJSONObject) then
+    var
+      RootJson: TJSONValue := TJSONObject.ParseJSONValue(Trim(JsonText));
+    if (RootJson = nil) or not(RootJson is TJSONObject) then
     begin
       WriteLn('ERROR: input is not a valid JSON object: ' + InputPath);
       RootJson.Free;
@@ -885,8 +879,8 @@ begin
         // key alone. Shipped builds always pass one (build_avroenco.bat).
         if (Length(CommentsIKM) = 0) and (not Quiet) then
           WriteLn('warning: no --comments-key-file, comments use the value domain');
-        var R: TAvroShieldResult := AvroShieldBuildFromJson(BuildJsonText, Password,
-          UseDefaultKey, BindMachine, UseHardware, OutBytes, KeyIKM, CommentsIKM);
+        var
+          R: TAvroShieldResult := AvroShieldBuildFromJson(BuildJsonText, Password, UseDefaultKey, BindMachine, UseHardware, OutBytes, KeyIKM, CommentsIKM);
         if R <> asrOk then
         begin
           WriteLn('ERROR: shield build failed (code ' + IntToStr(Ord(R)) + ')');
@@ -904,12 +898,12 @@ begin
           begin
             // Verify with the same options the build used, comments included:
             // the load-back then covers the comment domain too.
-            var VerifyOpts: TAvroShieldLoadOptions := AvroShieldDefaultLoadOptions;
+            var
+              VerifyOpts: TAvroShieldLoadOptions := AvroShieldDefaultLoadOptions;
             VerifyOpts.IncludeComments := True;
             VerifyOpts.DefaultSecretIKM := KeyIKM;
             VerifyOpts.CommentsIKM := CommentsIKM;
-            if not VerifyRoundTrip(BuildJsonText, Password, UseDefaultKey, OutBytes,
-              VerifyOpts, ErrMsg) then
+            if not VerifyRoundTrip(BuildJsonText, Password, UseDefaultKey, OutBytes, VerifyOpts, ErrMsg) then
             begin
               WriteLn('ERROR: verification failed - ' + ErrMsg);
               if UseDefaultKey then
@@ -942,9 +936,12 @@ begin
           if not NoVerify then
           begin
             // Load the v2 container back through the runtime reader.
-            var Loaded: string := Trim(DecryptAvroEncoToString(OutputPath, AnsiString(Password)));
-            var JsonA: TJSONValue := TJSONObject.ParseJSONValue(Trim(BuildJsonText));
-            var JsonB: TJSONValue := TJSONObject.ParseJSONValue(Loaded);
+            var
+              Loaded: string := Trim(DecryptAvroEncoToString(OutputPath, AnsiString(Password)));
+            var
+              JsonA: TJSONValue := TJSONObject.ParseJSONValue(Trim(BuildJsonText));
+            var
+              JsonB: TJSONValue := TJSONObject.ParseJSONValue(Loaded);
             if (JsonA = nil) or (JsonB = nil) or (not JsonTreesEqual(JsonA, JsonB)) then
             begin
               WriteLn('ERROR: verification failed - v2 round-trip mismatch');
@@ -980,38 +977,38 @@ begin
       end;
       if ContainerFormat = FORMAT_SHIELD then
       begin
-        Write('format: shield, flags: ');
+        write('format: shield, flags: ');
         if UseDefaultKey then
-          Write('default-key')
+          write('default-key')
         else
-          Write('password');
+          write('password');
         if BindMachine then
-          Write(' +machine-bind');
+          write(' +machine-bind');
         if UseHardware then
-          Write(' +hardware');
+          write(' +hardware');
         WriteLn;
       end
       else
       begin
-        Write('format: v2 (');
+        write('format: v2 (');
         if Password = '' then
-          Write('default-key')
+          write('default-key')
         else
-          Write('password');
+          write('password');
         WriteLn(')');
       end;
       WriteLn('input : ' + IntToStr(SrcSize) + ' bytes');
-      Write('output: ' + IntToStr(OutSize) + ' bytes');
+      write('output: ' + IntToStr(OutSize) + ' bytes');
       if (SrcSize > 0) and (OutSize > 0) then
-        Write(Format(' (%.1f%% of source)', [100.0 * OutSize / SrcSize]));
+        write(Format(' (%.1f%% of source)', [100.0 * OutSize / SrcSize]));
       WriteLn;
       if IconPath <> '' then
-        WriteLn('icon  : ' + ExtractFileName(IconPath) + ', frames ' +
-          SizesText(IconSizes) + ', ' + IntToStr(Length(IconSectionBase64)) +
-          ' Base64 chars in the payload');
+        WriteLn('icon  : ' + ExtractFileName(IconPath) + ', frames ' + SizesText(IconSizes) + ', ' + IntToStr(Length(IconSectionBase64)) +
+            ' Base64 chars in the payload');
       WriteLn('OK: ' + OutputPath);
     end;
   end;
 
   Halt(ExitCode);
+
 end.

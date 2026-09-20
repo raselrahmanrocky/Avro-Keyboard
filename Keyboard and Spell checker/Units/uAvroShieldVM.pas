@@ -22,22 +22,22 @@
   suite, the builder and every developer build working with no SDK present,
   while the release build defines the symbol and then runs
 
-      VMProtect_Con.exe avroshield.vmp
+  VMProtect_Con.exe avroshield.vmp
 
   in marker mode over the built executable.
 
   MARKER PLACEMENT RULES, FROM THE SHAPE OF THIS CODEBASE
 
-    * Mark LEAF routines. Do not wrap AvroShieldLoadFromBytesUtf8 or
-      AvroShieldBuildFromJson: they are long, contain try/finally (SEH),
-      TMemoryStream and string temporaries, and virtualising that shape is the
-      classic VMProtect breakage and performance trap. The secret lives in the
-      leaf routines that touch key material, not in the plumbing.
-    * Keep the marker pair free of SEH where the routine cannot raise.
-    * Compile marker-bearing units with inlining disabled (see the unit
-      headers). With inlining enabled Delphi may inline a marked routine into
-      its caller, leaving an unprotected copy of exactly the logic that was
-      virtualised.
+  * Mark LEAF routines. Do not wrap AvroShieldLoadFromBytesUtf8 or
+  AvroShieldBuildFromJson: they are long, contain try/finally (SEH),
+  TMemoryStream and string temporaries, and virtualising that shape is the
+  classic VMProtect breakage and performance trap. The secret lives in the
+  leaf routines that touch key material, not in the plumbing.
+  * Keep the marker pair free of SEH where the routine cannot raise.
+  * Compile marker-bearing units with inlining disabled (see the unit
+  headers). With inlining enabled Delphi may inline a marked routine into
+  its caller, leaving an unprotected copy of exactly the logic that was
+  virtualised.
 
   WHAT THIS BUYS, HONESTLY
 
@@ -55,41 +55,24 @@ unit uAvroShieldVM;
 interface
 
 {$IFDEF AVROSHIELD_VMPROTECT}
-
 {$IFDEF CPUX64}
-procedure _VMBeginVirtualization(const AName: PAnsiChar); stdcall;
-  external 'VMProtectSDK64.dll' name 'VMProtectBeginVirtualization';
-procedure _VMBeginMutation(const AName: PAnsiChar); stdcall;
-  external 'VMProtectSDK64.dll' name 'VMProtectBeginMutation';
-procedure _VMBeginUltra(const AName: PAnsiChar); stdcall;
-  external 'VMProtectSDK64.dll' name 'VMProtectBeginUltra';
-procedure _VMEnd; stdcall;
-  external 'VMProtectSDK64.dll' name 'VMProtectEnd';
-function _VMIsDebuggerPresent(const ACheckKernelMode: Boolean): Boolean; stdcall;
-  external 'VMProtectSDK64.dll' name 'VMProtectIsDebuggerPresent';
-function _VMIsVirtualMachinePresent: Boolean; stdcall;
-  external 'VMProtectSDK64.dll' name 'VMProtectIsVirtualMachinePresent';
-function _VMIsValidImageCRC: Boolean; stdcall;
-  external 'VMProtectSDK64.dll' name 'VMProtectIsValidImageCRC';
+procedure _VMBeginVirtualization(const AName: PAnsiChar); stdcall; external 'VMProtectSDK64.dll' name 'VMProtectBeginVirtualization';
+procedure _VMBeginMutation(const AName: PAnsiChar); stdcall; external 'VMProtectSDK64.dll' name 'VMProtectBeginMutation';
+procedure _VMBeginUltra(const AName: PAnsiChar); stdcall; external 'VMProtectSDK64.dll' name 'VMProtectBeginUltra';
+procedure _VMEnd; stdcall; external 'VMProtectSDK64.dll' name 'VMProtectEnd';
+function _VMIsDebuggerPresent(const ACheckKernelMode: Boolean): Boolean; stdcall; external 'VMProtectSDK64.dll' name 'VMProtectIsDebuggerPresent';
+function _VMIsVirtualMachinePresent: Boolean; stdcall; external 'VMProtectSDK64.dll' name 'VMProtectIsVirtualMachinePresent';
+function _VMIsValidImageCRC: Boolean; stdcall; external 'VMProtectSDK64.dll' name 'VMProtectIsValidImageCRC';
 {$ELSE}
-procedure _VMBeginVirtualization(const AName: PAnsiChar); stdcall;
-  external 'VMProtectSDK32.dll' name 'VMProtectBeginVirtualization';
-procedure _VMBeginMutation(const AName: PAnsiChar); stdcall;
-  external 'VMProtectSDK32.dll' name 'VMProtectBeginMutation';
-procedure _VMBeginUltra(const AName: PAnsiChar); stdcall;
-  external 'VMProtectSDK32.dll' name 'VMProtectBeginUltra';
-procedure _VMEnd; stdcall;
-  external 'VMProtectSDK32.dll' name 'VMProtectEnd';
-function _VMIsDebuggerPresent(const ACheckKernelMode: Boolean): Boolean; stdcall;
-  external 'VMProtectSDK32.dll' name 'VMProtectIsDebuggerPresent';
-function _VMIsVirtualMachinePresent: Boolean; stdcall;
-  external 'VMProtectSDK32.dll' name 'VMProtectIsVirtualMachinePresent';
-function _VMIsValidImageCRC: Boolean; stdcall;
-  external 'VMProtectSDK32.dll' name 'VMProtectIsValidImageCRC';
+procedure _VMBeginVirtualization(const AName: PAnsiChar); stdcall; external 'VMProtectSDK32.dll' name 'VMProtectBeginVirtualization';
+procedure _VMBeginMutation(const AName: PAnsiChar); stdcall; external 'VMProtectSDK32.dll' name 'VMProtectBeginMutation';
+procedure _VMBeginUltra(const AName: PAnsiChar); stdcall; external 'VMProtectSDK32.dll' name 'VMProtectBeginUltra';
+procedure _VMEnd; stdcall; external 'VMProtectSDK32.dll' name 'VMProtectEnd';
+function _VMIsDebuggerPresent(const ACheckKernelMode: Boolean): Boolean; stdcall; external 'VMProtectSDK32.dll' name 'VMProtectIsDebuggerPresent';
+function _VMIsVirtualMachinePresent: Boolean; stdcall; external 'VMProtectSDK32.dll' name 'VMProtectIsVirtualMachinePresent';
+function _VMIsValidImageCRC: Boolean; stdcall; external 'VMProtectSDK32.dll' name 'VMProtectIsValidImageCRC';
 {$ENDIF}
-
 {$ENDIF}
-
 { Marker wrappers. The marker names are short and deliberately meaningless:
   VMProtect records them in its protection report, and they are visible in a
   strings dump of the unprotected binary. }
@@ -112,8 +95,7 @@ procedure VMEnd;
   developer and CI build would take the fail-closed path. These signals are
   advisory inputs to the fail-closed policy, never an authority - each of them
   is individually defeatable. }
-function ShieldSelfCheck(out ADebuggerUserMode, ADebuggerKernelMode: Boolean;
-  out AVirtualMachine, AImageIntact: Boolean): Boolean;
+function ShieldSelfCheck(out ADebuggerUserMode, ADebuggerKernelMode: Boolean; out AVirtualMachine, AImageIntact: Boolean): Boolean;
 
 implementation
 
@@ -139,8 +121,7 @@ begin
   _VMEnd;
 end;
 
-function ShieldSelfCheck(out ADebuggerUserMode, ADebuggerKernelMode: Boolean;
-  out AVirtualMachine, AImageIntact: Boolean): Boolean;
+function ShieldSelfCheck(out ADebuggerUserMode, ADebuggerKernelMode: Boolean; out AVirtualMachine, AImageIntact: Boolean): Boolean;
 begin
   ADebuggerUserMode := _VMIsDebuggerPresent(False);
   ADebuggerKernelMode := _VMIsDebuggerPresent(True);
@@ -148,8 +129,7 @@ begin
   { False means the executable image was modified, including by a debugger
     patching code in memory. }
   AImageIntact := _VMIsValidImageCRC;
-  Result := (not ADebuggerUserMode) and (not ADebuggerKernelMode) and
-    AImageIntact;
+  Result := (not ADebuggerUserMode) and (not ADebuggerKernelMode) and AImageIntact;
 end;
 
 {$ELSE}
@@ -170,8 +150,7 @@ procedure VMEnd;
 begin
 end;
 
-function ShieldSelfCheck(out ADebuggerUserMode, ADebuggerKernelMode: Boolean;
-  out AVirtualMachine, AImageIntact: Boolean): Boolean;
+function ShieldSelfCheck(out ADebuggerUserMode, ADebuggerKernelMode: Boolean; out AVirtualMachine, AImageIntact: Boolean): Boolean;
 begin
   ADebuggerUserMode := False;
   ADebuggerKernelMode := False;

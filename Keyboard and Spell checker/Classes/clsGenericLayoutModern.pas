@@ -49,7 +49,7 @@ type
       // press fell through to Block = False, the host removed exactly ONE
       // character and the hook of the letter stayed behind, so the letter
       // needed a second press.
-      CommittedBanglaT:  string;
+      CommittedBanglaT: string;
       // Host characters that sit between the caret and CommittedBanglaT and
       // that are NOT in the ledger (an unmapped key's own character - a space
       // IS in the ledger, stored with the word it follows). They belong to the
@@ -204,26 +204,18 @@ var
 begin
 
   { --- Reph / Phala tail detection --- }
-  IsRephTail := (Length(PrevBanglaT) >= 3) and
-                (PrevBanglaT[Length(PrevBanglaT) - 2] = b_R) and
-                (PrevBanglaT[Length(PrevBanglaT) - 1] = b_Hasanta) and
-                IsPureConsonent(PrevBanglaT[Length(PrevBanglaT)]);
+  IsRephTail := (Length(PrevBanglaT) >= 3) and (PrevBanglaT[Length(PrevBanglaT) - 2] = b_R) and (PrevBanglaT[Length(PrevBanglaT) - 1] = b_Hasanta) and
+    IsPureConsonent(PrevBanglaT[Length(PrevBanglaT)]);
 
   DeleteCount := 1;
   if not IsRephTail then
   begin
-    if (Length(PrevBanglaT) >= 3) and
-       ((PrevBanglaT[Length(PrevBanglaT)-2] = ZWJ) or (PrevBanglaT[Length(PrevBanglaT)-2] = ZWNJ)) and
-       (PrevBanglaT[Length(PrevBanglaT)-1] = b_Hasanta) and
-       (PrevBanglaT[Length(PrevBanglaT)] = b_Z) then
+    if (Length(PrevBanglaT) >= 3) and ((PrevBanglaT[Length(PrevBanglaT) - 2] = ZWJ) or (PrevBanglaT[Length(PrevBanglaT) - 2] = ZWNJ)) and
+      (PrevBanglaT[Length(PrevBanglaT) - 1] = b_Hasanta) and (PrevBanglaT[Length(PrevBanglaT)] = b_Z) then
       DeleteCount := 3
-    else if (Length(PrevBanglaT) >= 2) and
-            (PrevBanglaT[Length(PrevBanglaT)-1] = b_Hasanta) and
-            (PrevBanglaT[Length(PrevBanglaT)] = b_Z) then
+    else if (Length(PrevBanglaT) >= 2) and (PrevBanglaT[Length(PrevBanglaT) - 1] = b_Hasanta) and (PrevBanglaT[Length(PrevBanglaT)] = b_Z) then
       DeleteCount := 2
-    else if (Length(PrevBanglaT) >= 2) and
-            (PrevBanglaT[Length(PrevBanglaT)-1] = b_Hasanta) and
-            (PrevBanglaT[Length(PrevBanglaT)] = b_R) then
+    else if (Length(PrevBanglaT) >= 2) and (PrevBanglaT[Length(PrevBanglaT) - 1] = b_Hasanta) and (PrevBanglaT[Length(PrevBanglaT)] = b_R) then
       DeleteCount := 2;
   end;
 
@@ -335,8 +327,7 @@ begin
       // Case B: E-kar Ligature with Chandra
       // E-kar + Chandrabindu + AA-kar -> O-kar + Chandra (েঁা -> োঁ)
       // E-kar + Chandrabindu + OU-kar/LengthMark -> OU-kar + Chandra (েঁৌ -> ৌঁ)
-      if (TrackL >= 2) and (LastChars[2] = b_Ekar) and
-              ((sKar = b_AAkar) or (sKar = b_OUkar) or (sKar = b_LengthMark)) then
+      if (TrackL >= 2) and (LastChars[2] = b_Ekar) and ((sKar = b_AAkar) or (sKar = b_OUkar) or (sKar = b_LengthMark)) then
       begin
         InternalBackspace(2);
         if sKar = b_AAkar then
@@ -511,7 +502,7 @@ begin
   begin
     Delete(CommittedBanglaT, 1, Length(CommittedBanglaT) - MaxCommitted);
     while (CommittedBanglaT <> '') and (IsKar(CommittedBanglaT[1]) or (CommittedBanglaT[1] = b_Hasanta) or (CommittedBanglaT[1] = ZWJ) or
-      (CommittedBanglaT[1] = ZWNJ)) do
+        (CommittedBanglaT[1] = ZWNJ)) do
       Delete(CommittedBanglaT, 1, 1);
   end;
 end;
@@ -574,7 +565,8 @@ end;
 {$HINTS ON}
 { =============================================================================== }
 
-function TGenericLayoutModern.MyProcessVKeyDown(const KeyCode: Integer; var Block: Boolean; const var_IsLogicalShift, var_IsTrueShift, var_IsAltGr: Boolean): string;
+function TGenericLayoutModern.MyProcessVKeyDown(const KeyCode: Integer; var Block: Boolean;
+  const var_IsLogicalShift, var_IsTrueShift, var_IsAltGr: Boolean): string;
 var
   CharForKey: string;
 begin
@@ -607,7 +599,7 @@ begin
 
     // =====================================================================
     // E-Kar Ligature Fix: E-kar (ে) + AA-kar (া) -> O-kar (ো)
-    //                     E-kar (ে) + OU-kar/LengthMark -> OU-kar (ৌ)
+    // E-kar (ে) + OU-kar/LengthMark -> OU-kar (ৌ)
     // =====================================================================
     // When the previous character is E-kar and the incoming key is AA-kar,
     // remove the previous E-kar via InternalBackspace and emit the O-kar
@@ -642,13 +634,12 @@ begin
 
     // =====================================================================
     // Chandrabindu + E-Kar + LengthMark Ligature Fix:
-    //   E-kar + Chandrabindu + LengthMark -> OU-kar + Chandra
+    // E-kar + Chandrabindu + LengthMark -> OU-kar + Chandra
     // =====================================================================
     // LengthMark is not recognized as a kar by IsKar, so it bypasses
     // InsertKar. Handle it here: when Chandrabindu follows E-kar and
     // the incoming key is LengthMark, form OU-kar + Chandra.
-    if (LastChar = b_Chandra) and (TrackL >= 2) and (LastChars[2] = b_Ekar) and
-       (CharForKey = b_LengthMark) then
+    if (LastChar = b_Chandra) and (TrackL >= 2) and (LastChars[2] = b_Ekar) and (CharForKey = b_LengthMark) then
     begin
       InternalBackspace(2);
       DeadKey := False;
@@ -669,9 +660,7 @@ begin
     // two blocks above. Like the E-kar ligature fix, this runs BEFORE the
     // vowel-formation block and works in both VowelFormating modes.
     if (CharForKey = b_LengthMark) and
-       (IsPureConsonent(LastChar) or
-        ((LastChar = b_Chandra) and (TrackL >= 2) and
-         (IsPureConsonent(LastChars[2]) or (LastChars[2] = b_Ekar)))) then
+      (IsPureConsonent(LastChar) or ((LastChar = b_Chandra) and (TrackL >= 2) and (IsPureConsonent(LastChars[2]) or (LastChars[2] = b_Ekar)))) then
     begin
       DeadKey := False;
       MyProcessVKeyDown := InsertKar(b_OUkar);
@@ -679,7 +668,7 @@ begin
     end;
 
     // Hasanta Handling: Hasanta + Kar -> Independent Vowel, Double Hasanta -> ZWNJ
-    //                 + Hasanta + ও -> O-kar (ো),  Hasanta + ৗ -> OU-kar (ৌ)
+    // + Hasanta + ও -> O-kar (ো),  Hasanta + ৗ -> OU-kar (ৌ)
     // =====================================================================
     if LastChar = b_Hasanta then
     begin
@@ -801,12 +790,12 @@ begin
     // is already kept accurate through every Backspace by
     // DeleteLastCharSteps_Ex / SetLastChar, so no separate memory is
     // needed at all:
-    //   - Pure consonant precedes (or Chandrabindu-after-consonant-or-E-kar) -> NOT a word boundary: fall through to
-    //     normal processing (the kar attaches via InsertKar below).
-    //   - Anything else precedes (empty buffer, after space/tab/enter,
-    //     after Backspace reveals a non-consonant, or LastChar is itself a
-    //     kar/vowel/hasanta) -> word boundary: convert the kar key to its
-    //     independent full vowel letter.
+    // - Pure consonant precedes (or Chandrabindu-after-consonant-or-E-kar) -> NOT a word boundary: fall through to
+    // normal processing (the kar attaches via InsertKar below).
+    // - Anything else precedes (empty buffer, after space/tab/enter,
+    // after Backspace reveals a non-consonant, or LastChar is itself a
+    // kar/vowel/hasanta) -> word boundary: convert the kar key to its
+    // independent full vowel letter.
     if (VowelFormating <> 'NO') then
     begin
       if IsPureConsonent(LastChar) or ((LastChar = b_Chandra) and (TrackL >= 2) and (IsPureConsonent(LastChars[2]) or (LastChars[2] = b_Ekar))) then
@@ -1200,8 +1189,8 @@ begin
   case KeyCode of
     VK_LEFT, VK_RIGHT, VK_UP, VK_DOWN, VK_HOME, VK_END, VK_PRIOR, VK_NEXT, VK_DELETE, VK_INSERT, VK_ESCAPE:
       Result := True;
-  else
-    Result := False;
+    else
+      Result := False;
   end;
 end;
 

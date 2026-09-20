@@ -50,29 +50,29 @@ type
   // Interceptor class for TComboBox (same name as the VCL base class, so the
   // .dfm only needs the standard "TComboBox" class name the IDE knows).  It
   // merges the two custom combos of this form:
-  //   * ANSI version combo (Style = csOwnerDrawFixed) - fully custom-painted
-  //     face (amber design language) and owner-drawn drop-down list.
-  //   * Font picker (Style = csDropDown) - searchable font picker with live
-  //     type-to-search filtering, click-to-open and keyboard navigation.
+  // * ANSI version combo (Style = csOwnerDrawFixed) - fully custom-painted
+  // face (amber design language) and owner-drawn drop-down list.
+  // * Font picker (Style = csDropDown) - searchable font picker with live
+  // type-to-search filtering, click-to-open and keyboard navigation.
   // FFontPickerMode is set by the form in FormCreate to select the behaviour.
   TComboBox = class(StdCtrls.TComboBox)
     private
       // Shared face state
-      FHovered:      Boolean;
-      FPressed:      Boolean;
-      FActive:       Boolean; // ANSI version combo: drop-down list is open
+      FHovered:        Boolean;
+      FPressed:        Boolean;
+      FActive:         Boolean; // ANSI version combo: drop-down list is open
       FFontPickerMode: Boolean; // this instance is the searchable font picker
       // Font-picker state
-      FFullFontList: TStringList; // Master list of every installed font
-      FActiveFont:   string;      // Last committed font
-      FSearchText:   string;      // Search text kept while navigating
-      FCursorIndex:  Integer;     // Highlighted suggestion index
-      FUpdating:     Boolean;     // Re-entrancy guard
-      FCommitting:   Boolean;     // A selection is being committed
-      FOpenByFilter: Boolean;     // List was opened by live filtering
-      FEditHandle:   hWnd;        // Inner EDIT control (keyboard/mouse focus target)
-      FDefEditProc:  Pointer;     // Original window proc of the inner EDIT
-      FClickWasOpen: Boolean;     // Drop-down was open at WM_LBUTTONDOWN
+      FFullFontList: TStringList;   // Master list of every installed font
+      FActiveFont:   string;        // Last committed font
+      FSearchText:   string;        // Search text kept while navigating
+      FCursorIndex:  Integer;       // Highlighted suggestion index
+      FUpdating:     Boolean;       // Re-entrancy guard
+      FCommitting:   Boolean;       // A selection is being committed
+      FOpenByFilter: Boolean;       // List was opened by live filtering
+      FEditHandle:   hWnd;          // Inner EDIT control (keyboard/mouse focus target)
+      FDefEditProc:  Pointer;       // Original window proc of the inner EDIT
+      FClickWasOpen: Boolean;       // Drop-down was open at WM_LBUTTONDOWN
       procedure ApplyEditCentering; // ES_LEFT + vertical centering of the edit text
       procedure CMMouseEnter(var Message: TMessage); message CM_MOUSEENTER;
       procedure CMMouseLeave(var Message: TMessage); message CM_MOUSELEAVE;
@@ -186,10 +186,10 @@ type
       FCurrentThemeMode: TThemeMode;
       // Non-nil while a background conversion (TConversionWorker) is running.
       // The worker nils it via Synchronize once its work has been applied.
-      FConvThread:       TThread;
+      FConvThread: TThread;
       // Guards FormClose against re-entry while it waits for a running
       // conversion to finish (a second WM_CLOSE during the wait loop).
-      FClosing:          Boolean;
+      FClosing: Boolean;
 
       procedure ApplySelectedTheme(Mode: TThemeMode);
       function ReadConverterThemeMode: TThemeMode;
@@ -637,7 +637,7 @@ function TForm1.CurrentMemoZoomPercent(RE: TRichEdit): Integer;
 var
   ZoomNum, ZoomDen: Cardinal;
 begin
-  if SendMessage(RE.Handle, EM_GETZOOM, WPARAM(@ZoomNum), LPARAM(@ZoomDen)) = 0 then
+  if SendMessage(RE.Handle, EM_GETZOOM, wParam(@ZoomNum), lParam(@ZoomDen)) = 0 then
   begin
     ZoomNum := 100;
     ZoomDen := 100;
@@ -717,7 +717,7 @@ end;
 
 // Stream-out callback for EM_STREAMOUT (SF_RTF): appends the RTF bytes the
 // rich edit produces into the TBytesStream passed as dwCookie.
-function RtfStreamOutCallback(dwCookie: DWORD_PTR; pbBuff: PByte; cb: Longint; var pcb: Longint): Longint; stdcall;
+function RtfStreamOutCallback(dwCookie: DWORD_PTR; pbBuff: PByte; cb: LongInt; var pcb: LongInt): LongInt; stdcall;
 begin
   Result := 0;
   try
@@ -730,7 +730,7 @@ end;
 
 // Stream-in callback for EM_STREAMIN (SF_TEXT or SF_UNICODE): feeds the
 // bytes of a TStringStream to the rich edit control.
-function RtfStreamInCallback(dwCookie: DWORD_PTR; pbBuff: PByte; cb: Longint; var pcb: Longint): Longint; stdcall;
+function RtfStreamInCallback(dwCookie: DWORD_PTR; pbBuff: PByte; cb: LongInt; var pcb: LongInt): LongInt; stdcall;
 begin
   Result := 0;
   try
@@ -751,16 +751,16 @@ end;
 procedure TForm1.CopyMemoWithFont(M: TRichEdit);
 var
   SavedStart, SavedLength: Integer;
-  WasSelected:            Boolean;
-  Stream:                 TBytesStream;
-  EditStream:             TEditStream;
-  RtfBytes:               TBytes;
-  RtfStr, UniText:        string;
-  Enc:                    TEncoding;
-  H:                      HGLOBAL;
-  P:                      Pointer;
-  ByteCount:              Integer;
-  RtfFmt:                 UINT;
+  WasSelected:             Boolean;
+  Stream:                  TBytesStream;
+  EditStream:              TEditStream;
+  RtfBytes:                TBytes;
+  RtfStr, UniText:         string;
+  Enc:                     TEncoding;
+  H:                       HGLOBAL;
+  P:                       Pointer;
+  ByteCount:               Integer;
+  RtfFmt:                  UINT;
 begin
   if M = nil then
     Exit;
@@ -782,7 +782,7 @@ begin
       FillChar(EditStream, SizeOf(EditStream), 0);
       EditStream.dwCookie := DWORD_PTR(Stream);
       EditStream.pfnCallback := RtfStreamOutCallback;
-      SendMessage(M.Handle, EM_STREAMOUT, SFF_SELECTION or SF_RTF, LPARAM(@EditStream));
+      SendMessage(M.Handle, EM_STREAMOUT, SFF_SELECTION or SF_RTF, lParam(@EditStream));
       RtfBytes := Stream.Bytes;
       SetLength(RtfBytes, Stream.Size);
     finally
@@ -887,8 +887,8 @@ begin
   ParaFormat.dwMask := PFM_ALIGNMENT;
   ParaFormat.wAlignment := PFA_JUSTIFY;
 
-  SendMessage(RE.Handle, EM_SETSEL, WPARAM(ASelStart), WPARAM(ASelEnd));
-  SendMessage(RE.Handle, EM_SETPARAFORMAT, 0, LPARAM(@ParaFormat));
+  SendMessage(RE.Handle, EM_SETSEL, wParam(ASelStart), wParam(ASelEnd));
+  SendMessage(RE.Handle, EM_SETPARAFORMAT, 0, lParam(@ParaFormat));
 end;
 
 { Re-asserts the word-wrap boundary: EM_SETMARGINS keeps the format rectangle
@@ -919,7 +919,7 @@ begin
   CF.cbSize := SizeOf(CF);
   CF.dwMask := CFM_COLOR;
   CF.crTextColor := ColorToRGB(AColor);
-  SendMessage(RE.Handle, EM_SETCHARFORMAT, SCF_ALL, LPARAM(@CF));
+  SendMessage(RE.Handle, EM_SETCHARFORMAT, SCF_ALL, lParam(@CF));
 end;
 
 procedure TForm1.PasteToPopupMemo(Target: TRichEdit = nil);
@@ -1022,7 +1022,7 @@ begin
     CF.crTextColor := ColorToRGB(TextColor);
     CF.yHeight := RE.Font.Size * 20;
     StrPLCopy(@CF.szFaceName[0], RE.Font.Name, LF_FACESIZE - 1);
-    SendMessage(RE.Handle, EM_SETCHARFORMAT, SCF_ALL, LPARAM(@CF));
+    SendMessage(RE.Handle, EM_SETCHARFORMAT, SCF_ALL, lParam(@CF));
 
     RE.DefAttributes.Color := TextColor;
     RE.DefAttributes.Name := RE.Font.Name;
@@ -1700,14 +1700,14 @@ begin
   PF.cbSize := SizeOf(PF);
   PF.dwMask := PFM_ALIGNMENT;
   PF.wAlignment := PFA_JUSTIFY;
-  SendMessage(RE.Handle, EM_SETPARAFORMAT, 0, LPARAM(@PF));
+  SendMessage(RE.Handle, EM_SETPARAFORMAT, 0, lParam(@PF));
 
   Stream := TStringStream.Create(Text, TEncoding.Unicode, False);
   try
     FillChar(ES, SizeOf(ES), 0);
     ES.dwCookie := DWORD_PTR(Stream);
     ES.pfnCallback := @RtfStreamInCallback;
-    SendMessage(RE.Handle, EM_STREAMIN, SF_TEXT or SF_UNICODE, LPARAM(@ES));
+    SendMessage(RE.Handle, EM_STREAMIN, SF_TEXT or SF_UNICODE, lParam(@ES));
   finally
     Stream.Free;
   end;
@@ -2779,7 +2779,7 @@ begin
     CF.bCharSet := ANSI_CHARSET;
     CF.yHeight := MEMO2.Font.Size * 20;
     StrPLCopy(@CF.szFaceName[0], FontName, LF_FACESIZE - 1);
-    SendMessage(MEMO2.Handle, EM_SETCHARFORMAT, SCF_ALL, LPARAM(@CF));
+    SendMessage(MEMO2.Handle, EM_SETCHARFORMAT, SCF_ALL, lParam(@CF));
 
     MakeTextJustified(MEMO2);
     // Explicitly re-apply word wrap to the window width after the font change

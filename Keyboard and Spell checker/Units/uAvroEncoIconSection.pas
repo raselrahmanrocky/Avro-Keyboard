@@ -7,7 +7,6 @@
 }
 
 {$INCLUDE ../../ProjectDefines.inc}
-
 unit uAvroEncoIconSection;
 
 { =============================================================================
@@ -92,11 +91,11 @@ const
   AVRO_ICON_MAX_FRAME_SIZE = 48;
 
   { ICONDIR header: reserved(2) + type(2) + count(2), then 16 bytes per entry. }
-  AVRO_ICONDIR_SIZE   = 6;
-  AVRO_ICONDIRENTRY   = 16;
+  AVRO_ICONDIR_SIZE = 6;
+  AVRO_ICONDIRENTRY = 16;
 
   { A frame whose width byte is 0 means 256 px. }
-  AVRO_ICON_SIZE_256  = 256;
+  AVRO_ICON_SIZE_256 = 256;
 
 type
   { One ICONDIRENTRY, already decoded. Width/Height are expressed in pixels
@@ -111,7 +110,7 @@ type
 
   TAvroIconFrames = TArray<TAvroIconFrame>;
 
-{ Every frame the .ico declares, in file order. Empty for a malformed file. }
+  { Every frame the .ico declares, in file order. Empty for a malformed file. }
 function IconFramesOf(const AIcoBytes: TBytes): TAvroIconFrames;
 
 { True when AFrame starts with the PNG signature, i.e. CreateIconFromResourceEx
@@ -123,18 +122,15 @@ function IsPortableNetworkFrame(const AFrame: TBytes): Boolean;
   otherwise the largest frame that exists. False when there is nothing usable.
   AFrameWidth/Height report the chosen frame's own size, which is what a caller
   needs to know whether Windows will have to rescale. }
-function PickBestIconFrame(const AIcoBytes: TBytes; ADesiredCX, ADesiredCY: Integer;
-  out AFrame: TBytes; out AFrameWidth, AFrameHeight: Integer): Boolean;
+function PickBestIconFrame(const AIcoBytes: TBytes; ADesiredCX, ADesiredCY: Integer; out AFrame: TBytes; out AFrameWidth, AFrameHeight: Integer): Boolean;
 
 { A new .ico holding only the frames whose width matches one of ASizes, packed
   with a rebuilt directory. Nil when none match, so a mis-specified --icon-sizes
   is a build error instead of a silently icon-less container. }
-function BuildIconFromFrames(const AIcoBytes: TBytes;
-  const ASizes: array of Integer): TBytes;
+function BuildIconFromFrames(const AIcoBytes: TBytes; const ASizes: array of Integer): TBytes;
 
 { The Base64 payload value for a mapping document. }
-function EncodeIconSection(const AIcoBytes: TBytes;
-  const ASizes: array of Integer): string;
+function EncodeIconSection(const AIcoBytes: TBytes; const ASizes: array of Integer): string;
 
 { The icon carried by a decrypted mapping document, or nil when it has none
   (legacy containers). Never raises: a damaged section reads as "no icon" so a
@@ -149,8 +145,7 @@ function ExtractIconSection(const AJSONContent: string): TBytes;
 function CreateHIconAtSize(const AIcoBytes: TBytes; ACX, ACY: Integer): HICON;
 
 { Parsers for the --icon-sizes command line value, e.g. '16,32,48'. }
-function ParseIconSizes(const AText: string; out ASizes: TArray<Integer>;
-  out AErr: string): Boolean;
+function ParseIconSizes(const AText: string; out ASizes: TArray<Integer>; out AErr: string): Boolean;
 
 implementation
 
@@ -162,14 +157,13 @@ end;
 
 function ReadDWord(const AData: TBytes; AOffset: Integer): Integer;
 begin
-  Result := Integer(AData[AOffset]) or (Integer(AData[AOffset + 1]) shl 8) or
-    (Integer(AData[AOffset + 2]) shl 16) or (Integer(AData[AOffset + 3]) shl 24);
+  Result := Integer(AData[AOffset]) or (Integer(AData[AOffset + 1]) shl 8) or (Integer(AData[AOffset + 2]) shl 16) or (Integer(AData[AOffset + 3]) shl 24);
 end;
 
 function IconFramesOf(const AIcoBytes: TBytes): TAvroIconFrames;
 var
   Count, I, Entry, Offset, Size: Integer;
-  W, H: Integer;
+  W, H:                          Integer;
 begin
   Result := nil;
   if Length(AIcoBytes) < AVRO_ICONDIR_SIZE then
@@ -217,14 +211,12 @@ end;
 
 function IsPortableNetworkFrame(const AFrame: TBytes): Boolean;
 begin
-  Result := (Length(AFrame) >= 8) and (AFrame[0] = $89) and (AFrame[1] = $50) and
-    (AFrame[2] = $4E) and (AFrame[3] = $47);
+  Result := (Length(AFrame) >= 8) and (AFrame[0] = $89) and (AFrame[1] = $50) and (AFrame[2] = $4E) and (AFrame[3] = $47);
 end;
 
-function PickBestIconFrame(const AIcoBytes: TBytes; ADesiredCX, ADesiredCY: Integer;
-  out AFrame: TBytes; out AFrameWidth, AFrameHeight: Integer): Boolean;
+function PickBestIconFrame(const AIcoBytes: TBytes; ADesiredCX, ADesiredCY: Integer; out AFrame: TBytes; out AFrameWidth, AFrameHeight: Integer): Boolean;
 var
-  Frames: TAvroIconFrames;
+  Frames:                 TAvroIconFrames;
   I, BestIdx, BestExtent: Integer;
 begin
   Result := False;
@@ -240,7 +232,7 @@ begin
 
   // Pass 1: exact extent. This is the case the tray hits at 100% DPI and the
   // menus hit always, and it is why no scaling is needed there.
-  for I := 0 to High(Frames) do
+  for I := 0 to high(Frames) do
     if (Frames[I].Width = ADesiredCX) and (Frames[I].Height = ADesiredCY) then
     begin
       AFrame := FrameBytesOf(AIcoBytes, Frames[I]);
@@ -253,9 +245,8 @@ begin
   // axes - shrinking a real frame beats enlarging a smaller one.
   BestIdx := -1;
   BestExtent := MaxInt;
-  for I := 0 to High(Frames) do
-    if (Frames[I].Width >= ADesiredCX) and (Frames[I].Height >= ADesiredCY) and
-      (Frames[I].Width < BestExtent) then
+  for I := 0 to high(Frames) do
+    if (Frames[I].Width >= ADesiredCX) and (Frames[I].Height >= ADesiredCY) and (Frames[I].Width < BestExtent) then
     begin
       BestIdx := I;
       BestExtent := Frames[I].Width;
@@ -266,7 +257,7 @@ begin
   if BestIdx < 0 then
   begin
     BestExtent := -1;
-    for I := 0 to High(Frames) do
+    for I := 0 to high(Frames) do
       if Frames[I].Width > BestExtent then
       begin
         BestIdx := I;
@@ -282,13 +273,12 @@ begin
   Result := not IsPortableNetworkFrame(AFrame);
 end;
 
-function BuildIconFromFrames(const AIcoBytes: TBytes;
-  const ASizes: array of Integer): TBytes;
+function BuildIconFromFrames(const AIcoBytes: TBytes; const ASizes: array of Integer): TBytes;
 var
-  Frames: TAvroIconFrames;
-  Keep: array of Integer;
+  Frames:                                TAvroIconFrames;
+  Keep:                                  array of Integer;
   I, J, Count, Size, DataSize, Hdr, Off: Integer;
-  Want: Boolean;
+  Want:                                  Boolean;
 begin
   Result := nil;
   Frames := IconFramesOf(AIcoBytes);
@@ -300,7 +290,7 @@ begin
   // meaningful.
   SetLength(Keep, Length(Frames));
   Count := 0;
-  for I := 0 to High(Frames) do
+  for I := 0 to high(Frames) do
   begin
     Want := False;
     for Size in ASizes do
@@ -366,8 +356,7 @@ begin
   end;
 end;
 
-function EncodeIconSection(const AIcoBytes: TBytes;
-  const ASizes: array of Integer): string;
+function EncodeIconSection(const AIcoBytes: TBytes; const ASizes: array of Integer): string;
 var
   Trimmed: TBytes;
 begin
@@ -388,46 +377,43 @@ end;
   what replaced that call.
 
   Strictness is deliberately the same as the DOM lookup it stands in for:
-    - only depth-1 members are considered, so a "AnsiLayoutIcon" nested inside
-      Metadata (where a hand-edited file could put one) is NOT the section;
-    - the value must be a JSON string; an object/array/number/bool/null answer
-      is reported as "not a string";
-    - string escapes are decoded like the DOM does (\" \\ \/ \b \f \n \r \t
-      and \uXXXX). They are not optional: a JSON writer may escape the '/' of a
-      Base64 payload as '\/', which is exactly how the shipped containers
-      arrived, and a scanner that refused escapes reported "no icon" for every
-      one of them. An UNKNOWN escape still reports "no icon" instead of
-      guessing.
+  - only depth-1 members are considered, so a "AnsiLayoutIcon" nested inside
+  Metadata (where a hand-edited file could put one) is NOT the section;
+  - the value must be a JSON string; an object/array/number/bool/null answer
+  is reported as "not a string";
+  - string escapes are decoded like the DOM does (\" \\ \/ \b \f \n \r \t
+  and \uXXXX). They are not optional: a JSON writer may escape the '/' of a
+  Base64 payload as '\/', which is exactly how the shipped containers
+  arrived, and a scanner that refused escapes reported "no icon" for every
+  one of them. An UNKNOWN escape still reports "no icon" instead of
+  guessing.
   Returns False only when the member is absent or malformed. }
-function FindTopLevelStringMember(const AJSON, AName: string;
-  out AValue: string): Boolean;
+function FindTopLevelStringMember(const AJSON, AName: string; out AValue: string): Boolean;
 var
   I, P, Depth: Integer;
-  Key, Text: string;
-  NextPos: Integer;
+  Key, Text:   string;
+  NextPos:     Integer;
 
   { Skips whitespace and returns the index of the next non-blank character
     (Len + 1 when the string ends). }
   function SkipBlank(AFrom: Integer): Integer;
   begin
     Result := AFrom;
-    while (Result <= Length(AJSON)) and
-      CharInSet(AJSON[Result], [' ', #9, #10, #13]) do
+    while (Result <= Length(AJSON)) and CharInSet(AJSON[Result], [' ', #9, #10, #13]) do
       Inc(Result);
   end;
 
-  { Reads the string token whose opening quote is at AStart and decodes its
-    escapes. ANext is the index after the closing quote; False when the token
-    never closes or contains an escape this reader does not understand.
+{ Reads the string token whose opening quote is at AStart and decodes its
+  escapes. ANext is the index after the closing quote; False when the token
+  never closes or contains an escape this reader does not understand.
 
-    One buffer for the whole token: the output is built into a string sized to
-    the remaining document and only shrunk at the end, so a 7.6 KB Base64
-    payload costs one allocation instead of one per character. }
-  function ReadString(AStart: Integer; out ADecoded: string;
-    out ANext: Integer): Boolean;
+  One buffer for the whole token: the output is built into a string sized to
+  the remaining document and only shrunk at the end, so a 7.6 KB Base64
+  payload costs one allocation instead of one per character. }
+  function ReadString(AStart: Integer; out ADecoded: string; out ANext: Integer): Boolean;
   var
     Q, N, H, V: Integer;
-    C: Char;
+    C:          Char;
   begin
     Result := False;
     ADecoded := '';
@@ -452,12 +438,18 @@ var
           Exit; // trailing backslash: the token cannot be trusted
         Inc(Q);
         case AJSON[Q] of
-          '"', '\', '/': C := AJSON[Q];
-          'b': C := #8;
-          'f': C := #12;
-          'n': C := #10;
-          'r': C := #13;
-          't': C := #9;
+          '"', '\', '/':
+            C := AJSON[Q];
+          'b':
+            C := #8;
+          'f':
+            C := #12;
+          'n':
+            C := #10;
+          'r':
+            C := #13;
+          't':
+            C := #9;
           'u':
             begin
               if Q + 4 > Length(AJSON) then
@@ -465,19 +457,22 @@ var
               V := 0;
               for H := 1 to 4 do
                 case AJSON[Q + H] of
-                  '0'..'9': V := V * 16 + (Ord(AJSON[Q + H]) - Ord('0'));
-                  'a'..'f': V := V * 16 + (Ord(AJSON[Q + H]) - Ord('a') + 10);
-                  'A'..'F': V := V * 16 + (Ord(AJSON[Q + H]) - Ord('A') + 10);
-                else
-                  Exit;
+                  '0' .. '9':
+                    V := V * 16 + (Ord(AJSON[Q + H]) - Ord('0'));
+                  'a' .. 'f':
+                    V := V * 16 + (Ord(AJSON[Q + H]) - Ord('a') + 10);
+                  'A' .. 'F':
+                    V := V * 16 + (Ord(AJSON[Q + H]) - Ord('A') + 10);
+                  else
+                    Exit;
                 end;
               // One UTF-16 code unit per \u, so a surrogate pair survives as
               // the two units the document wrote.
               C := Char(V);
               Inc(Q, 4);
             end;
-        else
-          Exit; // unknown escape: report "no icon" rather than guess
+          else
+            Exit; // unknown escape: report "no icon" rather than guess
         end;
       end;
       Inc(N);
@@ -533,8 +528,8 @@ begin
           else
             I := NextPos; // a string VALUE (or a key we do not want)
         end;
-    else
-      Inc(I);
+      else
+        Inc(I);
     end;
   end;
 end;
@@ -565,7 +560,7 @@ end;
 
 function CreateHIconAtSize(const AIcoBytes: TBytes; ACX, ACY: Integer): HICON;
 var
-  Frame: TBytes;
+  Frame:  TBytes;
   FW, FH: Integer;
 begin
   Result := 0;
@@ -574,17 +569,15 @@ begin
   // dwVer 3.0 ($00030000) is the version every 32bpp alpha icon uses. The
   // explicit cx/cy is the whole point: the shell receives a handle that is
   // already the size its metric asked for.
-  Result := CreateIconFromResourceEx(@Frame[0], DWORD(Length(Frame)), True,
-    $00030000, ACX, ACY, LR_DEFAULTCOLOR);
+  Result := CreateIconFromResourceEx(@Frame[0], DWORD(Length(Frame)), True, $00030000, ACX, ACY, LR_DEFAULTCOLOR);
 end;
 
-function ParseIconSizes(const AText: string; out ASizes: TArray<Integer>;
-  out AErr: string): Boolean;
+function ParseIconSizes(const AText: string; out ASizes: TArray<Integer>; out AErr: string): Boolean;
 var
-  Parts: TArray<string>;
+  Parts:      TArray<string>;
   I, N, Seen: Integer;
-  Part: string;
-  Vals: TArray<Integer>;
+  Part:       string;
+  Vals:       TArray<Integer>;
 begin
   Result := False;
   ASizes := nil;
@@ -598,7 +591,7 @@ begin
   Parts := AText.Split([',', ';']);
   SetLength(Vals, Length(Parts));
   Seen := 0;
-  for I := 0 to High(Parts) do
+  for I := 0 to high(Parts) do
   begin
     Part := Trim(Parts[I]);
     if Part = '' then

@@ -1,8 +1,8 @@
-{=============================================================================
+{ =============================================================================
   This Source Code Form is subject to the terms of the Mozilla Public
   License, v. 2.0. If a copy of the MPL was not distributed with this
   file, You can obtain one at https://mozilla.org/MPL/2.0/.
-  =============================================================================}
+  ============================================================================= }
 {$INCLUDE ../ProjectDefines.inc}
 {$O-}
 unit clsAnsiSequenceLookup;
@@ -14,8 +14,8 @@ unit clsAnsiSequenceLookup;
   Every Unicode-context rule is registered under BOTH key flavors so lookups
   succeed no matter whether the preceding context came from Avro's own buffer
   (Unicode) or from the caret sniffer (raw ANSI glyph):
-    - Unicode key :  #$099B#$09CD#$09B0 + modifier   ('ছ' + '্র')
-    - ANSI mirror :  Convert(#$099B)     + modifier   ('Q'  + '্র')
+  - Unicode key :  #$099B#$09CD#$09B0 + modifier   ('ছ' + '্র')
+  - ANSI mirror :  Convert(#$099B)     + modifier   ('Q'  + '্র')
 
   Entries whose group members are already ANSI strings (AnsiGroupMap /
   RaPhalaGroups) are registered ONLY under their ANSI key and never passed
@@ -54,11 +54,11 @@ var
   begin
     if AnsiToUniMap.TryGetValue(AnsiCtx, Arr) then
     begin
-      for N := 0 to High(Arr) do
+      for N := 0 to high(Arr) do
         if Arr[N] = UniCtx then
           Exit; // already present
       SetLength(Arr, Length(Arr) + 1);
-      Arr[High(Arr)] := UniCtx;
+      Arr[high(Arr)] := UniCtx;
       AnsiToUniMap.AddOrSetValue(AnsiCtx, Arr);
     end
     else
@@ -69,20 +69,20 @@ var
     end;
   end;
 
-  // Register a rule anchored on a UNICODE cluster. Both the Unicode key and
-  // its ANSI mirror get the same entry; the reverse map records ANSI->Unicode
-  // so sniffer-derived contexts can be chained. AnsiOutput stores ONLY the
-  // suffix not already present in the context rendering (the part the user
-  // still has to see appear); EraseCount counts the glyphs it replaces.
-  // A toggle-capable entry is never overwritten by a later plain one (the
-  // JSON lists specific consonant rules before the broad groups they also
-  // belong to - e.g. ra appears explicitly AND inside BaseLineRight).
+// Register a rule anchored on a UNICODE cluster. Both the Unicode key and
+// its ANSI mirror get the same entry; the reverse map records ANSI->Unicode
+// so sniffer-derived contexts can be chained. AnsiOutput stores ONLY the
+// suffix not already present in the context rendering (the part the user
+// still has to see appear); EraseCount counts the glyphs it replaces.
+// A toggle-capable entry is never overwritten by a later plain one (the
+// JSON lists specific consonant rules before the broad groups they also
+// belong to - e.g. ra appears explicitly AND inside BaseLineRight).
   procedure RegUni(const UniCtx, Modifier, AltRaw: string; IsToggle: Boolean);
   var
     E, Existing: TAnsiSequenceEntry;
-    AnsiCtx: string;
-    AnsiOut: string;
-    PLen:    Integer;
+    AnsiCtx:     string;
+    AnsiOut:     string;
+    PLen:        Integer;
 
     function OverwritesToggle(const Key: string): Boolean;
     begin
@@ -120,13 +120,13 @@ var
       AnsiSequenceLookup.AddOrSetValue(AnsiCtx + Modifier, E);
   end;
 
-  // Register a rule anchored on a pre-converted ANSI member (RaPhalaGroups).
-  // These mappings describe a kar rendered AFTER an already-present glyph,
-  // so they are strictly append-only (EraseCount = 0).
+// Register a rule anchored on a pre-converted ANSI member (RaPhalaGroups).
+// These mappings describe a kar rendered AFTER an already-present glyph,
+// so they are strictly append-only (EraseCount = 0).
   procedure RegAnsi(const AnsiCtx, Modifier, ValRaw, AltRaw: string; IsToggle: Boolean);
   var
     E, Existing: TAnsiSequenceEntry;
-    OutVal: string;
+    OutVal:      string;
   begin
     OutVal := ResolveValue(ValRaw);
     if (AnsiCtx = '') or (OutVal = '') then
@@ -160,7 +160,7 @@ begin
   try
     { === 1. Ra-Phala Rules (modifier = hasanta + ra) === }
     if Length(RfolaRules) > 0 then
-      for I := 0 to High(RfolaRules) do
+      for I := 0 to high(RfolaRules) do
       begin
         Rule := RfolaRules[I];
         if Rule.Consonants = '' then
@@ -186,12 +186,12 @@ begin
 
     { === 2. Vowel Kar Rules === }
     if Length(VowelRules) > 0 then
-      for I := 0 to High(VowelRules) do
+      for I := 0 to high(VowelRules) do
       begin
         VRule := VowelRules[I];
         if VRule.KarChar = '' then
           Continue;
-        for J := 0 to High(VRule.Mappings) do
+        for J := 0 to high(VRule.Mappings) do
         begin
           Mapping := VRule.Mappings[J];
           if Mapping.Consonants = '' then
@@ -213,20 +213,20 @@ begin
 
           // Literal single-consonant mapping (no group)
           if (ConsonantGroupMap = nil) or not ConsonantGroupMap.ContainsKey(Mapping.Consonants) then
-            if ((AnsiGroupMap = nil) or not AnsiGroupMap.ContainsKey(Mapping.Consonants)) and
-              (Length(Mapping.Consonants) = 1) and (Ord(Mapping.Consonants[1]) >= $0980) then
+            if ((AnsiGroupMap = nil) or not AnsiGroupMap.ContainsKey(Mapping.Consonants)) and (Length(Mapping.Consonants) = 1) and
+              (Ord(Mapping.Consonants[1]) >= $0980) then
               RegUni(Mapping.Consonants, VRule.KarChar, Mapping.Alt, Mapping.ToggleOnBackspace);
         end;
       end;
 
     { === 3. Full Forms (Unicode conjunct -> ANSI) === }
     if Length(ActiveReplacements) > 0 then
-      for I := 0 to High(ActiveReplacements) do
+      for I := 0 to high(ActiveReplacements) do
         if (ActiveReplacements[I].Key <> '') and (ActiveReplacements[I].Value <> '') then
           RegUni(ActiveReplacements[I].Key, '', '', False);
 
     if Length(KarInclusiveReplacements) > 0 then
-      for I := 0 to High(KarInclusiveReplacements) do
+      for I := 0 to high(KarInclusiveReplacements) do
         if (KarInclusiveReplacements[I].Key <> '') and (KarInclusiveReplacements[I].Value <> '') then
           RegUni(KarInclusiveReplacements[I].Key, '', '', False);
 

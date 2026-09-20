@@ -279,8 +279,7 @@ begin
     // b_Hasanta + b_r  = Ra-phala (্র)
     // b_Hasanta + b_z  = Ja-phala (্য)
     // b_R + b_Hasanta  = Reph     (র্)
-    Result := ((S[1] = b_Hasanta) and ((S[2] = b_R) or (S[2] = b_Z))) or
-      ((S[1] = b_R) and (S[2] = b_Hasanta));
+    Result := ((S[1] = b_Hasanta) and ((S[2] = b_R) or (S[2] = b_Z))) or ((S[1] = b_R) and (S[2] = b_Hasanta));
     Exit;
   end;
 

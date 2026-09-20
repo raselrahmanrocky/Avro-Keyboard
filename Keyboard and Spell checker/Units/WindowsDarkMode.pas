@@ -28,8 +28,7 @@ function DarkModeIsEnabled: boolean;
 // available (e.g. the VCL style was not embedded in the executable), so the
 // app degrades gracefully instead of showing a "Style not found" dialog.
 //
-procedure SetAppropriateThemeMode(const DarkModeThemeName, LightModeThemeName: string;
-  const FallbackStyleName: string = '');
+procedure SetAppropriateThemeMode(const DarkModeThemeName, LightModeThemeName: string; const FallbackStyleName: string = '');
 
 // Sets either a Dark Mode or non Dark mode theme based in the "AsDarkMode" boolean
 // For example:
@@ -49,14 +48,13 @@ uses
   {$ENDIF}
   System.SysUtils;
 
-procedure SetAppropriateThemeMode(const DarkModeThemeName, LightModeThemeName: string;
-  const FallbackStyleName: string = '');
+procedure SetAppropriateThemeMode(const DarkModeThemeName, LightModeThemeName: string; const FallbackStyleName: string = '');
 {$IFDEF MSWINDOWS}
 var
   PreferredStyle: string;
-{$ENDIF}
+  {$ENDIF}
 begin
-{$IFDEF MSWINDOWS}
+  {$IFDEF MSWINDOWS}
   if DarkModeIsEnabled then
     PreferredStyle := DarkModeThemeName
   else
@@ -66,7 +64,7 @@ begin
     dialog, so a missing style degrades gracefully to the fallback. }
   if not TStyleManager.TrySetStyle(PreferredStyle, False) and (FallbackStyleName <> '') then
     TStyleManager.TrySetStyle(FallbackStyleName, False);
-{$ENDIF}
+  {$ENDIF}
 end;
 
 procedure SetSpecificThemeMode(const AsDarkMode: boolean; const DarkModeThemeName, LightModeThemeName: string);

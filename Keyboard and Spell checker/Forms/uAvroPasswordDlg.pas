@@ -31,10 +31,10 @@ type
     btnCancel: TButton;
     procedure chkShowPasswordClick(Sender: TObject);
     procedure FormShow(Sender: TObject);
-  private
-    { Private declarations }
-  public
-    { Public declarations }
+    private
+      { Private declarations }
+    public
+      { Public declarations }
   end;
 
 function ShowPasswordDialog(out APassword: AnsiString; const AFileName: string = ''): Boolean;

@@ -52,8 +52,7 @@ type
     procedure ListBoxDrawItem(Control: TWinControl; Index: Integer; Rect: TRect; State: TOwnerDrawState);
     procedure ListBoxMouseMove(Sender: TObject; Shift: TShiftState; X, Y: Integer);
     procedure ListBoxMouseLeave(Sender: TObject);
-    procedure ListBoxMouseUp(Sender: TObject; Button: TMouseButton;
-      Shift: TShiftState; X, Y: Integer);
+    procedure ListBoxMouseUp(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
     procedure PopupExportClick(Sender: TObject);
     procedure PopupDescriptionClick(Sender: TObject);
     procedure PopupDeleteClick(Sender: TObject);
@@ -65,7 +64,7 @@ type
       FPrevForegroundWindow: HWND;
       // Resolved once per open (the form is created fresh every time it is
       // shown), so the draw handler never reads the registry.
-      FTheme:                TAppThemePalette;
+      FTheme: TAppThemePalette;
       function GetSelectedVersion: string;
       function RowIconHandle(const AVersionName: string): HICON;
       procedure AutoSizeForm;
@@ -471,15 +470,13 @@ begin
   ListBox.Canvas.Brush.Style := bsSolid;
 
   // 6. Trailing layout badge - the same 16 px icon the tray's "Select ANSI
-  //    Encoding" submenu shows, so the picker and the menu agree about which
-  //    encoding carries which icon. Rows without an icon ('Default', or a
-  //    container whose icon section is missing) stay badge-free.
+  // Encoding" submenu shows, so the picker and the menu agree about which
+  // encoding carries which icon. Rows without an icon ('Default', or a
+  // container whose icon section is missing) stay badge-free.
   IconHandle := RowIconHandle(ListBox.Items[index]);
   if IconHandle <> 0 then
-    DrawIconEx(ListBox.Canvas.Handle,
-      Rect.Right - BADGE_RIGHT_GAP - BADGE_SIZE,
-      Rect.Top + ((Rect.Bottom - Rect.Top - BADGE_SIZE) div 2),
-      IconHandle, BADGE_SIZE, BADGE_SIZE, 0, 0, DI_NORMAL);
+    DrawIconEx(ListBox.Canvas.Handle, Rect.Right - BADGE_RIGHT_GAP - BADGE_SIZE, Rect.Top + ((Rect.Bottom - Rect.Top - BADGE_SIZE) div 2), IconHandle,
+      BADGE_SIZE, BADGE_SIZE, 0, 0, DI_NORMAL);
 end;
 
 procedure TfrmAnsiVersionPicker.ListBoxMouseMove(Sender: TObject; Shift: TShiftState; X, Y: Integer);
@@ -504,7 +501,8 @@ procedure TfrmAnsiVersionPicker.CloseAndRestoreTarget;
 begin
   KillTimer(Handle, 1);
   Hide;
-  if CurrentPicker = Self then CurrentPicker := nil;
+  if CurrentPicker = Self then
+    CurrentPicker := nil;
   if IsWindow(FPrevForegroundWindow) then
     ForceForegroundWindow(FPrevForegroundWindow)
   else if IsWindow(FPrevFocusedWindow) then
@@ -515,9 +513,9 @@ end;
 procedure TfrmAnsiVersionPicker.ListBoxClick(Sender: TObject);
 var
   SelectedVersion, ErrorMsg, TargetPath: string;
-  Password: AnsiString;
-  PreloadThread: TAnsiPreloadThread;
-  ErrList: TStringList;
+  Password:                              AnsiString;
+  PreloadThread:                         TAnsiPreloadThread;
+  ErrList:                               TStringList;
 begin
   if not Assigned(CurrentPicker) then
     Exit;
@@ -562,8 +560,8 @@ begin
   TargetPath := GetActiveEncoFilePath(SelectedVersion, AnsiMappingDir);
   if TargetPath = '' then
   begin
-    Application.MessageBox(PChar('Mapping file not found: ' + SelectedVersion),
-      'ANSI Mapping Error', MB_ICONWARNING or MB_OK or MB_TOPMOST or MB_SETFOREGROUND);
+    Application.MessageBox(PChar('Mapping file not found: ' + SelectedVersion), 'ANSI Mapping Error', MB_ICONWARNING or MB_OK or MB_TOPMOST or
+        MB_SETFOREGROUND);
     Exit;
   end;
 
@@ -574,8 +572,7 @@ begin
   // Ask only when THIS encoding was never unlocked on this computer; the
   // per-file cache then unlocks every later switch silently (even after a
   // full restart). Default-key files never prompt.
-  if IsEncoFile(TargetPath) and (GetEncoCachedPassword(TargetPath) = '') and
-    (GetAvroEncoProtectionFlag(TargetPath) = AVROENCO_FLAG_USER_PASSWORD) then
+  if IsEncoFile(TargetPath) and (GetEncoCachedPassword(TargetPath) = '') and (GetAvroEncoProtectionFlag(TargetPath) = AVROENCO_FLAG_USER_PASSWORD) then
   begin
     if not PromptForPasswordAndValidate(TargetPath, Password) then
       Exit; // Cancelled - keep the picker open so another version can be chosen.
@@ -589,8 +586,7 @@ begin
     // other container was being parsed just for the privilege of sitting in
     // RAM. CapturePreloadItem returns a single item - the one the user is
     // about to select.
-    PreloadThread := TAnsiPreloadThread.Create(
-      AnsiEngineManager.CapturePreloadItem(SelectedVersion));
+    PreloadThread := TAnsiPreloadThread.Create(AnsiEngineManager.CapturePreloadItem(SelectedVersion));
     PreloadThread.FreeOnTerminate := True;
     PreloadThread.Start;
   end;
@@ -663,8 +659,7 @@ begin
   if ListBox.ItemIndex < 0 then
     ListBox.ItemIndex := 0
   else
-    ListBox.ItemIndex := (ListBox.ItemIndex + ADelta + ListBox.Items.Count)
-      mod ListBox.Items.Count;
+    ListBox.ItemIndex := (ListBox.ItemIndex + ADelta + ListBox.Items.Count) mod ListBox.Items.Count;
 end;
 
 { The single key implementation. Returns True when the key was consumed, and the
@@ -686,16 +681,16 @@ begin
       MoveSelection(-1);
     VK_DOWN:
       MoveSelection(1);
-  else
-    begin
-      // Number row (VK_1..VK_9) and numpad (VK_NUMPAD1..VK_NUMPAD9), mapping
-      // to the very numbers the list draws next to the rows.
-      TargetIdx := MappingIndexForKey(ListBox.Items, AKey);
-      if TargetIdx < 0 then
-        Result := False
-      else
-        ActivateIndex(TargetIdx);
-    end;
+    else
+      begin
+        // Number row (VK_1..VK_9) and numpad (VK_NUMPAD1..VK_NUMPAD9), mapping
+        // to the very numbers the list draws next to the rows.
+        TargetIdx := MappingIndexForKey(ListBox.Items, AKey);
+        if TargetIdx < 0 then
+          Result := False
+        else
+          ActivateIndex(TargetIdx);
+      end;
   end;
   if Result then
     AKey := 0;
@@ -738,7 +733,7 @@ end;
 
 procedure TfrmAnsiVersionPicker.BuildPopupMenu(const MappingName: string);
 var
-  Item: TMenuItem;
+  Item:      TMenuItem;
   IsDefault: Boolean;
 begin
   FPopup.Items.Clear;
@@ -766,8 +761,7 @@ begin
   end;
 end;
 
-procedure TfrmAnsiVersionPicker.ListBoxMouseUp(Sender: TObject; Button: TMouseButton;
-  Shift: TShiftState; X, Y: Integer);
+procedure TfrmAnsiVersionPicker.ListBoxMouseUp(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
 var
   Idx: Integer;
 begin
@@ -785,19 +779,16 @@ end;
 procedure TfrmAnsiVersionPicker.PopupExportClick(Sender: TObject);
 var
   MapName, SourcePath: string;
-  SaveDlg: TSaveDialog;
+  SaveDlg:             TSaveDialog;
 begin
-  if not (Sender is TMenuItem) then Exit;
+  if not(Sender is TMenuItem) then
+    Exit;
   Close;
   MapName := (Sender as TMenuItem).Hint;
 
   if SameText(MapName, 'Default') then
   begin
-    MessageDlg(
-      'Built-in Default mapping cannot be exported as a file.' + sLineBreak +
-      'It is compiled into Avro Keyboard.',
-      mtInformation, [mbOK], 0
-    );
+    MessageDlg('Built-in Default mapping cannot be exported as a file.' + sLineBreak + 'It is compiled into Avro Keyboard.', mtInformation, [mbOK], 0);
     Exit;
   end;
 
@@ -829,10 +820,11 @@ end;
 procedure TfrmAnsiVersionPicker.PopupDescriptionClick(Sender: TObject);
 var
   MapName, FilePath, Content, DescText, MetaText: string;
-  Password: AnsiString;
-  IsProtected: Boolean;
+  Password:                                       AnsiString;
+  IsProtected:                                    Boolean;
 begin
-  if not (Sender is TMenuItem) then Exit;
+  if not(Sender is TMenuItem) then
+    Exit;
   // The picker is a transient popup: choosing any context-menu action
   // dismisses it (Close -> FormClose -> caFree; the form is released
   // asynchronously, so the rest of this handler keeps running safely).
@@ -861,8 +853,7 @@ begin
         // Only password-protected files (flag $01 / legacy v1) prompt, and
         // only the very first time on this computer - the per-file cache
         // decrypts silently afterwards. Default-key files never prompt.
-        if (GetEncoCachedPassword(FilePath) = '') and
-          (GetAvroEncoProtectionFlag(FilePath) = AVROENCO_FLAG_USER_PASSWORD) then
+        if (GetEncoCachedPassword(FilePath) = '') and (GetAvroEncoProtectionFlag(FilePath) = AVROENCO_FLAG_USER_PASSWORD) then
         begin
           if not PromptForPasswordAndValidate(FilePath, Password) then
             Exit;
@@ -899,8 +890,7 @@ begin
         DescText := MetaText
       else
         // No Metadata at all - show a raw JSON preview.
-        DescText := 'Preview:' + sLineBreak +
-                    Copy(Content, 1, 350) + '...';
+        DescText := 'Preview:' + sLineBreak + Copy(Content, 1, 350) + '...';
 
       // Password-protected .AvroEnco containers get a footer line at the very
       // bottom of the card; plain .json and default-key files do not.
@@ -926,15 +916,15 @@ procedure TfrmAnsiVersionPicker.PopupDeleteClick(Sender: TObject);
 var
   MapName: string;
 begin
-  if not (Sender is TMenuItem) then Exit;
+  if not(Sender is TMenuItem) then
+    Exit;
   // Dismiss the transient picker as soon as the action is chosen.
   Close;
   MapName := (Sender as TMenuItem).Hint;
 
   if MessageDlg('Delete mapping "' + MapName + '"?', mtConfirmation, [mbYes, mbNo], 0) = mrYes then
   begin
-    if DeleteFile(AnsiMappingDir + MapName + '.AvroEnco') or
-       DeleteFile(AnsiMappingDir + MapName + '.json') then
+    if DeleteFile(AnsiMappingDir + MapName + '.AvroEnco') or DeleteFile(AnsiMappingDir + MapName + '.json') then
     begin
       if SameText(AnsiVersion, MapName) then
       begin

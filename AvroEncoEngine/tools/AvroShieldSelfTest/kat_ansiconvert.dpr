@@ -6,34 +6,34 @@
   wrong" has three completely different causes, and without a test they all look
   the same from outside:
 
-    1. the container pipeline is lossy (decrypt or bytecode round-trip changes
-       the mapping),
-    2. the mapping parser silently drops or mangles sections, so the engine runs
-       on its built-in defaults instead of the mapping's own tables,
-    3. the mapping document itself declares very little (an incomplete export):
-       the engine then legitimately falls back to the hardcoded V1-tuned
-       defaults, and the produced bytes belong to a different font than the one
-       in use.
+  1. the container pipeline is lossy (decrypt or bytecode round-trip changes
+  the mapping),
+  2. the mapping parser silently drops or mangles sections, so the engine runs
+  on its built-in defaults instead of the mapping's own tables,
+  3. the mapping document itself declares very little (an incomplete export):
+  the engine then legitimately falls back to the hardcoded V1-tuned
+  defaults, and the produced bytes belong to a different font than the one
+  in use.
 
   This program separates them objectively, with no GUI:
 
-    * CONTAINER == JSON: when a folder holds both a container and a plain JSON
-      with the same base name, the same corpus must convert to byte-identical
-      output through both. Any difference means the crypto/bytecode pipeline is
-      lossy - cause 1.
-    * PARSER FIDELITY: the loaded engine is serialized back to JSON
-      (ExportAnsiMapping) and compared with the source document. Every section
-      the source declares must still be there with at least as many entries, and
-      every group name must survive verbatim. A section that shrinks or vanishes
-      is the silent-drop failure mode - cause 2.
-    * CENSUS + CORPUS DUMP: the effective per-section entry counts and the
-      conversion of a fixed corpus are printed per mapping, so a document that
-      declares almost nothing (cause 3) is visible at a glance instead of being
-      guessed at.
-    * No output may contain an unresolved-reference placeholder: that would mean
-      the mapping referenced a constant the engine could not resolve, leaking
-      literal text into typed output. The placeholder is detected as the two
-      characters hash and open-brace, so this comment block stays parseable.
+  * CONTAINER == JSON: when a folder holds both a container and a plain JSON
+  with the same base name, the same corpus must convert to byte-identical
+  output through both. Any difference means the crypto/bytecode pipeline is
+  lossy - cause 1.
+  * PARSER FIDELITY: the loaded engine is serialized back to JSON
+  (ExportAnsiMapping) and compared with the source document. Every section
+  the source declares must still be there with at least as many entries, and
+  every group name must survive verbatim. A section that shrinks or vanishes
+  is the silent-drop failure mode - cause 2.
+  * CENSUS + CORPUS DUMP: the effective per-section entry counts and the
+  conversion of a fixed corpus are printed per mapping, so a document that
+  declares almost nothing (cause 3) is visible at a glance instead of being
+  guessed at.
+  * No output may contain an unresolved-reference placeholder: that would mean
+  the mapping referenced a constant the engine could not resolve, leaking
+  literal text into typed output. The placeholder is detected as the two
+  characters hash and open-brace, so this comment block stays parseable.
 
   Only the KAT's own temp file is written (inside %TEMP%).
 
@@ -42,7 +42,6 @@
 }
 
 {$APPTYPE CONSOLE}
-
 program kat_ansiconvert;
 
 uses
@@ -59,17 +58,42 @@ uses
 const
   // Bengali code points used to build the corpus without embedding any
   // non-ASCII byte in this source file.
-  U_HASANTA = $09CD;
-  U_AA = $0986; U_II = $0988; U_UU = $098A;
-  U_K = $0995; U_G = $0997; U_C = $099A; U_J = $099C; U_NYA = $099E;
-  U_T = $09A4; U_N = $09A8; U_P = $09AA; U_B = $09AC; U_BH = $09AD;
-  U_M = $09AE; U_R = $09B0; U_L = $09B2; U_SH = $09B6; U_SS = $09B7;
-  U_S = $09B8; U_T_KHANDATA = $09CE;
-  U_AAKAR = $09BE; U_IKAR = $09BF; U_IIKAR = $09C0; U_UKAR = $09C1;
-  U_UUKAR = $09C2; U_RIKAR = $09C3; U_EKAR = $09C7; U_OIKAR = $09C8;
-  U_OKAR = $09CB; U_OUKAR = $09CC;
-  U_ANUSVARA = $0982; U_VISARGA = $0983; U_CHANDRABINDU = $0981;
-  U_DANDA = $0964; U_TAKA = $09F3;
+  U_HASANTA      = $09CD;
+  U_AA           = $0986;
+  U_II           = $0988;
+  U_UU           = $098A;
+  U_K            = $0995;
+  U_G            = $0997;
+  U_C            = $099A;
+  U_J            = $099C;
+  U_NYA          = $099E;
+  U_T            = $09A4;
+  U_N            = $09A8;
+  U_P            = $09AA;
+  U_B            = $09AC;
+  U_BH           = $09AD;
+  U_M            = $09AE;
+  U_R            = $09B0;
+  U_L            = $09B2;
+  U_SH           = $09B6;
+  U_SS           = $09B7;
+  U_S            = $09B8;
+  U_T_KHANDATA   = $09CE;
+  U_AAKAR        = $09BE;
+  U_IKAR         = $09BF;
+  U_IIKAR        = $09C0;
+  U_UKAR         = $09C1;
+  U_UUKAR        = $09C2;
+  U_RIKAR        = $09C3;
+  U_EKAR         = $09C7;
+  U_OIKAR        = $09C8;
+  U_OKAR         = $09CB;
+  U_OUKAR        = $09CC;
+  U_ANUSVARA     = $0982;
+  U_VISARGA      = $0983;
+  U_CHANDRABINDU = $0981;
+  U_DANDA        = $0964;
+  U_TAKA         = $09F3;
 
 type
   TCorpusCase = record
@@ -78,18 +102,18 @@ type
   end;
 
 var
-  Fails: Integer;
+  Fails:  Integer;
   Checks: Integer;
-  Quiet: Boolean;
+  Quiet:  Boolean;
   // Optional reference folder for the authoring JSON. It is assets\, the folder
   // the containers are packed from, so the reference is normally that same
   // folder - passed in explicitly all the same, because a run that names no
   // source at all would skip the byte-for-byte comparison silently, which is
   // the one way a source/container drift could hide from this gate.
   SourceDir: string;
-  Corpus: TArray<TCorpusCase>;
+  Corpus:    TArray<TCorpusCase>;
 
-{ ---- reporting ----------------------------------------------------------- }
+  { ---- reporting ----------------------------------------------------------- }
 
 procedure Check(const AName: string; ACond: Boolean; const ADetail: string = '');
 begin
@@ -118,7 +142,7 @@ var
   I: Integer;
 begin
   Result := '';
-  for I := 0 to High(AItems) do
+  for I := 0 to high(AItems) do
   begin
     if I > 0 then
       Result := Result + ', ';
@@ -200,7 +224,7 @@ var
   I: Integer;
 begin
   Result := 0;
-  for I := 0 to High(ANames) do
+  for I := 0 to high(ANames) do
     Result := Result + Occurrences(AText, ResolveValue('#{' + ANames[I] + '}'));
 end;
 
@@ -211,7 +235,7 @@ var
   G: string;
 begin
   Result := '';
-  for I := 0 to High(ANames) do
+  for I := 0 to high(ANames) do
   begin
     G := ResolveValue('#{' + ANames[I] + '}');
     if (G <> '') and (Pos(G, AText) > 0) then
@@ -245,7 +269,7 @@ end;
 // unusable; AParseLog carries whatever the parser logged.
 function InstallMapping(const AJsonText: string; out AParseLog: string): Boolean;
 var
-  Log: TStringList;
+  Log:  TStringList;
   Root: TJSONValue;
 begin
   Result := False;
@@ -273,12 +297,12 @@ end;
 function ConvertAll: TArray<string>;
 var
   Conv: TUnicodeToBijoy2000;
-  I: Integer;
+  I:    Integer;
 begin
   SetLength(Result, Length(Corpus));
   Conv := TUnicodeToBijoy2000.Create;
   try
-    for I := 0 to High(Corpus) do
+    for I := 0 to high(Corpus) do
       Result[I] := Conv.Convert(Corpus[I].Text);
   finally
     Conv.Free;
@@ -292,16 +316,16 @@ end;
 function SectionCounts(const AJsonText: string): TDictionary<string, Integer>;
 var
   Root: TJSONValue;
-  Obj: TJSONObject;
+  Obj:  TJSONObject;
   Pair: TJSONPair;
-  Val: TJSONValue;
+  Val:  TJSONValue;
 begin
   Result := TDictionary<string, Integer>.Create;
   Root := TJSONObject.ParseJSONValue(AJsonText);
   if Root = nil then
     Exit;
   try
-    if not (Root is TJSONObject) then
+    if not(Root is TJSONObject) then
       Exit;
     Obj := TJSONObject(Root);
     for Pair in Obj do
@@ -325,13 +349,13 @@ end;
 
 function SortedNames(const ACounts: TDictionary<string, Integer>): TArray<string>;
 var
-  L: TList<string>;
+  L:    TList<string>;
   Name: string;
 begin
   L := TList<string>.Create;
   try
-    for Name in ACounts.Keys do
-      L.Add(Name);
+    for name in ACounts.Keys do
+      L.Add(name);
     L.Sort;
     Result := L.ToArray;
   finally
@@ -344,11 +368,11 @@ var
   Name: string;
 begin
   Result := '';
-  for Name in SortedNames(ACounts) do
+  for name in SortedNames(ACounts) do
   begin
     if Result <> '' then
       Result := Result + ' ';
-    Result := Result + Name + '=' + IntToStr(CountOf(ACounts, Name));
+    Result := Result + name + '=' + IntToStr(CountOf(ACounts, name));
   end;
   Result := ATag + ': ' + Result;
 end;
@@ -356,14 +380,13 @@ end;
 // Every key present in the source object section must still be present in the
 // engine's serialized section. A missing group name is the silent-drop failure
 // mode (the parser ignores what it does not understand).
-function MissingKeys(const ASourceText, AExportText, ASection: string;
-  out AMissing: TArray<string>): Boolean;
+function MissingKeys(const ASourceText, AExportText, ASection: string; out AMissing: TArray<string>): Boolean;
 var
-  SrcRoot, ExpRoot: TJSONValue;
+  SrcRoot, ExpRoot:       TJSONValue;
   SrcSection, ExpSection: TJSONObject;
-  L: TList<string>;
-  I, J: Integer;
-  Found: Boolean;
+  L:                      TList<string>;
+  I, J:                   Integer;
+  Found:                  Boolean;
 begin
   AMissing := nil;
   Result := False;
@@ -373,13 +396,13 @@ begin
   try
     if (SrcRoot = nil) or (ExpRoot = nil) then
       Exit;
-    if not (SrcRoot is TJSONObject) or not (ExpRoot is TJSONObject) then
+    if not(SrcRoot is TJSONObject) or not(ExpRoot is TJSONObject) then
       Exit;
-    if not (TJSONObject(SrcRoot).GetValue(ASection) is TJSONObject) then
+    if not(TJSONObject(SrcRoot).GetValue(ASection) is TJSONObject) then
       Exit;
     SrcSection := TJSONObject(TJSONObject(SrcRoot).GetValue(ASection));
 
-    if not (TJSONObject(ExpRoot).GetValue(ASection) is TJSONObject) then
+    if not(TJSONObject(ExpRoot).GetValue(ASection) is TJSONObject) then
     begin
       SetLength(AMissing, SrcSection.Count);
       for I := 0 to SrcSection.Count - 1 do
@@ -419,15 +442,15 @@ end;
 var
   Outputs: TDictionary<string, TArray<string>>;
 
-// Returns the converted output of one corpus case, addressed by its label.
+  // Returns the converted output of one corpus case, addressed by its label.
 function CaseOut(const AOut: TArray<string>; const ALabel: string; out AText: string): Boolean;
 var
   I: Integer;
 begin
   AText := '';
   Result := False;
-  for I := 0 to High(Corpus) do
-    if (Corpus[I].Label_ = ALabel) and (I <= High(AOut)) then
+  for I := 0 to high(Corpus) do
+    if (Corpus[I].Label_ = ALabel) and (I <= high(AOut)) then
     begin
       AText := AOut[I];
       Exit(True);
@@ -440,18 +463,16 @@ end;
 // uses - shows up as a doubled or misplaced mark, which is what "the kars do
 // not work" looks like on screen. ো/ৌ are judged the same way because the
 // engine splits them into ে + া / ে + ৗ and substitutes the e-kar itself.
-procedure CheckKarOnce(const ATag, ALabel, AWhat: string; const AOut: TArray<string>;
-  const ANames: array of string; APreBase: Boolean);
+procedure CheckKarOnce(const ATag, ALabel, AWhat: string; const AOut: TArray<string>; const ANames: array of string; APreBase: Boolean);
 var
-  S, Hit, Cons: string;
+  S, Hit, Cons:       string;
   N, HitPos, ConsPos: Integer;
 begin
   if not CaseOut(AOut, ALabel, S) then
     Exit;
 
   N := GlyphSum(S, ANames);
-  Check(Format('%s: %s emits one %s glyph', [ATag, ALabel, AWhat]), N = 1,
-    Format('found %d in %s', [N, AnsiEscaped(S)]));
+  Check(Format('%s: %s emits one %s glyph', [ATag, ALabel, AWhat]), N = 1, Format('found %d in %s', [N, AnsiEscaped(S)]));
 
   Hit := GlyphHit(S, ANames);
   Cons := ResolveValue('#{A_K}');
@@ -496,7 +517,7 @@ end;
 function CardValue(const ACard, AKey: string): string;
 var
   Lines: TStringList;
-  I: Integer;
+  I:     Integer;
 begin
   Result := '';
   Lines := TStringList.Create;
@@ -538,27 +559,24 @@ end;
 procedure AnalyseOneMapping(const APath, ATag: string; const AOut: TArray<string>);
 var
   SourceText, ExportText, ParseLog, TmpFile: string;
-  SrcCounts, ExpCounts: TDictionary<string, Integer>;
-  Name, Card, DeclaredEnc: string;
-  CardLines: TStringList;
-  SrcN, ExpN, I: Integer;
-  Shrunk, Dropped: TList<string>;
-  Missing: TArray<string>;
+  SrcCounts, ExpCounts:                      TDictionary<string, Integer>;
+  Name, Card, DeclaredEnc:                   string;
+  CardLines:                                 TStringList;
+  SrcN, ExpN, I:                             Integer;
+  Shrunk, Dropped:                           TList<string>;
+  Missing:                                   TArray<string>;
 begin
   SourceText := LoadMappingText(APath);
-  Check(ATag + ': mapping text loads', SourceText <> '',
-    'could not read or decrypt ' + ExtractFileName(APath));
+  Check(ATag + ': mapping text loads', SourceText <> '', 'could not read or decrypt ' + ExtractFileName(APath));
   if SourceText = '' then
     Exit;
 
-  Check(ATag + ': mapping parses', InstallMapping(SourceText, ParseLog),
-    'parser rejected the document');
+  Check(ATag + ': mapping parses', InstallMapping(SourceText, ParseLog), 'parser rejected the document');
   if ParseLog <> '' then
     Note(ATag + ': parser log: ' + StringReplace(ParseLog, sLineBreak, ' | ', [rfReplaceAll]));
 
   // Serialize the loaded engine back to JSON and compare with the source.
-  TmpFile := TPath.Combine(TPath.GetTempPath, 'kat_ansiconvert_' +
-    IntToStr(GetCurrentProcessId) + '.json');
+  TmpFile := TPath.Combine(TPath.GetTempPath, 'kat_ansiconvert_' + IntToStr(GetCurrentProcessId) + '.json');
   ExportAnsiMapping(TmpFile);
   ExportText := TFile.ReadAllText(TmpFile, TEncoding.UTF8);
   TFile.Delete(TmpFile);
@@ -572,38 +590,35 @@ begin
     Shrunk := TList<string>.Create;
     Dropped := TList<string>.Create;
     try
-      for Name in SortedNames(SrcCounts) do
+      for name in SortedNames(SrcCounts) do
       begin
         // Metadata is documentation, not engine state: the exporter does not
         // serialize it and its absence is not a dropped section.
-        if SameText(Name, 'Metadata') then
+        if SameText(name, 'Metadata') then
           Continue;
-        SrcN := CountOf(SrcCounts, Name);
-        ExpN := CountOf(ExpCounts, Name);
+        SrcN := CountOf(SrcCounts, name);
+        ExpN := CountOf(ExpCounts, name);
         if SrcN <= 0 then
           Continue;
         if ExpN < 0 then
-          Dropped.Add(Name)
+          Dropped.Add(name)
         else if ExpN < SrcN then
-          Shrunk.Add(Name + ' (' + IntToStr(SrcN) + '->' + IntToStr(ExpN) + ')');
+          Shrunk.Add(name + ' (' + IntToStr(SrcN) + '->' + IntToStr(ExpN) + ')');
       end;
 
-      Check(ATag + ': parser keeps every declared section', Dropped.Count = 0,
-        'sections dropped by the parser: ' + JoinArray(Dropped.ToArray));
-      Check(ATag + ': parser keeps every declared entry', Shrunk.Count = 0,
-        'sections that lost entries: ' + JoinArray(Shrunk.ToArray));
+      Check(ATag + ': parser keeps every declared section', Dropped.Count = 0, 'sections dropped by the parser: ' + JoinArray(Dropped.ToArray));
+      Check(ATag + ': parser keeps every declared entry', Shrunk.Count = 0, 'sections that lost entries: ' + JoinArray(Shrunk.ToArray));
     finally
       Shrunk.Free;
       Dropped.Free;
     end;
 
     // Group names are data here, so they must survive verbatim.
-    for Name in ['RaPhalaGroups', 'ConsonantGroups'] do
-      if MissingKeys(SourceText, ExportText, Name, Missing) then
-        Check(ATag + ': group names survive parsing (' + Name + ')', False,
-          'missing: ' + JoinArray(Missing))
+    for name in ['RaPhalaGroups', 'ConsonantGroups'] do
+      if MissingKeys(SourceText, ExportText, name, Missing) then
+        Check(ATag + ': group names survive parsing (' + name + ')', False, 'missing: ' + JoinArray(Missing))
       else
-        Check(ATag + ': group names survive parsing (' + Name + ')', True);
+        Check(ATag + ': group names survive parsing (' + name + ')', True);
   finally
     SrcCounts.Free;
     ExpCounts.Free;
@@ -618,18 +633,16 @@ begin
   try
     CardLines.Text := Card;
     for I := 0 to CardLines.Count - 1 do
-      if (Pos('Suggested Font', CardLines[I]) > 0) or
-         (Pos('was not found', CardLines[I]) > 0) or
-         (Pos('Name: ', CardLines[I]) = 1) or
-         (Pos('Encoding: ', CardLines[I]) = 1) then
+      if (Pos('Suggested Font', CardLines[I]) > 0) or (Pos('was not found', CardLines[I]) > 0) or (Pos('Name: ', CardLines[I]) = 1) or
+        (Pos('Encoding: ', CardLines[I]) = 1) then
         Note(ATag + ': card: ' + Trim(CardLines[I]));
   finally
     CardLines.Free;
   end;
 
   // The card's two identifying lines are a contract with the user:
-  //   Name     - the file as it appears in Explorer and in the picker,
-  //   Encoding - the profile the DOCUMENT declares.
+  // Name     - the file as it appears in Explorer and in the picker,
+  // Encoding - the profile the DOCUMENT declares.
   // Encoding is never a second copy of the file name: a path-derived value
   // made the card contradict the document, and for a container named after a
   // font (STM-BNT-Arjun.AvroEnco) it reported the font as the encoding. The
@@ -637,33 +650,26 @@ begin
   // named "Ansi V2" while declaring "ANSI V2", so SameText would pass against
   // the path-derived value this gate exists to catch.
   DeclaredEnc := DeclaredEncoding(SourceText);
-  Check(ATag + ': card Encoding reports the declared profile',
-    (DeclaredEnc <> '') and (CardValue(Card, 'Encoding') = DeclaredEnc),
+  Check(ATag + ': card Encoding reports the declared profile', (DeclaredEnc <> '') and (CardValue(Card, 'Encoding') = DeclaredEnc),
     'card: "' + CardValue(Card, 'Encoding') + '" declared: "' + DeclaredEnc + '"');
-  Check(ATag + ': card Name reports the file',
-    CardValue(Card, 'Name') = ExtractFileName(APath),
-    'card: "' + CardValue(Card, 'Name') + '" file: "' +
-    ExtractFileName(APath) + '"');
+  Check(ATag + ': card Name reports the file', CardValue(Card, 'Name') = ExtractFileName(APath), 'card: "' + CardValue(Card, 'Name') + '" file: "' +
+      ExtractFileName(APath) + '"');
 
-  Check(ATag + ': conversion produced output', Length(AOut) = Length(Corpus),
-    'the corpus did not convert');
+  Check(ATag + ': conversion produced output', Length(AOut) = Length(Corpus), 'the corpus did not convert');
   if Length(AOut) = Length(Corpus) then
     Outputs.AddOrSetValue(ATag, AOut);
 
   // No conversion may leak an unresolved reference or plain placeholder text.
-  for I := 0 to High(AOut) do
-    Check(ATag + ': no unresolved reference in output [' + Corpus[I].Label_ + ']',
-      Pos('#{', AOut[I]) = 0, 'output: ' + AnsiEscaped(AOut[I]));
+  for I := 0 to high(AOut) do
+    Check(ATag + ': no unresolved reference in output [' + Corpus[I].Label_ + ']', Pos('#{', AOut[I]) = 0, 'output: ' + AnsiEscaped(AOut[I]));
 
   CheckKarRendering(ATag, AOut);
 
   if not Quiet and (Length(AOut) = Length(Corpus)) then
   begin
     Note(ATag + ': corpus (' + IntToStr(Length(AOut)) + ' cases)');
-    for I := 0 to High(AOut) do
-      Note(Format('  %-20s %-36s -> %-26s %s',
-        [Corpus[I].Label_, UniCodes(Corpus[I].Text),
-         HexBytes(AOut[I]), AnsiEscaped(AOut[I])]));
+    for I := 0 to high(AOut) do
+      Note(Format('  %-20s %-36s -> %-26s %s', [Corpus[I].Label_, UniCodes(Corpus[I].Text), HexBytes(AOut[I]), AnsiEscaped(AOut[I])]));
   end;
 end;
 
@@ -673,49 +679,49 @@ procedure BuildCorpus;
   procedure Add(const ALabel, AText: string);
   begin
     SetLength(Corpus, Length(Corpus) + 1);
-    Corpus[High(Corpus)].Label_ := ALabel;
-    Corpus[High(Corpus)].Text := AText;
+    Corpus[high(Corpus)].Label_ := ALabel;
+    Corpus[high(Corpus)].Text := AText;
   end;
+
 begin
-  Add('single consonant',   Chr(U_K));
-  Add('a-kar',              Chr(U_K) + Chr(U_AAKAR));
-  Add('i-kar',              Chr(U_K) + Chr(U_IKAR));
-  Add('ii-kar',             Chr(U_K) + Chr(U_IIKAR));
-  Add('u-kar',              Chr(U_K) + Chr(U_UKAR));
-  Add('uu-kar',             Chr(U_K) + Chr(U_UUKAR));
-  Add('ri-kar',             Chr(U_K) + Chr(U_RIKAR));
-  Add('e-kar',              Chr(U_K) + Chr(U_EKAR));
-  Add('oi-kar',             Chr(U_K) + Chr(U_OIKAR));
-  Add('o-kar',              Chr(U_K) + Chr(U_OKAR));
-  Add('ou-kar',             Chr(U_K) + Chr(U_OUKAR));
-  Add('k-k conjunct',       Chr(U_K) + Chr(U_HASANTA) + Chr(U_K));
-  Add('k-t conjunct',       Chr(U_K) + Chr(U_HASANTA) + Chr(U_T));
-  Add('k-ss conjunct',      Chr(U_K) + Chr(U_HASANTA) + Chr(U_SS));
-  Add('k-sh conjunct',      Chr(U_K) + Chr(U_HASANTA) + Chr(U_SH));
-  Add('kr (ra-phala)',      Chr(U_K) + Chr(U_HASANTA) + Chr(U_R));
-  Add('pr (ra-phala)',      Chr(U_P) + Chr(U_HASANTA) + Chr(U_R));
-  Add('bhr (ra-phala)',     Chr(U_BH) + Chr(U_HASANTA) + Chr(U_R));
-  Add('tr (ra-phala)',      Chr(U_T) + Chr(U_HASANTA) + Chr(U_R));
-  Add('gr (ra-phala)',      Chr(U_G) + Chr(U_HASANTA) + Chr(U_R));
-  Add('shr (ra-phala)',     Chr(U_SH) + Chr(U_HASANTA) + Chr(U_R));
-  Add('mr (ra-phala)',      Chr(U_M) + Chr(U_HASANTA) + Chr(U_R));
-  Add('jr (ra-phala)',      Chr(U_J) + Chr(U_HASANTA) + Chr(U_R));
-  Add('j-nya conjunct',     Chr(U_J) + Chr(U_HASANTA) + Chr(U_NYA));
-  Add('n-ch conjunct',      Chr(U_N) + Chr(U_HASANTA) + Chr(U_C));
-  Add('r-k (reph)',         Chr(U_R) + Chr(U_HASANTA) + Chr(U_K));
-  Add('r-ki (reph+kar)',    Chr(U_R) + Chr(U_HASANTA) + Chr(U_K) + Chr(U_IKAR));
-  Add('anushvara',          Chr(U_K) + Chr(U_ANUSVARA));
-  Add('visarga',            Chr(U_K) + Chr(U_VISARGA));
-  Add('chandrabindu',       Chr(U_K) + Chr(U_CHANDRABINDU));
-  Add('khanda-ta',          Chr(U_K) + Chr(U_HASANTA) + Chr(U_T_KHANDATA));
+  Add('single consonant', Chr(U_K));
+  Add('a-kar', Chr(U_K) + Chr(U_AAKAR));
+  Add('i-kar', Chr(U_K) + Chr(U_IKAR));
+  Add('ii-kar', Chr(U_K) + Chr(U_IIKAR));
+  Add('u-kar', Chr(U_K) + Chr(U_UKAR));
+  Add('uu-kar', Chr(U_K) + Chr(U_UUKAR));
+  Add('ri-kar', Chr(U_K) + Chr(U_RIKAR));
+  Add('e-kar', Chr(U_K) + Chr(U_EKAR));
+  Add('oi-kar', Chr(U_K) + Chr(U_OIKAR));
+  Add('o-kar', Chr(U_K) + Chr(U_OKAR));
+  Add('ou-kar', Chr(U_K) + Chr(U_OUKAR));
+  Add('k-k conjunct', Chr(U_K) + Chr(U_HASANTA) + Chr(U_K));
+  Add('k-t conjunct', Chr(U_K) + Chr(U_HASANTA) + Chr(U_T));
+  Add('k-ss conjunct', Chr(U_K) + Chr(U_HASANTA) + Chr(U_SS));
+  Add('k-sh conjunct', Chr(U_K) + Chr(U_HASANTA) + Chr(U_SH));
+  Add('kr (ra-phala)', Chr(U_K) + Chr(U_HASANTA) + Chr(U_R));
+  Add('pr (ra-phala)', Chr(U_P) + Chr(U_HASANTA) + Chr(U_R));
+  Add('bhr (ra-phala)', Chr(U_BH) + Chr(U_HASANTA) + Chr(U_R));
+  Add('tr (ra-phala)', Chr(U_T) + Chr(U_HASANTA) + Chr(U_R));
+  Add('gr (ra-phala)', Chr(U_G) + Chr(U_HASANTA) + Chr(U_R));
+  Add('shr (ra-phala)', Chr(U_SH) + Chr(U_HASANTA) + Chr(U_R));
+  Add('mr (ra-phala)', Chr(U_M) + Chr(U_HASANTA) + Chr(U_R));
+  Add('jr (ra-phala)', Chr(U_J) + Chr(U_HASANTA) + Chr(U_R));
+  Add('j-nya conjunct', Chr(U_J) + Chr(U_HASANTA) + Chr(U_NYA));
+  Add('n-ch conjunct', Chr(U_N) + Chr(U_HASANTA) + Chr(U_C));
+  Add('r-k (reph)', Chr(U_R) + Chr(U_HASANTA) + Chr(U_K));
+  Add('r-ki (reph+kar)', Chr(U_R) + Chr(U_HASANTA) + Chr(U_K) + Chr(U_IKAR));
+  Add('anushvara', Chr(U_K) + Chr(U_ANUSVARA));
+  Add('visarga', Chr(U_K) + Chr(U_VISARGA));
+  Add('chandrabindu', Chr(U_K) + Chr(U_CHANDRABINDU));
+  Add('khanda-ta', Chr(U_K) + Chr(U_HASANTA) + Chr(U_T_KHANDATA));
   Add('k-ss-m (full form)', Chr(U_K) + Chr(U_HASANTA) + Chr(U_SS) + Chr(U_HASANTA) + Chr(U_M));
-  Add('digits',             Chr($09E6) + Chr($09E7) + Chr($09E8) + Chr($09E9) + Chr($09EA));
-  Add('danda-taka',         Chr(U_K) + Chr(U_DANDA) + Chr(U_TAKA));
-  Add('aa (independent)',   Chr(U_AA));
-  Add('word bangla',        Chr(U_B) + Chr(U_AAKAR) + Chr(U_N) + Chr(U_HASANTA) +
-                            Chr(U_L) + Chr(U_AAKAR));
-  Add('word sonar',         Chr(U_S) + Chr(U_OKAR) + Chr(U_N) + Chr(U_AAKAR) + Chr(U_R));
-  Add('ascii passthrough',  'abZ 123 !?');
+  Add('digits', Chr($09E6) + Chr($09E7) + Chr($09E8) + Chr($09E9) + Chr($09EA));
+  Add('danda-taka', Chr(U_K) + Chr(U_DANDA) + Chr(U_TAKA));
+  Add('aa (independent)', Chr(U_AA));
+  Add('word bangla', Chr(U_B) + Chr(U_AAKAR) + Chr(U_N) + Chr(U_HASANTA) + Chr(U_L) + Chr(U_AAKAR));
+  Add('word sonar', Chr(U_S) + Chr(U_OKAR) + Chr(U_N) + Chr(U_AAKAR) + Chr(U_R));
+  Add('ascii passthrough', 'abZ 123 !?');
 end;
 
 { ---- container vs JSON --------------------------------------------------- }
@@ -731,8 +737,7 @@ begin
     N := Length(B);
   for I := 0 to N - 1 do
     if A[I] <> B[I] then
-      Exit(Corpus[I].Label_ + ': first="' + AnsiEscaped(A[I]) +
-        '" second="' + AnsiEscaped(B[I]) + '"');
+      Exit(Corpus[I].Label_ + ': first="' + AnsiEscaped(A[I]) + '" second="' + AnsiEscaped(B[I]) + '"');
   if Length(A) <> Length(B) then
     Exit('lengths differ (' + IntToStr(Length(A)) + ' vs ' + IntToStr(Length(B)) + ')');
   Result := '';
@@ -750,16 +755,16 @@ function SameCaseCount(const A, B: TArray<string>): Integer; forward;
 // not declare it" instead of "the file is broken".
 procedure ReportCorpusTable;
 var
-  Tags: TArray<string>;
-  Sorted: TList<string>;
-  Name, Line: string;
-  I, J: Integer;
+  Tags:            TArray<string>;
+  Sorted:          TList<string>;
+  Name, Line:      string;
+  I, J:            Integer;
   AgreesWithFirst: Boolean;
 begin
   Sorted := TList<string>.Create;
   try
-    for Name in Outputs.Keys do
-      Sorted.Add(Name);
+    for name in Outputs.Keys do
+      Sorted.Add(name);
     Sorted.Sort;
     Tags := Sorted.ToArray;
   finally
@@ -769,17 +774,16 @@ begin
     Exit;
 
   WriteLn('--- corpus output per mapping (first column = case, then one column per mapping)');
-  for I := 0 to High(Corpus) do
+  for I := 0 to high(Corpus) do
   begin
     Line := Format('  %-20s', [Corpus[I].Label_]);
-    for J := 0 to High(Tags) do
+    for J := 0 to high(Tags) do
     begin
-      if I <= High(Outputs[Tags[J]]) then
+      if I <= high(Outputs[Tags[J]]) then
         Line := Line + Format(' %-14s', [AnsiEscaped(Outputs[Tags[J]][I])]);
     end;
-    AgreesWithFirst := (Length(Tags) > 1) and
-      (I <= High(Outputs[Tags[0]])) and (I <= High(Outputs[Tags[High(Tags)]])) and
-      (Outputs[Tags[0]][I] = Outputs[Tags[High(Tags)]][I]);
+    AgreesWithFirst := (Length(Tags) > 1) and (I <= high(Outputs[Tags[0]])) and (I <= high(Outputs[Tags[high(Tags)]])) and
+      (Outputs[Tags[0]][I] = Outputs[Tags[high(Tags)]][I]);
     if AgreesWithFirst then
       Line := Line + '  <= same as ' + Tags[0];
     WriteLn(Line);
@@ -792,15 +796,15 @@ end;
 // defaults were tuned for.
 procedure ReportCrossMapping;
 var
-  Tags: TArray<string>;
+  Tags:   TArray<string>;
   Sorted: TList<string>;
-  Name: string;
-  I, J: Integer;
+  Name:   string;
+  I, J:   Integer;
 begin
   Sorted := TList<string>.Create;
   try
-    for Name in Outputs.Keys do
-      Sorted.Add(Name);
+    for name in Outputs.Keys do
+      Sorted.Add(name);
     Sorted.Sort;
     Tags := Sorted.ToArray;
   finally
@@ -809,13 +813,10 @@ begin
 
   if Length(Tags) < 2 then
     Exit;
-  WriteLn('--- cross-mapping agreement (identical corpus cases out of ' +
-    IntToStr(Length(Corpus)) + ')');
-  for I := 0 to High(Tags) do
-    for J := I + 1 to High(Tags) do
-      WriteLn(Format('       %-14s vs %-14s %d/%d',
-        [Tags[I], Tags[J], SameCaseCount(Outputs[Tags[I]], Outputs[Tags[J]]),
-         Length(Corpus)]));
+  WriteLn('--- cross-mapping agreement (identical corpus cases out of ' + IntToStr(Length(Corpus)) + ')');
+  for I := 0 to high(Tags) do
+    for J := I + 1 to high(Tags) do
+      WriteLn(Format('       %-14s vs %-14s %d/%d', [Tags[I], Tags[J], SameCaseCount(Outputs[Tags[I]], Outputs[Tags[J]]), Length(Corpus)]));
 end;
 
 function SameCaseCount(const A, B: TArray<string>): Integer;
@@ -833,9 +834,9 @@ end;
 
 procedure RunFolder(const ADir: string);
 var
-  Conts: TArray<string>;
+  Conts:                                   TArray<string>;
   FileName, Base, JsonPath, Tag, ParseLog: string;
-  ContOut, JsonOut: TArray<string>;
+  ContOut, JsonOut:                        TArray<string>;
 begin
   if not TDirectory.Exists(ADir) then
   begin
@@ -844,8 +845,7 @@ begin
   end;
 
   Conts := TDirectory.GetFiles(ADir, '*.AvroEnco');
-  Check('mapping dir has .AvroEnco files: ' + ADir, Length(Conts) > 0,
-    'no .AvroEnco found');
+  Check('mapping dir has .AvroEnco files: ' + ADir, Length(Conts) > 0, 'no .AvroEnco found');
 
   for FileName in Conts do
   begin
@@ -877,8 +877,7 @@ begin
       if InstallMapping(LoadMappingText(JsonPath), ParseLog) then
       begin
         JsonOut := ConvertAll;
-        Check(Tag + ': container output matches the plain .json output',
-          (Length(ContOut) = Length(JsonOut)) and (FirstDifference(ContOut, JsonOut) = ''),
+        Check(Tag + ': container output matches the plain .json output', (Length(ContOut) = Length(JsonOut)) and (FirstDifference(ContOut, JsonOut) = ''),
           FirstDifference(ContOut, JsonOut));
       end
       else
@@ -889,7 +888,7 @@ end;
 
 var
   DirArg: string;
-  I: Integer;
+  I:      Integer;
 
 begin
   Fails := 0;
@@ -907,7 +906,7 @@ begin
       SourceDir := ParamStr(I);
 
   BuildCorpus;
-  Outputs := TDictionary<string, TArray<string>>.Create;
+  Outputs := TDictionary < string, TArray < string >>.Create;
 
   if DirArg = '' then
   begin
@@ -929,4 +928,5 @@ begin
     WriteLn(Format('%d of %d checks FAILED', [Fails, Checks]));
 
   ExitCode := Ord(Fails > 0);
+
 end.

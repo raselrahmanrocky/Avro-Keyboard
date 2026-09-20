@@ -75,6 +75,7 @@
         <VerInfo_AutoIncVersion>true</VerInfo_AutoIncVersion>
         <Custom_Styles>Windows10|VCLSTYLE|$(BDSCOMMONDIR)\Styles\Windows10.vsf;&quot;Windows10 Dark|VCLSTYLE|$(BDSCOMMONDIR)\Styles\Windows10Dark.vsf&quot;</Custom_Styles>
         <DCC_ExeOutput>.\..\build\</DCC_ExeOutput>
+        <DCC_DcuOutput>.\..\build\dcu\LayoutEditor\$(Platform)\$(Config)\</DCC_DcuOutput>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Base_Win32)'!=''">
         <DCC_Namespace>Data.Win;Datasnap.Win;Web.Win;Soap.Win;Xml.Win;Bde;$(DCC_Namespace)</DCC_Namespace>

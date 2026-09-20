@@ -52,12 +52,12 @@ procedure RebuildAnviVersionMenus;
 
   procedure BuildSingleMenu(AMenu: TMenuItem; const ASearchDir: string);
   var
-    SR: TSearchRec;
-    FileTitle: string;
+    SR:                     TSearchRec;
+    FileTitle:              string;
     Sep, MoreOptMenu, Item: TMenuItem;
-    I: Integer;
-    DisplayName: string;
-    Checked: Boolean;
+    I:                      Integer;
+    DisplayName:            string;
+    Checked:                Boolean;
 
     procedure AddDirectItem(AParentMenu: TMenuItem; const AName: string; AChecked: Boolean);
     var
@@ -183,11 +183,7 @@ var
 begin
   if SameText(AMapName, 'Default') then
   begin
-    MessageDlg(
-      'Built-in Default mapping cannot be exported as a file.' + sLineBreak +
-      'It is compiled into Avro Keyboard.',
-      mtInformation, [mbOK], 0
-    );
+    MessageDlg('Built-in Default mapping cannot be exported as a file.' + sLineBreak + 'It is compiled into Avro Keyboard.', mtInformation, [mbOK], 0);
     Exit;
   end;
 
@@ -202,11 +198,8 @@ begin
   try
     if not IsEncoFile(SourcePath) then
     begin
-      MessageDlg(
-        'This mapping is a plain JSON file and cannot be exported as .AvroEnco.' + sLineBreak +
-        'Re-import it as an .AvroEnco file to enable export.',
-        mtError, [mbOK], 0
-      );
+      MessageDlg('This mapping is a plain JSON file and cannot be exported as .AvroEnco.' + sLineBreak + 'Re-import it as an .AvroEnco file to enable export.',
+        mtError, [mbOK], 0);
       Exit;
     end;
     SaveDialog.Filter := 'Avro Encoded Mapping|*.AvroEnco';
@@ -233,17 +226,13 @@ end;
 procedure ShowMappingDescription(const AMapName: string);
 var
   AnsiMappingDir, SourcePath, JsonPath, JSONContent, MetaText, DescText: string;
-  Password: AnsiString;
-  IsProtected: Boolean;
+  Password:                                                              AnsiString;
+  IsProtected:                                                           Boolean;
 begin
   if SameText(AMapName, 'Default') then
   begin
-    MessageDlg(
-      'Mapping: Default' + sLineBreak +
-      'Built-in Bijoy 2000 compatible ANSI mapping.' + sLineBreak + sLineBreak +
-      'Features automatic contextual post-base & pre-base kar mapping.',
-      mtInformation, [mbOK], 0
-    );
+    MessageDlg('Mapping: Default' + sLineBreak + 'Built-in Bijoy 2000 compatible ANSI mapping.' + sLineBreak + sLineBreak +
+        'Features automatic contextual post-base & pre-base kar mapping.', mtInformation, [mbOK], 0);
     Exit;
   end;
 
@@ -258,15 +247,13 @@ begin
   // Remember whether this mapping lives in a password-protected container so
   // the card can mark it; captured before the fallback may switch to a
   // same-named .json file below.
-  IsProtected := IsEncoFile(SourcePath) and
-    (GetAvroEncoProtectionFlag(SourcePath) = AVROENCO_FLAG_USER_PASSWORD);
+  IsProtected := IsEncoFile(SourcePath) and (GetAvroEncoProtectionFlag(SourcePath) = AVROENCO_FLAG_USER_PASSWORD);
   if IsEncoFile(SourcePath) then
   begin
     // Only password-protected files (flag $01 / legacy v1) prompt, and only
     // the very first time on this computer - the per-file cache decrypts
     // silently afterwards. Default-key files never prompt.
-    if (GetEncoCachedPassword(SourcePath) = '') and
-      (GetAvroEncoProtectionFlag(SourcePath) = AVROENCO_FLAG_USER_PASSWORD) then
+    if (GetEncoCachedPassword(SourcePath) = '') and (GetAvroEncoProtectionFlag(SourcePath) = AVROENCO_FLAG_USER_PASSWORD) then
     begin
       if not PromptForPasswordAndValidate(SourcePath, Password) then
         Exit;
@@ -350,10 +337,7 @@ begin
     Exit;
   end;
 
-  if MessageDlg(
-    'Are you sure you want to delete the mapping "' + AMapName + '"?',
-    mtConfirmation, [mbYes, mbNo], 0
-  ) <> mrYes then
+  if MessageDlg('Are you sure you want to delete the mapping "' + AMapName + '"?', mtConfirmation, [mbYes, mbNo], 0) <> mrYes then
     Exit;
 
   AnsiDir := GetAvroDataDir + 'AnsiMapping\';

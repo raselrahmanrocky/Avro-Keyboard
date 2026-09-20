@@ -44,9 +44,9 @@ type
       FPrevForegroundWindow: HWND;
       // Resolved once per open (the form is created fresh every time it is
       // shown), so the draw handler never reads the registry.
-      FTheme:                TAppThemePalette;
-      FLayoutNames:          TStringList;
-      FLayoutValues:         TStringList;
+      FTheme:        TAppThemePalette;
+      FLayoutNames:  TStringList;
+      FLayoutValues: TStringList;
       function GetSelectedLayoutValue: string;
       procedure AutoSizeForm;
       procedure FormPaint(Sender: TObject);

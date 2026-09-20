@@ -2,7 +2,7 @@
   Persistent encrypted ANSI mapping cache.
 
   Cache location:
-    %APPDATA%\AvroKeyboard\Cache\<SHA-256 of source file>.cache
+  %APPDATA%\AvroKeyboard\Cache\<SHA-256 of source file>.cache
 
   The cache stores the decrypted UTF-8 mapping JSON encrypted with
   AES-256-GCM.  Its key includes the application secret, the source digest,
@@ -22,8 +22,7 @@ interface
 uses
   System.SysUtils;
 
-function LoadAnsiJSONCached(const ASourcePath: string;
-  const APassword: AnsiString; out AJSON: string): Boolean;
+function LoadAnsiJSONCached(const ASourcePath: string; const APassword: AnsiString; out AJSON: string): Boolean;
 procedure DeleteAnsiCache(const ASourcePath: string);
 procedure CleanupAnsiCache;
 function GetAnsiCacheDirectory: string;
@@ -51,21 +50,21 @@ var
   CacheWriteLock: TCriticalSection;
 
 const
-  CACHE_MAGIC: array[0..7] of AnsiChar = ('A','V','R','O','C','A','C','H');
-  CACHE_FORMAT_VERSION = 1;
-  CACHE_PARSER_VERSION = 1; // increment whenever mapping parser semantics change
-  CACHE_NONCE_SIZE = 12;
-  CACHE_DIGEST_SIZE = 32;
+  CACHE_MAGIC: array [0 .. 7] of AnsiChar = ('A', 'V', 'R', 'O', 'C', 'A', 'C', 'H');
+  CACHE_FORMAT_VERSION                    = 1;
+  CACHE_PARSER_VERSION                    = 1; // increment whenever mapping parser semantics change
+  CACHE_NONCE_SIZE                        = 12;
+  CACHE_DIGEST_SIZE                       = 32;
 
 type
   TAnsiCacheHeader = packed record
-    Magic: array[0..7] of AnsiChar;
+    Magic: array [0 .. 7] of AnsiChar;
     FormatVersion: Cardinal;
     ParserVersion: Cardinal;
     SourceSize: Int64;
     SourceWriteTimeUtc: TDateTime;
-    SourceSHA256: array[0..31] of Byte;
-    Nonce: array[0..11] of Byte;
+    SourceSHA256: array [0 .. 31] of Byte;
+    Nonce: array [0 .. 11] of Byte;
     PayloadSize: UInt64; // ciphertext + 16-byte GCM tag
   end;
 
@@ -83,20 +82,20 @@ end;
 const
   HASH_CHUNK_SIZE = 64 * 1024;
 
-{ SHA-256 of a file, streamed in fixed-size chunks.
+  { SHA-256 of a file, streamed in fixed-size chunks.
 
-  This used to be TFile.ReadAllBytes + one Update: a full private copy of the
-  container (114 KB for the largest shipped mapping) allocated, hashed and then
-  zeroed, on every load path - on top of the decrypt buffer and the UTF-16
-  string the caller builds next, with the parsed engine parked in RAM behind
-  all three. Hashing needs none of that to exist at once, and the digest is
-  identical because SHA-256 is defined over a stream. }
+    This used to be TFile.ReadAllBytes + one Update: a full private copy of the
+    container (114 KB for the largest shipped mapping) allocated, hashed and then
+    zeroed, on every load path - on top of the decrypt buffer and the UTF-16
+    string the caller builds next, with the parsed engine parked in RAM behind
+    all three. Hashing needs none of that to exist at once, and the digest is
+    identical because SHA-256 is defined over a stream. }
 function HashFile(const APath: string; out ASize: Int64): TBytes;
 var
-  FS: TFileStream;
-  Chunk: TBytes;
+  FS:        TFileStream;
+  Chunk:     TBytes;
   BytesRead: Integer;
-  H: THashSHA2;
+  H:         THashSHA2;
 begin
   Result := nil;
   ASize := 0;
@@ -121,12 +120,12 @@ end;
 
 function BytesToHex(const ABytes: TBytes): string;
 const
-  Hex: array[0..15] of Char = '0123456789abcdef';
+  Hex: array [0 .. 15] of Char = '0123456789abcdef';
 var
   I: Integer;
 begin
   SetLength(Result, Length(ABytes) * 2);
-  for I := 0 to High(ABytes) do
+  for I := 0 to high(ABytes) do
   begin
     Result[I * 2 + 1] := Hex[ABytes[I] shr 4];
     Result[I * 2 + 2] := Hex[ABytes[I] and $0F];
@@ -139,8 +138,7 @@ begin
   // the cache actually persists across runs (ProgramData required
   // installer-created ACLs and could silently fall back to decrypting
   // every startup). Format stays <SHA-256>.cache.
-  Result := IncludeTrailingPathDelimiter(
-    GetEnvironmentVariable('APPDATA')) + 'AvroKeyboard\Cache\';
+  Result := IncludeTrailingPathDelimiter(GetEnvironmentVariable('APPDATA')) + 'AvroKeyboard\Cache\';
   ForceDirectories(Result);
 end;
 
@@ -157,14 +155,12 @@ end;
 
 function SameDigest(const A: array of Byte; const B: TBytes): Boolean;
 begin
-  Result := (Length(A) = Length(B)) and
-    ((Length(B) = 0) or CompareMem(@A[0], @B[0], Length(B)));
+  Result := (Length(A) = Length(B)) and ((Length(B) = 0) or CompareMem(@A[0], @B[0], Length(B)));
 end;
 
-function BuildCacheKey(const ASourceDigest: TBytes;
-  const APassword: AnsiString): TBytes;
+function BuildCacheKey(const ASourceDigest: TBytes; const APassword: AnsiString): TBytes;
 var
-  Secret: string;
+  Secret:   string;
   Material: TBytes;
 begin
   // Password becomes key material for password-protected containers. For
@@ -191,30 +187,39 @@ begin
   Move(H, Result[0], AADSize);
 end;
 
-function TryReadCache(const ACachePath: string; const ADigest: TBytes;
-  const ASourceSize: Int64; const ASourceTime: TDateTime;
-  const APassword: AnsiString; out AJSON: string): Boolean;
+function TryReadCache(const ACachePath: string; const ADigest: TBytes; const ASourceSize: Int64; const ASourceTime: TDateTime; const APassword: AnsiString;
+  out AJSON: string): Boolean;
 var
-  FS: TFileStream;
-  H: TAnsiCacheHeader;
+  FS:                             TFileStream;
+  H:                              TAnsiCacheHeader;
   Cipher, Plain, Key, Nonce, AAD: TBytes;
 begin
   Result := False;
   AJSON := '';
-  if not FileExists(ACachePath) then Exit;
+  if not FileExists(ACachePath) then
+    Exit;
   try
     FS := TFileStream.Create(ACachePath, fmOpenRead or fmShareDenyNone);
     try
-      if FS.Size < SizeOf(H) then Exit;
+      if FS.Size < SizeOf(H) then
+        Exit;
       FS.ReadBuffer(H, SizeOf(H));
-      if not CompareMem(@H.Magic[0], @CACHE_MAGIC[0], SizeOf(CACHE_MAGIC)) then Exit;
-      if H.FormatVersion <> CACHE_FORMAT_VERSION then Exit;
-      if H.ParserVersion <> CACHE_PARSER_VERSION then Exit;
-      if H.SourceSize <> ASourceSize then Exit;
-      if H.SourceWriteTimeUtc <> ASourceTime then Exit;
-      if not SameDigest(H.SourceSHA256, ADigest) then Exit;
-      if (H.PayloadSize < 16) or (H.PayloadSize > UInt64(MaxInt)) then Exit;
-      if UInt64(FS.Size - SizeOf(H)) <> H.PayloadSize then Exit;
+      if not CompareMem(@H.Magic[0], @CACHE_MAGIC[0], SizeOf(CACHE_MAGIC)) then
+        Exit;
+      if H.FormatVersion <> CACHE_FORMAT_VERSION then
+        Exit;
+      if H.ParserVersion <> CACHE_PARSER_VERSION then
+        Exit;
+      if H.SourceSize <> ASourceSize then
+        Exit;
+      if H.SourceWriteTimeUtc <> ASourceTime then
+        Exit;
+      if not SameDigest(H.SourceSHA256, ADigest) then
+        Exit;
+      if (H.PayloadSize < 16) or (H.PayloadSize > UInt64(MaxInt)) then
+        Exit;
+      if UInt64(FS.Size - SizeOf(H)) <> H.PayloadSize then
+        Exit;
       SetLength(Cipher, Integer(H.PayloadSize));
       FS.ReadBuffer(Cipher[0], Length(Cipher));
     finally
@@ -225,25 +230,27 @@ begin
     Move(H.Nonce[0], Nonce[0], CACHE_NONCE_SIZE);
     AAD := HeaderAAD(H);
     Key := BuildCacheKey(ADigest, APassword);
-    if not AES256GCMDecrypt(Cipher, Key, Nonce, AAD, Plain) then Exit;
+    if not AES256GCMDecrypt(Cipher, Key, Nonce, AAD, Plain) then
+      Exit;
     AJSON := Trim(TEncoding.UTF8.GetString(Plain));
     Result := (AJSON <> '') and (AJSON[1] = '{');
   except
     Result := False;
     AJSON := '';
   end;
-  if Length(Plain) > 0 then FillChar(Plain[0], Length(Plain), 0);
-  if Length(Key) > 0 then FillChar(Key[0], Length(Key), 0);
+  if Length(Plain) > 0 then
+    FillChar(Plain[0], Length(Plain), 0);
+  if Length(Key) > 0 then
+    FillChar(Key[0], Length(Key), 0);
 end;
 
-procedure WriteCache(const ACachePath: string; const ADigest: TBytes;
-  const ASourceSize: Int64; const ASourceTime: TDateTime;
-  const APassword: AnsiString; const AJSON: string);
+procedure WriteCache(const ACachePath: string; const ADigest: TBytes; const ASourceSize: Int64; const ASourceTime: TDateTime; const APassword: AnsiString;
+  const AJSON: string);
 var
-  H: TAnsiCacheHeader;
+  H:                              TAnsiCacheHeader;
   Plain, Cipher, Key, Nonce, AAD: TBytes;
-  FS: TFileStream;
-  TempPath: string;
+  FS:                             TFileStream;
+  TempPath:                       string;
 begin
   FillChar(H, SizeOf(H), 0);
   Move(CACHE_MAGIC[0], H.Magic[0], SizeOf(CACHE_MAGIC));
@@ -281,29 +288,30 @@ begin
     CacheWriteLock.Leave;
   end;
 
-  if Length(Plain) > 0 then FillChar(Plain[0], Length(Plain), 0);
-  if Length(Key) > 0 then FillChar(Key[0], Length(Key), 0);
+  if Length(Plain) > 0 then
+    FillChar(Plain[0], Length(Plain), 0);
+  if Length(Key) > 0 then
+    FillChar(Key[0], Length(Key), 0);
 end;
 
-function LoadAnsiJSONCached(const ASourcePath: string;
-  const APassword: AnsiString; out AJSON: string): Boolean;
+function LoadAnsiJSONCached(const ASourcePath: string; const APassword: AnsiString; out AJSON: string): Boolean;
 var
-  Digest: TBytes;
+  Digest:     TBytes;
   SourceSize: Int64;
   SourceTime: TDateTime;
-  CachePath: string;
+  CachePath:  string;
   LegacyPath: string;
 begin
   Result := False;
   AJSON := '';
-  if not FileExists(ASourcePath) then Exit;
+  if not FileExists(ASourcePath) then
+    Exit;
   try
     Digest := HashFile(ASourcePath, SourceSize);
     SourceTime := TFile.GetLastWriteTimeUtc(ASourcePath);
     CachePath := CachePathForDigest(Digest);
 
-    if TryReadCache(CachePath, Digest, SourceSize, SourceTime,
-      APassword, AJSON) then
+    if TryReadCache(CachePath, Digest, SourceSize, SourceTime, APassword, AJSON) then
     begin
       Log('ANSI persistent cache HIT: ' + ExtractFileName(ASourcePath));
       Exit(True);
@@ -312,12 +320,9 @@ begin
     // Legacy location (ProgramData, versions before the AppData move):
     // read-only fallback. On a valid hit the entry is migrated to AppData.
     LegacyPath := GetLegacyAnsiCacheDirectory + BytesToHex(Digest) + '.cache';
-    if (LegacyPath <> CachePath) and
-      TryReadCache(LegacyPath, Digest, SourceSize, SourceTime,
-        APassword, AJSON) then
+    if (LegacyPath <> CachePath) and TryReadCache(LegacyPath, Digest, SourceSize, SourceTime, APassword, AJSON) then
     begin
-      Log('ANSI persistent cache LEGACY HIT (migrated): ' +
-        ExtractFileName(LegacyPath));
+      Log('ANSI persistent cache LEGACY HIT (migrated): ' + ExtractFileName(LegacyPath));
       try
         WriteCache(CachePath, Digest, SourceSize, SourceTime, APassword, AJSON);
       except
@@ -331,7 +336,8 @@ begin
       AJSON := Trim(DecryptAvroEncoToString(ASourcePath, APassword))
     else
       AJSON := Trim(TFile.ReadAllText(ASourcePath, TEncoding.UTF8));
-    if (AJSON = '') or (AJSON[1] <> '{') then Exit;
+    if (AJSON = '') or (AJSON[1] <> '{') then
+      Exit;
 
     try
       WriteCache(CachePath, Digest, SourceSize, SourceTime, APassword, AJSON);
@@ -349,19 +355,22 @@ end;
 
 procedure DeleteAnsiCache(const ASourcePath: string);
 var
-  Digest: TBytes;
-  N: Int64;
+  Digest:     TBytes;
+  N:          Int64;
   P, LegacyP: string;
 begin
-  if not FileExists(ASourcePath) then Exit;
+  if not FileExists(ASourcePath) then
+    Exit;
   try
     Digest := HashFile(ASourcePath, N);
     P := CachePathForDigest(Digest);
     LegacyP := GetLegacyAnsiCacheDirectory + BytesToHex(Digest) + '.cache';
     CacheWriteLock.Enter;
     try
-      if FileExists(P) then DeleteFile(P);
-      if (LegacyP <> P) and FileExists(LegacyP) then DeleteFile(LegacyP);
+      if FileExists(P) then
+        DeleteFile(P);
+      if (LegacyP <> P) and FileExists(LegacyP) then
+        DeleteFile(LegacyP);
     finally
       CacheWriteLock.Leave;
     end;
@@ -372,7 +381,7 @@ end;
 
 procedure CleanupAnsiCache;
 var
-  SR: TSearchRec;
+  SR:  TSearchRec;
   Dir: string;
 begin
   Dir := GetAnsiCacheDirectory;
@@ -392,9 +401,11 @@ begin
 end;
 
 initialization
-  CacheWriteLock := TCriticalSection.Create;
+
+CacheWriteLock := TCriticalSection.Create;
 
 finalization
-  FreeAndNil(CacheWriteLock);
+
+FreeAndNil(CacheWriteLock);
 
 end.

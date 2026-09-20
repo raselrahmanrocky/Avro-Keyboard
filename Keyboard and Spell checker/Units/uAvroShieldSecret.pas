@@ -1,4 +1,4 @@
-{=---------------------------------------------------------------------------
+{ =---------------------------------------------------------------------------
   uAvroShieldSecret - obfuscated root secret for default-key containers.
 
   GENERATED FILE - do not edit by hand. Regenerate with
@@ -19,7 +19,7 @@
   secrets do not interoperate (by design - that is what rotation means). The
   pinned digest in kat_shieldsecret.dpr intentionally fails on rotation so a
   new secret cannot be adopted by accident.
-  ---------------------------------------------------------------------------}
+  --------------------------------------------------------------------------- }
 
 unit uAvroShieldSecret;
 
@@ -63,15 +63,11 @@ const
   AVRO_SECRET_LEN = 44;
 
   { Masked secret. blob[i] XOR rotl8(keystream(i), i mod 8) == ikm[i]. }
-  AVRO_SECRET_BLOB: array [0 .. 47] of Byte = (
-        $69, $4E, $E0, $42, $C6, $73, $63, $1E, $8D, $F2, $ED, $C2,
-        $AE, $BA, $7B, $5F, $97, $B6, $91, $8C, $9D, $E9, $37, $A2,
-        $3D, $AB, $CD, $F7, $3A, $80, $C3, $6E, $AA, $63, $37, $02,
-        $43, $40, $57, $E9, $2F, $02, $B1, $B6, $8D, $BA, $4A, $06
-  );
+  AVRO_SECRET_BLOB: array [0 .. 47] of Byte = ($69, $4E, $E0, $42, $C6, $73, $63, $1E, $8D, $F2, $ED, $C2, $AE, $BA, $7B, $5F, $97, $B6, $91, $8C, $9D, $E9,
+    $37, $A2, $3D, $AB, $CD, $F7, $3A, $80, $C3, $6E, $AA, $63, $37, $02, $43, $40, $57, $E9, $2F, $02, $B1, $B6, $8D, $BA, $4A, $06);
 
-{ One xorshift32 step (Marsaglia). Kept trivial on purpose: this function and
-  its caller are the VMProtectBeginUltra region. }
+  { One xorshift32 step (Marsaglia). Kept trivial on purpose: this function and
+    its caller are the VMProtectBeginUltra region. }
 function AvroSecretXorShift32(AState: Cardinal): Cardinal; inline;
 begin
   AState := AState xor (AState shl 13);
@@ -86,13 +82,12 @@ end;
 function AvroSecretRotl8(AValue: Byte; ARot: Integer): Byte; inline;
 begin
   ARot := ARot and 7;
-  Result := Byte(((Integer(AValue) shl ARot) or (Integer(AValue) shr (8 - ARot)))
-    and $FF);
+  Result := Byte(((Integer(AValue) shl ARot) or (Integer(AValue) shr (8 - ARot))) and $FF);
 end;
 
 function AvroShieldSecretIKM: TBytes;
 var
-  I: Integer;
+  I:     Integer;
   State: Cardinal;
   Plain: Byte;
 begin
@@ -109,8 +104,7 @@ begin
   begin
     if (I mod 4) = 0 then
       State := AvroSecretXorShift32(State);
-    Plain := AVRO_SECRET_BLOB[I] xor
-      AvroSecretRotl8(Byte(State shr (8 * (I mod 4))), I);
+    Plain := AVRO_SECRET_BLOB[I] xor AvroSecretRotl8(Byte(State shr (8 * (I mod 4))), I);
     Result[I] := Plain;
     if Plain = 0 then
     begin

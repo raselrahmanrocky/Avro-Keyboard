@@ -20,22 +20,22 @@ type
   TLayoutChangeEvent = procedure(Sender: TObject) of object;
 
   TAvroDirectoryWatcher = class
-  private
-    FWatchHandle: THandle;
-    FDirectory: string;
-    FDebounceCountdown: Integer;
-    FOnChanged: TLayoutChangeEvent;
-    FActive: Boolean;
-  public
-    constructor Create(const ADirectory: string);
-    destructor Destroy; override;
-    procedure CheckForChanges;
-    { Re-arms the change notification, consuming any signal already pending.
-      Call before Active := True so a spurious event right after startup is
-      dropped instead of triggering a main-thread re-parse. }
-    procedure ResetWatchHandle;
-    property OnChanged: TLayoutChangeEvent read FOnChanged write FOnChanged;
-    property Active: Boolean read FActive write FActive;
+    private
+      FWatchHandle:       THandle;
+      FDirectory:         string;
+      FDebounceCountdown: Integer;
+      FOnChanged:         TLayoutChangeEvent;
+      FActive:            Boolean;
+    public
+      constructor Create(const ADirectory: string);
+      destructor Destroy; override;
+      procedure CheckForChanges;
+      { Re-arms the change notification, consuming any signal already pending.
+        Call before Active := True so a spurious event right after startup is
+        dropped instead of triggering a main-thread re-parse. }
+      procedure ResetWatchHandle;
+      property OnChanged: TLayoutChangeEvent read FOnChanged write FOnChanged;
+      property Active: Boolean read FActive write FActive;
   end;
 
 implementation
@@ -45,9 +45,9 @@ uses
 
 const
   DEBOUNCE_TICKS = 3;
-  WATCH_FLAGS = FILE_NOTIFY_CHANGE_FILE_NAME or FILE_NOTIFY_CHANGE_LAST_WRITE;
+  WATCH_FLAGS    = FILE_NOTIFY_CHANGE_FILE_NAME or FILE_NOTIFY_CHANGE_LAST_WRITE;
 
-{ TAvroDirectoryWatcher }
+  { TAvroDirectoryWatcher }
 
 constructor TAvroDirectoryWatcher.Create(const ADirectory: string);
 begin
@@ -72,11 +72,7 @@ procedure TAvroDirectoryWatcher.ResetWatchHandle;
 begin
   if FWatchHandle <> INVALID_HANDLE_VALUE then
     FindCloseChangeNotification(FWatchHandle);
-  FWatchHandle := FindFirstChangeNotification(
-    PChar(FDirectory),
-    False,
-    WATCH_FLAGS
-  );
+  FWatchHandle := FindFirstChangeNotification(PChar(FDirectory), False, WATCH_FLAGS);
   if FWatchHandle = INVALID_HANDLE_VALUE then
     Log('DirectoryWatcher: FindFirstChangeNotification failed for ' + FDirectory)
   else

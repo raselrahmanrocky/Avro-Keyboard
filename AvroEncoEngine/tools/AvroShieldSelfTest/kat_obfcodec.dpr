@@ -14,21 +14,21 @@
 
   Three properties are asserted here, and each one was violable before:
 
-    1. The obfuscation is keyed. The metadata blob - which carries the value
-       seed and the key map, and therefore the ability to invert every value -
-       is masked with a key derived from the container master key. The mask
-       used to be a constant compiled into uAvroShield, so anybody who
-       decrypted a container (or simply read the unit) could invert the entire
-       payload with no key material at all.
+  1. The obfuscation is keyed. The metadata blob - which carries the value
+  seed and the key map, and therefore the ability to invert every value -
+  is masked with a key derived from the container master key. The mask
+  used to be a constant compiled into uAvroShield, so anybody who
+  decrypted a container (or simply read the unit) could invert the entire
+  payload with no key material at all.
 
-    2. Comment text needs a second, developer-only key. Comment fields live in
-       their own domain (HKDF over the developer IKM, salted with the value
-       seed), so recovering comment text needs the container key AND an IKM
-       that the runtime never derives and never links.
+  2. Comment text needs a second, developer-only key. Comment fields live in
+  their own domain (HKDF over the developer IKM, salted with the value
+  seed), so recovering comment text needs the container key AND an IKM
+  that the runtime never derives and never links.
 
-    3. The runtime pays nothing for comments. IncludeComments=False drops every
-       comment field before the Base64 decode, so nothing is decoded, allocated
-       or wiped per load and the mapping parser never sees the field.
+  3. The runtime pays nothing for comments. IncludeComments=False drops every
+  comment field before the Base64 decode, so nothing is decoded, allocated
+  or wiped per load and the mapping parser never sees the field.
 
   It also pins the codec's positional salting (identical plaintext at different
   positions must not produce identical tokens), the per-build freshness of the
@@ -41,7 +41,6 @@
 }
 
 {$APPTYPE CONSOLE}
-
 program kat_obfcodec;
 
 uses
@@ -61,8 +60,7 @@ const
   // The sample from the codec spec: a number record whose Comment is the
   // Bengali zero (U+09E6) while the UnicodeKey field spells it as the hex
   // literal the mapping schema uses.
-  GOLDEN_JSON =
-    '{"Rec":{"UnicodeKey":"#$09E6","Value":"#$0030","Comment":"' + #$09E6 + '"}}';
+  GOLDEN_JSON = '{"Rec":{"UnicodeKey":"#$09E6","Value":"#$0030","Comment":"' + #$09E6 + '"}}';
 
   // Same plaintext at two different object paths, and at two array indices:
   // both must encrypt to different tokens (positional salting).
@@ -70,9 +68,9 @@ const
   SALT_INDEX_JSON = '{"L":[{"v":"#$0030"},{"v":"#$0030"}]}';
 
 var
-  Fails: Integer;
-  Checks: Integer;
-  Quiet: Boolean;
+  Fails:      Integer;
+  Checks:     Integer;
+  Quiet:      Boolean;
   CommentIKM: TBytes;
 
 procedure Check(const AName: string; ACond: Boolean; const ADetail: string = '');
@@ -149,9 +147,7 @@ var
 
   function IsBengaliStart(AIndex: Integer): Boolean;
   begin
-    Result := (AData[AIndex] = $E0) and
-      ((AData[AIndex + 1] = $A6) or (AData[AIndex + 1] = $A7)) and
-      (AData[AIndex + 2] >= $80) and (AData[AIndex + 2] <= $BF);
+    Result := (AData[AIndex] = $E0) and ((AData[AIndex + 1] = $A6) or (AData[AIndex + 1] = $A7)) and (AData[AIndex + 2] >= $80) and (AData[AIndex + 2] <= $BF);
   end;
 
 begin
@@ -186,12 +182,11 @@ end;
 
 { First value stored under AKey anywhere in the document - used to lift a real
   authored comment string out of a source mapping as a canary. }
-function FindFirstKeyValue(AValue: TJSONValue; const AKey: string;
-  out AFound: string): Boolean;
+function FindFirstKeyValue(AValue: TJSONValue; const AKey: string; out AFound: string): Boolean;
 var
-  I: Integer;
-  Obj: TJSONObject;
-  Arr: TJSONArray;
+  I:    Integer;
+  Obj:  TJSONObject;
+  Arr:  TJSONArray;
   Pair: TJSONPair;
 begin
   AFound := '';
@@ -228,11 +223,10 @@ end;
   over the payload reports chance matches: values are XOR-masked, so a random
   0x23 0x24 pair turns up in tens of kilobytes of masked data, and a test that
   fails at random teaches nobody anything. }
-procedure CollectPrefixed(AValue: TJSONValue; const APrefix: string;
-  AInto: TStrings; AMax: Integer);
+procedure CollectPrefixed(AValue: TJSONValue; const APrefix: string; AInto: TStrings; AMax: Integer);
 var
-  I: Integer;
-  S: string;
+  I:   Integer;
+  S:   string;
   Obj: TJSONObject;
   Arr: TJSONArray;
 begin
@@ -241,8 +235,7 @@ begin
   if AValue is TJSONString then
   begin
     S := TJSONString(AValue).Value;
-    if (Length(S) >= Length(APrefix)) and (Copy(S, 1, Length(APrefix)) = APrefix) and
-      (AInto.IndexOf(S) < 0) then
+    if (Length(S) >= Length(APrefix)) and (Copy(S, 1, Length(APrefix)) = APrefix) and (AInto.IndexOf(S) < 0) then
       AInto.Add(S);
     Exit;
   end;
@@ -280,19 +273,16 @@ end;
 { Builds a v3 default-key container in memory. The default-key IKM is left
   empty deliberately: this KAT links the runtime, so it builds with the same
   embedded secret the application uses and needs no key file for that part. }
-function BuildContainer(const AJson: string; const ACommentsIKM: TBytes;
-  out AData: TBytes): TAvroShieldResult;
+function BuildContainer(const AJson: string; const ACommentsIKM: TBytes; out AData: TBytes): TAvroShieldResult;
 begin
-  Result := AvroShieldBuildFromJson(AJson, '', True, False, False, AData, nil,
-    ACommentsIKM);
+  Result := AvroShieldBuildFromJson(AJson, '', True, False, False, AData, nil, ACommentsIKM);
 end;
 
-function LoadText(const AData: TBytes; const ACommentsIKM: TBytes;
-  AIncludeComments: Boolean; out AText, AErr: string): Boolean;
+function LoadText(const AData: TBytes; const ACommentsIKM: TBytes; AIncludeComments: Boolean; out AText, AErr: string): Boolean;
 var
   Options: TAvroShieldLoadOptions;
-  Bytes: TBytes;
-  R: TAvroShieldResult;
+  Bytes:   TBytes;
+  R:       TAvroShieldResult;
 begin
   Result := False;
   AText := '';
@@ -313,15 +303,13 @@ end;
 
 { The attacker's view: decrypted bytecode, still obfuscated, nothing applied
   beyond the container key. }
-function OpaqueView(const AData: TBytes; out ABytecode: TBytes;
-  out AOpaqueJson: string): Boolean;
+function OpaqueView(const AData: TBytes; out ABytecode: TBytes; out AOpaqueJson: string): Boolean;
 var
   Root: TAvroNode;
 begin
   ABytecode := nil;
   AOpaqueJson := '';
-  Result := AvroShieldExtractObfuscatedBytecode(AData, '', nil, True,
-    ABytecode) = asrOk;
+  Result := AvroShieldExtractObfuscatedBytecode(AData, '', nil, True, ABytecode) = asrOk;
   if not Result then
     Exit;
   Root := nil;
@@ -354,8 +342,8 @@ begin
       for I := 0 to ANode.Items.Count - 1 do
         if ANode.Keys[I] <> META_KEY then
           CollectTokens(ANode.Items[I], AInto);
-  else
-    ;
+    else
+      ;
   end;
 end;
 
@@ -368,13 +356,12 @@ end;
 function TokensOf(const AData: TBytes; out ATokens: TStringList): Boolean;
 var
   Bytecode: TBytes;
-  Root: TAvroNode;
-  I: Integer;
+  Root:     TAvroNode;
+  I:        Integer;
 begin
   Result := False;
   ATokens := TStringList.Create;
-  if AvroShieldExtractObfuscatedBytecode(AData, '', nil, True, Bytecode) <> asrOk
-  then
+  if AvroShieldExtractObfuscatedBytecode(AData, '', nil, True, Bytecode) <> asrOk then
     Exit;
   Root := nil;
   try
@@ -406,13 +393,13 @@ end;
 
 procedure RunGoldenVector;
 var
-  Data, WrongIKM: TBytes;
+  Data, WrongIKM:    TBytes;
   Text, Err, Opaque: string;
-  Bytecode: TBytes;
-  R: TAvroShieldResult;
-  Tampered: TBytes;
-  Options: TAvroShieldLoadOptions;
-  Dummy: TBytes;
+  Bytecode:          TBytes;
+  R:                 TAvroShieldResult;
+  Tampered:          TBytes;
+  Options:           TAvroShieldLoadOptions;
+  Dummy:             TBytes;
 begin
   if not Quiet then
   begin
@@ -425,41 +412,30 @@ begin
   if R <> asrOk then
     Exit;
 
-  Check('unpack with the comment key succeeds',
-    LoadText(Data, CommentIKM, True, Text, Err), Err);
-  Check('unpack restores the UnicodeKey hex literal',
-    Pos('"#$09E6"', Text) > 0, Text);
+  Check('unpack with the comment key succeeds', LoadText(Data, CommentIKM, True, Text, Err), Err);
+  Check('unpack restores the UnicodeKey hex literal', Pos('"#$09E6"', Text) > 0, Text);
   Check('unpack restores the Value hex literal', Pos('"#$0030"', Text) > 0, Text);
-  Check('unpack restores the Bengali comment',
-    Pos('"' + #$09E6 + '"', Text) > 0, Text);
+  Check('unpack restores the Bengali comment', Pos('"' + #$09E6 + '"', Text) > 0, Text);
   Check('unpack restores the field names', Pos('"UnicodeKey"', Text) > 0, Text);
 
   Check('opaque view available', OpaqueView(Data, Bytecode, Opaque));
-  Check('opaque view still carries the metadata blob',
-    Pos('"' + META_KEY + '"', Opaque) > 0, Opaque);
+  Check('opaque view still carries the metadata blob', Pos('"' + META_KEY + '"', Opaque) > 0, Opaque);
   // The masked bytecode is not text, so "does it contain a Bengali byte pair"
   // would be a chance-match lottery; see HasBengaliRun. These three checks are
   // deterministic and still catch a payload that stopped being obfuscated:
   // a real Bengali comment carries a run, and the authored strings below are
   // single-character and matched exactly.
   Check('opaque view exposes no Bengali run', not HasBengaliRun(Bytecode), Opaque);
-  Check('opaque view exposes no authored comment literal',
-    not HasText(Bytecode, '"' + #$09E6 + '"'), Opaque);
-  Check('opaque view exposes no authored hex literals',
-    (not HasText(Bytecode, '#$09E6')) and (not HasText(Bytecode, '#$0030')), Opaque);
+  Check('opaque view exposes no authored comment literal', not HasText(Bytecode, '"' + #$09E6 + '"'), Opaque);
+  Check('opaque view exposes no authored hex literals', (not HasText(Bytecode, '#$09E6')) and (not HasText(Bytecode, '#$0030')), Opaque);
   // Teeth: both detectors must fire on the authored plaintext, otherwise the
   // three assertions above would hold even for a payload that leaked every
   // string in the clear.
-  Check('Bengali run detector fires on real Bengali text',
-    HasBengaliRun(Utf8Of(#$0985 + #$0986)));
-  Check('authored-literal detector fires on the authored JSON',
-    HasText(Utf8Of(GOLDEN_JSON), '"' + #$09E6 + '"'));
-  Check('opaque view exposes no hex key literal',
-    (Pos('"#$09E6"', Opaque) = 0) and (Pos('"#$0030"', Opaque) = 0), Opaque);
-  Check('opaque view exposes no field name',
-    (Pos('UnicodeKey', Opaque) = 0) and (Pos('Comment', Opaque) = 0), Opaque);
-  Check('opaque view exposes no authored comment',
-    not HasText(Bytecode, #$09E6), Opaque);
+  Check('Bengali run detector fires on real Bengali text', HasBengaliRun(Utf8Of(#$0985 + #$0986)));
+  Check('authored-literal detector fires on the authored JSON', HasText(Utf8Of(GOLDEN_JSON), '"' + #$09E6 + '"'));
+  Check('opaque view exposes no hex key literal', (Pos('"#$09E6"', Opaque) = 0) and (Pos('"#$0030"', Opaque) = 0), Opaque);
+  Check('opaque view exposes no field name', (Pos('UnicodeKey', Opaque) = 0) and (Pos('Comment', Opaque) = 0), Opaque);
+  Check('opaque view exposes no authored comment', not HasText(Bytecode, #$09E6), Opaque);
 
   // The comment domain must not be reachable with the container key alone. A
   // wrong comment key normally fails the whole load (the codec fails closed on
@@ -468,24 +444,17 @@ begin
   WrongIKM := Copy(CommentIKM, 0, Length(CommentIKM));
   if Length(WrongIKM) > 0 then
     WrongIKM[0] := Byte(WrongIKM[0] xor $5A);
-  Check('wrong comment key does not reveal the comment',
-    (not LoadText(Data, WrongIKM, True, Text, Err)) or
-    (Pos('"' + #$09E6 + '"', Text) = 0), Err);
-  Check('no comment key does not reveal the comment',
-    (not LoadText(Data, nil, True, Text, Err)) or
-    (Pos('"' + #$09E6 + '"', Text) = 0), Err);
+  Check('wrong comment key does not reveal the comment', (not LoadText(Data, WrongIKM, True, Text, Err)) or (Pos('"' + #$09E6 + '"', Text) = 0), Err);
+  Check('no comment key does not reveal the comment', (not LoadText(Data, nil, True, Text, Err)) or (Pos('"' + #$09E6 + '"', Text) = 0), Err);
   // The operational payload is keyed by the container key, so a rotated or
   // wrong comment key must never cost the developer the mapping itself.
-  Check('wrong comment key still yields the operational fields',
-    LoadText(Data, WrongIKM, False, Text, Err) and
-    (Pos('UnicodeKey', Text) > 0) and (Pos('#$0030', Text) > 0), Err);
+  Check('wrong comment key still yields the operational fields', LoadText(Data, WrongIKM, False, Text, Err) and (Pos('UnicodeKey', Text) > 0) and
+      (Pos('#$0030', Text) > 0), Err);
 
   // The runtime path, which must not even keep the field.
   Check('runtime load succeeds', LoadText(Data, nil, False, Text, Err), Err);
-  Check('runtime load carries no comment field', CountText(Text, 'Comment') = 0,
-    Text);
-  Check('runtime load keeps the operational fields',
-    (Pos('UnicodeKey', Text) > 0) and (Pos('#$0030', Text) > 0), Text);
+  Check('runtime load carries no comment field', CountText(Text, 'Comment') = 0, Text);
+  Check('runtime load keeps the operational fields', (Pos('UnicodeKey', Text) > 0) and (Pos('#$0030', Text) > 0), Text);
 
   // Tampering with the ciphertext must fail closed, not decode to something.
   Tampered := Copy(Data, 0, Length(Data));
@@ -493,8 +462,7 @@ begin
   begin
     Tampered[60] := Byte(Tampered[60] xor $FF);
     Options := AvroShieldDefaultLoadOptions;
-    Check('tampered ciphertext is rejected',
-      AvroShieldLoadFromBytesUtf8Ex(Tampered, '', Options, Dummy) <> asrOk);
+    Check('tampered ciphertext is rejected', AvroShieldLoadFromBytesUtf8Ex(Tampered, '', Options, Dummy) <> asrOk);
   end;
 end;
 
@@ -502,11 +470,11 @@ end;
 
 procedure RunSalting;
 var
-  Data, Data2: TBytes;
+  Data, Data2:      TBytes;
   Tokens1, Tokens2: TStringList;
-  I, Same: Integer;
-  R: TAvroShieldResult;
-  Ok1, Ok2: Boolean;
+  I, Same:          Integer;
+  R:                TAvroShieldResult;
+  Ok1, Ok2:         Boolean;
 begin
   if not Quiet then
   begin
@@ -528,16 +496,12 @@ begin
   Tokens2 := nil;
   try
     Ok1 := TokensOf(Data, Tokens1);
-    Check('two value tokens collected', Ok1 and (Tokens1.Count = 2),
-      'count=' + IntToStr(Tokens1.Count));
-    Check('identical plaintext at two paths yields different tokens',
-      Ok1 and (Tokens1.Count = 2) and DistinctStrings(Tokens1), Tokens1.Text);
+    Check('two value tokens collected', Ok1 and (Tokens1.Count = 2), 'count=' + IntToStr(Tokens1.Count));
+    Check('identical plaintext at two paths yields different tokens', Ok1 and (Tokens1.Count = 2) and DistinctStrings(Tokens1), Tokens1.Text);
 
     Ok2 := TokensOf(Data2, Tokens2);
-    Check('two array-index tokens collected', Ok2 and (Tokens2.Count = 2),
-      'count=' + IntToStr(Tokens2.Count));
-    Check('identical plaintext at two array indices yields different tokens',
-      Ok2 and (Tokens2.Count = 2) and DistinctStrings(Tokens2), Tokens2.Text);
+    Check('two array-index tokens collected', Ok2 and (Tokens2.Count = 2), 'count=' + IntToStr(Tokens2.Count));
+    Check('identical plaintext at two array indices yields different tokens', Ok2 and (Tokens2.Count = 2) and DistinctStrings(Tokens2), Tokens2.Text);
 
     // A keystream fixed across builds would make the tokens identical for the
     // same input, which is what a precomputed dictionary attack needs.
@@ -546,8 +510,7 @@ begin
       for I := 0 to Tokens1.Count - 1 do
         if Tokens2.IndexOf(Tokens1[I]) >= 0 then
           Inc(Same);
-    Check('a rebuilt payload does not reuse the previous keystream',
-      Ok1 and Ok2 and (Same = 0), 'repeated tokens: ' + IntToStr(Same));
+    Check('a rebuilt payload does not reuse the previous keystream', Ok1 and Ok2 and (Same = 0), 'repeated tokens: ' + IntToStr(Same));
   finally
     Tokens1.Free;
     Tokens2.Free;
@@ -558,14 +521,14 @@ end;
 
 procedure RunSources(const ADir: string);
 var
-  Files: TArray<string>;
-  I: Integer;
-  Json, Canary, Text, Err, Opaque, Name: string;
-  Data, Bytecode: TBytes;
-  R: TAvroShieldResult;
-  Root: TJSONValue;
-  Canaries: TStringList;
-  K, Leaked: Integer;
+  Files:                                 TArray<string>;
+  I:                                     Integer;
+  JSON, Canary, Text, Err, Opaque, Name: string;
+  Data, Bytecode:                        TBytes;
+  R:                                     TAvroShieldResult;
+  Root:                                  TJSONValue;
+  Canaries:                              TStringList;
+  K, Leaked:                             Integer;
 begin
   if not Quiet then
   begin
@@ -583,29 +546,26 @@ begin
 
   for I := 0 to Length(Files) - 1 do
   begin
-    Name := ExtractFileName(Files[I]);
-    Json := ReadJsonFile(Files[I]);
-    R := BuildContainer(Json, CommentIKM, Data);
-    Check(Name + ': builds', R = asrOk, 'code ' + IntToStr(Ord(R)));
+    name := ExtractFileName(Files[I]);
+    JSON := ReadJsonFile(Files[I]);
+    R := BuildContainer(JSON, CommentIKM, Data);
+    Check(name + ': builds', R = asrOk, 'code ' + IntToStr(Ord(R)));
     if R <> asrOk then
       Continue;
 
     Bytecode := nil;
     Opaque := '';
-    Check(Name + ': opaque view available', OpaqueView(Data, Bytecode, Opaque));
-    Check(Name + ': payload carries the metadata blob',
-      Pos('"' + META_KEY + '"', Opaque) > 0);
+    Check(name + ': opaque view available', OpaqueView(Data, Bytecode, Opaque));
+    Check(name + ': payload carries the metadata blob', Pos('"' + META_KEY + '"', Opaque) > 0);
     // The opaque JSON is the parsed payload an attacker would dump: values are
     // Base64 tokens there, so this scan has no chance matches to explain away.
-    Check(Name + ': payload exposes no Bengali text',
-      not HasBengali(Utf8Of(Opaque)));
-    Check(Name + ': payload exposes no hex key literal',
-      not HasText(Utf8Of(Opaque), '#$'));
+    Check(name + ': payload exposes no Bengali text', not HasBengali(Utf8Of(Opaque)));
+    Check(name + ': payload exposes no hex key literal', not HasText(Utf8Of(Opaque), '#$'));
 
     // And on the raw bytecode, a targeted set: the real '#$' literals the file
     // declares must not be recoverable from the masked payload.
     Canaries := TStringList.Create;
-    Root := TJSONObject.ParseJSONValue(Json);
+    Root := TJSONObject.ParseJSONValue(JSON);
     try
       if Root <> nil then
         CollectPrefixed(Root, '#$', Canaries, 32);
@@ -613,41 +573,29 @@ begin
       for K := 0 to Canaries.Count - 1 do
         if HasText(Bytecode, Canaries[K]) then
           Inc(Leaked);
-      Check(Name + ': no authored hex literal survives into the payload',
-        (Canaries.Count > 0) and (Leaked = 0), 'leaked ' + IntToStr(Leaked) +
-        ' of ' + IntToStr(Canaries.Count));
+      Check(name + ': no authored hex literal survives into the payload', (Canaries.Count > 0) and (Leaked = 0),
+        'leaked ' + IntToStr(Leaked) + ' of ' + IntToStr(Canaries.Count));
     finally
       Root.Free;
       Canaries.Free;
     end;
-    Check(Name + ': payload exposes no comment field name',
-      not HasText(Bytecode, 'Comment'));
-    Check(Name + ': payload exposes no mapping section name',
-      (not HasText(Bytecode, 'Metadata')) and
-      (not HasText(Bytecode, 'Constants')));
+    Check(name + ': payload exposes no comment field name', not HasText(Bytecode, 'Comment'));
+    Check(name + ': payload exposes no mapping section name', (not HasText(Bytecode, 'Metadata')) and (not HasText(Bytecode, 'Constants')));
 
-    Canary := FirstCommentIn(Json);
-    Check(Name + ': has an authored comment to test with', Canary <> '');
+    Canary := FirstCommentIn(JSON);
+    Check(name + ': has an authored comment to test with', Canary <> '');
     if Canary <> '' then
     begin
-      Check(Name + ': the authored comment is not in the payload',
-        not HasText(Bytecode, Canary), Canary);
-      Check(Name + ': the comment key recovers that comment',
-        LoadText(Data, CommentIKM, True, Text, Err) and (Pos(Canary, Text) > 0),
-        Err);
+      Check(name + ': the authored comment is not in the payload', not HasText(Bytecode, Canary), Canary);
+      Check(name + ': the comment key recovers that comment', LoadText(Data, CommentIKM, True, Text, Err) and (Pos(Canary, Text) > 0), Err);
       // Same shape as the golden vector: a missing comment key either fails the
       // load closed or yields text without the comment. It must never yield
       // the authored comment text.
-      Check(Name + ': without the comment key that comment is unrecoverable',
-        (not LoadText(Data, nil, True, Text, Err)) or
-        (Pos(Canary, Text) = 0), Err);
+      Check(name + ': without the comment key that comment is unrecoverable', (not LoadText(Data, nil, True, Text, Err)) or (Pos(Canary, Text) = 0), Err);
     end;
 
-    Check(Name + ': runtime load drops every comment field',
-      LoadText(Data, nil, False, Text, Err) and (CountText(Text, 'Comment') = 0),
-      Err);
-    Check(Name + ': runtime load keeps the operational sections',
-      (Pos('"Constants"', Text) > 0) and (Pos('"Metadata"', Text) > 0), Err);
+    Check(name + ': runtime load drops every comment field', LoadText(Data, nil, False, Text, Err) and (CountText(Text, 'Comment') = 0), Err);
+    Check(name + ': runtime load keeps the operational sections', (Pos('"Constants"', Text) > 0) and (Pos('"Metadata"', Text) > 0), Err);
 
     AvroWipeAndRelease(Bytecode);
     AvroWipeAndRelease(Data);
@@ -659,9 +607,9 @@ end;
 procedure RunVersionAndLegacy;
 var
   Path, Text, Err: string;
-  Data: TBytes;
-  Options: TAvroShieldLoadOptions;
-  Dummy: TBytes;
+  Data:            TBytes;
+  Options:         TAvroShieldLoadOptions;
+  Dummy:           TBytes;
 begin
   if not Quiet then
   begin
@@ -669,8 +617,7 @@ begin
     WriteLn('=== versioning and the v2 fixture ===');
   end;
 
-  Check('current format version is 3', AvroShieldCurrentVersion = 3,
-    IntToStr(AvroShieldCurrentVersion));
+  Check('current format version is 3', AvroShieldCurrentVersion = 3, IntToStr(AvroShieldCurrentVersion));
   Check('v2 is still readable', AvroShieldSupportedVersion(2));
   Check('v3 is readable', AvroShieldSupportedVersion(3));
   Check('v1 (Argon2, removed) is rejected', not AvroShieldSupportedVersion(1));
@@ -683,23 +630,20 @@ begin
   if not FileExists(Path) then
     Exit;
   Data := TFile.ReadAllBytes(Path);
-  Check('frozen v2 container still loads',
-    LoadText(Data, nil, True, Text, Err), Err);
-  Check('frozen v2 container is not mistaken for v3',
-    (Length(Data) > 8) and (Data[8] = 2), '');
+  Check('frozen v2 container still loads', LoadText(Data, nil, True, Text, Err), Err);
+  Check('frozen v2 container is not mistaken for v3', (Length(Data) > 8) and (Data[8] = 2), '');
   // Documentation check, not a requirement: in format v2 there is no separate
   // comment domain, so comments decode with the value seed and are legible to
   // anyone holding the container key. This is precisely what v3 exists to fix,
   // and pinning it here means the difference cannot be papered over.
-  Check('legacy v2 comments stay in the value domain (known limit)',
-    (Pos(META_KEY, Text) = 0) and (Pos('"Comment"', Text) > 0), '');
+  Check('legacy v2 comments stay in the value domain (known limit)', (Pos(META_KEY, Text) = 0) and (Pos('"Comment"', Text) > 0), '');
 end;
 
 var
-  I: Integer;
-  Arg: string;
+  I:                           Integer;
+  Arg:                         string;
   SourcesDir, CommentsKeyPath: string;
-  Comments: TBytes;
+  Comments:                    TBytes;
 
 begin
   Fails := 0;
@@ -753,4 +697,5 @@ begin
     WriteLn(Format('%d of %d checks FAILED', [Fails, Checks]));
 
   Halt(Ord(Fails > 0));
+
 end.

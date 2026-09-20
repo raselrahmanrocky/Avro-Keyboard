@@ -15,16 +15,15 @@
   letter, a conjunct, and the raw ANSI mirror of both, which the caret sniffer
   yields when the text came from another application), and prints:
 
-    * the normal (word-buffer) conversion of context + kar,
-    * whether the isolated resolver claims the keystroke, and what it would
-      emit - flagged when it claims it while emitting nothing.
+  * the normal (word-buffer) conversion of context + kar,
+  * whether the isolated resolver claims the keystroke, and what it would
+  emit - flagged when it claims it while emitting nothing.
 
   Usage: kat_karcall <mapping-dir>
   Exit code: 0 no swallowed keystroke, 1 at least one.
 }
 
 {$APPTYPE CONSOLE}
-
 program kat_karcall;
 
 uses
@@ -37,11 +36,22 @@ uses
   clsUnicodeToBijoy2000;
 
 const
-  U_HASANTA = $09CD;
-  U_K = $0995; U_T = $09A4; U_R = $09B0; U_N = $09A8;
-  U_AAKAR = $09BE; U_IKAR = $09BF; U_IIKAR = $09C0; U_UKAR = $09C1;
-  U_UUKAR = $09C2; U_RIKAR = $09C3; U_EKAR = $09C7; U_OIKAR = $09C8;
-  U_OKAR = $09CB; U_OUKAR = $09CC; U_ANUSVARA = $0982;
+  U_HASANTA  = $09CD;
+  U_K        = $0995;
+  U_T        = $09A4;
+  U_R        = $09B0;
+  U_N        = $09A8;
+  U_AAKAR    = $09BE;
+  U_IKAR     = $09BF;
+  U_IIKAR    = $09C0;
+  U_UKAR     = $09C1;
+  U_UUKAR    = $09C2;
+  U_RIKAR    = $09C3;
+  U_EKAR     = $09C7;
+  U_OIKAR    = $09C8;
+  U_OKAR     = $09CB;
+  U_OUKAR    = $09CC;
+  U_ANUSVARA = $0982;
 
 var
   Fails: Integer;
@@ -79,7 +89,7 @@ end;
 
 function InstallMapping(const AJsonText: string): Boolean;
 var
-  Log: TStringList;
+  Log:  TStringList;
   Root: TJSONValue;
 begin
   Result := False;
@@ -128,14 +138,14 @@ end;
 
 procedure ProbeMapping(const APath, ATag: string);
 var
-  Conv: TUnicodeToBijoy2000;
-  Json_: string;
-  Kar, Ctx: TPair<string, string>;
+  Conv:                                                TUnicodeToBijoy2000;
+  Json_:                                               string;
+  Kar, Ctx:                                            TPair<string, string>;
   KarName, CtxName, AnsiCtx, Plain, Isolated, Matched: string;
-  Erase: Integer;
-  IsToggle, UsedAlt: Boolean;
-  Claimed, Visible, EmitsNothing: Boolean;
-  Kind: string;
+  Erase:                                               Integer;
+  IsToggle, UsedAlt:                                   Boolean;
+  Claimed, Visible, EmitsNothing:                      Boolean;
+  Kind:                                                string;
 begin
   Json_ := LoadMappingText(APath);
   if not InstallMapping(Json_) then
@@ -161,7 +171,7 @@ begin
         Visible := (Isolated <> '') or (Erase > 0);
         EmitsNothing := Claimed and (Isolated = '') and (Erase = 0);
         Kind := 'uni';
-        if Not EmitsNothing then
+        if not EmitsNothing then
         begin
           // (2) ANSI context, as the caret sniffer supplies it.
           Claimed := Conv.ResolveAnsiSequence(AnsiCtx, Kar.Value, Isolated, Erase, Matched, IsToggle, UsedAlt);
@@ -174,14 +184,12 @@ begin
         begin
           Inc(Fails);
           WriteLn(Format('SWALLOWED %s: %s after %s (%s) -> claimed, emitted nothing; normal path would be %s',
-            [ATag, KarName, Ctx.Key, Kind, HexBytes(Plain)]));
+              [ATag, KarName, Ctx.Key, Kind, HexBytes(Plain)]));
         end
         else if Claimed then
-          WriteLn(Format('  %-22s %-14s %-6s emits %-18s erase=%d  normal=%s',
-            [ATag, KarName, Ctx.Key, HexBytes(Isolated), Erase, HexBytes(Plain)]))
+          WriteLn(Format('  %-22s %-14s %-6s emits %-18s erase=%d  normal=%s', [ATag, KarName, Ctx.Key, HexBytes(Isolated), Erase, HexBytes(Plain)]))
         else
-          WriteLn(Format('  %-22s %-14s %-6s not claimed (falls through)  normal=%s',
-            [ATag, KarName, Ctx.Key, HexBytes(Plain)]));
+          WriteLn(Format('  %-22s %-14s %-6s not claimed (falls through)  normal=%s', [ATag, KarName, Ctx.Key, HexBytes(Plain)]));
       end;
     end;
   finally
@@ -190,8 +198,9 @@ begin
 end;
 
 var
-  SR: TSearchRec;
+  SR:        TSearchRec;
   Dir, Name: string;
+
 begin
   Fails := 0;
   Dir := '';
@@ -210,8 +219,8 @@ begin
       repeat
         if (SR.Attr and faDirectory) = 0 then
         begin
-          Name := ChangeFileExt(SR.Name, '');
-          ProbeMapping(Dir + SR.Name, Name);
+          name := ChangeFileExt(SR.Name, '');
+          ProbeMapping(Dir + SR.Name, name);
         end;
       until FindNext(SR) <> 0;
     finally
@@ -223,4 +232,5 @@ begin
   else
     WriteLn(Format('%d swallowed kar keystroke(s)', [Fails]));
   ExitCode := Ord(Fails > 0);
+
 end.

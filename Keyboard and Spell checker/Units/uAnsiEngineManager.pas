@@ -95,13 +95,13 @@ type
     switched away from. Stamps are unique, so the least recently USED engine is
     always the one dropped. }
   TEngineSlot = class
-  public
-    DisplayName: string;
-    FilePath: string;
-    LastWriteTime: TDateTime;
-    LastUseStamp: Cardinal;
-    State: TAnsiEngineState;
-    destructor Destroy; override;
+    public
+      DisplayName:   string;
+      FilePath:      string;
+      LastWriteTime: TDateTime;
+      LastUseStamp:  Cardinal;
+      State:         TAnsiEngineState;
+      destructor Destroy; override;
   end;
 
   { One engine to preload at startup. Password is non-empty only for
@@ -122,144 +122,141 @@ type
     DisplayName: string;
     FilePath: string;
     JSON: string;
-      OK: Boolean;
+    OK: Boolean;
     ErrorMsg: string;
   end;
 
   TAnsiEngineManager = class
-  private
-    FCache: TDictionary<string, TEngineSlot>; // key: Lowercase(DisplayName)
-    FCurrentKey: string;
-    FLock: TCriticalSection; // serializes every engine-state mutation
-    { Last value handed out by NextUseStamp; see TEngineSlot.LastUseStamp. }
-    FUseStamp: Cardinal;
-    { Hands out the next unique LRU stamp. Caller must hold FLock (every caller
-      is already inside it). }
-    function NextUseStamp: Cardinal;
-    function SlotKey(const AName: string): string;
-    { True while the unit globals actually hold a parsed engine. Invariant the
-      whole cache rests on: either the globals own the active engine's
-      containers (FCurrentKey names its slot, which is empty), or the globals
-      are empty and every engine sits in its slot. Every parse runs with empty
-      globals so it can never destroy the engine that is currently live. }
-    function GlobalsHoldEngine: Boolean;
-    { Moves the live engine's containers back into its own slot, leaving the
-      globals empty (the precondition of every parse). Never hollows a slot:
-      with empty globals this is a no-op. Returns True when it parked
-      something. Caller must hold FLock. }
-    function ParkLive: Boolean;
-    { Restores AKey's parked state into the globals. False for a missing or
-      hollow slot - the caller then treats it as a cache MISS instead of
-      serving an engine that cannot render. Publishes no version name. }
-    function RestoreSlotState(const AKey: string): Boolean;
-    { RestoreSlotState + publishes AName as the active display name; False when
-      the slot is hollow. }
-    function TryRestoreSlot(const AKey, AName: string): Boolean;
-    { True when AName's parked state is missing or hollow. }
-    function IsSlotHollow(const AKey: string): Boolean;
-    { Fail-closed safety net: when the globals hold no engine, put the active
-      slot back (or Default) so the app is never left engine-less. Never
-      changes AnsiVersion - callers that genuinely switch publish the name
-      themselves, and the startup restore path reads that global. }
-    procedure EnsureLiveEngine;
-    { Puts a live engine the caller just parked by hand back in place after a
-      failed parse. }
-    procedure RestoreParkedEngine(const AParked: Boolean);
-    { Parses AJSON into the globals and parks the result in a new slot added
-      to FCache. AFilePath is stored on the slot for the directory watcher.
-      Password-protected containers are decrypted by the CALLER (version
-      picker / menu / preload thread) before this is reached, so this never
-      prompts. Returns False (and fills ErrorLog) when the JSON contains no
-      usable mapping rules. Caller must hold FLock. }
-    function ParseJSONIntoSlot(const AName, AFilePath, AJSON: string;
-      ErrorLog: TStringList = nil): Boolean;
-    { Decrypts AFilePath (Shield/legacy container with APassword, or reads
-      plain .json) and parks the parsed result. AFilePath = '' builds the
-      built-in Default engine. Caller must hold FLock. }
-    function ParseIntoSlot(const AName, AFilePath: string;
-      ErrorLog: TStringList = nil; const APassword: AnsiString = ''): Boolean;
-    { Moves the currently active engine's globals back into its parked slot.
-      Caller must hold FLock. }
-    procedure ParkCurrent;
-    { Frees and removes a NON-ACTIVE cached engine. Caller must hold FLock. }
-    procedure DropSlot(const AKey: string);
-    { Lock-free core of InvalidateEngine. Caller must hold FLock. }
-    procedure DoInvalidateEngine(const AName: string);
-    { Stamps AKey's slot as used now. Every park/restore path calls this, so LRU
-      eviction reflects what the user actually switched between. }
-    procedure TouchSlot(const AKey: string);
-  public
-    constructor Create;
-    destructor Destroy; override;
-    property CurrentEngineName: string read FCurrentKey;
-    { True while the active engine is really usable - the UI/tests can use this
-      instead of trusting CurrentEngineName alone. }
-    function LiveEngineReady: Boolean;
-    { True when AName's parked engine is complete (cached and not hollow). }
-    function CachedEngineReady(const AName: string): Boolean;
-    { Snapshots the engines that can unlock without user interaction
-      (built-in Default, default-key containers, plain .json mappings and
-      password-protected containers with a persisted password). Call on the
-      main thread BEFORE starting the preload thread: the snapshot decouples
-      the worker from the AvroEncoFiles dictionary, which the folder-change
-      timers clear/refill while the worker runs. }
-    function CapturePreloadList: TArray<TPreloadItem>;
-    { Same snapshot, narrowed to ONE mapping: zero items when it is already
-      cached, is not a known file, or is a password container that was never
-      unlocked. This is what an explicit single-layout action (unlock in the
-      picker, import) warms before the user clicks it - warming the whole
-      folder for one unlock is the eager behaviour the cache no longer does. }
-    function CapturePreloadItem(const AName: string): TArray<TPreloadItem>;
-    { Parses the built-in Default engine (if missing) and every decrypted
-      snapshot result into the cache. Runs on the preload thread; takes
-      FLock, so it can never interleave with a main-thread switch. Returns
-      the number of engines committed.
+    private
+      FCache:      TDictionary<string, TEngineSlot>; // key: Lowercase(DisplayName)
+      FCurrentKey: string;
+      FLock:       TCriticalSection; // serializes every engine-state mutation
+      { Last value handed out by NextUseStamp; see TEngineSlot.LastUseStamp. }
+      FUseStamp: Cardinal;
+      { Hands out the next unique LRU stamp. Caller must hold FLock (every caller
+        is already inside it). }
+      function NextUseStamp: Cardinal;
+      function SlotKey(const AName: string): string;
+      { True while the unit globals actually hold a parsed engine. Invariant the
+        whole cache rests on: either the globals own the active engine's
+        containers (FCurrentKey names its slot, which is empty), or the globals
+        are empty and every engine sits in its slot. Every parse runs with empty
+        globals so it can never destroy the engine that is currently live. }
+      function GlobalsHoldEngine: Boolean;
+      { Moves the live engine's containers back into its own slot, leaving the
+        globals empty (the precondition of every parse). Never hollows a slot:
+        with empty globals this is a no-op. Returns True when it parked
+        something. Caller must hold FLock. }
+      function ParkLive: Boolean;
+      { Restores AKey's parked state into the globals. False for a missing or
+        hollow slot - the caller then treats it as a cache MISS instead of
+        serving an engine that cannot render. Publishes no version name. }
+      function RestoreSlotState(const AKey: string): Boolean;
+      { RestoreSlotState + publishes AName as the active display name; False when
+        the slot is hollow. }
+      function TryRestoreSlot(const AKey, AName: string): Boolean;
+      { True when AName's parked state is missing or hollow. }
+      function IsSlotHollow(const AKey: string): Boolean;
+      { Fail-closed safety net: when the globals hold no engine, put the active
+        slot back (or Default) so the app is never left engine-less. Never
+        changes AnsiVersion - callers that genuinely switch publish the name
+        themselves, and the startup restore path reads that global. }
+      procedure EnsureLiveEngine;
+      { Puts a live engine the caller just parked by hand back in place after a
+        failed parse. }
+      procedure RestoreParkedEngine(const AParked: Boolean);
+      { Parses AJSON into the globals and parks the result in a new slot added
+        to FCache. AFilePath is stored on the slot for the directory watcher.
+        Password-protected containers are decrypted by the CALLER (version
+        picker / menu / preload thread) before this is reached, so this never
+        prompts. Returns False (and fills ErrorLog) when the JSON contains no
+        usable mapping rules. Caller must hold FLock. }
+      function ParseJSONIntoSlot(const AName, AFilePath, AJSON: string; ErrorLog: TStringList = nil): Boolean;
+      { Decrypts AFilePath (Shield/legacy container with APassword, or reads
+        plain .json) and parks the parsed result. AFilePath = '' builds the
+        built-in Default engine. Caller must hold FLock. }
+      function ParseIntoSlot(const AName, AFilePath: string; ErrorLog: TStringList = nil; const APassword: AnsiString = ''): Boolean;
+      { Moves the currently active engine's globals back into its parked slot.
+        Caller must hold FLock. }
+      procedure ParkCurrent;
+      { Frees and removes a NON-ACTIVE cached engine. Caller must hold FLock. }
+      procedure DropSlot(const AKey: string);
+      { Lock-free core of InvalidateEngine. Caller must hold FLock. }
+      procedure DoInvalidateEngine(const AName: string);
+      { Stamps AKey's slot as used now. Every park/restore path calls this, so LRU
+        eviction reflects what the user actually switched between. }
+      procedure TouchSlot(const AKey: string);
+    public
+      constructor Create;
+      destructor Destroy; override;
+      property CurrentEngineName: string read FCurrentKey;
+      { True while the active engine is really usable - the UI/tests can use this
+        instead of trusting CurrentEngineName alone. }
+      function LiveEngineReady: Boolean;
+      { True when AName's parked engine is complete (cached and not hollow). }
+      function CachedEngineReady(const AName: string): Boolean;
+      { Snapshots the engines that can unlock without user interaction
+        (built-in Default, default-key containers, plain .json mappings and
+        password-protected containers with a persisted password). Call on the
+        main thread BEFORE starting the preload thread: the snapshot decouples
+        the worker from the AvroEncoFiles dictionary, which the folder-change
+        timers clear/refill while the worker runs. }
+      function CapturePreloadList: TArray<TPreloadItem>;
+      { Same snapshot, narrowed to ONE mapping: zero items when it is already
+        cached, is not a known file, or is a password container that was never
+        unlocked. This is what an explicit single-layout action (unlock in the
+        picker, import) warms before the user clicks it - warming the whole
+        folder for one unlock is the eager behaviour the cache no longer does. }
+      function CapturePreloadItem(const AName: string): TArray<TPreloadItem>;
+      { Parses the built-in Default engine (if missing) and every decrypted
+        snapshot result into the cache. Runs on the preload thread; takes
+        FLock, so it can never interleave with a main-thread switch. Returns
+        the number of engines committed.
 
-      The warm limit is NOT applied here: a batch commits exactly what it was
-      asked for, and the LRU release is what keeps the ordinary session
-      bounded (the app no longer batches at startup - the version picker
-      commits the ONE engine a password unlock just made available, and
-      CapturePreloadItem is what it snapshots with). The next switch or the
-      idle release then trims whatever is left over. }
-    function CommitPreload(const AResults: TArray<TPreloadResult>): Integer;
-    { Makes AName the active engine. For cached engines this is O(1) pointer
-      moves with zero disk/crypto/parse work. Uncached engines (password
-      protected, never unlocked before) are parsed once here. Returns False
-      on failure - the previously active engine stays untouched. }
-    function SwitchEngine(const AName: string;
-      ErrorLog: TStringList = nil): Boolean;
-    { UI-safe fast path. Never reads/decrypts/parses files and never waits for
-      the preload/refresh lock. Returns False immediately if busy/not cached. }
-    function TrySwitchCached(const AName: string): Boolean;
-    procedure WarmAllEngines(const AReturnTo: string);
-    { Re-parses one cached engine from its file (directory watcher /
-      auto-refresh on file change / import). If the engine is active it is
-      re-activated in place; on re-parse failure the active engine falls back
-      to Default so the app never loses a working engine. }
-    procedure InvalidateEngine(const AName: string);
-    { Reconciles the cache with the file system: drops engines whose files
-      disappeared (never the active one), re-parses default-key engines whose
-      last write time changed, and preloads newly added ones. }
-    procedure RefreshFromDisk;
-    { Removes a non-active engine from the cache (mapping deleted by user). }
-    procedure RemoveEngine(const AName: string);
-    { Parked engines currently held in RAM (the live one does not count). }
-    function WarmEngineCount: Integer;
-    { Drops least-recently-used parked engines until at most ALimit remain.
-      Never touches the live engine (its slot is empty by design, so it cannot
-      be a candidate anyway). Returns how many were dropped. }
-    function EvictToLimit(ALimit: Integer = MaxWarmEngines): Integer;
-    { Drops every parked engine and clears the per-mapping icon cache, then
-      returns the working set to the OS. Unconditional core of
-      ReleaseIdleEngines, exposed separately so the memory gate can exercise it
-      without waiting for the real system to go idle. The LIVE engine is
-      untouched: typing keeps working, and only a later version switch pays for
-      a fresh parse. Returns the number of engines dropped. }
-    function ReleaseWarmEngines: Integer;
-    { Idle wrapper around ReleaseWarmEngines: does nothing until the user has
-      been idle (system-wide, see uAvroEngineStats.GetSystemIdleSeconds) for at
-      least AMinIdleMinutes. Returns 0 when it declined to release. }
-    function ReleaseIdleEngines(AMinIdleMinutes: Integer): Integer;
+        The warm limit is NOT applied here: a batch commits exactly what it was
+        asked for, and the LRU release is what keeps the ordinary session
+        bounded (the app no longer batches at startup - the version picker
+        commits the ONE engine a password unlock just made available, and
+        CapturePreloadItem is what it snapshots with). The next switch or the
+        idle release then trims whatever is left over. }
+      function CommitPreload(const AResults: TArray<TPreloadResult>): Integer;
+      { Makes AName the active engine. For cached engines this is O(1) pointer
+        moves with zero disk/crypto/parse work. Uncached engines (password
+        protected, never unlocked before) are parsed once here. Returns False
+        on failure - the previously active engine stays untouched. }
+      function SwitchEngine(const AName: string; ErrorLog: TStringList = nil): Boolean;
+      { UI-safe fast path. Never reads/decrypts/parses files and never waits for
+        the preload/refresh lock. Returns False immediately if busy/not cached. }
+      function TrySwitchCached(const AName: string): Boolean;
+      procedure WarmAllEngines(const AReturnTo: string);
+      { Re-parses one cached engine from its file (directory watcher /
+        auto-refresh on file change / import). If the engine is active it is
+        re-activated in place; on re-parse failure the active engine falls back
+        to Default so the app never loses a working engine. }
+      procedure InvalidateEngine(const AName: string);
+      { Reconciles the cache with the file system: drops engines whose files
+        disappeared (never the active one), re-parses default-key engines whose
+        last write time changed, and preloads newly added ones. }
+      procedure RefreshFromDisk;
+      { Removes a non-active engine from the cache (mapping deleted by user). }
+      procedure RemoveEngine(const AName: string);
+      { Parked engines currently held in RAM (the live one does not count). }
+      function WarmEngineCount: Integer;
+      { Drops least-recently-used parked engines until at most ALimit remain.
+        Never touches the live engine (its slot is empty by design, so it cannot
+        be a candidate anyway). Returns how many were dropped. }
+      function EvictToLimit(ALimit: Integer = MaxWarmEngines): Integer;
+      { Drops every parked engine and clears the per-mapping icon cache, then
+        returns the working set to the OS. Unconditional core of
+        ReleaseIdleEngines, exposed separately so the memory gate can exercise it
+        without waiting for the real system to go idle. The LIVE engine is
+        untouched: typing keeps working, and only a later version switch pays for
+        a fresh parse. Returns the number of engines dropped. }
+      function ReleaseWarmEngines: Integer;
+      { Idle wrapper around ReleaseWarmEngines: does nothing until the user has
+        been idle (system-wide, see uAvroEngineStats.GetSystemIdleSeconds) for at
+        least AMinIdleMinutes. Returns 0 when it declined to release. }
+      function ReleaseIdleEngines(AMinIdleMinutes: Integer): Integer;
   end;
 
   { Startup preload worker. Decrypts every snapshot item in parallel and
@@ -268,18 +265,18 @@ type
     splash screen keeps painting while this thread runs; nothing here touches
     the UI. }
   TAnsiPreloadThread = class(TThread)
-  private
-    FItems: TArray<TPreloadItem>;
-    FResults: TArray<TPreloadResult>;
-    FNextJob: Integer;
-    FResultLock: TCriticalSection;
-    procedure DecryptItem(Index: Integer);
-    procedure ParallelDecrypt;
-  protected
-    procedure Execute; override;
-  public
-    constructor Create(const AItems: TArray<TPreloadItem>);
-    destructor Destroy; override;
+    private
+      FItems:      TArray<TPreloadItem>;
+      FResults:    TArray<TPreloadResult>;
+      FNextJob:    Integer;
+      FResultLock: TCriticalSection;
+      procedure DecryptItem(Index: Integer);
+      procedure ParallelDecrypt;
+    protected
+      procedure Execute; override;
+    public
+      constructor Create(const AItems: TArray<TPreloadItem>);
+      destructor Destroy; override;
   end;
 
 var
@@ -368,8 +365,8 @@ end;
 function TAnsiEngineManager.EvictToLimit(ALimit: Integer): Integer;
 var
   Key, Victim: string;
-  Oldest: Cardinal;
-  Slot: TEngineSlot;
+  Oldest:      Cardinal;
+  Slot:        TEngineSlot;
 begin
   Result := 0;
   if ALimit < 0 then
@@ -377,7 +374,7 @@ begin
   while WarmEngineCount > ALimit do
   begin
     Victim := '';
-    Oldest := High(Cardinal);
+    Oldest := high(Cardinal);
     for Key in FCache.Keys do
     begin
       if IsSlotHollow(Key) then
@@ -395,8 +392,7 @@ begin
       Exit; // nothing evictable (only the live engine is resident)
     DropSlot(Victim);
     Inc(Result);
-    Log('Engine cache: evicted "' + Victim + '" (warm limit ' +
-      IntToStr(ALimit) + ')');
+    Log('Engine cache: evicted "' + Victim + '" (warm limit ' + IntToStr(ALimit) + ')');
   end;
 end;
 
@@ -456,7 +452,7 @@ end;
 
 function TAnsiEngineManager.ParkLive: Boolean;
 var
-  Slot: TEngineSlot;
+  Slot:   TEngineSlot;
   Orphan: TAnsiEngineState; // owns, then discards, a live engine no slot claims
 begin
   Result := False;
@@ -481,8 +477,7 @@ begin
   // discard it - the owning slot is rebuilt from its file on demand.
   CaptureEngineState(Orphan);
   Orphan.Clear;
-  Log('Engine state: discarded un-owned live engine (active slot "' +
-    FCurrentKey + '")');
+  Log('Engine state: discarded un-owned live engine (active slot "' + FCurrentKey + '")');
   Result := True;
 end;
 
@@ -527,8 +522,7 @@ begin
     Exit;
 
   PrevKey := FCurrentKey;
-  if (PrevKey <> '') and (PrevKey <> DefaultEngineSlotKey) and
-    RestoreSlotState(PrevKey) then
+  if (PrevKey <> '') and (PrevKey <> DefaultEngineSlotKey) and RestoreSlotState(PrevKey) then
   begin
     Log('Engine state repaired: restored active engine "' + PrevKey + '"');
     Exit;
@@ -539,15 +533,13 @@ begin
   // release drops parked engines - but Default is compiled in, so it can be
   // rebuilt here without touching a file or the crypto stack. (The globals are
   // empty on this path, so the parse cannot park anything.)
-  if (not RestoreSlotState(DefaultEngineSlotKey)) and
-    ParseIntoSlot('Default', '', nil) then
+  if (not RestoreSlotState(DefaultEngineSlotKey)) and ParseIntoSlot('Default', '', nil) then
     RestoreSlotState(DefaultEngineSlotKey);
 
   if GlobalsHoldEngine then
   begin
     if PrevKey <> '' then
-      Log('WARNING: live engine "' + PrevKey +
-        '" was empty - fell back to Default (repair pending)')
+      Log('WARNING: live engine "' + PrevKey + '" was empty - fell back to Default (repair pending)')
     else
       Log('Engine state: no engine active - Default activated');
     Exit;
@@ -556,11 +548,10 @@ begin
   Log('WARNING: no usable ANSI engine available');
 end;
 
-function TAnsiEngineManager.ParseJSONIntoSlot(const AName, AFilePath, AJSON: string;
-  ErrorLog: TStringList = nil): Boolean;
+function TAnsiEngineManager.ParseJSONIntoSlot(const AName, AFilePath, AJSON: string; ErrorLog: TStringList = nil): Boolean;
 var
-  JSON: string;
-  Slot: TEngineSlot;
+  JSON:       string;
+  Slot:       TEngineSlot;
   LiveParked: Boolean;
 begin
   Result := False;
@@ -574,8 +565,7 @@ begin
   LiveParked := ParkLive;
 
   // Strip a leading UTF-8 BOM if one survived.
-  if (Length(JSON) >= 3) and (JSON[1] = #$EF) and (JSON[2] = #$BB) and
-    (JSON[3] = #$BF) then
+  if (Length(JSON) >= 3) and (JSON[1] = #$EF) and (JSON[2] = #$BB) and (JSON[3] = #$BF) then
     Delete(JSON, 1, 3);
   if Trim(JSON) = '' then
   begin
@@ -607,11 +597,9 @@ begin
     RestoreParkedEngine(LiveParked);
     Exit;
   end;
-  if (Length(CustomFullForms) = 0) and (Length(CustomPreReplacements) = 0) and
-    (Length(CustomPostReplacements) = 0) and (Length(VowelRules) = 0) and
-    (Length(RfolaRules) = 0) and (Length(KarCorrections) = 0) and
-    (Length(GroupKarCorrections) = 0) and
-    ((AnsiOverrides = nil) or (AnsiOverrides.Count = 0)) then
+  if (Length(CustomFullForms) = 0) and (Length(CustomPreReplacements) = 0) and (Length(CustomPostReplacements) = 0) and (Length(VowelRules) = 0) and
+    (Length(RfolaRules) = 0) and (Length(KarCorrections) = 0) and (Length(GroupKarCorrections) = 0) and ((AnsiOverrides = nil) or (AnsiOverrides.Count = 0))
+  then
   begin
     if Assigned(ErrorLog) then
       ErrorLog.Add('Error: mapping contains no usable rules for ' + AName);
@@ -651,11 +639,10 @@ begin
   Result := True;
 end;
 
-function TAnsiEngineManager.ParseIntoSlot(const AName, AFilePath: string;
-  ErrorLog: TStringList = nil; const APassword: AnsiString = ''): Boolean;
+function TAnsiEngineManager.ParseIntoSlot(const AName, AFilePath: string; ErrorLog: TStringList = nil; const APassword: AnsiString = ''): Boolean;
 var
-  JSON: string;
-  Slot: TEngineSlot;
+  JSON:        string;
+  Slot:        TEngineSlot;
   UsePassword: AnsiString;
 begin
   Result := False;
@@ -740,10 +727,10 @@ end;
 
 function TAnsiEngineManager.CapturePreloadList: TArray<TPreloadItem>;
 var
-  Info: TAvroEncoFileInfo;
+  Info:  TAvroEncoFileInfo;
   Items: TList<TPreloadItem>;
-  Item: TPreloadItem;
-  Flag: Byte;
+  Item:  TPreloadItem;
+  Flag:  Byte;
 begin
   Items := TList<TPreloadItem>.Create;
   try
@@ -780,8 +767,7 @@ begin
   end;
 end;
 
-function TAnsiEngineManager.CapturePreloadItem(
-  const AName: string): TArray<TPreloadItem>;
+function TAnsiEngineManager.CapturePreloadItem(const AName: string): TArray<TPreloadItem>;
 var
   Info: TAvroEncoFileInfo;
   Item: TPreloadItem;
@@ -795,8 +781,7 @@ begin
   try
     if FCache.ContainsKey(SlotKey(AName)) then
       Exit; // already cached: nothing to warm
-    if (not Assigned(AvroEncoFiles)) or
-      (not AvroEncoFiles.TryGetValue(SlotKey(AName), Info)) then
+    if (not Assigned(AvroEncoFiles)) or (not AvroEncoFiles.TryGetValue(SlotKey(AName), Info)) then
       Exit; // not a mapping this process knows about
   finally
     FLock.Leave;
@@ -820,10 +805,9 @@ begin
   Result[0] := Item;
 end;
 
-function TAnsiEngineManager.CommitPreload(
-  const AResults: TArray<TPreloadResult>): Integer;
+function TAnsiEngineManager.CommitPreload(const AResults: TArray<TPreloadResult>): Integer;
 var
-  R: TPreloadResult;
+  R:   TPreloadResult;
   Err: TStringList;
 begin
   Result := 0;
@@ -838,8 +822,8 @@ begin
         ParseIntoSlot('Default', '', Err);
       end;
       // 2. Every decrypted snapshot engine. Each parse parks the engine that
-      //    is live (mid-session preload) and leaves it parked on success, so
-      //    EnsureLiveEngine puts it back once the batch is done.
+      // is live (mid-session preload) and leaves it parked on success, so
+      // EnsureLiveEngine puts it back once the batch is done.
       for R in AResults do
       begin
         if not R.OK then
@@ -871,11 +855,10 @@ begin
   LogAvroMemStats('preload commit (' + IntToStr(Result) + ' engine(s))');
 end;
 
-function TAnsiEngineManager.SwitchEngine(const AName: string;
-  ErrorLog: TStringList = nil): Boolean;
+function TAnsiEngineManager.SwitchEngine(const AName: string; ErrorLog: TStringList = nil): Boolean;
 var
   Key, Path, PrevKey: string;
-  OwnErr: Boolean;
+  OwnErr:             Boolean;
 begin
   Result := False;
   Key := SlotKey(AName);
@@ -904,8 +887,7 @@ begin
         Exit(True);
       end;
       DropSlot(Key); // hollow: rebuild it from disk below
-      Log('Engine switch: hollow state for "' + AName +
-        '" - re-parsing from disk');
+      Log('Engine switch: hollow state for "' + AName + '" - re-parsing from disk');
     end;
 
     // Load on demand (password-protected engine, file added at runtime, or the
@@ -968,18 +950,22 @@ var
 begin
   Result := False;
   Key := SlotKey(AName);
-  if Key = '' then Exit;
+  if Key = '' then
+    Exit;
 
   // A picker/menu click must never wait behind parser/refresh work.
-  if not FLock.TryEnter then Exit;
+  if not FLock.TryEnter then
+    Exit;
   try
-    if not FCache.ContainsKey(Key) then Exit; // never cached: caller repairs
+    if not FCache.ContainsKey(Key) then
+      Exit; // never cached: caller repairs
 
     // Already active AND really live: O(1) no-op. This must come before the
     // hollow test - the active engine's slot is empty BY DESIGN (the globals
     // own its containers while it runs), so IsSlotHollow is true here even in
     // the healthy case.
-    if (Key = FCurrentKey) and GlobalsHoldEngine then Exit(True);
+    if (Key = FCurrentKey) and GlobalsHoldEngine then
+      Exit(True);
 
     if Key = FCurrentKey then
     begin
@@ -991,8 +977,7 @@ begin
         Log('Engine switch (fast path): repaired active engine "' + AName + '"');
         Exit(True);
       end;
-      Log('Engine switch (fast path): active engine "' + AName +
-        '" is hollow - repair required');
+      Log('Engine switch (fast path): active engine "' + AName + '" is hollow - repair required');
       Exit;
     end;
 
@@ -1000,8 +985,7 @@ begin
     // every rule/lookup table and silently leave typing broken.
     if IsSlotHollow(Key) then
     begin
-      Log('Engine switch (fast path): "' + AName +
-        '" is hollow - repair required');
+      Log('Engine switch (fast path): "' + AName + '" is hollow - repair required');
       Exit;
     end;
 
@@ -1020,16 +1004,17 @@ end;
 
 procedure TAnsiEngineManager.WarmAllEngines(const AReturnTo: string);
 var
-  Keys: TList<string>;
+  Keys:           TList<string>;
   Key, ReturnKey: string;
-  Warmed: Integer;
+  Warmed:         Integer;
 begin
   ReturnKey := SlotKey(AReturnTo);
   FLock.Enter;
   try
     Keys := TList<string>.Create;
     try
-      for Key in FCache.Keys do Keys.Add(Key);
+      for Key in FCache.Keys do
+        Keys.Add(Key);
       Warmed := 0;
       // Exercise every park/restore path before the keyboard hook starts.
       // Hollow slots are skipped: they cannot be restored and would only
@@ -1055,11 +1040,9 @@ begin
         // Never advertise it while another engine is live - the next switch
         // repairs it from disk.
         EnsureLiveEngine;
-        Log('WARNING: warm pass could not activate "' + AReturnTo +
-          '" - active engine is "' + FCurrentKey + '"');
+        Log('WARNING: warm pass could not activate "' + AReturnTo + '" - active engine is "' + FCurrentKey + '"');
       end;
-      Log('Engine cache warmed: ' + IntToStr(Warmed) + ' engine(s), active="' +
-        FCurrentKey + '"');
+      Log('Engine cache warmed: ' + IntToStr(Warmed) + ' engine(s), active="' + FCurrentKey + '"');
     finally
       Keys.Free;
     end;
@@ -1072,7 +1055,7 @@ procedure TAnsiEngineManager.DoInvalidateEngine(const AName: string);
 var
   Key, Path: string;
   WasActive: Boolean;
-  Err: TStringList;
+  Err:       TStringList;
 begin
   Key := SlotKey(AName);
   if not FCache.ContainsKey(Key) then
@@ -1095,8 +1078,7 @@ begin
       begin
         // Never leave the app without a working engine: fall back to Default.
         if TryRestoreSlot(DefaultEngineSlotKey, 'Default') then
-          Log('WARNING: active engine "' + AName +
-            '" could not be reparsed - fell back to Default')
+          Log('WARNING: active engine "' + AName + '" could not be reparsed - fell back to Default')
         else
           EnsureLiveEngine;
       end
@@ -1137,12 +1119,12 @@ end;
 
 procedure TAnsiEngineManager.RefreshFromDisk;
 var
-  Key: string;
-  Slot: TEngineSlot;
-  Info: TAvroEncoFileInfo;
-  Name: string;
+  Key:     string;
+  Slot:    TEngineSlot;
+  Info:    TAvroEncoFileInfo;
+  Name:    string;
   NewTime: TDateTime;
-  Keys: TList<string>;
+  Keys:    TList<string>;
 begin
   FLock.Enter;
   try
@@ -1155,8 +1137,7 @@ begin
       begin
         if Key = 'default' then
           Continue;
-        if FCache.TryGetValue(Key, Slot) and (Slot.FilePath <> '') and
-          (not FileExists(Slot.FilePath)) then
+        if FCache.TryGetValue(Key, Slot) and (Slot.FilePath <> '') and (not FileExists(Slot.FilePath)) then
         begin
           if Key = FCurrentKey then
             Continue; // active engine: keep; the delete flow switches away
@@ -1168,15 +1149,14 @@ begin
     end;
 
     // 2. Re-parse changed engines, preload newly added ones (default-key /
-    //    plain .json only; password engines stay lazy).
+    // plain .json only; password engines stay lazy).
     if Assigned(AvroEncoFiles) then
       for Info in AvroEncoFiles.Values do
       begin
-        if Info.IsEncoFile and
-          (GetAvroEncoProtectionFlag(Info.FilePath) <> AVROENCO_FLAG_DEFAULT_KEY) then
+        if Info.IsEncoFile and (GetAvroEncoProtectionFlag(Info.FilePath) <> AVROENCO_FLAG_DEFAULT_KEY) then
           Continue;
-        Name := Info.DisplayName;
-        Key := SlotKey(Name);
+        name := Info.DisplayName;
+        Key := SlotKey(name);
         if FCache.TryGetValue(Key, Slot) then
         begin
           try
@@ -1185,12 +1165,12 @@ begin
             NewTime := 0;
           end;
           if Abs(NewTime - Slot.LastWriteTime) > 0.000001 then
-            DoInvalidateEngine(Name);
+            DoInvalidateEngine(name);
         end
         else
         begin
-          Log('Engine added while running: ' + Name);
-          ParseIntoSlot(Name, Info.FilePath, nil);
+          Log('Engine added while running: ' + name);
+          ParseIntoSlot(name, Info.FilePath, nil);
         end;
       end;
 
@@ -1239,10 +1219,10 @@ end;
 
 procedure TAnsiPreloadThread.DecryptItem(Index: Integer);
 var
-  R: TPreloadResult;
+  R:    TPreloadResult;
   Item: TPreloadItem;
 begin
-  Item := FItems[Index];
+  Item := FItems[index];
   R.DisplayName := Item.DisplayName;
   R.FilePath := Item.FilePath;
   R.JSON := '';
@@ -1254,13 +1234,11 @@ begin
       // Shield/legacy containers: pure crypto, no shared state - safe to run
       // on worker threads. Default-key containers ignore the password;
       // cached-password containers decrypt with the persisted password.
-      R.OK := LoadAnsiJSONCached(Item.FilePath, Item.Password, R.JSON) and
-        (R.JSON <> '') and (R.JSON[1] = '{');
+      R.OK := LoadAnsiJSONCached(Item.FilePath, Item.Password, R.JSON) and (R.JSON <> '') and (R.JSON[1] = '{');
     end
     else
     begin
-      R.OK := LoadAnsiJSONCached(Item.FilePath, '', R.JSON) and
-        (Trim(R.JSON) <> '');
+      R.OK := LoadAnsiJSONCached(Item.FilePath, '', R.JSON) and (Trim(R.JSON) <> '');
     end;
     if (not R.OK) and (R.ErrorMsg = '') then
       R.ErrorMsg := 'decrypt/cache load returned no usable JSON';
@@ -1273,7 +1251,7 @@ begin
   end;
   FResultLock.Enter;
   try
-    FResults[Index] := R;
+    FResults[index] := R;
   finally
     FResultLock.Leave;
   end;
@@ -1282,7 +1260,7 @@ end;
 procedure TAnsiPreloadThread.ParallelDecrypt;
 var
   WorkerCount, I, Next: Integer;
-  Workers: TArray<TThread>;
+  Workers:              TArray<TThread>;
 begin
   // Shield v2 decryption is millisecond-level with small, short-lived
   // buffers (the 64 MB Argon2 arenas are gone - Argon2 was removed
@@ -1303,7 +1281,7 @@ begin
   for I := 0 to WorkerCount - 1 do
   begin
     Workers[I] := TThread.CreateAnonymousThread(
-      procedure
+        procedure
       var
         Job: Integer;
       begin
@@ -1334,7 +1312,7 @@ end;
 
 procedure TAnsiPreloadThread.Execute;
 var
-  I, N: Integer;
+  I, N:      Integer;
   Completed: TArray<TPreloadResult>;
 begin
   try
@@ -1365,9 +1343,11 @@ begin
 end;
 
 initialization
-  AnsiEngineManager := TAnsiEngineManager.Create;
+
+AnsiEngineManager := TAnsiEngineManager.Create;
 
 finalization
-  FreeAndNil(AnsiEngineManager);
+
+FreeAndNil(AnsiEngineManager);
 
 end.

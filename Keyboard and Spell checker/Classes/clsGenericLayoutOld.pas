@@ -397,7 +397,7 @@ end;
   Appends one kar key press to the record.
   UniKar      - the canonical kar the press stands for (ে, ি, ৈ ...)
   AnsGlyph    - the glyph that was streamed to the screen ('' in Unicode
-                classic mode, where nothing at all is emitted)
+  classic mode, where nothing at all is emitted)
 }
 procedure TGenericLayoutOld.PushKarPress(const UniKar, AnsGlyph: string);
 begin
@@ -415,7 +415,7 @@ begin
     '\x0995' '\x09BF' space '\x09BF' '\x09B0'  ->  ink ink (one too many). }
   if KarRunCommitted then
   begin
-    ClearKarRun;               // also clears KarRunCommitted + the anchor
+    ClearKarRun; // also clears KarRunCommitted + the anchor
     AnsiMirror := '';
     AnsiMirrorActive := False; // the next StreamMirrorAppend re-anchors here
   end;
@@ -533,9 +533,9 @@ end;
   ParseAndSendNow, AnsiVisualPop's candidates and the hasanta paths can never
   disagree about the stream:
   * the ink was streamed right behind Conv(KarAnchor), so it is spliced there
-    (KarAnchor = '' means "at the very head of the word")
+  (KarAnchor = '' means "at the very head of the word")
   * when the anchor is gone (a deletion or a ligature crossed it) the safest
-    stream is the ink trailing at the end - never a backspace storm.
+  stream is the ink trailing at the end - never a backspace storm.
 }
 function TGenericLayoutOld.AnsiSplice(const ConvText: string): string;
 var
@@ -1498,15 +1498,15 @@ function TGenericLayoutOld.PressPreBaseKar(const KarChar: string): string;
 var
   mGlyph: string;
 
-{ the glyph for the DETACHED visual cell, per the ACTIVE mapping:
-  - word start (buffer empty): Convert(kar) = A_EKar1/A_OIKar1 form
-  - after a letter: the JHULANTA (attached) form. Probe with TWO
-  consonants then the kar: the kar's owner is the LAST one and the
-  kar renders right after the FIRST consonant's glyph -
-  Convert('কর'+ে) = 'K‡v'  ->  middle = '‡'   (V3: 'Köìv' -> 'öì')
-  (A single 'ক'+kar can NOT be used: the kar's owner is ক itself and
-  the kar travels to the STREAM HEAD there: '†K'.)
-  ি has a single form (A_IKar). }
+  { the glyph for the DETACHED visual cell, per the ACTIVE mapping:
+    - word start (buffer empty): Convert(kar) = A_EKar1/A_OIKar1 form
+    - after a letter: the JHULANTA (attached) form. Probe with TWO
+    consonants then the kar: the kar's owner is the LAST one and the
+    kar renders right after the FIRST consonant's glyph -
+    Convert('কর'+ে) = 'K‡v'  ->  middle = '‡'   (V3: 'Köìv' -> 'öì')
+    (A single 'ক'+kar can NOT be used: the kar's owner is ক itself and
+    the kar travels to the STREAM HEAD there: '†K'.)
+    ি has a single form (A_IKar). }
   function StreamGlyph(const AKar: string): string;
   var
     Mid, First, Last: string;
@@ -1526,8 +1526,8 @@ var
   end;
 
 { the screen mirror while kar ink is live = the ANSI stream. The FIRST
-    glyph of the run also records the SEAM (anchor) the ink belongs to, so
-    every later stream can put it back in exactly the typed position. }
+  glyph of the run also records the SEAM (anchor) the ink belongs to, so
+  every later stream can put it back in exactly the typed position. }
   procedure StreamMirrorAppend(const AGlyph: string);
   begin
     if not AnsiMirrorActive then
@@ -1540,11 +1540,11 @@ var
     AnsiMirror := AnsiMirror + AGlyph;
   end;
 
-  { NOTE: the mirror never SHRINKS its ink any more. The old helper existed
-    only for "a different kar erases the streamed glyph" and for the ী key
-    wiping the pending run - both are gone: ink is frozen, not erased. A
-    deletion path that really must take a glyph off the screen emits the
-    backspace itself and pops the press (see DoBackspace / HandleIsolated). }
+{ NOTE: the mirror never SHRINKS its ink any more. The old helper existed
+  only for "a different kar erases the streamed glyph" and for the ী key
+  wiping the pending run - both are gone: ink is frozen, not erased. A
+  deletion path that really must take a glyph off the screen emits the
+  backspace itself and pops the press (see DoBackspace / HandleIsolated). }
 
 begin
   if KarChar = b_IIkar then
@@ -1759,8 +1759,7 @@ begin
         are untouched.) }
       IsRephTailCtx := (LastChars[2] = b_R) and (LastChars[3] <> b_Hasanta) and (LastChars[3] <> ' ') and (CharForKey <> b_Ikar);
 
-      if (not IsRephTailCtx) or KarBindable or ((CharForKey <> b_Ekar) and (CharForKey <> b_Ikar) and (CharForKey <> b_OIkar))
-      then
+      if (not IsRephTailCtx) or KarBindable or ((CharForKey <> b_Ekar) and (CharForKey <> b_Ikar) and (CharForKey <> b_OIkar)) then
       begin
 
         { chandrabindu sits right before the hasanta: a vowel SIGN must be

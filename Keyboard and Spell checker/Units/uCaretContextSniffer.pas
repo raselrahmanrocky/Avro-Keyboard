@@ -17,11 +17,11 @@ unit uCaretContextSniffer;
   in a document.
 
   Layered strategy:
-    A) Message-based fast path - EM_GETSEL + WM_GETTEXT on standard Edit /
-       RichEdit controls. Zero side effects.
-    B) Clipboard round-trip fallback - select one char left (Shift+Left),
-       copy (Ctrl+C), read CF_UNICODETEXT, restore caret (Right), restore the
-       previous clipboard text. Used for Word/browsers/custom controls.
+  A) Message-based fast path - EM_GETSEL + WM_GETTEXT on standard Edit /
+  RichEdit controls. Zero side effects.
+  B) Clipboard round-trip fallback - select one char left (Shift+Left),
+  copy (Ctrl+C), read CF_UNICODETEXT, restore caret (Right), restore the
+  previous clipboard text. Used for Word/browsers/custom controls.
 
   Every synthetic key event is stamped with AVRO_SNIFF_TAG in dwExtraInfo so
   our own WH_KEYBOARD_LL hook passes them straight through without layout
@@ -35,12 +35,11 @@ const
   AVRO_SNIFF_TAG = $A09E5701; // dwExtraInfo marker for sniffer input
 
 type
-  TSniffResult = (
-    srNone,        // nothing usable before the caret (BOS/unknown app/failure)
-    srAnsiGlyph,   // an ANSI (Bijoy font range) character
-    srUnicodeChar, // a Unicode Bengali character ($0980..$09FF)
-    srDelimiter    // space/tab/newline directly before the caret
-  );
+  TSniffResult = (srNone, // nothing usable before the caret (BOS/unknown app/failure)
+    srAnsiGlyph,          // an ANSI (Bijoy font range) character
+    srUnicodeChar,        // a Unicode Bengali character ($0980..$09FF)
+    srDelimiter           // space/tab/newline directly before the caret
+    );
 
 var
   SniffingActive: Boolean = False; // reentrancy guard checked by layout engines
@@ -53,7 +52,7 @@ var
   SniffOverrideActive: Boolean = False;
   SniffOverride:       string  = '';
 
-// Reads one char left of the caret. Returns True when Chars is meaningful.
+  // Reads one char left of the caret. Returns True when Chars is meaningful.
 function SniffCharBeforeCaret(out Chars: string; out Kind: TSniffResult): Boolean;
 
 implementation
@@ -66,12 +65,12 @@ uses
   uRegistrySettings;
 
 const
-  SNIFF_MSG_TIMEOUT = 100; // ms per SendMessageTimeout
+  SNIFF_MSG_TIMEOUT = 100;   // ms per SendMessageTimeout
   SNIFF_MAX_TEXTLEN = $F000; // above this EM_GETSEL lo/hi contract is unsafe
-  SNIFF_COPY_DELAY = 25;   // ms wait after Ctrl+C
-  SNIFF_SEL_DELAY = 12;    // ms wait after Shift+Left
+  SNIFF_COPY_DELAY  = 25;    // ms wait after Ctrl+C
+  SNIFF_SEL_DELAY   = 12;    // ms wait after Shift+Left
 
-{ =============================================================================== }
+  { =============================================================================== }
 
 function GetFocusedEditHandle: HWND;
 var
@@ -153,10 +152,10 @@ end;
 
 function TryReadViaMessages(hEdit: HWND; out Ch: string): Boolean;
 var
-  Res:     LRESULT;
+  Res:              LRESULT;
   SelStart, SelEnd: Integer;
-  TextLen: Integer;
-  Buf:     string;
+  TextLen:          Integer;
+  Buf:              string;
 begin
   Result := False;
   Ch := '';
@@ -174,8 +173,8 @@ begin
   Res := SendMessageTimeout(hEdit, EM_GETSEL, 0, 0, SMTO_ABORTIFHUNG, SNIFF_MSG_TIMEOUT, nil);
   if Res = 0 then
     Exit;
-  SelStart := DWORD(Res) and $FFFF;         // LOWORD = selection start
-  SelEnd := (DWORD(Res) shr 16) and $FFFF;  // HIWORD = selection end
+  SelStart := DWORD(Res) and $FFFF;        // LOWORD = selection start
+  SelEnd := (DWORD(Res) shr 16) and $FFFF; // HIWORD = selection end
   if SelStart <> SelEnd then
     Exit; // user has an active selection - do not disturb
   if SelStart < 1 then
@@ -194,11 +193,11 @@ end;
 
 function TryReadViaClipboard(out Ch: string): Boolean;
 var
-  hEdit: HWND;
-  Res: LRESULT;
+  hEdit:            HWND;
+  Res:              LRESULT;
   SelStart, SelEnd: Integer;
-  SavedClip: string;
-  HadClip:   Boolean;
+  SavedClip:        string;
+  HadClip:          Boolean;
 begin
   Result := False;
   Ch := '';
@@ -278,11 +277,11 @@ begin
     case Chars[1] of
       ' ', #9, #13, #10:
         Kind := srDelimiter;
-    else
-      if (Ord(Chars[1]) >= $0980) and (Ord(Chars[1]) <= $09FF) then
-        Kind := srUnicodeChar
       else
-        Kind := srAnsiGlyph;
+        if (Ord(Chars[1]) >= $0980) and (Ord(Chars[1]) <= $09FF) then
+          Kind := srUnicodeChar
+        else
+          Kind := srAnsiGlyph;
     end;
     Result := True;
     Exit;
@@ -311,11 +310,11 @@ begin
   case Ch[1] of
     ' ', #9, #13, #10:
       Kind := srDelimiter;
-  else
-    if (Ord(Ch[1]) >= $0980) and (Ord(Ch[1]) <= $09FF) then
-      Kind := srUnicodeChar
     else
-      Kind := srAnsiGlyph;
+      if (Ord(Ch[1]) >= $0980) and (Ord(Ch[1]) <= $09FF) then
+        Kind := srUnicodeChar
+      else
+        Kind := srAnsiGlyph;
   end;
 end;
 

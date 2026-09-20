@@ -34,8 +34,7 @@ procedure DestroyDict;
   from startup for every user, including the ones who never type
   phonetically. Nothing but typing needs it, and the first keystroke pays for
   it once (single-digit milliseconds; the file is in the page cache by then). }
-function TryAutoCorrectWord(const AWord: string;
-  out AReplacement: string): Boolean;
+function TryAutoCorrectWord(const AWord: string; out AReplacement: string): Boolean;
 
 var
   Dict: TDictionary<string, string>;
@@ -54,8 +53,7 @@ begin
   LoadDict;
 end;
 
-function TryAutoCorrectWord(const AWord: string;
-  out AReplacement: string): Boolean;
+function TryAutoCorrectWord(const AWord: string; out AReplacement: string): Boolean;
 begin
   AReplacement := '';
   if AWord = '' then

@@ -3,23 +3,22 @@
   kat_shieldsecret - KATs for the two hardening primitives that everything
   else depends on:
 
-    1. uAvroShieldSecret: the obfuscated root secret must decode to the exact
-       IKM this release was built against. The expected value is pinned as a
-       SHA-256 digest, not as the secret itself, so this file can live in the
-       repository without publishing the secret. If someone rotates the
-       secret without updating the pin, this fails loudly - that is the point
-       (a silent rotation would break every previously built container).
+  1. uAvroShieldSecret: the obfuscated root secret must decode to the exact
+  IKM this release was built against. The expected value is pinned as a
+  SHA-256 digest, not as the secret itself, so this file can live in the
+  repository without publishing the secret. If someone rotates the
+  secret without updating the pin, this fails loudly - that is the point
+  (a silent rotation would break every previously built container).
 
-    2. uAvroSecureMem: the wipe primitives must actually clear memory that is
-       subsequently read (proving the store was not eliminated), and
-       AvroWipeString must break copy-on-write instead of corrupting a string
-       that another variable still shares.
+  2. uAvroSecureMem: the wipe primitives must actually clear memory that is
+  subsequently read (proving the store was not eliminated), and
+  AvroWipeString must break copy-on-write instead of corrupting a string
+  that another variable still shares.
 
   Exit code: 0 all PASS, 1 FAIL.
 }
 
 {$APPTYPE CONSOLE}
-
 program kat_shieldsecret;
 
 uses
@@ -33,9 +32,8 @@ const
   { SHA-256 of the decoded root secret IKM (44 bytes of ASCII). Publishing the
     digest is safe: the IKM carries ~128 bits of entropy from its random tail,
     so the digest cannot be inverted. }
-  PinnedIKMSha256 =
-    '91ea351e02f65fd97d4c7cd2bcd9038fa3b130bfd43796b71da27a6cc9bad048';
-  ExpectedIKMLen = 44;
+  PinnedIKMSha256 = '91ea351e02f65fd97d4c7cd2bcd9038fa3b130bfd43796b71da27a6cc9bad048';
+  ExpectedIKMLen  = 44;
 
   Canary = $A5;
 
@@ -83,16 +81,12 @@ end;
 procedure CheckRootSecret;
 var
   IKM: TBytes;
-  S: string;
+  S:   string;
 begin
   IKM := AvroShieldSecretIKM;
   try
-    Check('secret decodes to the pinned length',
-      Length(IKM) = ExpectedIKMLen,
-      Format('length=%d expected=%d', [Length(IKM), ExpectedIKMLen]));
-    Check('secret matches the pinned SHA-256',
-      Sha256Hex(IKM) = PinnedIKMSha256,
-      'sha256=' + Sha256Hex(IKM) + ' expected=' + PinnedIKMSha256);
+    Check('secret decodes to the pinned length', Length(IKM) = ExpectedIKMLen, Format('length=%d expected=%d', [Length(IKM), ExpectedIKMLen]));
+    Check('secret matches the pinned SHA-256', Sha256Hex(IKM) = PinnedIKMSha256, 'sha256=' + Sha256Hex(IKM) + ' expected=' + PinnedIKMSha256);
   finally
     AvroWipeAndRelease(IKM);
   end;
@@ -102,8 +96,7 @@ begin
     divergence here would silently orphan every existing cache file. }
   S := AvroShieldSecretString;
   try
-    Check('legacy string accessor agrees with the byte IKM',
-      Sha256Hex(TEncoding.ASCII.GetBytes(S)) = PinnedIKMSha256);
+    Check('legacy string accessor agrees with the byte IKM', Sha256Hex(TEncoding.ASCII.GetBytes(S)) = PinnedIKMSha256);
   finally
     AvroWipeString(S);
   end;
@@ -112,8 +105,7 @@ begin
   IKM := AvroShieldSecretIKM;
   try
     AvroWipeBytes(IKM);
-    Check('wipe of the first returned IKM zeroes every byte',
-      Sha256Hex(IKM) <> PinnedIKMSha256);
+    Check('wipe of the first returned IKM zeroes every byte', Sha256Hex(IKM) <> PinnedIKMSha256);
   finally
     AvroWipeAndRelease(IKM);
   end;
@@ -125,24 +117,23 @@ end;
 
 procedure CheckWipeLocalArray;
 var
-  Local: array [0 .. 63] of Byte;
+  Local:  array [0 .. 63] of Byte;
   I, Sum: Integer;
 begin
-  for I := 0 to High(Local) do
-    Local[I] := Canary;
-  AvroSecureZero(Local, SizeOf(Local));
+  for I := 0 to high(local) do
+    local[I] := Canary;
+  AvroSecureZero(local, SizeOf(local));
   { Read the values afterwards: a compiler that eliminated the wipe as a dead
     store cannot pass this, because the sum would still be Canary * 64. }
   Sum := 0;
-  for I := 0 to High(Local) do
-    Sum := Sum + Local[I];
-  Check('AvroSecureZero clears a local buffer that is read afterwards',
-    Sum = 0, Format('sum=%d expected=0', [Sum]));
+  for I := 0 to high(local) do
+    Sum := Sum + local[I];
+  Check('AvroSecureZero clears a local buffer that is read afterwards', Sum = 0, Format('sum=%d expected=0', [Sum]));
 end;
 
 procedure CheckWipeBytes;
 var
-  B: TBytes;
+  B:      TBytes;
   I, Sum: Integer;
 begin
   SetLength(B, 128);
@@ -152,14 +143,11 @@ begin
   Sum := 0;
   for I := 0 to Length(B) - 1 do
     Sum := Sum + B[I];
-  Check('AvroWipeBytes clears the buffer contents', Sum = 0,
-    Format('sum=%d expected=0', [Sum]));
-  Check('AvroWipeBytes keeps the length (content-only wipe)',
-    Length(B) = 128, Format('length=%d expected=128', [Length(B)]));
+  Check('AvroWipeBytes clears the buffer contents', Sum = 0, Format('sum=%d expected=0', [Sum]));
+  Check('AvroWipeBytes keeps the length (content-only wipe)', Length(B) = 128, Format('length=%d expected=128', [Length(B)]));
 
   AvroWipeAndRelease(B);
-  Check('AvroWipeAndRelease releases the buffer', Length(B) = 0,
-    Format('length=%d expected=0', [Length(B)]));
+  Check('AvroWipeAndRelease releases the buffer', Length(B) = 0, Format('length=%d expected=0', [Length(B)]));
 end;
 
 procedure CheckWipeStringCopyOnWrite;
@@ -174,11 +162,8 @@ begin
   S1 := Copy(S1, 1, 32); // still logically the same 32 'K's
 
   AvroWipeString(S1);
-  Check('AvroWipeString clears the variable it owns', S1 = '',
-    'value not cleared');
-  Check('AvroWipeString does not corrupt a sibling sharing the buffer',
-    S2 = StringOfChar('K', 32),
-    Format('sibling length=%d (expected 32)', [Length(S2)]));
+  Check('AvroWipeString clears the variable it owns', S1 = '', 'value not cleared');
+  Check('AvroWipeString does not corrupt a sibling sharing the buffer', S2 = StringOfChar('K', 32), Format('sibling length=%d (expected 32)', [Length(S2)]));
   AvroWipeString(S2);
 end;
 
@@ -190,10 +175,8 @@ begin
     it must copy-on-write, never write into .rdata. }
   S := 'literal-backed-string';
   AvroWipeString(S);
-  Check('AvroWipeString is safe for literal-backed strings',
-    S = '', 'value not cleared');
-  Check('literal itself is still readable after the wipe',
-    'literal-backed-string' = 'literal-backed-string');
+  Check('AvroWipeString is safe for literal-backed strings', S = '', 'value not cleared');
+  Check('literal itself is still readable after the wipe', 'literal-backed-string' = 'literal-backed-string');
 end;
 
 procedure CheckWipeStringArray;
@@ -205,9 +188,7 @@ begin
   A[1] := 'beta';
   A[2] := 'gamma';
   AvroWipeStringArray(A);
-  Check('AvroWipeStringArray clears every element',
-    (A[0] = '') and (A[1] = '') and (A[2] = ''),
-    Format('[%s][%s][%s]', [A[0], A[1], A[2]]));
+  Check('AvroWipeStringArray clears every element', (A[0] = '') and (A[1] = '') and (A[2] = ''), Format('[%s][%s][%s]', [A[0], A[1], A[2]]));
 
   SetLength(A, 0);
   AvroWipeStringArray(A); // empty array must be a safe no-op
@@ -220,19 +201,13 @@ end;
 
 procedure CheckFusedGate;
 begin
-  Check('AvroFuse(True) equals the pinned open value',
-    AvroFuse(True) = AVRO_FUSE_OPEN,
-    Format('$%.8x expected $%.8x', [AvroFuse(True), AVRO_FUSE_OPEN]));
-  Check('AVRO_FUSE_OPEN matches the documented derivation',
-    AVRO_FUSE_OPEN = (AVRO_FUSE_MUL xor AVRO_FUSE_XOR),
-    Format('$%.8x', [AVRO_FUSE_OPEN]));
-  Check('AvroFuse(False) does not open the gate',
-    AvroFuse(False) <> AVRO_FUSE_OPEN);
+  Check('AvroFuse(True) equals the pinned open value', AvroFuse(True) = AVRO_FUSE_OPEN, Format('$%.8x expected $%.8x', [AvroFuse(True), AVRO_FUSE_OPEN]));
+  Check('AVRO_FUSE_OPEN matches the documented derivation', AVRO_FUSE_OPEN = (AVRO_FUSE_MUL xor AVRO_FUSE_XOR), Format('$%.8x', [AVRO_FUSE_OPEN]));
+  Check('AvroFuse(False) does not open the gate', AvroFuse(False) <> AVRO_FUSE_OPEN);
   Check('AvroFuseOk accepts the open value', AvroFuseOk(AvroFuse(True)));
   Check('AvroFuseOk rejects the closed value', not AvroFuseOk(AvroFuse(False)));
   { A gate value must not be openable by an unrelated arithmetic accident. }
-  Check('AvroFuseOk rejects an adjacent value',
-    not AvroFuseOk(AVRO_FUSE_OPEN xor 1));
+  Check('AvroFuseOk rejects an adjacent value', not AvroFuseOk(AVRO_FUSE_OPEN xor 1));
 end;
 
 begin
@@ -258,4 +233,5 @@ begin
 
   if Fails > 0 then
     Halt(1);
+
 end.

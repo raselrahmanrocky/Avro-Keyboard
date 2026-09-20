@@ -3,22 +3,29 @@ unit ufrmAnsiToast;
 interface
 
 uses
-  Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, ExtCtrls,
+  Windows,
+  Messages,
+  SysUtils,
+  Classes,
+  Graphics,
+  Controls,
+  Forms,
+  ExtCtrls,
   StdCtrls;
 
 type
   TfrmAnsiToast = class(TForm)
-  private
-    FLabel: TLabel;
-    FTimer: TTimer;
-    procedure TimerHandler(Sender: TObject);
-    procedure FormClose(Sender: TObject; var Action: TCloseAction);
-  protected
-    procedure CreateParams(var Params: TCreateParams); override;
-    procedure WMMouseActivate(var Msg: TWMMouseActivate); message WM_MOUSEACTIVATE;
-  public
-    procedure Setup;
-    procedure ShowToast(const AText: string);
+    private
+      FLabel: TLabel;
+      FTimer: TTimer;
+      procedure TimerHandler(Sender: TObject);
+      procedure FormClose(Sender: TObject; var Action: TCloseAction);
+    protected
+      procedure CreateParams(var Params: TCreateParams); override;
+      procedure WMMouseActivate(var Msg: TWMMouseActivate); message WM_MOUSEACTIVATE;
+    public
+      procedure Setup;
+      procedure ShowToast(const AText: string);
   end;
 
 procedure ShowAnsiToastNotification(const AText: string);
@@ -42,8 +49,7 @@ procedure TfrmAnsiToast.CreateParams(var Params: TCreateParams);
 begin
   inherited;
   Params.Style := WS_POPUP;
-  Params.ExStyle := Params.ExStyle or WS_EX_TOPMOST or WS_EX_NOACTIVATE or
-    WS_EX_TOOLWINDOW;
+  Params.ExStyle := Params.ExStyle or WS_EX_TOPMOST or WS_EX_NOACTIVATE or WS_EX_TOOLWINDOW;
   Params.WndParent := GetDesktopWindow;
 end;
 
@@ -85,8 +91,7 @@ begin
   Width := FLabel.Canvas.TextWidth(AText) + 40;
   Left := Screen.WorkAreaRect.Right - Width - 20;
   Top := Screen.WorkAreaRect.Bottom - Height - 20;
-  SetWindowPos(Handle, HWND_TOPMOST, Left, Top, Width, Height,
-    SWP_NOACTIVATE or SWP_SHOWWINDOW);
+  SetWindowPos(Handle, HWND_TOPMOST, Left, Top, Width, Height, SWP_NOACTIVATE or SWP_SHOWWINDOW);
   ShowWindow(Handle, SW_SHOWNOACTIVATE);
   FTimer.Enabled := True;
 end;
@@ -105,9 +110,11 @@ begin
 end;
 
 initialization
-  CurrentToast := nil;
+
+CurrentToast := nil;
 
 finalization
-  FreeAndNil(CurrentToast);
+
+FreeAndNil(CurrentToast);
 
 end.

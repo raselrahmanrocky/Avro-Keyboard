@@ -7,10 +7,10 @@
   highest-value check in the hardening set: it would have caught, on the day
   each was introduced,
 
-    (a) the root secret being stored as two adjacent XOR-able arrays with the
-        plaintext repeated in a comment next to them, and
-    (b) any container accidentally built from, or shipped alongside, its
-        unprotected JSON payload.
+  (a) the root secret being stored as two adjacent XOR-able arrays with the
+  plaintext repeated in a comment next to them, and
+  (b) any container accidentally built from, or shipped alongside, its
+  unprotected JSON payload.
 
   It links the runtime, so it knows the root secret without needing any
   external key file - the check is authoritative rather than best-effort.
@@ -22,12 +22,12 @@
   the developer comment domain are doing their job - see CheckObfuscatedPayload.
 
   Hard failures (exit 1):
-    * the root secret IKM appears in the executable, or in any container;
-    * any source-mapping JSON string (field name or value) appears in the
-      matching compiled container, which would mean the payload is not
-      actually encrypted;
-    * any authored mapping text, Bengali codepoint, '#$' literal or comment
-      field name is legible in the unwrapped payload.
+  * the root secret IKM appears in the executable, or in any container;
+  * any source-mapping JSON string (field name or value) appears in the
+  matching compiled container, which would mean the payload is not
+  actually encrypted;
+  * any authored mapping text, Bengali codepoint, '#$' literal or comment
+  field name is legible in the unwrapped payload.
 
   Warnings (reported, do not fail): legacy v2 format internals that remain in
   the binary because the v2 reader needs them. They disappear with the v3
@@ -38,7 +38,6 @@
 }
 
 {$APPTYPE CONSOLE}
-
 program kat_staticleak;
 
 uses
@@ -62,11 +61,7 @@ const
     needs them. Reported as warnings rather than failures; the v3 ordinal-field
     encoding replaces them. (The AVROSHLD/AVROBC magics are intentionally not
     listed: the loader must compare against them, so they are expected.) }
-  LEGACY_TOKENS: array [0 .. 3] of string = (
-    '_obf_meta',
-    'key_map',
-    'dummies',
-    'AvroShieldBytecodeXORv1');
+  LEGACY_TOKENS: array [0 .. 3] of string = ('_obf_meta', 'key_map', 'dummies', 'AvroShieldBytecodeXORv1');
 
 var
   Fails: Integer;
@@ -88,7 +83,7 @@ end;
 function IndexBytes(const AHay, ANeedle: TBytes): Integer;
 var
   I, J, H, N: Integer;
-  First: Byte;
+  First:      Byte;
 begin
   Result := -1;
   H := Length(AHay);
@@ -236,9 +231,9 @@ procedure CollectCanaries(const AValue: TJSONValue; AList: TStrings);
   end;
 
 var
-  I: Integer;
-  Obj: TJSONObject;
-  Arr: TJSONArray;
+  I:    Integer;
+  Obj:  TJSONObject;
+  Arr:  TJSONArray;
   Pair: TJSONPair;
 begin
   if AValue = nil then
@@ -267,31 +262,30 @@ end;
 { Sorted + dupIgnore gives deduplication for free. }
 function BuildCanaries(const AJsonPath: string; AList: TStringList): Boolean;
 var
-  Json: TJSONValue;
+  JSON: TJSONValue;
 begin
   Result := False;
   AList.Clear;
   if not FileExists(AJsonPath) then
     Exit;
   try
-    Json := TJSONObject.ParseJSONValue(TFile.ReadAllText(AJsonPath,
-      TEncoding.UTF8));
+    JSON := TJSONObject.ParseJSONValue(TFile.ReadAllText(AJsonPath, TEncoding.UTF8));
   except
-    Json := nil;
+    JSON := nil;
   end;
-  if Json = nil then
+  if JSON = nil then
     Exit;
   try
-    CollectCanaries(Json, AList);
+    CollectCanaries(JSON, AList);
     Result := True;
   finally
-    Json.Free;
+    JSON.Free;
   end;
 end;
 
 procedure CheckExe(const APath: string);
 var
-  Data: TBytes;
+  Data:   TBytes;
   I, Off: Integer;
   Leaked: Boolean;
 begin
@@ -306,27 +300,24 @@ begin
   // arguments right to left, so reading Off inside the Check call would report
   // the pre-search value.
   Leaked := SecretPresent(Data, Off);
-  Check('exe contains no copy of the root secret (raw or as a string literal)',
-    not Leaked,
-    'root secret found at offset ' + IntToStr(Off) +
-    ' - the whole pipeline reduces to this one value');
+  Check('exe contains no copy of the root secret (raw or as a string literal)', not Leaked, 'root secret found at offset ' + IntToStr(Off) +
+      ' - the whole pipeline reduces to this one value');
 
-  for I := 0 to High(LEGACY_TOKENS) do
+  for I := 0 to high(LEGACY_TOKENS) do
     if IndexText(Data, LEGACY_TOKENS[I]) >= 0 then
-      Warn('exe still contains v2 format token: ' + LEGACY_TOKENS[I],
-        'readable in a strings dump; removed by the v3 ordinal-field encoding');
+      Warn('exe still contains v2 format token: ' + LEGACY_TOKENS[I], 'readable in a strings dump; removed by the v3 ordinal-field encoding');
 
   WriteLn(Format('     (scanned %d bytes)', [Length(Data)]));
 end;
 
 procedure CheckContainer(const AContainerPath, ASourceJsonPath: string);
 var
-  Data, Needle: TBytes;
-  Canaries: TStringList;
-  I, Used, Off: Integer;
+  Data, Needle:  TBytes;
+  Canaries:      TStringList;
+  I, Used, Off:  Integer;
   Found, Leaked: Boolean;
-  Offender: string;
-  BaseName: string;
+  Offender:      string;
+  BaseName:      string;
 begin
   BaseName := ExtractFileName(AContainerPath);
   WriteLn('=== container: ' + BaseName + ' ===');
@@ -339,10 +330,8 @@ begin
   Check('container readable (' + IntToStr(Length(Data)) + ' bytes)', True);
 
   Leaked := SecretPresent(Data, Off); // before the detail string, see CheckExe
-  Check('container carries no copy of the root secret (raw or as a string literal)',
-    not Leaked,
-    'the key material is embedded in the container at offset ' +
-    IntToStr(Off) + ', not merely referenced');
+  Check('container carries no copy of the root secret (raw or as a string literal)', not Leaked, 'the key material is embedded in the container at offset ' +
+      IntToStr(Off) + ', not merely referenced');
 
   Canaries := TStringList.Create;
   try
@@ -350,8 +339,7 @@ begin
     Canaries.Duplicates := dupIgnore;
     if not BuildCanaries(ASourceJsonPath, Canaries) then
     begin
-      Warn('source canaries available', ExtractFileName(ASourceJsonPath) +
-        ' not found - plaintext check skipped for ' + BaseName);
+      Warn('source canaries available', ExtractFileName(ASourceJsonPath) + ' not found - plaintext check skipped for ' + BaseName);
       Exit;
     end;
 
@@ -373,8 +361,7 @@ begin
     end;
     Needle := nil;
 
-    Check(Format('%s: no cleartext mapping data (%d canaries from %s)',
-      [BaseName, Used, ExtractFileName(ASourceJsonPath)]), not Found,
+    Check(Format('%s: no cleartext mapping data (%d canaries from %s)', [BaseName, Used, ExtractFileName(ASourceJsonPath)]), not Found,
       'plaintext leaked into the container, e.g. "' + Offender + '"');
   finally
     Canaries.Free;
@@ -389,10 +376,10 @@ end;
   which is exactly what an attacker holds after recovering the container key
   from the binary, and asserts that nothing legible survives there:
 
-    * no Bengali codepoints and no '#$' literal in the parsed payload;
-    * none of the authored strings of the matching source document (>= 10
-      chars, the same canary set used for the raw scan);
-    * no comment field name and no mapping section name.
+  * no Bengali codepoints and no '#$' literal in the parsed payload;
+  * none of the authored strings of the matching source document (>= 10
+  chars, the same canary set used for the raw scan);
+  * no comment field name and no mapping section name.
 
   The pattern scans run over the parsed payload rather than the raw bytecode.
   Values are XOR-masked there, so a generic '#$' or Bengali search over tens of
@@ -407,19 +394,17 @@ end;
 procedure CheckObfuscatedPayload(const AContainerPath, ASourceJsonPath: string);
 var
   Data, Bytecode, OpaqueBytes: TBytes;
-  Canaries: TStringList;
-  Root: TAvroNode;
-  Opaque, Name: string;
-  I, LeakedRaw, LeakedText: Integer;
-  OffenderRaw, OffenderText: string;
+  Canaries:                    TStringList;
+  Root:                        TAvroNode;
+  Opaque, Name:                string;
+  I, LeakedRaw, LeakedText:    Integer;
+  OffenderRaw, OffenderText:   string;
 begin
-  Name := ExtractFileName(AContainerPath);
+  name := ExtractFileName(AContainerPath);
   Data := TFile.ReadAllBytes(AContainerPath);
-  if AvroShieldExtractObfuscatedBytecode(Data, '', nil, True, Bytecode) <> asrOk
-  then
+  if AvroShieldExtractObfuscatedBytecode(Data, '', nil, True, Bytecode) <> asrOk then
   begin
-    Check(Name + ': payload unwrappable for inspection', False,
-      'cannot unwrap with the embedded secret - wrong key or damaged file');
+    Check(name + ': payload unwrappable for inspection', False, 'cannot unwrap with the embedded secret - wrong key or damaged file');
     Exit;
   end;
 
@@ -429,21 +414,16 @@ begin
   try
     if not AvroShieldParseBytecode(Bytecode, Root) then
     begin
-      Check(Name + ': payload parses as bytecode', False, '');
+      Check(name + ': payload parses as bytecode', False, '');
       Exit;
     end;
     Opaque := AvroShieldNodeToJSON(Root);
     OpaqueBytes := TEncoding.UTF8.GetBytes(Opaque);
 
-    Check(Name + ': payload carries the metadata blob',
-      Pos('_obf_meta', Opaque) > 0,
-      'the payload does not look obfuscated at all');
-    Check(Name + ': payload exposes no Bengali text',
-      not HasBengaliBytes(OpaqueBytes));
-    Check(Name + ': payload exposes no hex key literal',
-      IndexBytes(OpaqueBytes, AsciiBytes('#$')) < 0);
-    Check(Name + ': payload exposes no comment field name',
-      Pos('"Comment"', Opaque) = 0);
+    Check(name + ': payload carries the metadata blob', Pos('_obf_meta', Opaque) > 0, 'the payload does not look obfuscated at all');
+    Check(name + ': payload exposes no Bengali text', not HasBengaliBytes(OpaqueBytes));
+    Check(name + ': payload exposes no hex key literal', IndexBytes(OpaqueBytes, AsciiBytes('#$')) < 0);
+    Check(name + ': payload exposes no comment field name', Pos('"Comment"', Opaque) = 0);
 
     Canaries := TStringList.Create;
     LeakedRaw := 0;
@@ -466,12 +446,8 @@ begin
             OffenderText := Canaries[I];
         end;
       end;
-    Check(Name + ': masked bytes expose no authored mapping text',
-      LeakedRaw = 0, IntToStr(LeakedRaw) + ' canary/ies legible, first: ' +
-      OffenderRaw);
-    Check(Name + ': parsed payload exposes no authored mapping text',
-      LeakedText = 0, IntToStr(LeakedText) + ' canary/ies legible, first: ' +
-      OffenderText);
+    Check(name + ': masked bytes expose no authored mapping text', LeakedRaw = 0, IntToStr(LeakedRaw) + ' canary/ies legible, first: ' + OffenderRaw);
+    Check(name + ': parsed payload exposes no authored mapping text', LeakedText = 0, IntToStr(LeakedText) + ' canary/ies legible, first: ' + OffenderText);
   finally
     if Canaries <> nil then
       Canaries.Free;
@@ -496,9 +472,9 @@ end;
 
 var
   ContainerDir, SourceDir, ExePath: string;
-  Files: TStringDynArray;
-  F: string;
-  Containers: Integer;
+  Files:                            TStringDynArray;
+  F:                                string;
+  Containers:                       Integer;
 
 begin
   Fails := 0;
@@ -513,8 +489,7 @@ begin
   // Windows drops an empty first argument, which would silently shift the
   // parameters. Accept the containers-only form either as an explicit "-" or
   // by detecting that the first parameter is a directory.
-  if (CompareText(ParamStr(1), '-') = 0) or
-    ((ParamCount = 2) and DirectoryExists(ParamStr(1))) then
+  if (CompareText(ParamStr(1), '-') = 0) or ((ParamCount = 2) and DirectoryExists(ParamStr(1))) then
   begin
     ExePath := '';
     ContainerDir := IncludeTrailingPathDelimiter(ParamStr(1));
@@ -551,19 +526,17 @@ begin
     CheckObfuscatedPayload(F, SourceDir + ChangeFileExt(ExtractFileName(F), '.json'));
   end;
 
-  Check('at least one container was present to check', Containers > 0,
-    'none found under ' + ContainerDir);
+  Check('at least one container was present to check', Containers > 0, 'none found under ' + ContainerDir);
 
   WriteLn;
   if (Fails = 0) and (Warns = 0) then
     WriteLn('STATIC LEAK GATE PASSED (' + IntToStr(Containers) + ' container(s))')
   else if Fails = 0 then
-    WriteLn('STATIC LEAK GATE PASSED with ' + IntToStr(Warns) +
-      ' warning(s) (' + IntToStr(Containers) + ' container(s))')
+    WriteLn('STATIC LEAK GATE PASSED with ' + IntToStr(Warns) + ' warning(s) (' + IntToStr(Containers) + ' container(s))')
   else
-    WriteLn('STATIC LEAK GATE FAILED: ' + IntToStr(Fails) + ' hard failure(s), ' +
-      IntToStr(Warns) + ' warning(s)');
+    WriteLn('STATIC LEAK GATE FAILED: ' + IntToStr(Fails) + ' hard failure(s), ' + IntToStr(Warns) + ' warning(s)');
 
   if Fails > 0 then
     Halt(1);
+
 end.

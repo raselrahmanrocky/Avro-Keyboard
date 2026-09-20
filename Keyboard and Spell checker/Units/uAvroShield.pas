@@ -7,42 +7,42 @@
   Data flow (unprotect), all in memory - nothing plain is ever written to
   disk:
 
-    .AvroShield -> verify HMAC-SHA512 -> AES-256-GCM decrypt -> zlib
-                -> bytecode -> BytecodeParser -> deobfuscate
-                -> in-memory JSON text (returned to the caller)
+  .AvroShield -> verify HMAC-SHA512 -> AES-256-GCM decrypt -> zlib
+  -> bytecode -> BytecodeParser -> deobfuscate
+  -> in-memory JSON text (returned to the caller)
 
   Obfuscation (container format v3) and the developer comment domain:
 
-    values         Base64(plain XOR SHA-256-CTR keystream keyed by the value
-                   seed and the value's context path), so identical plaintext
-                   at different positions encrypts differently.
-    metadata blob  masked with HKDF-SHA256(container master key) instead of a
-                   constant compiled into this unit - which is what makes the
-                   obfuscation keyed: without the container key the value seed
-                   and the key map stay unreachable.
-    comments       obfuscated in a second domain keyed by
-                   HKDF-SHA256(developer IKM, salt = value seed). The runtime
-                   never derives that key and never links the IKM, so comment
-                   text survives in the container without being readable to
-                   anyone who merely opens it (see
-                   AvroEncoEngine\docs\obfuscation-codec.md).
-    runtime cost   IncludeComments = False drops every comment field before the
-                   Base64 decode: no decode, no keystream, no allocation, and
-                   the mapping parser never sees the field.
+  values         Base64(plain XOR SHA-256-CTR keystream keyed by the value
+  seed and the value's context path), so identical plaintext
+  at different positions encrypts differently.
+  metadata blob  masked with HKDF-SHA256(container master key) instead of a
+  constant compiled into this unit - which is what makes the
+  obfuscation keyed: without the container key the value seed
+  and the key map stay unreachable.
+  comments       obfuscated in a second domain keyed by
+  HKDF-SHA256(developer IKM, salt = value seed). The runtime
+  never derives that key and never links the IKM, so comment
+  text survives in the container without being readable to
+  anyone who merely opens it (see
+  AvroEncoEngine\docs\obfuscation-codec.md).
+  runtime cost   IncludeComments = False drops every comment field before the
+  Base64 decode: no decode, no keystream, no allocation, and
+  the mapping parser never sees the field.
 
-    Format v2 containers keep loading through the legacy path (constant
-    metadata mask, comments in the value domain), so the switch is not a
-    re-release of every existing file.
+  Format v2 containers keep loading through the legacy path (constant
+  metadata mask, comments in the value domain), so the switch is not a
+  re-release of every existing file.
 
   Key derivation (container version 2; the v1 Argon2id schedule was removed
   project-wide, including password files, by explicit owner decision):
 
-    default-key containers (flag $10):
-      master = HKDF-SHA256(secret, salt, info, len=32)   // RFC 5869, ~us
-    password containers:
-      master = PBKDF2-HMAC-SHA256(password, salt, 100000, len=32)  // ~100 ms
-    final  = SHA-512(master || machine_factor(16) || hardware_factor(16))
-    enc_key = final[0..31], mac_key = final[32..63]
+  default-key containers (flag $10):
+  master = HKDF-SHA256(secret, salt, info, len=32)   // RFC 5869, ~us
+  password containers:
+  master = PBKDF2-HMAC-SHA256(password, salt, 100000, len=32)  // ~100 ms
+  final  = SHA-512(master || machine_factor(16) || hardware_factor(16))
+  enc_key = final[0..31], mac_key = final[32..63]
 
   This Delphi unit is the authoritative spec for the v2 KDF. The former
   'matches avroenco/src/crypto.py' claim no longer holds: that external
@@ -60,13 +60,11 @@
 
 {$OVERFLOWCHECKS OFF}
 {$RANGECHECKS OFF}
-
 { Inlining OFF because this unit contains VMProtect marker regions. An inlined
   marked routine leaves an unprotected copy of the same logic in its caller,
   which defeats the marker. Only marker-bearing units disable inlining;
   uAvroCryptoUtils (the AES/GCM hot path) deliberately keeps it. }
 {$INLINE OFF}
-
 unit uAvroShield;
 
 interface
@@ -78,23 +76,10 @@ uses
 
 type
   { Result codes for AvroShieldLoadFromFile / AvroShieldLoadFromBytes. }
-  TAvroShieldResult = (
-    asrOk = 0,
-    asrFileNotFound,
-    asrFileTooShort,
-    asrBadMagic,
-    asrBadVersion,
-    asrMachineMismatch,
-    asrMachineBindRequired,
-    asrHmacFailed,
-    asrDecryptFailed,
-    asrDecompressFailed,
-    asrBadBytecode,
-    asrCorruptPayload,
-    asrEmptyPassword,     // writer: password required but none given
-    asrNotJsonObject,     // writer: input is not a JSON object
-    asrUnknown
-  );
+  TAvroShieldResult = (asrOk = 0, asrFileNotFound, asrFileTooShort, asrBadMagic, asrBadVersion, asrMachineMismatch, asrMachineBindRequired, asrHmacFailed,
+    asrDecryptFailed, asrDecompressFailed, asrBadBytecode, asrCorruptPayload, asrEmptyPassword, // writer: password required but none given
+    asrNotJsonObject, // writer: input is not a JSON object
+    asrUnknown);
 
   { Options for AvroShieldLoadFromBytesUtf8Ex. The runtime never uses this
     record: it calls AvroShieldLoadForRuntime, which pins IncludeComments to
@@ -121,54 +106,50 @@ type
   TAvroNodeKind = (nkNull, nkBool, nkInt, nkFloat, nkString, nkArray, nkObject);
 
   TAvroNode = class
-  public
-    Kind: TAvroNodeKind;
-    BoolVal: Boolean;
-    IntVal: Int64;
-    FloatVal: Double;
-    StrVal: string;
-    Items: TObjectList<TAvroNode>;   // array elements / object values
-    Keys: TStringList;               // object keys, parallel to Items
-    constructor Create;
-    destructor Destroy; override;
+    public
+      Kind:     TAvroNodeKind;
+      BoolVal:  Boolean;
+      IntVal:   Int64;
+      FloatVal: Double;
+      StrVal:   string;
+      Items:    TObjectList<TAvroNode>; // array elements / object values
+      Keys:     TStringList;            // object keys, parallel to Items
+      constructor Create;
+      destructor Destroy; override;
   end;
 
   EAvroShieldError = class(Exception);
 
-{ Fills in the runtime defaults: machine bind on, comments dropped, both IKM
-  overrides empty. }
+  { Fills in the runtime defaults: machine bind on, comments dropped, both IKM
+    overrides empty. }
 function AvroShieldDefaultLoadOptions: TAvroShieldLoadOptions;
 
 { Loads, verifies, decrypts, parses and deobfuscates an .AvroShield file.
   On asrOk, AJSONText holds the deobfuscated mapping JSON (in memory only). }
-function AvroShieldLoadFromFile(const AFileName, APassword: string;
-  out AJSONText: string; AUseMachineBind: Boolean = True): TAvroShieldResult;
+function AvroShieldLoadFromFile(const AFileName, APassword: string; out AJSONText: string; AUseMachineBind: Boolean = True): TAvroShieldResult;
 
 { Same, from raw file bytes (used by tests and in-memory callers). The JSON
   is returned as a string, which the caller cannot reliably wipe - prefer
   AvroShieldLoadFromBytesUtf8 or AvroShieldLoadForRuntime on any load path. }
-function AvroShieldLoadFromBytes(const AData: TBytes; const APassword: string;
-  out AJSONText: string; AUseMachineBind: Boolean = True): TAvroShieldResult;
+function AvroShieldLoadFromBytes(const AData: TBytes; const APassword: string; out AJSONText: string; AUseMachineBind: Boolean = True): TAvroShieldResult;
 
 { Core loader. Returns the deobfuscated mapping as UTF-8 bytes so the caller
   owns the plaintext buffer and can wipe it deterministically. All derived key
   material and intermediates are wiped before return. }
-function AvroShieldLoadFromBytesUtf8(const AData: TBytes; const APassword: string;
-  out AJsonUtf8: TBytes; AUseMachineBind: Boolean = True): TAvroShieldResult;
+function AvroShieldLoadFromBytesUtf8(const AData: TBytes; const APassword: string; out AJsonUtf8: TBytes; AUseMachineBind: Boolean = True): TAvroShieldResult;
 
 { Same pipeline with the developer knobs (see TAvroShieldLoadOptions). Used by
   AvroEncoBuilder for the pack/unpack round trip; never by the runtime. }
-function AvroShieldLoadFromBytesUtf8Ex(const AData: TBytes; const APassword: string;
-  const AOptions: TAvroShieldLoadOptions; out AJsonUtf8: TBytes): TAvroShieldResult;
+function AvroShieldLoadFromBytesUtf8Ex(const AData: TBytes; const APassword: string; const AOptions: TAvroShieldLoadOptions; out AJsonUtf8: TBytes)
+  : TAvroShieldResult;
 
 { Tooling entry: unwraps a container down to the decrypted but still
   OBFUSCATED bytecode - no parse, no deobfuscation. That is exactly the view an
   attacker has after extracting the container key from the binary, so the
   static-leak gate scans this buffer for legible mapping text (Bengali
   codepoints, '#$' literals, comment words). Never call it at runtime. }
-function AvroShieldExtractObfuscatedBytecode(const AData: TBytes;
-  const APassword: string; const ADefaultSecretIKM: TBytes;
-  AUseMachineBind: Boolean; out ABytecode: TBytes): TAvroShieldResult;
+function AvroShieldExtractObfuscatedBytecode(const AData: TBytes; const APassword: string; const ADefaultSecretIKM: TBytes; AUseMachineBind: Boolean;
+  out ABytecode: TBytes): TAvroShieldResult;
 
 { True for every container version this build can read. Single source of truth
   for "is this a Shield container we understand": uAvroEncoCrypto used to keep
@@ -203,8 +184,7 @@ function AvroShieldCommentKey(const ACommentsIKM, ASeed: TBytes): TBytes;
   that can be observed cannot learn which stage rejected the container. The
   detailed codes remain available through the non-runtime entry points for the
   builder, the KATs and support builds. }
-function AvroShieldLoadForRuntime(const AData: TBytes; const APassword: string;
-  out AJsonUtf8: TBytes; AUseMachineBind: Boolean = True): TAvroShieldResult;
+function AvroShieldLoadForRuntime(const AData: TBytes; const APassword: string; out AJsonUtf8: TBytes; AUseMachineBind: Boolean = True): TAvroShieldResult;
 
 { 16-byte machine identifier: SHA-256(MachineGuid UTF-8)[:16], MAC fallback. }
 function AvroShieldMachineId: TBytes;
@@ -224,9 +204,7 @@ function AvroShieldDeobfuscate(const AObfuscated: TAvroNode; out AValue: TAvroNo
   core turns into the comment key once the value seed is available.
   AIncludeComments=False drops every comment field without decoding it: no
   Base64 decode, no XOR keystream, no UTF-16 allocation. }
-function AvroShieldDeobfuscateEx(const AObfuscated: TAvroNode;
-  const AKeyMeta, ACommentsIKM: TBytes; AIncludeComments: Boolean;
-  out AValue: TAvroNode): Boolean;
+function AvroShieldDeobfuscateEx(const AObfuscated: TAvroNode; const AKeyMeta, ACommentsIKM: TBytes; AIncludeComments: Boolean; out AValue: TAvroNode): Boolean;
 
 { Serializes a node tree to compact JSON text (loader/tests). }
 function AvroShieldNodeToJSON(const ANode: TAvroNode): string;
@@ -242,12 +220,11 @@ function AvroShieldContainerUsesDefaultKey(const AFilePath: string): Boolean;
   ShieldKdfDefaultKey / ShieldKdfPasswordKey wrappers). }
 function HkdfExtractSHA256(const ASalt, AIKM: TBytes): TBytes;
 function HkdfExpandSHA256(const APRK, AInfo: TBytes; ALen: Integer): TBytes;
-function Pbkdf2HMACSHA256(const APassword, ASalt: TBytes;
-  AIterations, ADkLen: Integer): TBytes;
+function Pbkdf2HMACSHA256(const APassword, ASalt: TBytes; AIterations, ADkLen: Integer): TBytes;
 
 { Writer side: builds a Shield-format container from mapping JSON, the exact
   inverse of AvroShieldLoadFromBytes. The pipeline runs entirely in RAM:
-    JSON -> obfuscated bytecode -> zlib -> AES-256-GCM -> HMAC-SHA512 trailer.
+  JSON -> obfuscated bytecode -> zlib -> AES-256-GCM -> HMAC-SHA512 trailer.
   ADefaultKey=True protects the container with the built-in default secret
   (no password prompt ever); ADefaultKey=False requires a non-empty
   APassword. ABindToMachine / AUseHardwareFactor set the matching header
@@ -270,10 +247,8 @@ function Pbkdf2HMACSHA256(const APassword, ASalt: TBytes;
   On asrOk, AOutBytes holds the complete container and can be written to a
   .AvroEnco file. All intermediate key material and plaintext buffers are
   wiped before the function returns. }
-function AvroShieldBuildFromJson(const AJsonText, APassword: string;
-  const ADefaultKey, ABindToMachine, AUseHardwareFactor: Boolean;
-  out AOutBytes: TBytes; const ADefaultSecretIKM: TBytes = nil;
-  const ACommentsIKM: TBytes = nil): TAvroShieldResult;
+function AvroShieldBuildFromJson(const AJSONText, APassword: string; const ADefaultKey, ABindToMachine, AUseHardwareFactor: Boolean; out AOutBytes: TBytes;
+  const ADefaultSecretIKM: TBytes = nil; const ACommentsIKM: TBytes = nil): TAvroShieldResult;
 
 implementation
 
@@ -312,11 +287,11 @@ const
 
 function ShieldOpaqueError(const AMessage: string): EAvroShieldError;
 begin
-{$IFDEF AVROSHIELD_VERBOSE_ERRORS}
+  {$IFDEF AVROSHIELD_VERBOSE_ERRORS}
   Result := EAvroShieldError.Create(AMessage);
-{$ELSE}
+  {$ELSE}
   Result := EAvroShieldError.Create(SHIELD_OPAQUE_ERROR_TEXT);
-{$ENDIF}
+  {$ENDIF}
 end;
 
 { Writer-side errors are never attacker-facing: the builder is a local offline
@@ -338,16 +313,16 @@ const
   // derived from the container master key, so the obfuscation cannot be
   // inverted without the container key. v2 containers keep loading through the
   // legacy path (constant mask, comments in the value domain).
-  AS_VERSION = 3;
+  AS_VERSION        = 3;
   AS_VERSION_LEGACY = 2;
-  AS_HEADER_SIZE = 58;
-  AS_TRAILER_SIZE = 80;   // auth_tag(16) + hmac(64)
-  AS_HMAC_SIZE = 64;
+  AS_HEADER_SIZE    = 58;
+  AS_TRAILER_SIZE   = 80; // auth_tag(16) + hmac(64)
+  AS_HMAC_SIZE      = 64;
 
-  FLAG_PASSWORD = $01;
-  FLAG_HARDWARE = $02;
+  FLAG_PASSWORD     = $01;
+  FLAG_HARDWARE     = $02;
   FLAG_MACHINE_BIND = $04;
-  FLAG_BYTECODE_V1 = $08;
+  FLAG_BYTECODE_V1  = $08;
 
   // Container protected with the built-in default application secret
   // (GetAvroEncoDefaultSecret) instead of a user password: it loads
@@ -365,21 +340,21 @@ const
   // Honest trade-off: PBKDF2 has no memory-hardness, so password files
   // are weaker against GPU/ASIC brute force than under Argon2id;
   // accepted explicitly, still safe against casual attack.
-  SHIELD_MASTER_LEN = 32;
+  SHIELD_MASTER_LEN        = 32;
   SHIELD_HKDF_INFO_DEFAULT = 'AvroShield-v2/hkdf-sha256/default-key';
   SHIELD_PBKDF2_ITERATIONS = 100000;
 
   // ---- bytecode ----
   BC_HEADER_SIZE = 23;
-  BC_XOR_SEED = 'AvroShieldBytecodeXORv1';
+  BC_XOR_SEED    = 'AvroShieldBytecodeXORv1';
 
-  TYPE_NULL = $00;
-  TYPE_STRING = $01;
-  TYPE_NUMBER = $02;
-  TYPE_BOOLEAN = $03;
-  TYPE_ARRAY = $04;
-  TYPE_OBJECT = $05;
-  TYPE_REFERENCE = $06;
+  TYPE_NULL       = $00;
+  TYPE_STRING     = $01;
+  TYPE_NUMBER     = $02;
+  TYPE_BOOLEAN    = $03;
+  TYPE_ARRAY      = $04;
+  TYPE_OBJECT     = $05;
+  TYPE_REFERENCE  = $06;
   TYPE_OBFUSCATED = $07;
 
   // ---- obfuscation ----
@@ -388,7 +363,7 @@ const
   // HKDF info labels for the two obfuscation domains. Changing either one is a
   // format break for v3 containers, so they are written down here rather than
   // inline at the call sites.
-  OBF_INFO_META = 'AvroShield-v3/obf-meta';
+  OBF_INFO_META     = 'AvroShield-v3/obf-meta';
   OBF_INFO_COMMENTS = 'AvroShield-v3/comments';
 
   // Fields that carry developer documentation. They are obfuscated in their
@@ -398,12 +373,12 @@ const
   // runtime will never need the value.
   OBF_COMMENT_FIELDS: array [0 .. 2] of string = ('Comment', 'comment', '_comment');
 
-{ =============================================================================
-  Byte helpers
-  ============================================================================= }
+  { =============================================================================
+    Byte helpers
+    ============================================================================= }
 
-{ Byte-string builders for the fixed obfuscation seeds (Delphi has no
-  dynamic-array typed constants). }
+  { Byte-string builders for the fixed obfuscation seeds (Delphi has no
+    dynamic-array typed constants). }
 function AsMagic: TBytes;
 begin
   Result := TEncoding.ASCII.GetBytes('AVROSHLD');
@@ -425,8 +400,7 @@ end;
 
 function MetaSeed: TBytes;
 const
-  M: array [0 .. 17] of Byte = ($41, $76, $72, $6F, $53, $68, $69, $65,
-    $6C, $64, $4D, $65, $74, $61, $56, $31, 0, 1);
+  M: array [0 .. 17] of Byte = ($41, $76, $72, $6F, $53, $68, $69, $65, $6C, $64, $4D, $65, $74, $61, $56, $31, 0, 1);
 begin
   SetLength(Result, Length(M));
   Move(M[0], Result[0], Length(M));
@@ -439,8 +413,7 @@ end;
 
 function BE32(const AData: TBytes; AOff: Integer): Cardinal;
 begin
-  Result := (Cardinal(AData[AOff]) shl 24) or (Cardinal(AData[AOff + 1]) shl 16) or
-    (Cardinal(AData[AOff + 2]) shl 8) or AData[AOff + 3];
+  Result := (Cardinal(AData[AOff]) shl 24) or (Cardinal(AData[AOff + 1]) shl 16) or (Cardinal(AData[AOff + 2]) shl 8) or AData[AOff + 3];
 end;
 
 function BcRead(const AData: TBytes; var AOff: Integer; ACount: Integer): TBytes;
@@ -538,7 +511,7 @@ end;
   T(1) | T(2) | ... with T(n) = HMAC-SHA256(PRK, T(n-1) | info | n). }
 function HkdfExpandSHA256(const APRK, AInfo: TBytes; ALen: Integer): TBytes;
 var
-  T, Block: TBytes;
+  T, Block:     TBytes;
   N, Pos, Take: Integer;
 begin
   SetLength(Result, ALen);
@@ -570,10 +543,9 @@ begin
 end;
 
 { PBKDF2-HMAC-SHA256 (RFC 2898 section 5.2) with AIterations rounds. }
-function Pbkdf2HMACSHA256(const APassword, ASalt: TBytes;
-  AIterations, ADkLen: Integer): TBytes;
+function Pbkdf2HMACSHA256(const APassword, ASalt: TBytes; AIterations, ADkLen: Integer): TBytes;
 var
-  U, Acc, SaltBlock: TBytes;
+  U, Acc, SaltBlock:        TBytes;
   BlockNo, I, J, Pos, Take: Integer;
 begin
   SetLength(Result, ADkLen);
@@ -618,10 +590,7 @@ end;
 function ShieldKdfDefaultKey(const ASecret, ASalt: TBytes): TBytes;
 begin
   VMBeginVirtualization('kdfd');
-  Result := HkdfExpandSHA256(
-    HkdfExtractSHA256(ASalt, ASecret),
-    TEncoding.UTF8.GetBytes(SHIELD_HKDF_INFO_DEFAULT),
-    SHIELD_MASTER_LEN);
+  Result := HkdfExpandSHA256(HkdfExtractSHA256(ASalt, ASecret), TEncoding.UTF8.GetBytes(SHIELD_HKDF_INFO_DEFAULT), SHIELD_MASTER_LEN);
   VMEnd;
 end;
 
@@ -632,8 +601,7 @@ end;
 function ShieldKdfPasswordKey(const APassword, ASalt: TBytes): TBytes;
 begin
   VMBeginVirtualization('kdfp');
-  Result := Pbkdf2HMACSHA256(APassword, ASalt,
-    SHIELD_PBKDF2_ITERATIONS, SHIELD_MASTER_LEN);
+  Result := Pbkdf2HMACSHA256(APassword, ASalt, SHIELD_PBKDF2_ITERATIONS, SHIELD_MASTER_LEN);
   VMEnd;
 end;
 
@@ -643,32 +611,29 @@ end;
 
 function ReadMachineGuid: string;
 var
-  RegKey: HKEY;
-  Buf: array [0 .. 127] of WideChar;
+  RegKey:  HKEY;
+  Buf:     array [0 .. 127] of WideChar;
   BufSize: DWORD;
 begin
   Result := '';
-  if RegOpenKeyExW(HKEY_LOCAL_MACHINE,
-    'SOFTWARE\Microsoft\Cryptography', 0, KEY_READ or KEY_WOW64_64KEY,
-    RegKey) = ERROR_SUCCESS then
-  try
-    BufSize := SizeOf(Buf);
-    if RegQueryValueExW(RegKey, 'MachineGuid', nil, nil, @Buf[0],
-      @BufSize) = ERROR_SUCCESS then
-      Result := Buf;
-  finally
-    RegCloseKey(RegKey);
-  end;
+  if RegOpenKeyExW(HKEY_LOCAL_MACHINE, 'SOFTWARE\Microsoft\Cryptography', 0, KEY_READ or KEY_WOW64_64KEY, RegKey) = ERROR_SUCCESS then
+    try
+      BufSize := SizeOf(Buf);
+      if RegQueryValueExW(RegKey, 'MachineGuid', nil, nil, @Buf[0], @BufSize) = ERROR_SUCCESS then
+        Result := Buf;
+    finally
+      RegCloseKey(RegKey);
+    end;
 end;
 
 { Fallback matching uuid.getnode(): primary MAC rendered as a decimal string
   (Python uses str(uuid.getnode())). Only used when MachineGuid is missing. }
 function GetPrimaryMacString: string;
 var
-  BufSize: DWORD;
+  BufSize:     DWORD;
   Adapters, P: PIP_ADAPTER_INFO;
-  Value: UInt64;
-  I: Integer;
+  Value:       UInt64;
+  I:           Integer;
 begin
   Result := '';
   BufSize := 0;
@@ -682,7 +647,7 @@ begin
         P := Adapters;
         while Assigned(P) do
         begin
-          if P^.Type_ = 6 then   // MIB_IF_TYPE_ETHERNET
+          if P^.Type_ = 6 then // MIB_IF_TYPE_ETHERNET
           begin
             Value := 0;
             for I := 0 to 5 do
@@ -719,7 +684,7 @@ end;
 function BcMaskString(const AData: TBytes): TBytes;
 var
   LenB, Key: TBytes;
-  I: Integer;
+  I:         Integer;
 begin
   SetLength(LenB, 4);
   LenB[0] := Byte(Length(AData) shr 24);
@@ -735,7 +700,7 @@ end;
 function BcReadInt64(const AData: TBytes; AOff: Integer): Int64;
 var
   Bits: UInt64;
-  I: Integer;
+  I:    Integer;
 begin
   Bits := 0;
   for I := 0 to 7 do
@@ -746,7 +711,7 @@ end;
 function BcReadDouble(const AData: TBytes; AOff: Integer): Double;
 var
   Bits: UInt64;
-  I: Integer;
+  I:    Integer;
 begin
   Bits := 0;
   for I := 0 to 7 do
@@ -756,9 +721,9 @@ end;
 
 function ParseNode(const AData: TBytes; var AOff: Integer): TAvroNode;
 var
-  Typ: Byte;
+  Typ:               Byte;
   Len, Cnt, I, KLen: Integer;
-  Masked: TBytes;
+  Masked:            TBytes;
 begin
   if AOff >= Length(AData) then
     raise ShieldOpaqueError('Truncated node');
@@ -837,8 +802,8 @@ begin
           end;
         end;
 
-    else
-      raise ShieldOpaqueError(Format('Unsupported bytecode node type: %d', [Typ]));
+      else
+        raise ShieldOpaqueError(Format('Unsupported bytecode node type: %d', [Typ]));
     end;
   except
     Result.Free;
@@ -849,9 +814,9 @@ end;
 function AvroShieldParseBytecode(const ABytecode: TBytes; out AValue: TAvroNode): Boolean;
 var
   Off, I, TypeCount, EntryCount, KLen, NodeLen, EntryStart, NZero: Integer;
-  KeyBytes, NodeBytes, Entry, Calc, BC_MAGIC: TBytes;
-  Root: TAvroNode;
-  StoredCrc: Cardinal;
+  KeyBytes, NodeBytes, Entry, Calc, BC_MAGIC:                      TBytes;
+  Root:                                                            TAvroNode;
+  StoredCrc:                                                       Cardinal;
 begin
   AValue := nil;
   Root := nil;
@@ -918,9 +883,8 @@ begin
     AValue := Root;
     Root := nil;
     Result := True;
-    except
-    on E: Exception do
-      ; // Result stays False
+  except
+    on E: Exception do; // Result stays False
   end;
   Root.Free;
 end;
@@ -933,7 +897,7 @@ end;
 function DeobfStream(const AKey: TBytes; ALength: Integer): TBytes;
 var
   OutB, CounterB, Block: TBytes;
-  Counter, I, Take: Integer;
+  Counter, I, Take:      Integer;
 begin
   SetLength(OutB, ALength);
   Counter := 0;
@@ -959,7 +923,7 @@ end;
 function DeobfCodec(const ASeed, AData: TBytes; const ACtx: string): TBytes;
 var
   Key, Stream: TBytes;
-  I: Integer;
+  I:           Integer;
 begin
   Key := Sha256Of(StrTag + ASeed + TEncoding.UTF8.GetBytes(#0 + ACtx));
   Stream := DeobfStream(Key, Length(AData));
@@ -1009,7 +973,7 @@ var
   I: Integer;
 begin
   Result := False;
-  for I := Low(OBF_COMMENT_FIELDS) to High(OBF_COMMENT_FIELDS) do
+  for I := low(OBF_COMMENT_FIELDS) to high(OBF_COMMENT_FIELDS) do
     if AName = OBF_COMMENT_FIELDS[I] then
       Exit(True);
 end;
@@ -1025,7 +989,7 @@ end;
 
 { Metadata mask for a container the caller has already opened:
 
-    KeyMeta = HKDF-SHA256(IKM = master, info = OBF_INFO_META)
+  KeyMeta = HKDF-SHA256(IKM = master, info = OBF_INFO_META)
 
   Master is already a per-container salted secret, so the mask needs no second
   salt. Before this existed the mask was a constant compiled into the unit, so
@@ -1048,8 +1012,8 @@ end;
 
 { Comment domain key:
 
-    KeyComments = HKDF-SHA256(IKM = comment IKM, salt = value seed,
-                              info = OBF_INFO_COMMENTS)
+  KeyComments = HKDF-SHA256(IKM = comment IKM, salt = value seed,
+  info = OBF_INFO_COMMENTS)
 
   The developer IKM is what the runtime never has, and the value seed is only
   reachable through the keyed metadata blob, so comment text needs both the
@@ -1089,17 +1053,15 @@ end;
   nothing to load: a comment field is skipped here, before the Base64 decode,
   before the keystream and before the UTF-16 allocation, instead of being
   decoded and then thrown away by the mapping parser. }
-function DeobfValue(ANode: TAvroNode; const ACtx: string;
-  const AEffSeed, ACommentSeed: TBytes; AIncludeComments, ACommentDomain: Boolean;
-  const ARev: TDictionary<string, string>;
-  const ASkip: TDictionary<string, Boolean>): TAvroNode;
+function DeobfValue(ANode: TAvroNode; const ACtx: string; const AEffSeed, ACommentSeed: TBytes; AIncludeComments, ACommentDomain: Boolean;
+  const ARev: TDictionary<string, string>; const ASkip: TDictionary<string, Boolean>): TAvroNode;
 var
-  I: Integer;
-  OrigKey, HashedKey: string;
-  Child: TAvroNode;
+  I:                     Integer;
+  OrigKey, HashedKey:    string;
+  Child:                 TAvroNode;
   ChildSeed, EffCmtSeed: TBytes;
-  ChildCtxPath: string;
-  IsComment: Boolean;
+  ChildCtxPath:          string;
+  IsComment:             Boolean;
 begin
   EffCmtSeed := ACommentSeed;
   if Length(EffCmtSeed) = 0 then
@@ -1132,8 +1094,7 @@ begin
             ChildSeed := AEffSeed;
             ChildCtxPath := ChildCtx(ACtx, HashedKey);
           end;
-          Child := DeobfValue(ANode.Items[I], ChildCtxPath, ChildSeed,
-            EffCmtSeed, AIncludeComments, ACommentDomain, ARev, ASkip);
+          Child := DeobfValue(ANode.Items[I], ChildCtxPath, ChildSeed, EffCmtSeed, AIncludeComments, ACommentDomain, ARev, ASkip);
           Result.Keys.Add(OrigKey);
           Result.Items.Add(Child);
         end;
@@ -1142,21 +1103,18 @@ begin
       begin
         Result.Kind := nkArray;
         for I := 0 to ANode.Items.Count - 1 do
-          Result.Items.Add(DeobfValue(ANode.Items[I], IndexCtx(ACtx, I),
-            AEffSeed, EffCmtSeed, AIncludeComments, ACommentDomain, ARev,
-            ASkip));
+          Result.Items.Add(DeobfValue(ANode.Items[I], IndexCtx(ACtx, I), AEffSeed, EffCmtSeed, AIncludeComments, ACommentDomain, ARev, ASkip));
       end;
     nkString:
       begin
         Result.Kind := nkString;
-        Result.StrVal := TEncoding.UTF8.GetString(DeobfCodec(AEffSeed,
-          TNetEncoding.Base64.DecodeStringToBytes(ANode.StrVal), ACtx));
+        Result.StrVal := TEncoding.UTF8.GetString(DeobfCodec(AEffSeed, TNetEncoding.Base64.DecodeStringToBytes(ANode.StrVal), ACtx));
       end;
-  else
-    Result.Kind := ANode.Kind;
-    Result.BoolVal := ANode.BoolVal;
-    Result.IntVal := ANode.IntVal;
-    Result.FloatVal := ANode.FloatVal;
+    else
+      Result.Kind := ANode.Kind;
+      Result.BoolVal := ANode.BoolVal;
+      Result.IntVal := ANode.IntVal;
+      Result.FloatVal := ANode.FloatVal;
   end;
 end;
 
@@ -1167,20 +1125,18 @@ end;
   v2 container carries; v3 passes its derived key. An empty ACommentsIKM means
   the comment domain is not separable from the value domain (v2), so comments
   are decoded with the value seed exactly as before. }
-function DeobfuscateCore(const AObfuscated: TAvroNode;
-  const AKeyMeta, ACommentsIKM: TBytes; AIncludeComments: Boolean;
-  out AValue: TAvroNode): Boolean;
+function DeobfuscateCore(const AObfuscated: TAvroNode; const AKeyMeta, ACommentsIKM: TBytes; AIncludeComments: Boolean; out AValue: TAvroNode): Boolean;
 var
   Seed, CommentKey: TBytes;
-  MetaMask: TBytes;
-  Rev: TDictionary<string, string>;
-  Skip: TDictionary<string, Boolean>;
-  MetaIdx, I: Integer;
-  MetaVal: TAvroNode;
-  Json: TJSONValue;
-  JObj, KMap: TJSONObject;
-  JArr: TJSONArray;
-  Pair: TJSONPair;
+  MetaMask:         TBytes;
+  Rev:              TDictionary<string, string>;
+  Skip:             TDictionary<string, Boolean>;
+  MetaIdx, I:       Integer;
+  MetaVal:          TAvroNode;
+  JSON:             TJSONValue;
+  JObj, KMap:       TJSONObject;
+  JArr:             TJSONArray;
+  Pair:             TJSONPair;
 begin
   AValue := nil;
   Result := False;
@@ -1202,13 +1158,11 @@ begin
       else
         MetaMask := MetaSeed;
 
-      Json := TJSONObject.ParseJSONValue(TEncoding.UTF8.GetString(DeobfCodec(
-        MetaMask, TNetEncoding.Base64.DecodeStringToBytes(MetaVal.StrVal),
-        META_KEY)));
-      if not (Json is TJSONObject) then
+      JSON := TJSONObject.ParseJSONValue(TEncoding.UTF8.GetString(DeobfCodec(MetaMask, TNetEncoding.Base64.DecodeStringToBytes(MetaVal.StrVal), META_KEY)));
+      if not(JSON is TJSONObject) then
         Exit;
       try
-        JObj := TJSONObject(Json);
+        JObj := TJSONObject(JSON);
         Seed := TNetEncoding.Base64.DecodeStringToBytes(JObj.GetValue('seed').Value);
         KMap := JObj.GetValue('key_map') as TJSONObject;
         if Assigned(KMap) then
@@ -1219,7 +1173,7 @@ begin
           for I := 0 to JArr.Count - 1 do
             Skip.Add(JArr.Items[I].Value, True);
       finally
-        Json.Free;
+        JSON.Free;
       end;
 
       // The comment key is derived only now, after the metadata blob has been
@@ -1229,8 +1183,7 @@ begin
       // A keyed metadata mask is exactly the marker of format v3, and format
       // v3 is the only format with a separate comment domain. The legacy entry
       // point passes no mask, which keeps its v2 semantics.
-      AValue := DeobfValue(AObfuscated, '', Seed, CommentKey,
-        AIncludeComments, Length(AKeyMeta) > 0, Rev, Skip);
+      AValue := DeobfValue(AObfuscated, '', Seed, CommentKey, AIncludeComments, Length(AKeyMeta) > 0, Rev, Skip);
       Result := True;
     finally
       AvroWipeAndRelease(CommentKey);
@@ -1251,12 +1204,9 @@ begin
   Result := DeobfuscateCore(AObfuscated, nil, nil, True, AValue);
 end;
 
-function AvroShieldDeobfuscateEx(const AObfuscated: TAvroNode;
-  const AKeyMeta, ACommentsIKM: TBytes; AIncludeComments: Boolean;
-  out AValue: TAvroNode): Boolean;
+function AvroShieldDeobfuscateEx(const AObfuscated: TAvroNode; const AKeyMeta, ACommentsIKM: TBytes; AIncludeComments: Boolean; out AValue: TAvroNode): Boolean;
 begin
-  Result := DeobfuscateCore(AObfuscated, AKeyMeta, ACommentsIKM,
-    AIncludeComments, AValue);
+  Result := DeobfuscateCore(AObfuscated, AKeyMeta, ACommentsIKM, AIncludeComments, AValue);
 end;
 
 { =============================================================================
@@ -1273,18 +1223,25 @@ begin
   begin
     C := S[I];
     case C of
-      '"': Result := Result + '\"';
-      '\': Result := Result + '\';
-      #8: Result := Result + '\b';
-      #9: Result := Result + '\t';
-      #10: Result := Result + '\n';
-      #12: Result := Result + '\f';
-      #13: Result := Result + '\r';
-    else
-      if Ord(C) < 32 then
-        Result := Result + Format('\u%.4x', [Ord(C)])
+      '"':
+        Result := Result + '\"';
+      '\':
+        Result := Result + '\';
+      #8:
+        Result := Result + '\b';
+      #9:
+        Result := Result + '\t';
+      #10:
+        Result := Result + '\n';
+      #12:
+        Result := Result + '\f';
+      #13:
+        Result := Result + '\r';
       else
-        Result := Result + C;
+        if Ord(C) < 32 then
+          Result := Result + Format('\u%.4x', [Ord(C)])
+        else
+          Result := Result + C;
     end;
   end;
 end;
@@ -1294,18 +1251,26 @@ var
   I: Integer;
 begin
   case ANode.Kind of
-    nkNull: Result := 'null';
+    nkNull:
+      Result := 'null';
     nkBool:
-      if ANode.BoolVal then Result := 'true' else Result := 'false';
-    nkInt: Result := IntToStr(ANode.IntVal);
-    nkFloat: Result := FloatToStr(ANode.FloatVal, TFormatSettings.Invariant);
-    nkString: Result := '"' + JsonEscape(ANode.StrVal) + '"';
+      if ANode.BoolVal then
+        Result := 'true'
+      else
+        Result := 'false';
+    nkInt:
+      Result := IntToStr(ANode.IntVal);
+    nkFloat:
+      Result := FloatToStr(ANode.FloatVal, TFormatSettings.Invariant);
+    nkString:
+      Result := '"' + JsonEscape(ANode.StrVal) + '"';
     nkArray:
       begin
         Result := '[';
         for I := 0 to ANode.Items.Count - 1 do
         begin
-          if I > 0 then Result := Result + ',';
+          if I > 0 then
+            Result := Result + ',';
           Result := Result + AvroShieldNodeToJSON(ANode.Items[I]);
         end;
         Result := Result + ']';
@@ -1315,9 +1280,9 @@ begin
         Result := '{';
         for I := 0 to ANode.Items.Count - 1 do
         begin
-          if I > 0 then Result := Result + ',';
-          Result := Result + '"' + JsonEscape(ANode.Keys[I]) + '":' +
-            AvroShieldNodeToJSON(ANode.Items[I]);
+          if I > 0 then
+            Result := Result + ',';
+          Result := Result + '"' + JsonEscape(ANode.Keys[I]) + '":' + AvroShieldNodeToJSON(ANode.Items[I]);
         end;
         Result := Result + '}';
       end;
@@ -1331,9 +1296,9 @@ end;
 function ZlibDecompressBytes(const AData: TBytes): TBytes;
 var
   InS, OutS: TMemoryStream;
-  Z: TZDecompressionStream;
-  Buf: array [0 .. 8191] of Byte;
-  N: Integer;
+  Z:         TZDecompressionStream;
+  Buf:       array [0 .. 8191] of Byte;
+  N:         Integer;
 begin
   Result := nil;
   InS := TMemoryStream.Create;
@@ -1381,16 +1346,15 @@ end;
   them; the caller owns and must wipe all three outs. Every other intermediate
   - derived keys, the GCM tag, the HMAC input, the compressed blob - is wiped
   here, so the container crypto stage exists in exactly one place. }
-function ShieldOpenContainer(const AData: TBytes; const APassword: string;
-  const ADefaultSecretIKM: TBytes; AUseMachineBind: Boolean;
+function ShieldOpenContainer(const AData: TBytes; const APassword: string; const ADefaultSecretIKM: TBytes; AUseMachineBind: Boolean;
   out ABytecode, AMaster, ASalt: TBytes): TAvroShieldResult;
 var
-  Flags: Byte;
-  Salt, IV, StoredMachine, Master: TBytes;
-  MachineF, HardwareF, FinalKey, EncKey, MacKey: TBytes;
-  DefaultIKM, PasswordIKM: TBytes;
+  Flags:                                                    Byte;
+  Salt, IV, StoredMachine, Master:                          TBytes;
+  MachineF, HardwareF, FinalKey, EncKey, MacKey:            TBytes;
+  DefaultIKM, PasswordIKM:                                  TBytes;
   Cipher, Tag, ExpectedMac, HmacData, Compressed, Bytecode: TBytes;
-  MacOk, CryptoOk: Boolean;
+  MacOk, CryptoOk:                                          Boolean;
 begin
   ABytecode := nil;
   AMaster := nil;
@@ -1460,17 +1424,16 @@ begin
     EncKey := Copy(FinalKey, 0, 32);
     MacKey := Copy(FinalKey, 32, 32);
 
-    Cipher := Copy(AData, AS_HEADER_SIZE,
-      Length(AData) - AS_HEADER_SIZE - AS_TRAILER_SIZE);
+    Cipher := Copy(AData, AS_HEADER_SIZE, Length(AData) - AS_HEADER_SIZE - AS_TRAILER_SIZE);
     Tag := Copy(AData, Length(AData) - AS_TRAILER_SIZE, 16);
     ExpectedMac := Copy(AData, Length(AData) - AS_HMAC_SIZE, AS_HMAC_SIZE);
 
     HmacData := Copy(AData, 0, AS_HEADER_SIZE) + Cipher + Tag;
 
     // Two independent authenticators, both evaluated on every load:
-    //   * the outer HMAC-SHA512 binds the 58-byte header, the ciphertext and
-    //     the GCM tag under MacKey;
-    //   * the AES-GCM tag binds the ciphertext under EncKey.
+    // * the outer HMAC-SHA512 binds the 58-byte header, the ciphertext and
+    // the GCM tag under MacKey;
+    // * the AES-GCM tag binds the ciphertext under EncKey.
     // A fault that suppresses the HMAC verdict therefore does not by itself
     // make the GCM tag validate - the redundancy here is cryptographic rather
     // than a repeated branch on the same value.
@@ -1538,15 +1501,13 @@ begin
 end;
 
 { Tooling: the decrypted but still obfuscated bytecode of a container. }
-function AvroShieldExtractObfuscatedBytecode(const AData: TBytes;
-  const APassword: string; const ADefaultSecretIKM: TBytes;
-  AUseMachineBind: Boolean; out ABytecode: TBytes): TAvroShieldResult;
+function AvroShieldExtractObfuscatedBytecode(const AData: TBytes; const APassword: string; const ADefaultSecretIKM: TBytes; AUseMachineBind: Boolean;
+  out ABytecode: TBytes): TAvroShieldResult;
 var
   Master, Salt: TBytes;
 begin
   ABytecode := nil;
-  Result := ShieldOpenContainer(AData, APassword, ADefaultSecretIKM,
-    AUseMachineBind, ABytecode, Master, Salt);
+  Result := ShieldOpenContainer(AData, APassword, ADefaultSecretIKM, AUseMachineBind, ABytecode, Master, Salt);
   AvroWipeAndRelease(Master);
   AvroWipeAndRelease(Salt);
   if Result <> asrOk then
@@ -1582,18 +1543,17 @@ end;
   comment key derived from the caller's comment IKM. Every intermediate - the
   derived keys, the bytecode, the interim UTF-16 JSON - is wiped before
   return. }
-function AvroShieldLoadFromBytesUtf8Ex(const AData: TBytes; const APassword: string;
-  const AOptions: TAvroShieldLoadOptions; out AJsonUtf8: TBytes): TAvroShieldResult;
+function AvroShieldLoadFromBytesUtf8Ex(const AData: TBytes; const APassword: string; const AOptions: TAvroShieldLoadOptions; out AJsonUtf8: TBytes)
+  : TAvroShieldResult;
 var
   Bytecode, Master, Salt, KeyMeta, KeyComments: TBytes;
-  Root, Deobf: TAvroNode;
-  JsonText: string;
+  Root, Deobf:                                  TAvroNode;
+  JsonText:                                     string;
 begin
   AJsonUtf8 := nil;
   Root := nil;
   Deobf := nil;
-  Result := ShieldOpenContainer(AData, APassword, AOptions.DefaultSecretIKM,
-    AOptions.UseMachineBind, Bytecode, Master, Salt);
+  Result := ShieldOpenContainer(AData, APassword, AOptions.DefaultSecretIKM, AOptions.UseMachineBind, Bytecode, Master, Salt);
   if Result <> asrOk then
     Exit;
   try
@@ -1608,8 +1568,7 @@ begin
       if not AvroShieldParseBytecode(Bytecode, Root) then
         Exit(asrBadBytecode);
       try
-        if not AvroShieldDeobfuscateEx(Root, KeyMeta, AOptions.CommentsIKM,
-          AOptions.IncludeComments, Deobf) then
+        if not AvroShieldDeobfuscateEx(Root, KeyMeta, AOptions.CommentsIKM, AOptions.IncludeComments, Deobf) then
           Exit(asrCorruptPayload);
         try
           JsonText := AvroShieldNodeToJSON(Deobf);
@@ -1641,8 +1600,7 @@ begin
   end;
 end;
 
-function AvroShieldLoadFromBytesUtf8(const AData: TBytes; const APassword: string;
-  out AJsonUtf8: TBytes; AUseMachineBind: Boolean): TAvroShieldResult;
+function AvroShieldLoadFromBytesUtf8(const AData: TBytes; const APassword: string; out AJsonUtf8: TBytes; AUseMachineBind: Boolean): TAvroShieldResult;
 var
   Options: TAvroShieldLoadOptions;
 begin
@@ -1655,28 +1613,25 @@ end;
   do not all have to change. The string it returns cannot be reliably wiped by
   the caller (reference-counted, possibly shared), which is exactly why the
   runtime path uses AvroShieldLoadFromBytesUtf8 instead. }
-function AvroShieldLoadFromBytes(const AData: TBytes; const APassword: string;
-  out AJSONText: string; AUseMachineBind: Boolean): TAvroShieldResult;
+function AvroShieldLoadFromBytes(const AData: TBytes; const APassword: string; out AJSONText: string; AUseMachineBind: Boolean): TAvroShieldResult;
 var
-  Utf8: TBytes;
+  UTF8: TBytes;
 begin
   AJSONText := '';
-  Result := AvroShieldLoadFromBytesUtf8(AData, APassword, Utf8, AUseMachineBind);
+  Result := AvroShieldLoadFromBytesUtf8(AData, APassword, UTF8, AUseMachineBind);
   if Result = asrOk then
   begin
-    AJSONText := TEncoding.UTF8.GetString(Utf8);
-    AvroWipeAndRelease(Utf8);
+    AJSONText := TEncoding.UTF8.GetString(UTF8);
+    AvroWipeAndRelease(UTF8);
   end;
 end;
 
 { Runtime entry point: one externally visible failure code. }
-function AvroShieldLoadForRuntime(const AData: TBytes; const APassword: string;
-  out AJsonUtf8: TBytes; AUseMachineBind: Boolean): TAvroShieldResult;
+function AvroShieldLoadForRuntime(const AData: TBytes; const APassword: string; out AJsonUtf8: TBytes; AUseMachineBind: Boolean): TAvroShieldResult;
 var
   Raw: TAvroShieldResult;
 begin
-  Raw := AvroShieldLoadFromBytesUtf8(AData, APassword, AJsonUtf8,
-    AUseMachineBind);
+  Raw := AvroShieldLoadFromBytesUtf8(AData, APassword, AJsonUtf8, AUseMachineBind);
   if AvroFuseOk(AvroFuse(Raw = asrOk)) then
     Result := asrOk
   else
@@ -1686,10 +1641,9 @@ begin
   end;
 end;
 
-function AvroShieldLoadFromFile(const AFileName, APassword: string;
-  out AJSONText: string; AUseMachineBind: Boolean): TAvroShieldResult;
+function AvroShieldLoadFromFile(const AFileName, APassword: string; out AJSONText: string; AUseMachineBind: Boolean): TAvroShieldResult;
 var
-  FS: TFileStream;
+  FS:   TFileStream;
   Data: TBytes;
 begin
   AJSONText := '';
@@ -1820,16 +1774,15 @@ end;
   Developer documentation fields (OBF_COMMENT_FIELDS) are encoded in their own
   domain under AvroShieldCommentCtx, with a key derived from the developer
   comment IKM - which is never derived from anything the runtime holds. }
-function ObfuscateTree(ANode: TAvroNode; const ACtx: string;
-  const ASeed, ACommentSeed: TBytes;
-  ARev: TDictionary<string, string>; const ASkip: TDictionary<string, Boolean>): TAvroNode;
+function ObfuscateTree(ANode: TAvroNode; const ACtx: string; const ASeed, ACommentSeed: TBytes; ARev: TDictionary<string, string>;
+  const ASkip: TDictionary<string, Boolean>): TAvroNode;
 var
-  I:         Integer;
-  OrigKey, HashedKey: string;
-  Child:     TAvroNode;
+  I:                         Integer;
+  OrigKey, HashedKey:        string;
+  Child:                     TAvroNode;
   ChildSeed, EffCommentSeed: TBytes;
-  ChildCtxPath: string;
-  IsComment: Boolean;
+  ChildCtxPath:              string;
+  IsComment:                 Boolean;
 begin
   // A container built without a comment key keeps comments in the value domain,
   // exactly like format v2, so the reader's fallback matches on both sides.
@@ -1861,8 +1814,7 @@ begin
             ChildSeed := ASeed;
             ChildCtxPath := ChildCtx(ACtx, HashedKey);
           end;
-          Child := ObfuscateTree(ANode.Items[I], ChildCtxPath, ChildSeed,
-            EffCommentSeed, ARev, ASkip);
+          Child := ObfuscateTree(ANode.Items[I], ChildCtxPath, ChildSeed, EffCommentSeed, ARev, ASkip);
           Result.Keys.Add(HashedKey);
           Result.Items.Add(Child);
         end;
@@ -1871,34 +1823,31 @@ begin
       begin
         Result.Kind := nkArray;
         for I := 0 to ANode.Items.Count - 1 do
-          Result.Items.Add(ObfuscateTree(ANode.Items[I], IndexCtx(ACtx, I),
-            ASeed, EffCommentSeed, ARev, ASkip));
+          Result.Items.Add(ObfuscateTree(ANode.Items[I], IndexCtx(ACtx, I), ASeed, EffCommentSeed, ARev, ASkip));
       end;
     nkString:
       begin
         Result.Kind := nkString;
         // XOR codec is symmetric: encode == decode.
-        Result.StrVal := TNetEncoding.Base64.EncodeBytesToString(
-          DeobfCodec(ASeed, TEncoding.UTF8.GetBytes(ANode.StrVal), ACtx));
+        Result.StrVal := TNetEncoding.Base64.EncodeBytesToString(DeobfCodec(ASeed, TEncoding.UTF8.GetBytes(ANode.StrVal), ACtx));
       end;
-  else
-    Result.Kind := ANode.Kind;
-    Result.BoolVal := ANode.BoolVal;
-    Result.IntVal := ANode.IntVal;
-    Result.FloatVal := ANode.FloatVal;
+    else
+      Result.Kind := ANode.Kind;
+      Result.BoolVal := ANode.BoolVal;
+      Result.IntVal := ANode.IntVal;
+      Result.FloatVal := ANode.FloatVal;
   end;
 end;
 
 { Injects 4-8 decoy root keys with obfuscated random string values. The decoys
   are listed in ADummies and ASkip, so the deobfuscator drops them while the
   raw bytecode still looks like a larger, non-obvious document. }
-procedure AddDummyEntries(ARoot: TAvroNode; const ASeed: TBytes;
-  ASkip: TDictionary<string, Boolean>; ADummies: TStringList);
+procedure AddDummyEntries(ARoot: TAvroNode; const ASeed: TBytes; ASkip: TDictionary<string, Boolean>; ADummies: TStringList);
 var
-  I, N, Guard: Integer;
+  I, N, Guard:    Integer;
   KeyBytes, Rand: TBytes;
-  Key: string;
-  Node: TAvroNode;
+  Key:            string;
+  Node:           TAvroNode;
 begin
   FillRandomBytes(Rand, 4);
   N := 4 + (Integer(Rand[0]) mod 5); // 4..8 decoys
@@ -1909,15 +1858,13 @@ begin
       FillRandomBytes(KeyBytes, 16);
       Key := 'd' + HexOfSha256(KeyBytes);
       Inc(Guard);
-    until (not ASkip.ContainsKey(Key)) and (ARoot.Keys.IndexOf(Key) < 0) and
-      (Guard < 16);
+    until (not ASkip.ContainsKey(Key)) and (ARoot.Keys.IndexOf(Key) < 0) and (Guard < 16);
     if Guard >= 16 then
       Break;
     Node := TAvroNode.Create;
     Node.Kind := nkString;
     FillRandomBytes(Rand, 24);
-    Node.StrVal := TNetEncoding.Base64.EncodeBytesToString(
-      DeobfCodec(ASeed, Rand, Key));
+    Node.StrVal := TNetEncoding.Base64.EncodeBytesToString(DeobfCodec(ASeed, Rand, Key));
     ARoot.Keys.Add(Key);
     ARoot.Items.Add(Node);
     ASkip.Add(Key, True);
@@ -1928,8 +1875,7 @@ end;
 { _obf_meta JSON carries: seed (base64), key_map and dummies. NOTE the
   inverted key_map order - the deobfuscator reads
   Rev[JsonValue.Value] := JsonString.Value, i.e. hashed <- orig. }
-function BuildMetaJson(const ASeed: TBytes;
-  const ARev: TDictionary<string, string>; const ADummies: TStringList): string;
+function BuildMetaJson(const ASeed: TBytes; const ARev: TDictionary<string, string>; const ADummies: TStringList): string;
 var
   Obj, KMap: TJSONObject;
   JArr:      TJSONArray;
@@ -1977,20 +1923,26 @@ end;
 
 procedure BcWriteNode(AStrm: TStream; ANode: TAvroNode);
 var
-  Typ, B:  Byte;
-  Bytes:   TBytes;
-  Bits:    UInt64;
-  I, Cnt:  Integer;
+  Typ, B: Byte;
+  Bytes:  TBytes;
+  Bits:   UInt64;
+  I, Cnt: Integer;
 begin
   case ANode.Kind of
-    nkNull:   Typ := TYPE_NULL;
-    nkBool:   Typ := TYPE_BOOLEAN;
-    nkInt, nkFloat: Typ := TYPE_NUMBER;
-    nkString: Typ := TYPE_STRING;
-    nkArray:  Typ := TYPE_ARRAY;
-    nkObject: Typ := TYPE_OBJECT;
-  else
-    raise ShieldWriterError('Cannot serialize node kind');
+    nkNull:
+      Typ := TYPE_NULL;
+    nkBool:
+      Typ := TYPE_BOOLEAN;
+    nkInt, nkFloat:
+      Typ := TYPE_NUMBER;
+    nkString:
+      Typ := TYPE_STRING;
+    nkArray:
+      Typ := TYPE_ARRAY;
+    nkObject:
+      Typ := TYPE_OBJECT;
+    else
+      raise ShieldWriterError('Cannot serialize node kind');
   end;
   AStrm.WriteBuffer(Typ, 1);
 
@@ -2058,10 +2010,10 @@ end;
   BE32 crc32 + SHA-256 trailer over everything before the last 32 bytes. }
 function AssembleBytecode(ARoot: TAvroNode): TBytes;
 var
-  MS, EntryMS, NodeMS: TMemoryStream;
-  B:      Byte;
-  I:      Integer;
-  Crc:    Cardinal;
+  MS, EntryMS, NodeMS:           TMemoryStream;
+  B:                             Byte;
+  I:                             Integer;
+  Crc:                           Cardinal;
   Trailer, TrailerSrc, KeyBytes: TBytes;
 begin
   Result := nil;
@@ -2134,9 +2086,9 @@ end;
 function ZlibCompressBytes(const AData: TBytes): TBytes;
 var
   InS, OutS: TMemoryStream;
-  Z:   TZCompressionStream;
-  Buf: array [0 .. 8191] of Byte;
-  N:   Integer;
+  Z:         TZCompressionStream;
+  Buf:       array [0 .. 8191] of Byte;
+  N:         Integer;
 begin
   Result := nil;
   InS := TMemoryStream.Create;
@@ -2170,24 +2122,22 @@ end;
 
 { ---- container assembly ---------------------------------------------------- }
 
-function AvroShieldBuildFromJson(const AJsonText, APassword: string;
-  const ADefaultKey, ABindToMachine, AUseHardwareFactor: Boolean;
-  out AOutBytes: TBytes; const ADefaultSecretIKM: TBytes;
-  const ACommentsIKM: TBytes): TAvroShieldResult;
+function AvroShieldBuildFromJson(const AJSONText, APassword: string; const ADefaultKey, ABindToMachine, AUseHardwareFactor: Boolean; out AOutBytes: TBytes;
+  const ADefaultSecretIKM: TBytes; const ACommentsIKM: TBytes): TAvroShieldResult;
 var
-  Json:      TJSONValue;
-  Root, Obf, MetaNode: TAvroNode;
-  Rev:       TDictionary<string, string>;
-  Skip:      TDictionary<string, Boolean>;
-  Dummies:   TStringList;
-  Seed, CommentSeed, MetaMask: TBytes;
-  Salt, IV, Machine, Master, FinalKey, EncKey, MacKey: TBytes;
-  MachineF, HardwareF: TBytes;
-  DefaultIKM, PasswordIKM: TBytes;
-  Flags, B:  Byte;
+  JSON:                                                       TJSONValue;
+  Root, Obf, MetaNode:                                        TAvroNode;
+  Rev:                                                        TDictionary<string, string>;
+  Skip:                                                       TDictionary<string, Boolean>;
+  Dummies:                                                    TStringList;
+  Seed, CommentSeed, MetaMask:                                TBytes;
+  Salt, IV, Machine, Master, FinalKey, EncKey, MacKey:        TBytes;
+  MachineF, HardwareF:                                        TBytes;
+  DefaultIKM, PasswordIKM:                                    TBytes;
+  Flags, B:                                                   Byte;
   Compressed, Bytecode, CipherTag, HmacData, Hmac, HeaderSrc: TBytes;
-  MetaJson: string;
-  AStrm:     TMemoryStream;
+  MetaJson:                                                   string;
+  AStrm:                                                      TMemoryStream;
 begin
   Result := asrUnknown;
   AOutBytes := nil;
@@ -2195,18 +2145,18 @@ begin
   if (not ADefaultKey) and (APassword = '') then
     Exit(asrEmptyPassword);
 
-  Json := TJSONObject.ParseJSONValue(Trim(AJsonText));
-  if Json = nil then
+  JSON := TJSONObject.ParseJSONValue(Trim(AJSONText));
+  if JSON = nil then
     Exit(asrCorruptPayload);
-  if not (Json is TJSONObject) then
+  if not(JSON is TJSONObject) then
   begin
-    Json.Free;
+    JSON.Free;
     Exit(asrNotJsonObject);
   end;
   try
-    Root := JsonValueToNode(Json);
+    Root := JsonValueToNode(JSON);
   finally
-    Json.Free;
+    JSON.Free;
   end;
   try
     // ---- container key material ----
@@ -2256,8 +2206,7 @@ begin
         MetaJson := BuildMetaJson(Seed, Rev, Dummies);
         MetaNode := TAvroNode.Create;
         MetaNode.Kind := nkString;
-        MetaNode.StrVal := TNetEncoding.Base64.EncodeBytesToString(
-          DeobfCodec(MetaMask, TEncoding.UTF8.GetBytes(MetaJson), META_KEY));
+        MetaNode.StrVal := TNetEncoding.Base64.EncodeBytesToString(DeobfCodec(MetaMask, TEncoding.UTF8.GetBytes(MetaJson), META_KEY));
         Obf.Keys.Add(META_KEY);
         Obf.Items.Add(MetaNode);
         Bytecode := AssembleBytecode(Obf);
@@ -2280,7 +2229,7 @@ begin
       Exit(asrCorruptPayload);
 
     // ---- header flags (Salt/Master were derived before the obfuscation
-    //      stage; the IV is per container and not needed earlier) ----
+    // stage; the IV is per container and not needed earlier) ----
     FillRandomBytes(IV, 16);
     Flags := FLAG_PASSWORD or FLAG_BYTECODE_V1;
     if ADefaultKey then

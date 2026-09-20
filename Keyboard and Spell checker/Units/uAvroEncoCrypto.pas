@@ -7,7 +7,6 @@
 }
 
 {$INCLUDE ../../ProjectDefines.inc}
-
 { The AES/PKCS#7 and Shield-decryption arithmetic is ported from Python and
   intentionally wraps (unbounded ints). With the IDE Debug configuration
   (overflow/range checks ON) those wrap-arounds raise EIntOverflow and every
@@ -15,7 +14,6 @@
   deliberately modular. }
 {$OVERFLOWCHECKS OFF}
 {$RANGECHECKS OFF}
-
 unit uAvroEncoCrypto;
 
 { =============================================================================
@@ -23,42 +21,42 @@ unit uAvroEncoCrypto;
 
   The container is a binary blob that is always decrypted ENTIRELY IN RAM:
 
-    v2 (current):
-      [0..8]   9 bytes  'AVROENCO' + $02
-      [9]      1 byte   Protection flag:
-                           $00 = Default Application Key (no prompt)
-                           $01 = User Password
-      [10..25] 16 bytes Salt
-      [26..41] 16 bytes IV
-      [42..N]  AES-256-CBC ciphertext, PKCS#7 padded
+  v2 (current):
+  [0..8]   9 bytes  'AVROENCO' + $02
+  [9]      1 byte   Protection flag:
+  $00 = Default Application Key (no prompt)
+  $01 = User Password
+  [10..25] 16 bytes Salt
+  [26..41] 16 bytes IV
+  [42..N]  AES-256-CBC ciphertext, PKCS#7 padded
 
-    v1 (legacy, read-only):
-      [0..8]   9 bytes  'AVROENCO' + $01
-      [9..24] 16 bytes Salt
-      [25..40]16 bytes IV
-      [41..N]  AES-256-CBC ciphertext, PKCS#7 padded
-      (password-only, key = SHA-256(raw password bytes + salt))
+  v1 (legacy, read-only):
+  [0..8]   9 bytes  'AVROENCO' + $01
+  [9..24] 16 bytes Salt
+  [25..40]16 bytes IV
+  [41..N]  AES-256-CBC ciphertext, PKCS#7 padded
+  (password-only, key = SHA-256(raw password bytes + salt))
 
   Key derivation (v2):
-      key = SHA-256( UTF-8(secret) + salt )
-      where secret = the built-in default application secret, reconstructed
-      at runtime from two XOR-masked byte arrays via
-      uAvroCryptoUtils.GetAvroEncoDefaultSecret (flag $00), or the user
-      password (flag $01). SHA-256 comes from System.Hash (pure RTL).
+  key = SHA-256( UTF-8(secret) + salt )
+  where secret = the built-in default application secret, reconstructed
+  at runtime from two XOR-masked byte arrays via
+  uAvroCryptoUtils.GetAvroEncoDefaultSecret (flag $00), or the user
+  password (flag $01). SHA-256 comes from System.Hash (pure RTL).
 
   Cryptographic engine: uAvroCryptoUtils - a 100% Pure Pascal AES-256-CBC
   engine with ZERO external DLL dependencies. No bcrypt.dll / advapi32.dll /
   OpenSSL is used anywhere in this unit.
 
   SECURITY CONTRACT
-    * Decrypted plaintext lives only in private TBytes buffers / strings in
-      RAM. It is NEVER written to a file or temporary file.
-    * Plaintext TBytes buffers are zero-filled before being released.
-    * Wrong password / corrupted data fails decryption (PKCS#7 validation);
-      callers must treat an empty result as "cannot load" and keep the
-      previously active mapping.
-    * Files protected with the default application key (flag $00) decrypt
-      transparently without any password.
+  * Decrypted plaintext lives only in private TBytes buffers / strings in
+  RAM. It is NEVER written to a file or temporary file.
+  * Plaintext TBytes buffers are zero-filled before being released.
+  * Wrong password / corrupted data fails decryption (PKCS#7 validation);
+  callers must treat an empty result as "cannot load" and keep the
+  previously active mapping.
+  * Files protected with the default application key (flag $00) decrypt
+  transparently without any password.
   ============================================================================= }
 
 interface
@@ -69,15 +67,13 @@ uses
 
 const
   // Container version markers: 'AVROENCO' + version byte.
-  AVROENCO_MAGIC_BASE: array [0 .. 7] of Byte = (
-    $41, $56, $52, $4F, $45, $4E, $43, $4F
-  );
-  AVROENCO_MAGIC_TAIL_V1 = $01; // legacy (read-only support)
-  AVROENCO_MAGIC_TAIL_V2 = $02; // current container
+  AVROENCO_MAGIC_BASE: array [0 .. 7] of Byte = ($41, $56, $52, $4F, $45, $4E, $43, $4F);
+  AVROENCO_MAGIC_TAIL_V1                      = $01; // legacy (read-only support)
+  AVROENCO_MAGIC_TAIL_V2                      = $02; // current container
 
-  AVROENCO_FLAG_DEFAULT_KEY     = $00; // protected with the built-in app secret
-  AVROENCO_FLAG_USER_PASSWORD   = $01; // protected with a user password
-  AVROENCO_FLAG_INVALID         = $FF; // header could not be read
+  AVROENCO_FLAG_DEFAULT_KEY   = $00; // protected with the built-in app secret
+  AVROENCO_FLAG_USER_PASSWORD = $01; // protected with a user password
+  AVROENCO_FLAG_INVALID       = $FF; // header could not be read
 
   SALT_SIZE  = 16;
   IV_SIZE    = 16;
@@ -89,17 +85,15 @@ const
   // Shield-format container markers: 'AVROSHLD' + version byte. The Shield
   // container shares the .AvroEnco extension with the legacy CBC format;
   // detection is by magic bytes, so both formats coexist under one extension.
-  AVROSHLD_MAGIC: array [0 .. 7] of Byte = (
-    $41, $56, $52, $4F, $53, $48, $4C, $44
-  );
+  AVROSHLD_MAGIC: array [0 .. 7] of Byte = ($41, $56, $52, $4F, $53, $48, $4C, $44);
   // There is deliberately no local copy of the Shield version byte here any
   // more: it used to be duplicated from uAvroShield, which is exactly how the
   // two drifted apart when the container format was bumped. Detection asks
   // uAvroShield.AvroShieldSupportedVersion instead.
   // Shield layout: header(58) + ciphertext + auth_tag(16) + hmac(64).
-  AVROSHLD_HEADER_SIZE = 58;
+  AVROSHLD_HEADER_SIZE  = 58;
   AVROSHLD_TRAILER_SIZE = 80; // auth_tag(16) + hmac(64)
-  AVROSHLD_MIN_SIZE = AVROSHLD_HEADER_SIZE + AVROSHLD_TRAILER_SIZE + 1;
+  AVROSHLD_MIN_SIZE     = AVROSHLD_HEADER_SIZE + AVROSHLD_TRAILER_SIZE + 1;
 
   // Default Application Key secret. NOT stored as a plain string: it is
   // reconstructed at runtime from two XOR-masked byte arrays in
@@ -109,9 +103,9 @@ const
 
 function ValidateAvroEncoHeader(const AFilePath: string): Boolean;
 // Protection mode of the file:
-//   AVROENCO_FLAG_USER_PASSWORD for v1 legacy files and v2 flag $01 files,
-//   AVROENCO_FLAG_DEFAULT_KEY for v2 flag $00 files,
-//   AVROENCO_FLAG_INVALID when the header is unreadable.
+// AVROENCO_FLAG_USER_PASSWORD for v1 legacy files and v2 flag $01 files,
+// AVROENCO_FLAG_DEFAULT_KEY for v2 flag $00 files,
+// AVROENCO_FLAG_INVALID when the header is unreadable.
 function GetAvroEncoProtectionFlag(const AFilePath: string): Byte;
 // Decrypts the file in RAM and returns the clean UTF-8 JSON text
 // (leading U+FEFF / UTF-8 BOM stripped). Returns '' when decryption fails
@@ -140,7 +134,7 @@ uses
 type
   TAvroEncoFormat = (aefInvalid, aefV1, aefV2);
 
-// Reads the raw bytes of a small binary file (header + ciphertext only).
+  // Reads the raw bytes of a small binary file (header + ciphertext only).
 function ReadFileBytes(const AFilePath: string; out ABytes: TBytes): Boolean;
 var
   FS: TFileStream;
@@ -170,8 +164,10 @@ begin
   if not CompareMem(@AFileBytes[0], @AVROENCO_MAGIC_BASE[0], 8) then
     Exit;
   case AFileBytes[8] of
-    AVROENCO_MAGIC_TAIL_V1: Result := aefV1;
-    AVROENCO_MAGIC_TAIL_V2: Result := aefV2;
+    AVROENCO_MAGIC_TAIL_V1:
+      Result := aefV1;
+    AVROENCO_MAGIC_TAIL_V2:
+      Result := aefV2;
   end;
 end;
 
@@ -179,9 +175,7 @@ function HasAvroShieldMagic(const AFileBytes: TBytes): Boolean;
 begin
   // Any version this build can read. The loader still rejects an unsupported
   // one with asrBadVersion; this predicate only answers "is the magic ours".
-  Result := (Length(AFileBytes) >= MAGIC_SIZE) and
-    CompareMem(@AFileBytes[0], @AVROSHLD_MAGIC[0], 8) and
-    AvroShieldSupportedVersion(AFileBytes[8]);
+  Result := (Length(AFileBytes) >= MAGIC_SIZE) and CompareMem(@AFileBytes[0], @AVROSHLD_MAGIC[0], 8) and AvroShieldSupportedVersion(AFileBytes[8]);
 end;
 
 function IsAvroShieldContainer(const AFilePath: string): Boolean;
@@ -220,10 +214,12 @@ begin
 
     Format := DetectFormat(FileBytes);
     case Format of
-      aefV1: MinSize := V1_HEADER_SIZE + AES_BLOCK_SIZE;
-      aefV2: MinSize := V2_HEADER_SIZE + AES_BLOCK_SIZE;
-    else
-      MinSize := MaxInt;
+      aefV1:
+        MinSize := V1_HEADER_SIZE + AES_BLOCK_SIZE;
+      aefV2:
+        MinSize := V2_HEADER_SIZE + AES_BLOCK_SIZE;
+      else
+        MinSize := MaxInt;
     end;
     Result := Length(FileBytes) >= MinSize;
   finally
@@ -289,10 +285,10 @@ end;
 function DecryptAvroEncoToContent(const AFilePath: string; const APassword: AnsiString; out AContent: string): Boolean;
 var
   FileBytes, Salt, IV, KeyBytes, Cipher, PlainBuf: TBytes;
-  Format: TAvroEncoFormat;
-  Flag:   Byte;
-  Off:    Integer;
-  I:      Integer;
+  Format:                                          TAvroEncoFormat;
+  Flag:                                            Byte;
+  Off:                                             Integer;
+  I:                                               Integer;
 begin
   Result := False;
   AContent := '';
@@ -333,8 +329,8 @@ begin
           else
             KeyBytes := DeriveKeySHA256FromString(string(APassword), Salt);
         end;
-    else
-      Exit; // unknown / corrupt header
+      else
+        Exit; // unknown / corrupt header
     end;
 
     SetLength(Cipher, Length(FileBytes) - Off);
@@ -402,8 +398,7 @@ begin
   begin
     try
       R := AvroShieldLoadFromFile(AFilePath, string(APassword), Result, True);
-      Log('AvroShieldLoadFromFile(' + ExtractFileName(AFilePath) +
-        ') -> asr=' + IntToStr(Ord(R)) + ' len=' + IntToStr(Length(Result)));
+      Log('AvroShieldLoadFromFile(' + ExtractFileName(AFilePath) + ') -> asr=' + IntToStr(Ord(R)) + ' len=' + IntToStr(Length(Result)));
       if R <> asrOk then
         Result := '';
       Result := Trim(Result);
@@ -437,10 +432,10 @@ end;
 
 function EncryptJsonToAvroEncoFile(const AJsonText: string; const APassword: AnsiString; const AOutFilePath: string): Boolean;
 var
-  FS: TFileStream;
+  FS:                                        TFileStream;
   Salt, IV, PlainBytes, CipherBuf, KeyBytes: TBytes;
-  Flag: Byte;
-  L:    Integer;
+  Flag:                                      Byte;
+  L:                                         Integer;
 begin
   Result := False;
   if AJsonText = '' then

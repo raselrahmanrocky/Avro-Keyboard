@@ -168,11 +168,11 @@ type
   { Complete snapshot of the ANSI engine's global parsing state. One instance
     is parked in the engine cache (uAnsiEngineManager) per available mapping
     version. Ownership rules:
-      * A state record OWNS its containers (objects + dynamic arrays) while
-        they are parked; Clear frees them.
-      * While the engine is ACTIVE (restored), the containers live in the
-        unit globals and the state record holds no references (all fields
-        nil / empty).
+    * A state record OWNS its containers (objects + dynamic arrays) while
+    they are parked; Clear frees them.
+    * While the engine is ACTIVE (restored), the containers live in the
+    unit globals and the state record holds no references (all fields
+    nil / empty).
     CaptureEngineState / RestoreEngineState move ownership between the two
     locations with plain pointer/array-reference moves - O(1), no deep copy. }
   TAnsiEngineState = record
@@ -186,24 +186,24 @@ type
     // (about 300) in every parked engine, and hashed each name on capture and
     // restore, for data the registry's fixed build order already identifies.
     ScalarValues: TArray<string>;
-    CustomFullForms:          TArray<TReplacementPair>;
-    CustomPreReplacements:    TArray<TReplacementPair>;
-    CustomPostReplacements:   TArray<TReplacementPair>;
-    ActiveReplacements:       TArray<TReplacementPair>;
+    CustomFullForms: TArray<TReplacementPair>;
+    CustomPreReplacements: TArray<TReplacementPair>;
+    CustomPostReplacements: TArray<TReplacementPair>;
+    ActiveReplacements: TArray<TReplacementPair>;
     KarInclusiveReplacements: TArray<TReplacementPair>;
-    VowelRules:               TArray<TVowelRule>;
-    RfolaRules:               TArray<TRfolaRule>;
-    KarCorrections:           TArray<TKarCorrection>;
-    GroupKarCorrections:      TArray<TGroupKarCorrection>;
-    AnsiRegistry:             TList<TAnsiVarRec>;
-    AnsiRegistryMap:          TDictionary<string, TAnsiVarRec>;
-    AnsiOverrides:            TDictionary<string, string>;
-    ConsonantGroupMap:        TDictionary<string, TArray<string>>;
-    AnsiGroupMap:             TDictionary<string, TArray<string>>;
-    AnsiGroupRawMap:          TDictionary<string, TArray<string>>;
-    ConsonantGroupRawMap:     TDictionary<string, TArray<string>>;
-    AnsiSequenceLookup:       TAnsiSequenceMap;
-    AnsiToUniMap:             TAnsiToUniMap;
+    VowelRules: TArray<TVowelRule>;
+    RfolaRules: TArray<TRfolaRule>;
+    KarCorrections: TArray<TKarCorrection>;
+    GroupKarCorrections: TArray<TGroupKarCorrection>;
+    AnsiRegistry: TList<TAnsiVarRec>;
+    AnsiRegistryMap: TDictionary<string, TAnsiVarRec>;
+    AnsiOverrides: TDictionary<string, string>;
+    ConsonantGroupMap: TDictionary<string, TArray<string>>;
+    AnsiGroupMap: TDictionary<string, TArray<string>>;
+    AnsiGroupRawMap: TDictionary<string, TArray<string>>;
+    ConsonantGroupRawMap: TDictionary<string, TArray<string>>;
+    AnsiSequenceLookup: TAnsiSequenceMap;
+    AnsiToUniMap: TAnsiToUniMap;
     procedure Clear;
   end;
 
@@ -3145,7 +3145,7 @@ procedure TAnsiEngineState.Clear;
     AvroWipeString(CopyRec.Comment);
   end;
 
-  { Positional scalar capture: refcounted strings, no name copies. }
+{ Positional scalar capture: refcounted strings, no name copies. }
   procedure WipeScalarValues(AArr: TArray<string>);
   var
     I: Integer;
@@ -3154,83 +3154,83 @@ procedure TAnsiEngineState.Clear;
       AvroWipeString(AArr[I]);
   end;
 
-  { Snapshots keys and values, releases the dictionary, then wipes. }
+{ Snapshots keys and values, releases the dictionary, then wipes. }
   procedure WipeStringDict(ADict: TDictionary<string, string>);
   var
     Keys, Values: TArray<string>;
-    I: Integer;
+    I:            Integer;
   begin
     if ADict = nil then
       Exit;
     Keys := ADict.Keys.ToArray;
     Values := ADict.Values.ToArray;
     ADict.Clear;
-    for I := 0 to High(Keys) do
+    for I := 0 to high(Keys) do
       AvroWipeString(Keys[I]);
     AvroWipeStringArray(Values);
   end;
 
-  procedure WipeStrListDict(ADict: TDictionary<string, TArray<string>>);
+  procedure WipeStrListDict(ADict: TDictionary < string, TArray < string >> );
   var
-    Keys: TArray<string>;
+    Keys:   TArray<string>;
     Values: TArray<TArray<string>>;
-    I: Integer;
+    I:      Integer;
   begin
     if ADict = nil then
       Exit;
     Keys := ADict.Keys.ToArray;
     Values := ADict.Values.ToArray;
     ADict.Clear;
-    for I := 0 to High(Keys) do
+    for I := 0 to high(Keys) do
       AvroWipeString(Keys[I]);
-    for I := 0 to High(Values) do
+    for I := 0 to high(Values) do
       AvroWipeStringArray(Values[I]);
   end;
 
   procedure WipeVarRecDict(ADict: TDictionary<string, TAnsiVarRec>);
   var
-    Keys: TArray<string>;
+    Keys:   TArray<string>;
     Values: TArray<TAnsiVarRec>;
-    I: Integer;
+    I:      Integer;
   begin
     if ADict = nil then
       Exit;
     Keys := ADict.Keys.ToArray;
     Values := ADict.Values.ToArray;
     ADict.Clear;
-    for I := 0 to High(Keys) do
+    for I := 0 to high(Keys) do
       AvroWipeString(Keys[I]);
-    for I := 0 to High(Values) do
+    for I := 0 to high(Values) do
       WipeVarRec(Values[I]);
   end;
 
   procedure WipeRegistryList(AList: TList<TAnsiVarRec>);
   var
     Values: TArray<TAnsiVarRec>;
-    I: Integer;
+    I:      Integer;
   begin
     if AList = nil then
       Exit;
     Values := AList.ToArray;
     AList.Clear;
-    for I := 0 to High(Values) do
+    for I := 0 to high(Values) do
       WipeVarRec(Values[I]);
   end;
 
   procedure WipeSequenceMap(AMap: TAnsiSequenceMap);
   var
-    Keys: TArray<string>;
+    Keys:   TArray<string>;
     Values: TArray<TAnsiSequenceEntry>;
-    I: Integer;
+    I:      Integer;
   begin
     if AMap = nil then
       Exit;
     Keys := AMap.Keys.ToArray;
     Values := AMap.Values.ToArray;
     AMap.Clear;
-    for I := 0 to High(Keys) do
+    for I := 0 to high(Keys) do
       AvroWipeString(Keys[I]);
-    for I := 0 to High(Values) do
+    for I := 0 to high(Values) do
     begin
       AvroWipeString(Values[I].AnsiOutput);
       AvroWipeString(Values[I].AltAnsiOutput);
@@ -3319,7 +3319,7 @@ procedure CaptureEngineState(var AState: TAnsiEngineState);
 var
   Rec: TAnsiVarRec;
   Val: string;
-  I: Integer;
+  I:   Integer;
 begin
   AState.Clear;
   AState.DisplayName := AnsiVersion;
@@ -3340,24 +3340,42 @@ begin
     end;
   end;
 
-  AState.CustomFullForms := CustomFullForms;          CustomFullForms := nil;
-  AState.CustomPreReplacements := CustomPreReplacements; CustomPreReplacements := nil;
-  AState.CustomPostReplacements := CustomPostReplacements; CustomPostReplacements := nil;
-  AState.ActiveReplacements := ActiveReplacements;    ActiveReplacements := nil;
-  AState.KarInclusiveReplacements := KarInclusiveReplacements; KarInclusiveReplacements := nil;
-  AState.VowelRules := VowelRules;                    VowelRules := nil;
-  AState.RfolaRules := RfolaRules;                    RfolaRules := nil;
-  AState.KarCorrections := KarCorrections;            KarCorrections := nil;
-  AState.GroupKarCorrections := GroupKarCorrections;  GroupKarCorrections := nil;
-  AState.AnsiRegistry := AnsiRegistry;                AnsiRegistry := nil;
-  AState.AnsiRegistryMap := AnsiRegistryMap;          AnsiRegistryMap := nil;
-  AState.AnsiOverrides := AnsiOverrides;              AnsiOverrides := nil;
-  AState.ConsonantGroupMap := ConsonantGroupMap;      ConsonantGroupMap := nil;
-  AState.AnsiGroupMap := AnsiGroupMap;                AnsiGroupMap := nil;
-  AState.AnsiGroupRawMap := AnsiGroupRawMap;          AnsiGroupRawMap := nil;
-  AState.ConsonantGroupRawMap := ConsonantGroupRawMap; ConsonantGroupRawMap := nil;
-  AState.AnsiSequenceLookup := AnsiSequenceLookup;    AnsiSequenceLookup := nil;
-  AState.AnsiToUniMap := AnsiToUniMap;                AnsiToUniMap := nil;
+  AState.CustomFullForms := CustomFullForms;
+  CustomFullForms := nil;
+  AState.CustomPreReplacements := CustomPreReplacements;
+  CustomPreReplacements := nil;
+  AState.CustomPostReplacements := CustomPostReplacements;
+  CustomPostReplacements := nil;
+  AState.ActiveReplacements := ActiveReplacements;
+  ActiveReplacements := nil;
+  AState.KarInclusiveReplacements := KarInclusiveReplacements;
+  KarInclusiveReplacements := nil;
+  AState.VowelRules := VowelRules;
+  VowelRules := nil;
+  AState.RfolaRules := RfolaRules;
+  RfolaRules := nil;
+  AState.KarCorrections := KarCorrections;
+  KarCorrections := nil;
+  AState.GroupKarCorrections := GroupKarCorrections;
+  GroupKarCorrections := nil;
+  AState.AnsiRegistry := AnsiRegistry;
+  AnsiRegistry := nil;
+  AState.AnsiRegistryMap := AnsiRegistryMap;
+  AnsiRegistryMap := nil;
+  AState.AnsiOverrides := AnsiOverrides;
+  AnsiOverrides := nil;
+  AState.ConsonantGroupMap := ConsonantGroupMap;
+  ConsonantGroupMap := nil;
+  AState.AnsiGroupMap := AnsiGroupMap;
+  AnsiGroupMap := nil;
+  AState.AnsiGroupRawMap := AnsiGroupRawMap;
+  AnsiGroupRawMap := nil;
+  AState.ConsonantGroupRawMap := ConsonantGroupRawMap;
+  ConsonantGroupRawMap := nil;
+  AState.AnsiSequenceLookup := AnsiSequenceLookup;
+  AnsiSequenceLookup := nil;
+  AState.AnsiToUniMap := AnsiToUniMap;
+  AnsiToUniMap := nil;
 end;
 
 { Inverse of CaptureEngineState: moves AState's containers back into the unit
@@ -3369,26 +3387,44 @@ procedure RestoreEngineState(var AState: TAnsiEngineState);
 var
   Rec: TAnsiVarRec;
   Val: string;
-  I: Integer;
+  I:   Integer;
 begin
-  CustomFullForms := AState.CustomFullForms;          AState.CustomFullForms := nil;
-  CustomPreReplacements := AState.CustomPreReplacements; AState.CustomPreReplacements := nil;
-  CustomPostReplacements := AState.CustomPostReplacements; AState.CustomPostReplacements := nil;
-  ActiveReplacements := AState.ActiveReplacements;    AState.ActiveReplacements := nil;
-  KarInclusiveReplacements := AState.KarInclusiveReplacements; AState.KarInclusiveReplacements := nil;
-  VowelRules := AState.VowelRules;                    AState.VowelRules := nil;
-  RfolaRules := AState.RfolaRules;                    AState.RfolaRules := nil;
-  KarCorrections := AState.KarCorrections;            AState.KarCorrections := nil;
-  GroupKarCorrections := AState.GroupKarCorrections;  AState.GroupKarCorrections := nil;
-  AnsiRegistry := AState.AnsiRegistry;                AState.AnsiRegistry := nil;
-  AnsiRegistryMap := AState.AnsiRegistryMap;          AState.AnsiRegistryMap := nil;
-  AnsiOverrides := AState.AnsiOverrides;              AState.AnsiOverrides := nil;
-  ConsonantGroupMap := AState.ConsonantGroupMap;      AState.ConsonantGroupMap := nil;
-  AnsiGroupMap := AState.AnsiGroupMap;                AState.AnsiGroupMap := nil;
-  AnsiGroupRawMap := AState.AnsiGroupRawMap;          AState.AnsiGroupRawMap := nil;
-  ConsonantGroupRawMap := AState.ConsonantGroupRawMap; AState.ConsonantGroupRawMap := nil;
-  AnsiSequenceLookup := AState.AnsiSequenceLookup;    AState.AnsiSequenceLookup := nil;
-  AnsiToUniMap := AState.AnsiToUniMap;                AState.AnsiToUniMap := nil;
+  CustomFullForms := AState.CustomFullForms;
+  AState.CustomFullForms := nil;
+  CustomPreReplacements := AState.CustomPreReplacements;
+  AState.CustomPreReplacements := nil;
+  CustomPostReplacements := AState.CustomPostReplacements;
+  AState.CustomPostReplacements := nil;
+  ActiveReplacements := AState.ActiveReplacements;
+  AState.ActiveReplacements := nil;
+  KarInclusiveReplacements := AState.KarInclusiveReplacements;
+  AState.KarInclusiveReplacements := nil;
+  VowelRules := AState.VowelRules;
+  AState.VowelRules := nil;
+  RfolaRules := AState.RfolaRules;
+  AState.RfolaRules := nil;
+  KarCorrections := AState.KarCorrections;
+  AState.KarCorrections := nil;
+  GroupKarCorrections := AState.GroupKarCorrections;
+  AState.GroupKarCorrections := nil;
+  AnsiRegistry := AState.AnsiRegistry;
+  AState.AnsiRegistry := nil;
+  AnsiRegistryMap := AState.AnsiRegistryMap;
+  AState.AnsiRegistryMap := nil;
+  AnsiOverrides := AState.AnsiOverrides;
+  AState.AnsiOverrides := nil;
+  ConsonantGroupMap := AState.ConsonantGroupMap;
+  AState.ConsonantGroupMap := nil;
+  AnsiGroupMap := AState.AnsiGroupMap;
+  AState.AnsiGroupMap := nil;
+  AnsiGroupRawMap := AState.AnsiGroupRawMap;
+  AState.AnsiGroupRawMap := nil;
+  ConsonantGroupRawMap := AState.ConsonantGroupRawMap;
+  AState.ConsonantGroupRawMap := nil;
+  AnsiSequenceLookup := AState.AnsiSequenceLookup;
+  AState.AnsiSequenceLookup := nil;
+  AnsiToUniMap := AState.AnsiToUniMap;
+  AState.AnsiToUniMap := nil;
 
   // Scalars: write the captured values back through the stable registry Ptrs,
   // positionally. The count guard is the correctness condition of the flat
@@ -3396,8 +3432,7 @@ begin
   // rebuilt from the same InitializeAnsiRegistry source) would otherwise map
   // values onto the wrong variables, so a mismatch writes nothing and leaves
   // the caller's ResetAnsiToDefaults values in place.
-  if (AnsiRegistry <> nil) and (AState.ScalarValues <> nil) and
-    (Length(AState.ScalarValues) = AnsiRegistry.Count) then
+  if (AnsiRegistry <> nil) and (AState.ScalarValues <> nil) and (Length(AState.ScalarValues) = AnsiRegistry.Count) then
     for I := 0 to AnsiRegistry.Count - 1 do
     begin
       Rec := AnsiRegistry[I];
@@ -3411,9 +3446,7 @@ begin
         PString(Rec.Ptr)^ := Val;
     end
   else if (AState.ScalarValues <> nil) and (AnsiRegistry <> nil) then
-    OutputDebugString(PChar(Format(
-      '[AvroEnco] engine state scalar mismatch: captured=%d registry=%d; ' +
-      'scalars left at defaults',
+    OutputDebugString(PChar(Format('[AvroEnco] engine state scalar mismatch: captured=%d registry=%d; ' + 'scalars left at defaults',
       [Length(AState.ScalarValues), AnsiRegistry.Count])));
   AState.ScalarValues := nil;
 end;
@@ -3422,7 +3455,7 @@ end;
 
 procedure LoadAnsiMapping(const Path: string; ErrorLog: TStringList = nil);
 var
-  JSON: string;
+  JSON:  string;
   Lines: TStringList;
 begin
   ResetAnsiToDefaults;
@@ -4988,7 +5021,7 @@ begin
   Result := False;
   ErrorMessage := '';
 
-  if Lowercase(ExtractFileExt(Path)) = '.avroenco' then
+  if LowerCase(ExtractFileExt(Path)) = '.avroenco' then
   begin
     Result := True;
     Exit;
