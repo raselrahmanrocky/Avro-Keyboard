@@ -93,6 +93,14 @@ procedure AnsiCaretSnifferConfigure(const AEnabled, ADebugLog: Boolean);
 function AnsiCaretSnifferEnabled: Boolean;
 function AnsiCaretSnifferDebugLog: Boolean;
 
+{ One line to the debug log (OutputDebugString), written ONLY while the log is
+  switched on - AnsiCaretSnifferConfigure's ADebugLog, which the application
+  takes from the AnsiBackspaceLog setting. Exported because the reading layers
+  below own decisions the cache cannot see: whether an injected modifier took
+  effect, which layer answered, why a read was declined. Nothing in the shipped
+  path writes here unless the setting is on. }
+procedure AnsiTrace(const AText: string);
+
 { Installs the reading layer. Passing nil removes it (every read then fails),
   which is how production behaves before the UIA/clipboard readers exist. }
 procedure AnsiCaretSnifferSetProvider(const AProvider: TAnsiContextProvider); overload;

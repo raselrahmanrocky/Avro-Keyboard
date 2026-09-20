@@ -151,9 +151,26 @@ type
     procedure ShortcutEditClick(Sender: TObject);
     private
       { Private declarations }
+
+      { ---- the ANSI caret-context options ------------------------------------
+        These arrived after this dialog was laid out and after every category
+        panel was full, so they are built in CODE into the "Global Output" page
+        - the page that already owns the ANSI/Unicode choices they belong to -
+        rather than by editing the .dfm: a .dfm is not checked by the compiler,
+        and a broken one fails at run time, in the dialog, for the user. Built
+        once, at the top of LoadSettings, and remembered in these fields so the
+        same dialog instance can be reopened. }
+      chkAnsiHostErase: TCheckBox;
+      chkAnsiUIA:       TCheckBox;
+      chkAnsiClipboard: TCheckBox;
+      chkAnsiDebugLog:  TCheckBox;
+      edAnsiUnitCap:    TEdit;
+      edAnsiApps:       TEdit;
+
       procedure LoadSettings;
       procedure SaveSettings;
       function GetListIndex(List: TStrings; SearchS: string): Integer;
+      procedure BuildAnsiContextOptions;
     public
       { Public declarations }
     protected
@@ -178,7 +195,8 @@ uses
   u_Admin,
   ufrmEncodingWarning,
   uKeyboardMacro,
-  uThemeManager;
+  uThemeManager,
+  uCaretWatch; // restarted after a save: see ApplyAnsiContextSettings
 
 const
   Show_Window_in_Taskbar = True;
@@ -191,6 +209,20 @@ var
 begin
   U := UpperCase(Trim(Text));
   Result := (U = '') or (U = 'NONE') or (U = 'SET SHORTCUT') or (U = 'PRESS ANY KEY...');
+end;
+
+{ =============================================================================== }
+
+{ The ANSI caret-context options (host erase, UI Automation, the clipboard
+  fallback, the per-application list) are read when the caret watch STARTS: the
+  reading layers are decided there. Restarting the watch is what makes a saved
+  change take effect now instead of at the next launch. It is called from the two
+  places that save - never from RefreshSettings, which the menus call on every
+  layout and mode change and which has no business cycling the watch. }
+procedure ApplyAnsiContextSettings;
+begin
+  AnsiCaretWatchStop;
+  AnsiCaretWatchStart;
 end;
 
 { =============================================================================== }
@@ -212,6 +244,7 @@ begin
   RecordingTargetEdit := nil;
   Self.SaveSettings;
   AvroMainForm1.RefreshSettings;
+  ApplyAnsiContextSettings;
 
   { Surface the "Settings saved!" status, auto-hidden after 2s
     by LabelHideTimer. Reset the timer in case the user clicks
@@ -252,6 +285,7 @@ begin
   RecordingTargetEdit := nil;
   Self.SaveSettings;
   AvroMainForm1.RefreshSettings;
+  ApplyAnsiContextSettings;
   Self.Close;
 end;
 
@@ -662,11 +696,89 @@ end;
 
 { =============================================================================== }
 
+procedure TfrmOptions.BuildAnsiContextOptions;
+const
+  BOX_LEFT  = 27;
+  BOX_TOP   = 400; // below the last designer-made control of the page
+  BOX_WIDTH = 590;
+var
+  Box:  TGroupBox;
+  Lbl:  TLabel;
+  RowY: Integer;
+
+  { The page is widened and narrowed with the dialog (see the form's resize
+    handler), so the rows grow with the box instead of being clipped by it. }
+  function AddCheck(const ACaption: string): TCheckBox;
+  begin
+    Result := TCheckBox.Create(Self);
+    Result.Parent := Box;
+    Result.Left := 16;
+    Result.Top := RowY;
+    Result.Width := Box.Width - 32;
+    Result.Anchors := [akLeft, akTop, akRight];
+    Result.Caption := ACaption;
+    Result.ParentFont := True;
+    Inc(RowY, 26);
+  end;
+
+  function AddEdit(const ACaption: string; const AEditWidth: Integer): TEdit;
+  begin
+    Lbl := TLabel.Create(Self);
+    Lbl.Parent := Box;
+    Lbl.Left := 16;
+    Lbl.Top := RowY + 4;
+    Lbl.Caption := ACaption;
+    Lbl.ParentFont := True;
+
+    Result := TEdit.Create(Self);
+    Result.Parent := Box;
+    Result.Left := 16 + Lbl.Width + 8;
+    Result.Top := RowY;
+    Result.Width := AEditWidth;
+    Result.Anchors := [akLeft, akTop, akRight];
+    Result.ParentFont := True;
+    Inc(RowY, 30);
+  end;
+
+begin
+  if Assigned(chkAnsiHostErase) then
+    Exit; // built already: this dialog instance is reused
+
+  Box := TGroupBox.Create(Self);
+  Box.Parent := GlobalOutput_Panel;
+  Box.Left := BOX_LEFT;
+  Box.Top := BOX_TOP;
+  Box.Width := BOX_WIDTH;
+  Box.Anchors := [akLeft, akTop, akRight];
+  Box.ParentFont := True;
+  Box.Caption := 'ANSI backspace (smart erase)';
+
+  RowY := 24;
+  chkAnsiHostErase := AddCheck('Erase the whole glyph the application printed, not one ANSI unit');
+  chkAnsiUIA := AddCheck('Read the text in front of the caret with UI Automation (Word, Chrome, editors)');
+  chkAnsiClipboard := AddCheck('Clipboard round-trip as a last resort (experimental; it moves the caret)');
+  chkAnsiDebugLog := AddCheck('Log the caret decisions for troubleshooting (OutputDebugString)');
+  edAnsiUnitCap := AddEdit('Never erase more than (ANSI units):', 40);
+  { The application list gets the rest of the row: a class-name list is long. }
+  edAnsiApps := AddEdit('Leave these applications alone (window classes, '';'' separated):', 200);
+  edAnsiApps.Width := Box.Width - edAnsiApps.Left - 16;
+
+  Box.Height := RowY + 14;
+  if GlobalOutput_Panel.Height < Box.Top + Box.Height + 12 then
+    GlobalOutput_Panel.Height := Box.Top + Box.Height + 12;
+end;
+
+{ =============================================================================== }
+
 procedure TfrmOptions.LoadSettings;
 var
   Skins:    TStringList;
   I, Count: Integer;
 begin
+  { The ANSI caret-context controls live on the Global Output page and are built
+    the first time the dialog loads its settings. }
+  BuildAnsiContextOptions;
+
   // =========================================================
   // General Settings
   if StartWithWindows = 'YES' then
@@ -932,6 +1044,30 @@ begin
   else
     CheckIgnoreCapsLockShortcut.Checked := False;
 
+  // ANSI caret-context settings (built in BuildAnsiContextOptions).
+  if AnsiBackspaceHostErase = 'YES' then
+    chkAnsiHostErase.Checked := True
+  else
+    chkAnsiHostErase.Checked := False;
+
+  if AnsiBackspaceUIA = 'YES' then
+    chkAnsiUIA.Checked := True
+  else
+    chkAnsiUIA.Checked := False;
+
+  if AnsiBackspaceClipboard = 'YES' then
+    chkAnsiClipboard.Checked := True
+  else
+    chkAnsiClipboard.Checked := False;
+
+  if AnsiBackspaceLog = 'YES' then
+    chkAnsiDebugLog.Checked := True
+  else
+    chkAnsiDebugLog.Checked := False;
+
+  edAnsiUnitCap.Text := AnsiBackspaceUnitCap;
+  edAnsiApps.Text := AnsiBackspaceApps;
+
 end;
 
 { =============================================================================== }
@@ -1166,6 +1302,32 @@ begin
     IgnoreCapsLock := 'YES'
   else
     IgnoreCapsLock := 'NO';
+
+  // ANSI caret-context settings (built in BuildAnsiContextOptions). The unit cap
+  // is free text: anything that is not a number falls back to the built-in
+  // default where it is read, so a typo cannot make the eraser guess a width.
+  if chkAnsiHostErase.Checked = True then
+    AnsiBackspaceHostErase := 'YES'
+  else
+    AnsiBackspaceHostErase := 'NO';
+
+  if chkAnsiUIA.Checked = True then
+    AnsiBackspaceUIA := 'YES'
+  else
+    AnsiBackspaceUIA := 'NO';
+
+  if chkAnsiClipboard.Checked = True then
+    AnsiBackspaceClipboard := 'YES'
+  else
+    AnsiBackspaceClipboard := 'NO';
+
+  if chkAnsiDebugLog.Checked = True then
+    AnsiBackspaceLog := 'YES'
+  else
+    AnsiBackspaceLog := 'NO';
+
+  AnsiBackspaceUnitCap := Trim(edAnsiUnitCap.Text);
+  AnsiBackspaceApps := Trim(edAnsiApps.Text);
 
   // Application theme (Interface Settings). The combo items are in
   // TAppThemeMode order; a missing selection means "follow Windows".

@@ -760,24 +760,21 @@ end;
   caret (start of the document) or the host refused the move. }
 function TUiaTextReader.TextBefore(const ASpan: IUIAutomationTextRange; const AMaxChars: Integer; out ATail: string): Boolean;
 var
-  Span:    IUIAutomationTextRange;
-  Moved:   Integer;
-  Text:    WideString;
-  HrClone: HRESULT;
-  HrMove:  HRESULT;
-  HrText:  HRESULT;
+  Span:  IUIAutomationTextRange;
+  Moved: Integer;
+  Text:  WideString;
+  Hr:    HRESULT;
 begin
   Result := False;
   ATail := '';
   if ASpan = nil then
     Exit;
 
-  HrClone := 0;
   Span := nil;
-  HrClone := ASpan.Clone(Span);
-  if (not UiaOk(HrClone)) or (Span = nil) then
+  Hr := ASpan.Clone(Span);
+  if (not UiaOk(Hr)) or (Span = nil) then
   begin
-    FRangeTrace := FRangeTrace + Format('; clone=$%.8x', [Cardinal(HrClone)]);
+    FRangeTrace := FRangeTrace + Format('; clone=$%.8x', [Cardinal(Hr)]);
     Exit;
   end;
 
@@ -837,18 +834,17 @@ var
   Count:  Integer;
   Sel:    IUIAutomationTextRange;
   Comp:   Integer;
-  HrSel:  HRESULT;
+  Hr:     HRESULT;
 begin
   Result := False;
   ATail := '';
   if FPattern = nil then
     Exit;
 
-  HrSel := 0;
   Ranges := nil;
-  HrSel := FPattern.GetSelection(Ranges);
-  FRangeTrace := FRangeTrace + Format('; sel=$%.8x ranges=%s', [Cardinal(HrSel), BoolToStr(Ranges <> nil, True)]);
-  if (not UiaOk(HrSel)) or (Ranges = nil) then
+  Hr := FPattern.GetSelection(Ranges);
+  FRangeTrace := FRangeTrace + Format('; sel=$%.8x ranges=%s', [Cardinal(Hr), BoolToStr(Ranges <> nil, True)]);
+  if (not UiaOk(Hr)) or (Ranges = nil) then
     Exit;
 
   Count := 0;

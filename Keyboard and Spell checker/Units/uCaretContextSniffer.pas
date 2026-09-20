@@ -101,7 +101,8 @@ uses
   Messages,
   SysUtils,
   Clipbrd,
-  uRegistrySettings;
+  uRegistrySettings,
+  uCaretContextCache; // AnsiTrace (the debug log) and the sniffer's own switch
 
 const
   SNIFF_MSG_TIMEOUT = 100;   // ms per SendMessageTimeout
@@ -162,30 +163,98 @@ begin
   SendInput(1, KInput, SizeOf(KInput));
 end;
 
-procedure SelectOneCharLeft;
+{ =============================================================================== }
+{ The injected modifiers are never taken on trust.
+
+  SendInput goes through the whole input stack, and that stack is not always
+  neutral: a machine was measured where an injected Shift down is followed by a
+  Shift up the sender never sent, so the arrow keys arrive with the modifier
+  released. Unchecked, that turns the round-trip into something the user did not
+  ask for - Shift+Left becomes a bare caret move - and, worse, an unmodified
+  Ctrl+C is a typed 'c' in the middle of their document.
+
+  So every modifier this unit presses is confirmed against the DESKTOP
+  (GetAsyncKeyState, not our own queue) before the key that depends on it is
+  pressed, and confirmed released again before the next key. Nothing else in
+  this unit changes: a modifier that does not take effect means no reading, and
+  no reading is the pre-feature behaviour. }
+
+{ True while the desktop considers the key held. }
+function KeyHeld(const AVk: Integer): Boolean;
 begin
-  SniffKeyEvent(VK_SHIFT, False);
-  Sleep(SNIFF_SEL_DELAY);
-  SniffKeyEvent(VK_LEFT, False);
-  SniffKeyEvent(VK_LEFT, True);
-  Sleep(SNIFF_SEL_DELAY);
-  SniffKeyEvent(VK_SHIFT, True);
-  Sleep(SNIFF_SEL_DELAY);
+  Result := (GetAsyncKeyState(AVk) and $8000) <> 0;
 end;
 
-procedure CopySelection;
+{ Presses a modifier and waits for the desktop to agree that it is down. False
+  means it never took effect (or was taken away again at once), and the caller
+  must NOT press the key that depends on it. }
+function ModifierDown(const AVk: Integer): Boolean;
+var
+  I: Integer;
 begin
-  SniffKeyEvent(VK_CONTROL, False);
-  Sleep(SNIFF_SEL_DELAY);
+  Result := False;
+  SniffKeyEvent(AVk, False);
+
+  { Twice: a stack that eats the modifier takes it away a moment AFTER the
+    press, so one look immediately afterwards is not enough to see it. }
+  for I := 1 to 2 do
+  begin
+    Sleep(SNIFF_SEL_DELAY);
+    if not KeyHeld(AVk) then
+    begin
+      SniffKeyEvent(AVk, True); // release what little there was
+      Exit;
+    end;
+  end;
+
+  Result := True;
+end;
+
+{ Releases a modifier and waits for the desktop to agree, so that the NEXT key is
+  not silently modified - a Shift the desktop still holds turns the collapse of
+  the selection into an extension of it. False = it could not be released, and
+  the caller must leave the keyboard alone. }
+function ModifierUp(const AVk: Integer; const AAlso: Integer = 0): Boolean;
+var
+  I: Integer;
+begin
+  Result := False;
+  for I := 1 to 3 do
+  begin
+    SniffKeyEvent(AVk, True);
+    if AAlso <> 0 then
+      SniffKeyEvent(AAlso, True); // a stack may only know the named left/right key
+    Sleep(SNIFF_SEL_DELAY);
+    if (not KeyHeld(AVk)) and ((AAlso = 0) or (not KeyHeld(AAlso))) then
+      Exit(True);
+  end;
+end;
+
+{ Ctrl+C. False = the Ctrl never took effect, in which case 'C' was NOT pressed:
+  a bare 'c' would be typed into the user's document. }
+function CopySelection: Boolean;
+begin
+  Result := False;
+  if not ModifierDown(VK_CONTROL) then
+  begin
+    AnsiTrace('clipboard: the desktop did not hold the injected Ctrl - nothing was typed');
+    Exit;
+  end;
+
   SniffKeyEvent(Ord('C'), False);
   SniffKeyEvent(Ord('C'), True);
-  Sleep(SNIFF_SEL_DELAY);
-  SniffKeyEvent(VK_CONTROL, True);
+  Sleep(SNIFF_COPY_DELAY);
+
+  Result := True;
+  if not ModifierUp(VK_CONTROL, VK_LCONTROL) then
+    AnsiTrace('clipboard: the desktop kept the injected Ctrl down');
 end;
 
+{ Selection was [caret-ACount..caret]; ONE Right collapses back to the caret the
+  round-trip started from. Only ever called when a selection was really created
+  and the Shift was really released. }
 procedure CollapseSelection;
 begin
-  // Selection was [(caret-1)..caret]; Right collapses back to the original pos
   SniffKeyEvent(VK_RIGHT, False);
   SniffKeyEvent(VK_RIGHT, True);
 end;
@@ -212,6 +281,27 @@ end;
 function IsPasswordEdit(hEdit: HWND): Boolean;
 begin
   Result := (hEdit <> 0) and ((GetWindowLong(hEdit, GWL_STYLE) and ES_PASSWORD) <> 0);
+end;
+
+{ What the CONTROL says its selection is - the only reliable account of what the
+  injected keys actually did, because the desktop's own modifier state is not
+  enough: a stack that reshapes keys can report the modifier as held right up to
+  the moment the next key is pressed (measured). False = this control cannot
+  answer (it is not a standard EDIT/RICHEDIT, or the window is hung). }
+function TargetSelection(hEdit: HWND; out AStart, AEnd: Integer): Boolean;
+var
+  Res: LRESULT;
+begin
+  Result := False;
+  AStart := 0;
+  AEnd := 0;
+  if not IsStandardEditClass(hEdit) then
+    Exit;
+  if not SendTimed(hEdit, EM_GETSEL, 0, 0, Res) then
+    Exit;
+  AStart := Integer(DWORD(Res) and $FFFF);        // LOWORD = selection start
+  AEnd := Integer((DWORD(Res) shr 16) and $FFFF); // HIWORD = selection end
+  Result := True;
 end;
 
 function TryReadViaMessages(hEdit: HWND; out Ch: string): Boolean;
@@ -252,41 +342,78 @@ begin
 end;
 
 { =============================================================================== }
-// Layer B: clipboard round-trip (Shift+Left -> Ctrl+C -> read -> Right).
+{ Layer B: the clipboard round-trip - Shift+Left x N, Ctrl+C, read, Right.
 
-function TryReadViaClipboard(out Ch: string): Boolean;
+  Why the implementation looks the way it does
+  --------------------------------------------
+  The keys are injected, and injected keys are not private to this process: the
+  whole desktop sees them, and the desktop does not always deliver them the way
+  they were sent. A real machine was measured where an injected Shift down is
+  answered by a Shift up nobody sent, so the arrow keys arrive UNMODIFIED - and
+  the desktop's own modifier state (GetAsyncKeyState) reports the Shift as held
+  right up to the moment the next key is pressed, so a modifier check alone
+  cannot catch it. An unmodified Left MOVES THE CARET, and an unmodified 'C'
+  TYPES A LETTER into the user's document.
+
+  This layer promises that a failed read is invisible. It cannot keep that
+  promise by trusting its own input, so it asks the CONTROL what happened and
+  undoes exactly that:
+
+    1. the caret/selection is read before anything is pressed (EM_GETSEL - a
+       standard EDIT/RICHEDIT is the only kind of control that can answer);
+    2. the modifier is confirmed against the desktop before its key is pressed,
+       and released again with confirmation;
+    3. after the arrow keys the control is asked again:
+         * a selection of exactly the asked width, ending where the caret was
+           -> the round-trip copies it, and ONE Right collapses it back;
+         * no selection (the modifier was lost), or any other shape
+           -> the caret is walked back to where it started, key by key, and
+              NOTHING is copied - there is nothing to copy;
+    4. the collapse only ever happens when a selection was really made, and the
+       caret is re-read afterwards so a mis-undo is visible instead of silent.
+
+  A host that cannot answer (Chrome, Office and everything else this layer exists
+  for) keeps the older best-effort shape: select, copy, collapse with one Right -
+  there is nothing else to go on there, and the layer stays off by default. }
+
+{ The whole round-trip for ACount characters. False - with an empty AText - means
+  no reading, and every path that answers False leaves the document, the caret
+  and the clipboard as they were (or says in the debug log that it could not). }
+function ClipboardRoundTrip(const ACount: Integer; out AText: string): Boolean;
 var
   hEdit:            HWND;
-  Res:              LRESULT;
   SelStart, SelEnd: Integer;
+  Before:           Integer;
+  Measured:         Boolean;
+  Selected:         Boolean;
+  Releasable:       Boolean;
+  I:                Integer;
   SavedClip:        string;
   HadClip:          Boolean;
-  Full:             string;
+  Copied:           string;
 begin
   Result := False;
-  Ch := '';
-  SavedClip := '';
-  HadClip := False;
+  AText := '';
+  Selected := False;
+  Releasable := True;
+  SelStart := 0;
+  SelEnd := 0;
 
-  // Abort if the target is a password field (a secret is never a caret
-  // context), or if it has an active selection – the round-trip
-  // (Shift+Left / Ctrl+C / Right) would collapse that selection, disturbing
-  // the user.
   hEdit := GetFocusedEditHandle;
+
+  { A password field is never read, and an active selection belongs to the user:
+    the round-trip would collapse it. Both are checked before any key is sent. }
+  Measured := (hEdit <> 0) and TargetSelection(hEdit, SelStart, SelEnd);
   if hEdit <> 0 then
   begin
     if IsPasswordEdit(hEdit) then
       Exit;
-    if SendTimed(hEdit, EM_GETSEL, 0, 0, Res) and (Res <> 0) then
-    begin
-      SelStart := DWORD(Res) and $FFFF;
-      SelEnd := (DWORD(Res) shr 16) and $FFFF;
-      if SelStart <> SelEnd then
-        Exit; // active selection – do not disturb
-    end;
+    if Measured and (SelStart <> SelEnd) then
+      Exit;
   end;
 
-  // Snapshot the existing clipboard text (best effort)
+  Before := SelEnd; // = SelStart: nothing is selected at this point
+
   try
     SavedClip := Clipboard.AsText;
     HadClip := True;
@@ -295,33 +422,81 @@ begin
   end;
 
   try
-    SelectOneCharLeft;
-    CopySelection;
+    { ---- 1. the modifier, then the arrow keys --------------------------- }
+    if not ModifierDown(VK_SHIFT) then
+      Exit; // nothing was pressed, so there is nothing to undo
 
-    try
-      if Clipboard.HasFormat(CF_UNICODETEXT) or Clipboard.HasFormat(CF_TEXT) then
+    for I := 1 to ACount do
+    begin
+      SniffKeyEvent(VK_LEFT, False);
+      SniffKeyEvent(VK_LEFT, True);
+    end;
+    Sleep(SNIFF_SEL_DELAY);
+
+    Releasable := ModifierUp(VK_SHIFT, VK_LSHIFT);
+    if not Releasable then
+      AnsiTrace('clipboard: the desktop kept the injected Shift down; the keyboard is left alone');
+
+    { ---- 2. what did the control actually do? --------------------------- }
+    Selected := True; // a host that cannot answer keeps the best-effort shape
+    if Measured then
+    begin
+      if not (TargetSelection(hEdit, SelStart, SelEnd) and (SelStart = Before - ACount) and (SelEnd = Before)) then
       begin
-        Full := Clipboard.AsText;
-        { NOTHING WAS COPIED when the clipboard still holds exactly what it held
-          before the round-trip: an empty selection (the caret at the start of
-          the document, a control that ignores Shift+Left, or a password field
-          that refuses to copy) leaves the old content in place, and reporting
-          its last character would be a reading of the CLIPBOARD, not of the
-          caret. Refusing costs one missed character; accepting would erase
-          text of a document nobody ever read. }
-        if (Full <> '') and (not HadClip or (Full <> SavedClip)) then
+        Selected := False;
+        AnsiTrace('clipboard: the arrows selected nothing - the caret is put back and nothing is copied');
+        { Walk the caret home, re-reading after every key: one Right collapses a
+          selection without moving it, and only the control can say which of the
+          two each key just did. Bounded, and it stops as soon as it is home. }
+        for I := 1 to (ACount * 2) + 2 do
         begin
-          Ch := Full[Length(Full)]; // last copied char = char before original caret
-          Result := True;
+          if TargetSelection(hEdit, SelStart, SelEnd) and (SelStart >= Before) and (SelEnd >= Before) then
+            Break;
+          SniffKeyEvent(VK_RIGHT, False);
+          SniffKeyEvent(VK_RIGHT, True);
+          Sleep(SNIFF_SEL_DELAY);
         end;
+        if TargetSelection(hEdit, SelStart, SelEnd) and ((SelStart <> Before) or (SelEnd <> Before)) then
+          AnsiTrace(Format('clipboard: the caret could not be put back (%d..%d, wanted %d)', [SelStart, SelEnd, Before]))
+        else
+          AnsiTrace('clipboard: the caret is back where it was');
       end;
-    except
-      Result := False;
+    end;
+
+    if not Releasable then
+      Exit; // a stuck modifier: pressing anything more would make it worse
+    if not Selected then
+      Exit;
+
+    { ---- 3. copy what is selected, and read it -------------------------- }
+    if not CopySelection then
+      Exit; // no verified Ctrl, so no 'C' was pressed either
+
+    if Clipboard.HasFormat(CF_UNICODETEXT) or Clipboard.HasFormat(CF_TEXT) then
+    begin
+      Copied := Clipboard.AsText;
+      { NOTHING WAS COPIED when the clipboard still holds exactly what it held
+        before the round-trip: an empty selection (the caret at the start of the
+        document, a control that ignores Shift+Left, or a password field that
+        refuses to copy) leaves the old content in place, and reporting its last
+        character would be a reading of the CLIPBOARD, not of the caret.
+        Refusing costs one missed character; accepting would erase text nobody
+        readable ever read. }
+      if (Copied <> '') and (not HadClip or (Copied <> SavedClip)) then
+      begin
+        AText := Copied;
+        Result := True;
+      end;
     end;
   finally
-    CollapseSelection;
-    // Restore previous clipboard content (CF_UNICODETEXT snapshot only -
-    // other formats are lost during a sniff; gated by EnableCaretSniffer)
+    { ---- 4. undo, and only what was really done ------------------------- }
+    if Selected and Releasable then
+    begin
+      CollapseSelection; // the selection is [caret-ACount..caret]: ONE Right holds it
+      if Measured and TargetSelection(hEdit, SelStart, SelEnd) and ((SelStart <> Before) or (SelEnd <> Before)) then
+        AnsiTrace(Format('clipboard: the collapse left the caret at %d..%d instead of %d', [SelStart, SelEnd, Before]));
+    end;
+
     if HadClip then
       try
         Clipboard.AsText := SavedClip;
@@ -330,94 +505,28 @@ begin
   end;
 end;
 
-{ =============================================================================== }
-// Layer C (N characters): see the interface comment for the contract.
-
-function SniffTextViaClipboard(const AMaxChars: Integer; out AText: string): Boolean;
+{ The one-character form, kept for the legacy path (see the interface comment). }
+function TryReadViaClipboard(out Ch: string): Boolean;
 var
-  hEdit:            HWND;
-  Res:              LRESULT;
-  SelStart, SelEnd: Integer;
-  SavedClip:        string;
-  HadClip:          Boolean;
-  I:                Integer;
-  Copied:           string;
+  Full: string;
 begin
-  Result := False;
+  Result := ClipboardRoundTrip(1, Full);
+  if Result then
+    Ch := Full[Length(Full)] // the character immediately before the caret
+  else
+    Ch := '';
+end;
+
+{ The width form: up to AMaxChars characters before the caret, for the glyphs
+  that are several ANSI units wide. }
+function SniffTextViaClipboard(const AMaxChars: Integer; out AText: string): Boolean;
+begin
   AText := '';
-
-  // A wider selection is a bigger disturbance for no benefit: no glyph any
-  // shipped mapping draws is longer than a handful of units.
+  { Wider than any shipped glyph and narrower than the fixtures: a bigger
+    selection is a bigger disturbance for no benefit. }
   if (AMaxChars < 1) or (AMaxChars > 64) then
-    Exit;
-
-  // A password field is never read, and an active selection belongs to the
-  // user: the collapse below would destroy it, and the caret would not be where
-  // the eraser assumes either.
-  hEdit := GetFocusedEditHandle;
-  if hEdit <> 0 then
-  begin
-    if IsPasswordEdit(hEdit) then
-      Exit;
-    if SendTimed(hEdit, EM_GETSEL, 0, 0, Res) and (Res <> 0) then
-    begin
-      SelStart := DWORD(Res) and $FFFF;
-      SelEnd := (DWORD(Res) shr 16) and $FFFF;
-      if SelStart <> SelEnd then
-        Exit;
-    end;
-  end;
-
-  try
-    SavedClip := Clipboard.AsText;
-    HadClip := True;
-  except
-    HadClip := False;
-  end;
-
-  try
-    try
-      // Select AMaxChars characters to the LEFT of the caret. The anchor stays
-      // at the caret, so ONE Right collapses back to it (that is the same
-      // contract CollapseSelection relies on).
-      SniffKeyEvent(VK_SHIFT, False);
-      Sleep(SNIFF_SEL_DELAY);
-      for I := 1 to AMaxChars do
-      begin
-        SniffKeyEvent(VK_LEFT, False);
-        SniffKeyEvent(VK_LEFT, True);
-      end;
-      Sleep(SNIFF_SEL_DELAY);
-      SniffKeyEvent(VK_SHIFT, True);
-      Sleep(SNIFF_SEL_DELAY);
-
-      CopySelection;
-
-      if Clipboard.HasFormat(CF_UNICODETEXT) or Clipboard.HasFormat(CF_TEXT) then
-      begin
-        Copied := Clipboard.AsText;
-        { The same guard as the one-character form: an unchanged clipboard means
-          the copy produced nothing (the caret was already at the start, or the
-          control refused), and the old clipboard text is not a reading of the
-          document. }
-        if (Copied <> '') and (not HadClip or (Copied <> SavedClip)) then
-        begin
-          AText := Copied;
-          Result := True;
-        end;
-      end;
-    except
-      Result := False;
-      AText := '';
-    end;
-  finally
-    CollapseSelection;
-    if HadClip then
-      try
-        Clipboard.AsText := SavedClip;
-      except
-      end;
-  end;
+    Exit(False);
+  Result := ClipboardRoundTrip(AMaxChars, AText);
 end;
 
 { =============================================================================== }

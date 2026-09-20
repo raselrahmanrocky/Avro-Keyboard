@@ -1086,10 +1086,11 @@ end;
   the CHILD process: the keys injected here go to the child's focused control and
   the child processes them in its own message loop, which is exactly what the
   shipped application relies on. Nothing in this copy has to pump for it. }
+{ The round-trip itself: needs the injected keys to take effect on this desktop
+  (that is what SelectionMechanismWorks is asked first). }
 procedure ClipboardJobOnEdit;
 var
   Text:    string;
-  T0:      Cardinal;
   OnClip:  string;
   ClipOk:  Boolean;
 begin
@@ -1108,8 +1109,46 @@ begin
   ClipOk := ClipAsText(OnClip);
   Check('clipboard: the previous clipboard content is put back', ClipOk and (OnClip = CLIP_SENTINEL),
     Format('clipboard=[%s] want [%s]', [OnClip, CLIP_SENTINEL]));
+end;
 
+{ The one side effect the layer must never have, whatever the desktop does.
+
+  Every key it injects is only meaningful together with its modifier, and an
+  unmodified one is a real edit: a bare Left moves the caret and a bare 'c' types
+  a letter into the document. The layer therefore confirms each modifier against
+  the DESKTOP before pressing the key that needs it, and this case holds it to
+  that: after a read, the text and the caret are exactly where they were.
+
+  It does not care whether the keys WORK - on the desktop this was written on
+  they do not, which is exactly when the guard has to hold - so it always runs. }
+procedure ClipboardJobNoSideEffects;
+var
+  Before: string;
+  Text:   string;
+begin
+  SetText(FEdit, HOST_TEXT);
+  SetCaret(FEdit, 6);
+  Pump(60);
+  Before := TextOf(FEdit);
+
+  SniffTextViaClipboard(3, Text); // what it reads is not what this case judges
+
+  Check('clipboard: a read leaves the document and the caret untouched',
+    (TextOf(FEdit) = Before) and (Before = HOST_TEXT) and (SelectionStartOf(FEdit) = 6) and (SelectionEndOf(FEdit) = 6),
+    Format('text=[%s] want [%s]; caret=%d..%d want 6..6; reading=[%s]', [TextOf(FEdit), HOST_TEXT, SelectionStartOf(FEdit),
+      SelectionEndOf(FEdit), Text]));
+end;
+
+{ The refusals. None of them needs the injected keys to take effect: an active
+  selection is refused before anything is pressed, and an unchanged clipboard is
+  what a copy with nothing to copy leaves behind. }
+procedure ClipboardJobRefusals;
+var
+  Text:   string;
+  T0:     Cardinal;
+begin
   { An active selection belongs to the user: the round-trip would collapse it. }
+  SetText(FEdit, HOST_TEXT);
   SetSelection(FEdit, 2, 4);
   Check('clipboard: an active selection is refused, not collapsed',
     (not SniffTextViaClipboard(3, Text)) and (SelectionStartOf(FEdit) = 2) and (SelectionEndOf(FEdit) = 4),
@@ -1293,15 +1332,21 @@ begin
     Exit;
   end;
 
+  { These two do not need the injected keys to take effect - one is about what
+    happens when they do NOT - so they run on any desktop. }
+  RunJob('clipboard: an attempted read', ClipboardJobNoSideEffects);
+  RunJob('clipboard: the refusals', ClipboardJobRefusals);
+
+  { The round-trip reading itself does need them. }
   if not SelectionMechanismWorks(FEdit, EDIT_ID, Why) then
   begin
     Skip('clipboard: this desktop does not deliver the keys the layer injects, so the round-trip cases cannot judge it');
     Say('       ' + Why);
-    Exit;
-  end;
+  end
+  else
+    RunJob('clipboard: the round-trip', ClipboardJobOnEdit);
 
-  RunJob('clipboard: the round-trip', ClipboardJobOnEdit);
-
+  { The password control is the one refusal that needs its own window focused. }
   if not TakeFocus(FPass, PASS_ID) then
     Skip('clipboard: the password control could not take the foreground')
   else
