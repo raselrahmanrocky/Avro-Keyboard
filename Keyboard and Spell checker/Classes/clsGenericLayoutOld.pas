@@ -148,6 +148,15 @@ type
       KarPressN:   Integer;                       // presses currently live
       KarCanBind:  Boolean;                       // the LAST press may bind
       KarFrozen:   Boolean;                       // ink committed - poppable, not bindable
+      // A frozen run whose WORD has ended (a delimiter was typed): the glyphs
+      // are previous-word text from now on. They stay on screen and stay
+      // poppable, but they belong to no live word - so they must never be
+      // spliced into the next word's conversion (AnsiSplice) and must never
+      // be the screen baseline of the next word's diff (ParseAndSendNow).
+      // Without this flag the next word was diffed against the PREVIOUS
+      // word's screen and the engine erased it to retype both together:
+      // 'ক' 'ি' space 'র'  ->  BS=3 then 'কিঋ'  (the space vanished).
+      KarRunCommitted: Boolean;
 
       // ANSI ZERO-FLICKER VISUAL STREAM: a pending pre-base kar is NOT in
       // the Unicode buffer - its glyph is streamed straight to the screen and
@@ -367,6 +376,7 @@ begin
   KarPressN := 0;
   KarCanBind := False;
   KarFrozen := False;
+  KarRunCommitted := False;
   KarAnchor := '';
   KarAnchorConv := '';
 end;
@@ -393,6 +403,23 @@ procedure TGenericLayoutOld.PushKarPress(const UniKar, AnsGlyph: string);
 begin
   if KarPressN >= TrackL then
     Exit; // not a sequence a human types - keep the screen exactly as it is
+
+  { A run committed at a word boundary is PREVIOUS-WORD text: its glyphs sit
+    behind the delimiter, so they may not take part in this word's ink and
+    their splice anchor may not drag them into it. The record is dropped here
+    (the screen keeps those glyphs - they just stop being THIS word's poppable
+    ink) and the stream window is re-based on the text typed since.
+    Without this a kar-first word after a committed run inherited the old
+    press count: the consonant took the "run of several presses" branch and
+    Convert() re-emitted the whole old run - a duplicated kar glyph:
+    '\x0995' '\x09BF' space '\x09BF' '\x09B0'  ->  ink ink (one too many). }
+  if KarRunCommitted then
+  begin
+    ClearKarRun;               // also clears KarRunCommitted + the anchor
+    AnsiMirror := '';
+    AnsiMirrorActive := False; // the next StreamMirrorAppend re-anchors here
+  end;
+
   Inc(KarPressN);
   KarPressUni[KarPressN] := UniKar;
   KarPressAns[KarPressN] := AnsGlyph;
@@ -516,6 +543,11 @@ var
 begin
   Ink := KarInkRun;
   if Ink = '' then
+    Exit(ConvText);
+
+  { the run was already committed at a word boundary - those glyphs are the
+    PREVIOUS word's text and this conversion describes a NEW word }
+  if KarRunCommitted then
     Exit(ConvText);
 
   Head := Copy(ConvText, 1, Length(KarAnchorConv));
@@ -737,18 +769,23 @@ begin
   if (Length(B) >= 2) and (B[Length(B) - 1] = b_Hasanta) and ((B[Length(B)] = b_Z) or (B[Length(B)] = b_R)) then
     Exit;
 
-  { the screen truth }
-  if AnsiMirrorActive then
+  { the screen truth: the mirror is the LIVE word's stream. A run committed
+    at a word boundary describes the text sitting BEHIND the delimiter, so a
+    word typed after it is diffed against its own conversion - otherwise the
+    pop erased glyphs across the space. }
+  if AnsiMirrorActive and (not KarRunCommitted) then
     S := AnsiMirror
   else
-    S := ConvCached(B);
+    S := AnsiSplice(ConvCached(B));
 
   { ink of a kar run whose Unicode is NOT in the buffer: either still waiting
     for its consonant or FROZEN by a symbol typed after it - both must stay
     poppable (the frozen case had no backspace handler at all before).
     Ink     = the glyph of the LAST press - step 1 pops exactly that one
-    InkAll  = the whole run             - what the candidates must show }
-  if KarActive and (KarInkRun <> '') then
+    InkAll  = the whole run             - what the candidates must show
+    A COMMITTED run is only poppable while the caret sits right behind it
+    (empty buffer); inside the next word it is not this word's ink. }
+  if KarActive and (KarInkRun <> '') and ((not KarRunCommitted) or (B = '')) then
   begin
     Ink := KarPressAns[KarPressN];
     InkAll := KarInkRun;
@@ -991,6 +1028,7 @@ var
   SavedCommitted:     string;
   ArmedKar:           string;
   PrevAnsi, NewAnsi:  string;
+  NewCommitted:       string;
 begin
 
   { === Delimiter / isolated-modifier bookkeeping (ANSI contextual engine) === }
@@ -1039,7 +1077,8 @@ begin
     kar stays armed (handled by the ANSI block right after this one).
     -------------------------------------------------------------------- }
   ArmedKar := GetActivePreBaseKar;
-  if ((ArmedKar <> '') or (KarInkRun <> '')) and not((PrevBanglaT <> '') and (RightStr(PrevBanglaT, 1) = b_Hasanta)) then
+  if ((ArmedKar <> '') or (KarInkRun <> '')) and (not((PrevBanglaT <> '') and (RightStr(PrevBanglaT, 1) = b_Hasanta))) and
+    ((not KarRunCommitted) or (PrevBanglaT = '')) then
   begin
     { ANSI: the ink of the LAST press is what the user sees going away - pop
       exactly that one glyph (one press = one glyph), even when the run was
@@ -1177,6 +1216,51 @@ begin
       if Length(BijoyNewBanglaText) >= 1 then
       begin
         EmitBatch(Length(BijoyNewBanglaText), '');
+        Block := True;
+      end
+      else if CommittedBanglaT <> '' then
+      begin
+        { Nothing is pending any more, so this press deletes the last unit of
+          the text that is already COMMITTED on screen (the word sitting
+          behind the delimiter we just removed).
+
+          What is on screen there is glyph text, and ONE Bangla letter can be
+          several glyph characters (Ansi V3: ক = '\x201E\xFE', আ = 'xy',
+          ই = '\xA3z', উ = 'v\xFEz'), so the unit has to be erased with its OWN
+          width. Letting the host's native backspace do it removed exactly ONE
+          character: the rest of the letter - its hook - stayed on screen and
+          needed a second press, and CommittedBanglaT kept a letter that was no
+          longer there, so further presses walked into the previous word.
+
+          The unit boundaries are the ones the Unicode branch above uses (a
+          plain letter/kar, a phala, a reph - where the letter itself survives
+          -, ZWJ/ZWNJ + hasanta + Z), and SendAnsiDiff erases the mismatched
+          tail and retypes what survives a re-shaping. }
+        L := Length(CommittedBanglaT);
+        if (L >= 3) and (CommittedBanglaT[L - 2] = b_R) and (CommittedBanglaT[L - 1] = b_Hasanta) and IsPureConsonent(CommittedBanglaT[L]) then
+          NewCommitted := LeftStr(CommittedBanglaT, L - 3) + CommittedBanglaT[L]
+        else if (L >= 4) and ((CommittedBanglaT[L - 3] = ZWJ) or (CommittedBanglaT[L - 3] = ZWNJ)) and (CommittedBanglaT[L - 2] = b_Hasanta) and
+          (CommittedBanglaT[L - 1] = b_Z) then
+          NewCommitted := LeftStr(CommittedBanglaT, L - 3)
+        else if (L >= 2) and (CommittedBanglaT[L - 1] = b_Hasanta) and ((CommittedBanglaT[L] = b_Z) or (CommittedBanglaT[L] = b_R)) and
+          (CommittedBanglaT[L - 2] <> b_R) then
+          NewCommitted := LeftStr(CommittedBanglaT, L - 2)
+        else
+          NewCommitted := LeftStr(CommittedBanglaT, L - 1);
+
+        { the streamed ink sits BEHIND the committed text (it was typed after
+          the delimiter), so both sides of the diff carry it unchanged }
+        PrevAnsi := ConvCached(CommittedBanglaT) + KarInkRun;
+        NewAnsi := ConvCached(NewCommitted) + KarInkRun;
+        SendAnsiDiff(PrevAnsi, NewAnsi);
+        CommittedBanglaT := NewCommitted;
+        if KarInkRun <> '' then
+        begin
+          AnsiMirror := NewAnsi;
+          AnsiMirrorActive := True;
+        end
+        else
+          AnsiMirrorActive := False;
         Block := True;
       end
       else
@@ -2312,7 +2396,12 @@ begin
     { ZERO-FLICKER STREAM: while kar ink is live, the screen mirror is the
       ANSI stream kept by the kar press - the ink is deliberately NOT in the
       Unicode buffer, so Convert(PrevBanglaT) would NOT describe the screen }
-    if AnsiMirrorActive then
+    { the mirror is the LIVE word's screen. A run frozen at a word boundary
+      describes the PREVIOUS word (plus the delimiter the host inserted), so
+      using it here made this word's first key erase that word and retype it:
+      'ক' 'ি' space 'র' -> BS=3 'কিঋ'. With the run committed the baseline is
+      the plain conversion of a fresh (empty) word - a pure append. }
+    if AnsiMirrorActive and (not KarRunCommitted) then
       BijoyPrevBanglaT := AnsiMirror
     else
       BijoyPrevBanglaT := ConvCached(PrevBanglaT);
@@ -2326,13 +2415,15 @@ begin
       key had been typed after the ink. }
     BijoyNewBanglaText := AnsiSplice(ConvCached(NewBanglaText));
 
-    if KarInkRun <> '' then
+    if KarInkRun = '' then
+      AnsiMirrorActive := False // the stream window closes when the run is empty
+    else if not KarRunCommitted then
     begin
       AnsiMirror := BijoyNewBanglaText;
       AnsiMirrorActive := True;
-    end
-    else
-      AnsiMirrorActive := False; // the stream window closes when the run is empty
+    end;
+    { a COMMITTED run keeps its mirror untouched: that mirror is the ledger a
+      backspace still needs for the previous word's ink }
 
     if BijoyPrevBanglaT = '' then
     begin
@@ -2488,10 +2579,19 @@ procedure TGenericLayoutOld.ResetLastChar;
 var
   I: Integer;
 begin
-  { NOTE: on-screen ANSI ink belongs to the word that just ended; the record
-    is dropped here, so the glyphs simply stay as previous-word text (exactly
-    like a word typed before a space). Callers that still need them (the
-    unmapped-key path) freeze them first. }
+  { NOTE: on-screen ANSI ink belongs to the word that just ended and simply
+    stays as previous-word text (exactly like a word typed before a space) -
+    but the glyphs are still THERE, so the run is FROZEN here rather than
+    dropped (frozen already means "no consonant can bind it any more" and
+    "one backspace still takes one glyph").
+
+    Dropping the record made those glyphs text whose width the committed
+    ledger cannot know - the kar was never part of the word - and a backspace
+    into the committed text then erased a character of the letter in FRONT of
+    them: Ansi V3 'ক' + 'ি' + space, one press took '\x201E\xFE!' apart as if
+    the word were two characters wide and left '\x201E' behind. The ink-aware
+    branches of DoBackspace and AnsiVisualPop need the record AND a mirror
+    that describes that screen, which is why both are refreshed here. }
   // Save committed context before clearing (soft reset)
   if PrevBanglaT <> '' then
   begin
@@ -2507,9 +2607,22 @@ begin
   IsAtWordBoundary := True;
   ClearIsoState;
   SpacePendingCount := 0;
-  ClearKarRun;
-  AnsiMirrorActive := False;
-  AnsiMirror := '';
+  if KarInkRun <> '' then
+  begin
+    FreezeKarRun;
+    // The ledger must describe the screen this word leaves behind, so it is
+    // spliced where the ink was typed - AnsiSplice() itself now skips a
+    // committed run, hence the flag is only set AFTER the splice.
+    AnsiMirror := AnsiSplice(ConvCached(PrevBanglaT));
+    KarRunCommitted := True; // history from here on - see the field note
+    AnsiMirrorActive := True;
+  end
+  else
+  begin
+    ClearKarRun;
+    AnsiMirrorActive := False;
+    AnsiMirror := '';
+  end;
   FConvSrc := ''; // the conversion memo dies with the word
   FConvAnsi := '';
 

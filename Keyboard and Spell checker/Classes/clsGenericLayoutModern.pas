@@ -24,6 +24,11 @@ const
 
   // Skeleton of Class TGenericLayoutModern
 type
+  { One host edit: erase EraseCount characters, then type Text. Every edit the
+    engine makes is reported through OnRawEmit, so a head-less harness can
+    capture the exact stream; nil in production (the real injection runs). }
+  TModernHostEditEvent = procedure(const EraseCount: Integer; const Text: string) of object;
+
   TGenericLayoutModern = class
     private
       Bijoy:                      TUnicodeToBijoy2000;
@@ -34,15 +39,43 @@ type
       LastChars:                  array [1 .. TrackL] of string;
       PrevBanglaT, NewBanglaText: string;
 
+      // COMMITTED TEXT LEDGER (ANSI output). When a delimiter - or an unmapped
+      // key the host inserts itself - ends a word, its glyphs stay on screen as
+      // plain text, and ONE Bangla letter is often SEVERAL ANSI characters
+      // (Ansi V3: ই = '\xA3z', ক = '\x201E\xFE', উ = 'v\xFEz'). Modern style
+      // keeps no stream mirror, because the screen of that text IS
+      // Bijoy.Convert(CommittedBanglaT) - and keeping it is what lets one
+      // backspace erase one WHOLE unit with its own width. Without it the
+      // press fell through to Block = False, the host removed exactly ONE
+      // character and the hook of the letter stayed behind, so the letter
+      // needed a second press.
+      CommittedBanglaT:  string;
+      // Host characters that sit between the caret and CommittedBanglaT and
+      // that are NOT in the ledger (an unmapped key's own character - a space
+      // IS in the ledger, stored with the word it follows). They belong to the
+      // host, so the first presses behind the caret are handed over to it.
+      PendingHostChars: Integer;
+
+      // TEST / EMBEDDING HOOKS: nil/false in production, so the engine always
+      // talks to the real host unless a caller replaces it.
+      FOnRawEmit:    TModernHostEditEvent;
+      FModeOverride: Boolean;
+      FModeValue:    Integer;
+
       procedure InternalBackspace(KeyRepeat: Integer = 1);
       procedure DoBackspace(var Block: Boolean);
       procedure ParseAndSendNow;
       function InsertKar(const sKar: string): string;
       function InsertReph: string;
       procedure HostEdit(const EraseCount: Integer; const Text: string);
+      procedure RawSend(const EraseCount: Integer; const Text: string);
+      procedure AppendCommitted(const S: string);
+      procedure SendAnsiDiff(const PrevAnsi, NewAnsi: string);
+      function IsCaretMovingKey(const KeyCode: Integer): Boolean;
       procedure DeleteLastCharSteps_Ex(StepCount: Integer);
       procedure SetLastChar(const wChar: string);
       procedure ResetLastChar;
+      function CurrentKeyboardMode: Integer;
       function MyProcessVKeyDown(const KeyCode: Integer; var Block: Boolean; const var_IsLogicalShift, var_IsTrueShift, var_IsAltGr: Boolean): string;
       procedure MyProcessVKeyUP(const KeyCode: Integer; var Block: Boolean; const var_IsLogicalShift: Boolean; const var_IsTrueShift: Boolean;
         const var_IsAltGr: Boolean);
@@ -56,6 +89,9 @@ type
       function ProcessVKeyDown(const KeyCode: Integer; var Block: Boolean): string;
       procedure ProcessVKeyUP(const KeyCode: Integer; var Block: Boolean);
       procedure ResetDeadKey;
+
+      property OnRawEmit: TModernHostEditEvent read FOnRawEmit write FOnRawEmit;
+      procedure SetKeyboardModeOverride(const Enabled: Boolean; const Mode: Integer);
   end;
 
 implementation
@@ -103,6 +139,12 @@ begin
     b_CurrencyNumerator1LessThanDenominator + b_CurrencyDenominator16;
 
   // End Initialize DeadKeyChar Variable
+
+  CommittedBanglaT := '';
+  PendingHostChars := 0;
+  FOnRawEmit := nil;
+  FModeOverride := False;
+  FModeValue := Ord(SysDefault);
 
   ResetLastChar;
   DeadKey := True;
@@ -156,6 +198,9 @@ var
   SavedChar:          string;
   DeleteCount:        Integer;
   IsRephTail:         Boolean;
+  PrevAnsi, NewAnsi:  string;
+  NewCommitted:       string;
+  L:                  Integer;
 begin
 
   { --- Reph / Phala tail detection --- }
@@ -185,16 +230,67 @@ begin
   if (Length(PrevBanglaT) - DeleteCount) <= 0 then
   begin
 
+    { (1) A delimiter the host inserted sits right behind the caret - but ONLY
+      while no live word is on screen. A word typed after the delimiter is at
+      the caret, so the press belongs to that word (below); the delimiter can
+      only be reached once that word is gone. The delimiter is the host's own
+      character, so the press is handed over (exactly one character), and the
+      ledger drops it too when it holds it (a committed word is stored with
+      its trailing space - an unmapped key's character is not in it). }
+    if (PrevBanglaT = '') and (PendingHostChars > 0) then
+    begin
+      Dec(PendingHostChars);
+      if (CommittedBanglaT <> '') and (CommittedBanglaT[Length(CommittedBanglaT)] = ' ') then
+        Delete(CommittedBanglaT, Length(CommittedBanglaT), 1);
+      ResetDeadKey;
+      Block := False;
+      Exit;
+    end;
+
+    { (2) Text already COMMITTED on screen (the word that sits behind that
+      delimiter) is still ours. ONE Bangla letter is often SEVERAL ANSI
+      characters, so this press erases exactly one UNIT with its own width.
+      Handing the press to the host removed a single character and left the
+      hook of the letter behind (Ansi V3: ই = '\xA3z' -> only 'z' went and a
+      second press was needed). The unit boundaries are the ones the live
+      buffer uses above (a plain letter/kar, a phala, a reph - where the
+      letter itself survives -, ZWJ/ZWNJ + hasanta + Z), and SendAnsiDiff
+      erases the mismatched tail and retypes what survives a re-shaping. }
+    if (OutputIsBijoy = 'YES') and (CommittedBanglaT <> '') and (PrevBanglaT = '') then
+    begin
+      L := Length(CommittedBanglaT);
+      if (L >= 3) and (CommittedBanglaT[L - 2] = b_R) and (CommittedBanglaT[L - 1] = b_Hasanta) and IsPureConsonent(CommittedBanglaT[L]) then
+        NewCommitted := LeftStr(CommittedBanglaT, L - 3) + CommittedBanglaT[L]
+      else if (L >= 4) and ((CommittedBanglaT[L - 3] = ZWJ) or (CommittedBanglaT[L - 3] = ZWNJ)) and (CommittedBanglaT[L - 2] = b_Hasanta) and
+        (CommittedBanglaT[L - 1] = b_Z) then
+        NewCommitted := LeftStr(CommittedBanglaT, L - 3)
+      else if (L >= 2) and (CommittedBanglaT[L - 1] = b_Hasanta) and ((CommittedBanglaT[L] = b_Z) or (CommittedBanglaT[L] = b_R)) and
+        (CommittedBanglaT[L - 2] <> b_R) then
+        NewCommitted := LeftStr(CommittedBanglaT, L - 2)
+      else
+        NewCommitted := LeftStr(CommittedBanglaT, L - 1);
+
+      PrevAnsi := Bijoy.Convert(CommittedBanglaT);
+      NewAnsi := Bijoy.Convert(NewCommitted);
+      CommittedBanglaT := NewCommitted;
+      ResetDeadKey; // the live buffer is empty - only the ledger describes the screen
+      SendAnsiDiff(PrevAnsi, NewAnsi);
+      Block := True;
+      Exit;
+    end;
+
+    { (3) nothing of ours behind the caret: the word just typed goes, and the
+      host's own backspace takes the last character with it }
     if OutputIsBijoy <> 'YES' then
     begin
       if (Length(NewBanglaText) - 1) >= 1 then
-        Backspace(Length(NewBanglaText) - 1);
+        RawSend(Length(NewBanglaText) - 1, '');
     end
     else
     begin
       BijoyNewBanglaText := Bijoy.Convert(NewBanglaText);
       if (Length(BijoyNewBanglaText) - 1) >= 1 then
-        Backspace(Length(BijoyNewBanglaText) - 1);
+        RawSend(Length(BijoyNewBanglaText) - 1, '');
     end;
 
     ResetDeadKey;
@@ -375,12 +471,70 @@ end;
 {
   The single place this engine writes to the host.
 }
+{
+  The lowest emission point: everything the engine does to the host text goes
+  through here, so the real injection and the test sink can never diverge.
+  One SendInput batch (erase + type) instead of two calls, which also means a
+  whole "erase and retype" is atomic: fast typing can no longer interleave.
+}
+procedure TGenericLayoutModern.RawSend(const EraseCount: Integer; const Text: string);
+begin
+  if Assigned(FOnRawEmit) then
+    FOnRawEmit(EraseCount, Text)
+  else
+    SendInputBatch_BackspaceAndChar(EraseCount, Text);
+end;
+
 procedure TGenericLayoutModern.HostEdit(const EraseCount: Integer; const Text: string);
 begin
-  if EraseCount > 0 then
-    Backspace(EraseCount);
-  if Text <> '' then
-    SendKey_Char(Text);
+  if (EraseCount <= 0) and (Text = '') then
+    Exit;
+  RawSend(EraseCount, Text);
+end;
+
+{
+  Appends text to the committed ledger (see the field note) and keeps only a
+  tail that is long enough for any realistic walk back. The tail never starts
+  on a combining mark or a joiner: the screen behind the caret starts with a
+  base letter, and a ledger that started with a dangling kar would convert to
+  a different glyph stream.
+}
+procedure TGenericLayoutModern.AppendCommitted(const S: string);
+const
+  MaxCommitted = 24;
+begin
+  if S = '' then
+    Exit;
+
+  CommittedBanglaT := CommittedBanglaT + S;
+  if Length(CommittedBanglaT) > MaxCommitted then
+  begin
+    Delete(CommittedBanglaT, 1, Length(CommittedBanglaT) - MaxCommitted);
+    while (CommittedBanglaT <> '') and (IsKar(CommittedBanglaT[1]) or (CommittedBanglaT[1] = b_Hasanta) or (CommittedBanglaT[1] = ZWJ) or
+      (CommittedBanglaT[1] = ZWNJ)) do
+      Delete(CommittedBanglaT, 1, 1);
+  end;
+end;
+
+{
+  ANSI: re-syncs the screen from PrevAnsi to NewAnsi with the smallest
+  possible edit (erase the mismatched tail, then type the remainder) - the
+  same rule ParseAndSendNow uses for the live buffer.
+}
+procedure TGenericLayoutModern.SendAnsiDiff(const PrevAnsi, NewAnsi: string);
+var
+  I, Matched, UnMatched: Integer;
+begin
+  Matched := 0;
+  for I := 1 to Length(PrevAnsi) do
+    if (I <= Length(NewAnsi)) and (PrevAnsi[I] = NewAnsi[I]) then
+      Inc(Matched)
+    else
+      Break;
+
+  UnMatched := Length(PrevAnsi) - Matched;
+  if (UnMatched > 0) or (Length(NewAnsi) > Matched) then
+    HostEdit(UnMatched, Copy(NewAnsi, Matched + 1, MaxInt));
 end;
 
 procedure TGenericLayoutModern.InternalBackspace(KeyRepeat: Integer);
@@ -425,13 +579,13 @@ var
   CharForKey: string;
 begin
 
-  if AvroMainForm1.GetMyCurrentKeyboardMode = SysDefault then
+  if CurrentKeyboardMode = Ord(SysDefault) then
   begin
     Block := False;
     MyProcessVKeyDown := '';
     Exit;
   end
-  else if AvroMainForm1.GetMyCurrentKeyboardMode = bangla then
+  else if CurrentKeyboardMode = Ord(bangla) then
   begin
     CharForKey := GetCharForKey(KeyCode, var_IsLogicalShift, var_IsTrueShift, var_IsAltGr);
     // PERF/PRIVACY: no Log() here. This runs on EVERY keystroke, and DebugLog
@@ -441,6 +595,12 @@ begin
     // more (see its header), but the rule stands: this path stays free of
     // string building too. Same reasoning as the PERF notes in
     // KeyboardFunctions.pas; the value reaches the debugger instead.
+
+    if IsCaretMovingKey(KeyCode) then
+    begin
+      CommittedBanglaT := '';
+      PendingHostChars := 0;
+    end;
 
     if VowelFormating = 'NO' then
       DeadKey := False;
@@ -736,6 +896,9 @@ begin
     case KeyCode of
       VK_RETURN:
         begin
+          { the caret leaves the line: nothing of ours sits behind it now }
+          CommittedBanglaT := '';
+          PendingHostChars := 0;
           Block := False;
           DeadKey := True;
           ResetLastChar;
@@ -744,6 +907,12 @@ begin
         end;
       VK_SPACE:
         begin
+          { COMMIT: the word's glyphs stay on screen as text, behind the
+            delimiter the host is about to insert. The ledger spells the
+            screen ('word ' 'word ' ...) INCLUDING that space, so every later
+            backspace can erase exactly one unit of it - a letter with its own
+            ANSI width, or the space itself - with the plain prefix diff. }
+          AppendCommitted(PrevBanglaT + ' ');
           Block := False;
           DeadKey := True;
           ResetLastChar;
@@ -752,6 +921,10 @@ begin
         end;
       VK_TAB:
         begin
+          { the caret jumps to the next tab stop: what is behind it there is
+            not the text we typed, so the ledger cannot describe it any more }
+          CommittedBanglaT := '';
+          PendingHostChars := 0;
           Block := False;
           DeadKey := True;
           ResetLastChar;
@@ -776,6 +949,16 @@ begin
           end
           else if CharForKey = '' then
           begin
+            { an unmapped key: the word ends here and the host inserts the
+              key's own character - one character we did not type. Commit the
+              word so a later backspace can still erase its units with their
+              own widths, and mark that character as pending, so the first
+              press behind the caret stays the host's. }
+            if (PrevBanglaT <> '') and (not IsCaretMovingKey(KeyCode)) then
+            begin
+              AppendCommitted(PrevBanglaT);
+              Inc(PendingHostChars);
+            end;
             DeadKey := False;
             Block := False;
             MyProcessVKeyDown := '';
@@ -829,13 +1012,13 @@ procedure TGenericLayoutModern.MyProcessVKeyUP(const KeyCode: Integer; var Block
 var
   CharForKey: string;
 begin
-  if AvroMainForm1.GetMyCurrentKeyboardMode = SysDefault then
+  if CurrentKeyboardMode = Ord(SysDefault) then
   begin
 
     Block := False;
     Exit;
   end
-  else if AvroMainForm1.GetMyCurrentKeyboardMode = bangla then
+  else if CurrentKeyboardMode = Ord(bangla) then
   begin
 
     CharForKey := GetCharForKey(KeyCode, var_IsLogicalShift, var_IsTrueShift, var_IsAltGr);
@@ -978,6 +1161,48 @@ procedure TGenericLayoutModern.ResetDeadKey;
 begin
   DeadKey := True;
   ResetLastChar;
+end;
+
+{ =============================================================================== }
+
+{
+  The keyboard mode the engine works with: the override when a test/embedding
+  caller set one, the real form otherwise - so the engine is never reachable
+  through a nil form.
+}
+function TGenericLayoutModern.CurrentKeyboardMode: Integer;
+begin
+  if FModeOverride then
+    Result := FModeValue
+  else if Assigned(AvroMainForm1) then
+    Result := Ord(AvroMainForm1.GetMyCurrentKeyboardMode)
+  else
+    Result := Ord(SysDefault);
+end;
+
+procedure TGenericLayoutModern.SetKeyboardModeOverride(const Enabled: Boolean; const Mode: Integer);
+begin
+  FModeOverride := Enabled;
+  if Enabled then
+    FModeValue := Mode;
+end;
+
+{
+  A key that moves the caret (or changes the text after it): what sits behind
+  the caret is then no longer the text this engine committed, so the ledger
+  has to be dropped before the press that follows.
+  NOTE: a mouse click inside the document cannot be observed - the app has no
+  mouse hook - so a click, a backspace and then a multi character glyph behind
+  the caret is the one case this guard cannot cover.
+}
+function TGenericLayoutModern.IsCaretMovingKey(const KeyCode: Integer): Boolean;
+begin
+  case KeyCode of
+    VK_LEFT, VK_RIGHT, VK_UP, VK_DOWN, VK_HOME, VK_END, VK_PRIOR, VK_NEXT, VK_DELETE, VK_INSERT, VK_ESCAPE:
+      Result := True;
+  else
+    Result := False;
+  end;
 end;
 
 { =============================================================================== }
