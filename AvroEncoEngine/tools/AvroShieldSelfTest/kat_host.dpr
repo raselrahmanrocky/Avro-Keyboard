@@ -88,7 +88,18 @@
   failures, S skipped", and only F makes the exit code 1. The reason is printed
   with it, so a skip is never silent.
 
-  Usage: kat_host [quiet]
+  E. THE HOST MATRIX (`--matrix`) and F. THE PROBE (`--probe`) answer the two
+     questions the cases above cannot. The matrix measures the hosts this program
+     created AND names the real ones it can only find (Notepad, WordPad, Word,
+     Excel, Chrome/Edge, VS Code, LibreOffice Writer) - a harness never types into
+     somebody's document, so a real host is a row saying what was found and what
+     to run instead. The probe describes whatever window is in the FOREGROUND at
+     that moment through the same layers and prints one line, without typing,
+     without selecting and without touching the clipboard: run it with Word in
+     front and paste the line into a bug report.
+
+  Usage: kat_host [quiet] [--matrix]
+         kat_host --probe [quiet]                (no child process: the window in front)
          kat_host --serve <parent-pid> [quiet]   (started by the line above)
   Exit code: 0 all PASS, 1 FAIL, 2 the window could not get the foreground.
 
@@ -153,6 +164,19 @@ const
     any shipped mapping draws (four units) and narrower than the fixtures. }
   PROBE_CHARS = 8;
 
+  { What the matrix puts in front of the cluster it measures: two characters the
+    caret offset can be read off, so every row's evidence names the same place. }
+  MATRIX_FILLER = 'ab';
+
+  { The clusters the matrix measures, as Unicode: the two glyphs users report
+    most (i and u), the two conjuncts (ka+hasanta+ka and the reph form
+    ra+hasanta+ka), the ka+hasanta+ssa form and the two joiner spellings. The ANSI
+    units for each one come from the ACTIVE mapping's own converter at run time,
+    never from a literal here - a literal would only be true for one mapping. }
+  MATRIX_CORPUS: array [0 .. 6] of string = (#$0987, #$0989, #$0995#$09CD#$0995, #$09B0#$09CD#$0995,
+    #$0995#$09CD#$09B7, #$0995#$200D#$09CD#$09B7, #$0995#$200C#$09CD#$09B7);
+  MATRIX_LABELS: array [0 .. 6] of string = ('i', 'u', 'kka', 'rka', 'kkha', 'ZWJ kkha', 'ZWNJ kkha');
+
 type
   { The low-level keyboard hook structure (KBDLLHOOKSTRUCT). This Delphi's
     Winapi.Windows declares no such type, so - exactly like KeyboardHook.pas,
@@ -199,6 +223,8 @@ var
 
   FSink:    TEraseSink;
   FQuiet:   Boolean;
+  FMatrix:  Boolean; // --matrix: also record the host matrix
+  FProbe:   Boolean; // --probe: describe the window in front and stop
   FChecks:  Integer;
   FFails:   Integer;
   FSkipped: Integer;
@@ -1916,6 +1942,443 @@ begin
 end;
 
 { ============================================================================== }
+{ E. the host matrix: what each host answers, what it costs, what it touches      }
+{ ============================================================================== }
+
+{ Why this section exists at all: every case above runs against a window THIS
+  program created, and the hosts users report against are Word, Excel, Chrome, VS
+  Code, WordPad and LibreOffice. A harness cannot type into a real document, so
+  the matrix MEASURES the hosts it owns and, for the ones it can only FIND, emits
+  a row naming the window it found and the command that produces the real row.
+  Evidence instead of a guess. }
+
+{ The layer that served a reading, for the table's own column: the enum is the
+  product's, this is only how a person reads it. }
+function SourceName(const ASource: TAnsiContextSource): string;
+begin
+  case ASource of
+    csWindowText:
+      Result := 'window-text';
+    csUIA:
+      Result := 'uia';
+    csClipboard:
+      Result := 'clipboard';
+    csInjected:
+      Result := 'injected';
+  else
+    Result := 'none';
+  end;
+end;
+
+function YesNo(const AValue: Boolean): string;
+begin
+  if AValue then
+    Result := 'ok'
+  else
+    Result := 'NO';
+end;
+
+{ What the CLIPBOARD holds right now, in one string: its text, how many formats
+  it offers and whether a bitmap is one of them. The matrix asserts the value is
+  the same before and after a reading, and a fingerprint that looked only at the
+  text would call a wiped image-only clipboard "unchanged" - which is exactly the
+  data loss the clipboard layer's own format check exists to prevent. }
+function ClipboardFingerprint: string;
+var
+  Text:   string;
+  Fmt:    UINT;
+  Fmts:   Integer;
+  Bitmap: Boolean;
+begin
+  if ClipAsText(Text) then
+    Result := Format('text=[%s]', [Text])
+  else
+    Result := 'text=<unreadable>';
+  try
+    Bitmap := Clipboard.HasFormat(CF_BITMAP);
+  except
+    on E: Exception do
+      Bitmap := False; // another application holds it open: report what is known
+  end;
+  Fmts := 0;
+  if OpenClipboard(0) then
+  begin
+    Fmt := EnumClipboardFormats(0);
+    while Fmt <> 0 do
+    begin
+      Inc(Fmts);
+      Fmt := EnumClipboardFormats(Fmt);
+    end;
+    CloseClipboard;
+  end;
+  Result := Format('%s formats=%d bitmap=%s', [Result, Fmts, BoolToStr(Bitmap, True)]);
+end;
+
+{ One control, the whole corpus.
+
+  For every item the control is filled with the ACTIVE mapping's own ANSI units
+  for that cluster and the caret is put behind them, one reading is taken through
+  the REAL layer chain, and the row records which layer answered, how long it
+  took, what it read and how wide the press path thinks the cluster is - together
+  with whether the document, the caret and the clipboard came out untouched. The
+  last column is asserted by code, not observed by eye.
+
+  AExpectRead is False for the password field: there the row of interest is the
+  refusal, and what is asserted is that the field is untouched and that the width
+  is the one-unit safety answer the invariants demand. }
+procedure MatrixControl(const AName: string; const ACtl: HWND; const AId: Integer; const AExpectRead: Boolean);
+var
+  Conv:     TUnicodeToBijoy2000;
+  I:        Integer;
+  Units:    string;
+  Fill:     string;
+  Tail:     string;
+  Reason:   string;
+  Layer:    string;
+  Decision: TAnsiEraseDecision;
+  Width:    Integer;
+  Ms:       Integer;
+  T0:       Cardinal;
+  ClipWas:  string;
+  Keys:     Integer;
+  CaretWas: Integer;
+  LenWas:   Integer;
+  ReadOk:   Boolean;
+  TextOk:   Boolean;
+  CaretOk:  Boolean;
+  ClipOk:   Boolean;
+begin
+  if not TakeFocus(ACtl, AId) then
+  begin
+    Skip(Format('matrix: %s could not take the foreground', [AName]));
+    Exit;
+  end;
+
+  Conv := TUnicodeToBijoy2000.Create;
+  try
+    for I := 0 to high(MATRIX_CORPUS) do
+    begin
+      Units := Conv.Convert(MATRIX_CORPUS[I]);
+      if Units = '' then
+      begin
+        Skip(Format('matrix: %s / %s: the active mapping draws no ANSI units for it', [AName, MATRIX_LABELS[I]]));
+        Continue;
+      end;
+
+      Fill := MATRIX_FILLER + Units;
+      SetText(ACtl, Fill);
+      SetCaret(ACtl, Length(Fill));
+      Pump(60);
+      if not TakeFocus(ACtl, AId) then
+      begin
+        Skip(Format('matrix: %s / %s: the foreground was taken by %s', [AName, MATRIX_LABELS[I],
+          Described(GetForegroundWindow)]));
+        Continue;
+      end;
+
+      ClipWas := ClipboardFingerprint;
+      Keys := ChildKeyLines;
+      CaretWas := SelectionStartOf(ACtl);
+      LenWas := TextLenOf(ACtl);
+
+      T0 := GetTickCount;
+      ReadHere(Format('matrix: %s / %s', [AName, MATRIX_LABELS[I]]));
+      Ms := Integer(GetTickCount - T0);
+
+      ReadOk := AnsiCaretContextTail(Tail);
+      if not ReadOk then
+        Tail := '';
+      Layer := SourceName(AnsiCaretContextSource);
+
+      { The Boolean only says whether the press path would erase; the width and the
+        decision the row exists for are set on every path. }
+      AnsiHostClusterUnits(Width, Decision, Reason);
+
+      if AExpectRead then
+        TextOk := TextOf(ACtl) = Fill
+      else
+        TextOk := TextLenOf(ACtl) = LenWas; // a password field's text is not readable from here
+      CaretOk := (SelectionStartOf(ACtl) = CaretWas) and (SelectionEndOf(ACtl) = CaretWas);
+      ClipOk := ClipboardFingerprint = ClipWas;
+
+      Say(Format('  %-16s %-10s %-12s %4d  %5d  %-20s text=%-3s caret=%-3s clip=%-3s tail=[%s]',
+        [AName, MATRIX_LABELS[I], Layer, Ms, Width, AnsiDecisionName(Decision), YesNo(TextOk), YesNo(CaretOk),
+        YesNo(ClipOk), HexUnits(Tail)]));
+
+      Check(Format('matrix: %s / %s: the reading describes the text before the caret', [AName, MATRIX_LABELS[I]]),
+        (ReadOk = AExpectRead) and ((not AExpectRead) or (Tail = Fill)),
+        Format('layer=%s tail=[%s] want [%s] (%s)', [Layer, HexUnits(Tail), HexUnits(Fill), Reason]));
+      Check(Format('matrix: %s / %s: the document, the caret and the clipboard are untouched', [AName, MATRIX_LABELS[I]]),
+        TextOk and CaretOk and ClipOk,
+        Format('text=%s caret=%s clipboard=%s (%s)', [BoolToStr(TextOk, True), BoolToStr(CaretOk, True),
+        BoolToStr(ClipOk, True), ClipWas]));
+      Check(Format('matrix: %s / %s: the reading pressed no key', [AName, MATRIX_LABELS[I]]), ChildKeyLines = Keys,
+        Format('the control received %d key messages while it was read', [ChildKeyLines - Keys]));
+      if not AExpectRead then
+        Check(Format('matrix: %s / %s: with no reading the width is the one-unit safety answer', [AName, MATRIX_LABELS[I]]),
+          (Width = 1) and (Decision = edNotMine), Format('units=%d decision=%s', [Width, AnsiDecisionName(Decision)]));
+    end;
+  finally
+    Conv.Free;
+  end;
+end;
+
+type
+  { One real host the reviewers ask about. Klass is a '|'-separated list of window
+    class substrings (any of them matches, case-insensitively - the same partial
+    match idea the per-application override uses) and Title is a substring the
+    window's TITLE must contain, because a frame class alone does not name an
+    application: 'Chrome_WidgetWin_1' is Chrome, Edge and every Electron app at
+    once, and 'ApplicationFrameWindow' is half the Store. }
+  TMatrixHost = record
+    Name:  string;
+    Klass: string;
+    Title: string;
+    Note:  string;
+  end;
+
+const
+  FOREIGN_HOSTS: array [0 .. 6] of TMatrixHost = (
+    (Name: 'Notepad'; Klass: 'NOTEPAD|APPLICATIONFRAMEWINDOW'; Title: 'NOTEPAD'; Note: 'the frame; its editor is an Edit control'),
+    (Name: 'WordPad'; Klass: 'WORDPADCLASS'; Title: 'WORDPAD'; Note: 'the frame; its editor is a RICHEDIT control'),
+    (Name: 'MS Word'; Klass: 'OPUSAPP'; Title: 'WORD'; Note: 'the frame; the editing surface is a _WwG child window'),
+    (Name: 'Excel'; Klass: 'XLMAIN'; Title: 'EXCEL'; Note: 'the frame; the grid is an EXCEL7 child window'),
+    (Name: 'Chrome/Edge'; Klass: 'CHROME_WIDGETWIN_1'; Title: ''; Note: 'any Chromium host - an Electron application matches this too'),
+    (Name: 'VS Code'; Klass: 'CHROME_WIDGETWIN_1'; Title: 'VISUAL STUDIO CODE'; Note: 'the frame; the editor itself is a second window'),
+    (Name: 'LibreOffice Writer'; Klass: 'SALFRAME'; Title: 'LIBREOFFICE'; Note: 'the document frame'));
+
+var
+  FFindClass: string;
+  FFindTitle: string;
+  FFindFound: HWND;
+
+{ Does a window carry this class, and this much of its title? }
+function WindowMatches(const AWin: HWND; const APatterns, ATitleHint: string): Boolean;
+var
+  Buf:    array [0 .. 255] of Char;
+  Title:  array [0 .. 255] of Char;
+  Cls:    string;
+  Seen:   string;
+  Parts:  TStringList;
+  I:      Integer;
+begin
+  Result := False;
+  if AWin = 0 then
+    Exit;
+  Cls := '';
+  if GetClassName(AWin, Buf, Length(Buf)) > 0 then
+    Cls := Buf;
+  Cls := UpperCase(Cls);
+
+  if ATitleHint <> '' then
+  begin
+    Title := '';
+    GetWindowText(AWin, Title, Length(Title));
+    Seen := Title;
+    if (Seen = '') or (Pos(UpperCase(ATitleHint), UpperCase(Seen)) = 0) then
+      Exit;
+  end;
+
+  Parts := TStringList.Create;
+  try
+    Parts.Delimiter := '|';
+    Parts.StrictDelimiter := True;
+    Parts.DelimitedText := APatterns;
+    for I := 0 to Parts.Count - 1 do
+      if (Parts[I] <> '') and (Pos(UpperCase(Parts[I]), Cls) > 0) then
+        Exit(True);
+  finally
+    Parts.Free;
+  end;
+end;
+
+function EnumHostProc(AWin: HWND; AParam: LPARAM): BOOL; stdcall;
+begin
+  Result := True; // keep enumerating: a later window may be the one looked for
+  if (FFindFound <> 0) or (not IsWindowVisible(AWin)) then
+    Exit;
+  if WindowMatches(AWin, FFindClass, FFindTitle) then
+    FFindFound := AWin;
+end;
+
+function FindHostWindow(const APatterns, ATitleHint: string; out AWin: HWND): Boolean;
+begin
+  FFindClass := APatterns;
+  FFindTitle := ATitleHint;
+  FFindFound := 0;
+  EnumWindows(@EnumHostProc, 0);
+  AWin := FFindFound;
+  Result := AWin <> 0;
+end;
+
+function TitleHintText(const AHint: string): string;
+begin
+  if AHint = '' then
+    Result := ''
+  else
+    Result := Format(' and a title containing [%s]', [AHint]);
+end;
+
+{ The hosts this run cannot measure. This is the honest half of a host matrix: a
+  row that says the application was FOUND (class and pid, so anyone can repeat
+  the measurement) and names the one command that produces its real row - rather
+  than a harness that opens the user's document to score a point. }
+procedure MatrixForeignHosts;
+var
+  I:   Integer;
+  Win: HWND;
+begin
+  Say('');
+  Say('  the hosts this run cannot measure - a harness never types into a real document:');
+  for I := 0 to high(FOREIGN_HOSTS) do
+  begin
+    if not FindHostWindow(FOREIGN_HOSTS[I].Klass, FOREIGN_HOSTS[I].Title, Win) then
+      Skip(Format('matrix: %s: not running (looked for class [%s]%s)', [FOREIGN_HOSTS[I].Name, FOREIGN_HOSTS[I].Klass,
+        TitleHintText(FOREIGN_HOSTS[I].Title)]))
+    else
+      Skip(Format('matrix: %s: running as %s - put it in the foreground and run `kat_host --probe` for its real row (%s)',
+        [FOREIGN_HOSTS[I].Name, Described(Win), FOREIGN_HOSTS[I].Note]));
+  end;
+end;
+
+{ The whole matrix: the controls this program owns, then the hosts it can only
+  find. The head-less watch is used again - the real provider chain and the real
+  fingerprint, no OS hooks - because the rows are about WHICH layer answers and
+  what it reads, not about whether this desktop delivers caret events. }
+procedure MatrixChecks;
+var
+  Tail: string;
+begin
+  AnsiSmartBackspace := 'YES';
+  AnsiBackspaceHostErase := 'YES';
+  AnsiBackspaceSurgical := 'AUTO';
+  AnsiBackspaceUIA := 'YES';
+  AnsiBackspaceClipboard := 'NO'; // the matrix never injects a key
+  AnsiCaretWatchStartHeadless;
+  try
+    Say('');
+    Say('  host              cluster     layer          ms  units decision              text caret clip tail');
+    MatrixControl('edit', FEdit, EDIT_ID, True);
+    MatrixControl('multi-line edit', FMulti, MULTI_ID, True);
+    if FRich = 0 then
+      Skip('matrix: no rich edit class on this machine, so the rich-edit row is missing')
+    else
+      MatrixControl('rich edit', FRich, RICH_ID, True);
+    MatrixControl('password edit', FPass, PASS_ID, False);
+  finally
+    AnsiCaretWatchStop;
+    AnsiBackspaceUIA := 'YES';
+  end;
+
+  MatrixForeignHosts;
+
+  Tail := '';
+  Check('matrix: the matrix leaves no reading behind', not AnsiCaretContextTail(Tail), Format('tail=[%s]', [HexUnits(Tail)]));
+end;
+
+{ ============================================================================== }
+{ F. the probe: one line of evidence for the window in front                      }
+{ ============================================================================== }
+
+{ For a host this program cannot drive - Word, Excel, a browser, a terminal - the
+  only honest measurement is taken while the USER has it in front. `kat_host
+  --probe` describes the foreground window through the same layers and prints one
+  line: which layer answered, how long it took, the tail, the width the press path
+  would erase, the decision and the caret fingerprint. It never types, never
+  selects, never takes the foreground and never touches the clipboard - the
+  clipboard layer is forced OFF here by construction, because a diagnostic that
+  injects keys into somebody's document is not a diagnostic. }
+procedure ProbeForeground;
+var
+  Fg:       HWND;
+  Focused:  HWND;
+  Reader:   TUiaTextReader;
+  Tail:     string;
+  UiaTail:  string;
+  Reason:   string;
+  Layer:    string;
+  Decision: TAnsiEraseDecision;
+  Units:    Integer;
+  Ms:       Integer;
+  T0:       Cardinal;
+  Events:   Integer;
+  Refs:     Integer;
+  Fp:       TCaretFingerprint;
+  HaveFp:   Boolean;
+  Erase:    Boolean;
+begin
+  Fg := GetForegroundWindow;
+  Focused := FocusedControl;
+
+  Say('  the clipboard layer is switched OFF for a probe: nothing below injects a key');
+  Say('');
+  Say(Format('  foreground : %s', [Described(Fg)]));
+  Say(Format('  focus      : %s', [Described(Focused)]));
+
+  AnsiSmartBackspace := 'YES';
+  AnsiBackspaceHostErase := 'YES';
+  AnsiBackspaceUIA := 'YES';
+  AnsiBackspaceClipboard := 'NO';
+  SniffOverrideActive := False; // the REAL readers
+
+  Tail := '';
+  Layer := 'none';
+  Units := 1;
+  Decision := edNotMine;
+  Reason := 'the probe did not run';
+  Events := 0;
+  Refs := 0;
+
+  { Everything that needs a reading is measured BEFORE the watch stops: stopping
+    it drops the reading, which is asserted in section D and is the behaviour the
+    press path relies on. }
+  AnsiCaretWatchStartHeadless;
+  try
+    AnsiCaretWatchNoteCaretEvent('probe: describe the window in front');
+    T0 := GetTickCount;
+    AnsiCaretWatchTick;
+    Ms := Integer(GetTickCount - T0);
+    AnsiCaretWatchStats(Events, Refs);
+
+    if AnsiCaretContextTail(Tail) then
+      Layer := SourceName(AnsiCaretContextSource)
+    else
+    begin
+      Tail := '';
+      Layer := 'none';
+    end;
+    HaveFp := AnsiCaretContextFingerprint(Fp);
+    Erase := AnsiHostClusterUnits(Units, Decision, Reason);
+  finally
+    AnsiCaretWatchStop;
+  end;
+
+  { The UIA half, taken directly and after the fact: it costs a COM client and can
+    block in a browser that is only just waking its accessibility support, so it is
+    reported separately from the layer chain above. }
+  Reader := TUiaTextReader.Create;
+  try
+    UiaTail := Reader.ReadBeforeCaret(PROBE_CHARS);
+    Say(Format('  uia        : read=%s available=%s', [BoolToStr(UiaTail <> '', True), BoolToStr(Reader.Available, True)]));
+    Say(Format('  uia element: %s', [Reader.ElementInfo]));
+    Say(Format('  uia tail   : [%s]', [HexUnits(UiaTail)]));
+  finally
+    Reader.Reset;
+    Reader.Free;
+  end;
+
+  Say('');
+  Say(Format('PROBE layer=%s ms=%d tail=[%s] units=%d decision=%s erase=%s reason=[%s]',
+    [Layer, Ms, HexUnits(Tail), Units, AnsiDecisionName(Decision), BoolToStr(Erase, True), Reason]));
+  if HaveFp then
+    Say(Format('PROBE fingerprint window=%x caret=%d,%d %s', [NativeUInt(Fp.Window), Fp.CaretX, Fp.CaretY,
+      Format('chars before the caret=%d', [Fp.TextLength])]))
+  else
+    Say('PROBE fingerprint: none - no reading describes this window');
+  Say(Format('PROBE watches: events=%d refreshes=%d', [Events, Refs]));
+end;
+
+{ ============================================================================== }
 { entry point                                                                    }
 { ============================================================================== }
 
@@ -1940,13 +2403,19 @@ begin
   FChildPid := 0;
   FServe := False;
   FServeQuit := False;
+  FMatrix := False;
+  FProbe := False;
   ParentPid := 0;
 
   for I := 1 to ParamCount do
     if SameText(ParamStr(I), 'quiet') then
       FQuiet := True
     else if SameText(ParamStr(I), '--serve') then
-      FServe := True;
+      FServe := True
+    else if SameText(ParamStr(I), '--matrix') then
+      FMatrix := True
+    else if SameText(ParamStr(I), '--probe') then
+      FProbe := True;
 
   if FServe then
   begin
@@ -1968,7 +2437,10 @@ begin
   end;
 
   try
-    Say('kat_host: the reading layers against real controls of a child process');
+    if FProbe then
+      Say('kat_host --probe: one line for the window in the foreground')
+    else
+      Say('kat_host: the reading layers against real controls of a child process');
 
     { A console process starts with the settings globals EMPTY, i.e. NOT the
       application's defaults, and the ANSI host-text path is only reachable in
@@ -1989,7 +2461,11 @@ begin
     SniffOverrideActive := False; // the REAL readers, not the head-less hook
 
     FSink := TEraseSink.Create;
-    StartChild;
+    { The probe describes a window that is already in front, so it starts nothing
+      and takes no foreground: a diagnostic that steals the foreground measures
+      itself instead of the host the user cares about. }
+    if not FProbe then
+      StartChild;
   except
     on E: Exception do
     begin
@@ -2013,6 +2489,13 @@ begin
     ErrLog.Free;
   end;
   Mapping := AnsiVersion;
+
+  if FProbe then
+  begin
+    ProbeForeground;
+    FSink.Free;
+    Halt(0);
+  end;
 
   if not TakeFocus(FEdit, EDIT_ID) then
   begin
@@ -2067,6 +2550,13 @@ begin
     Say('');
     Say('=== D. the watch, a real key press and one emission');
     HookChecks;
+
+    if FMatrix then
+    begin
+      Say('');
+      Say('=== E. the host matrix (every host this run measures, and every host it cannot)');
+      MatrixChecks;
+    end;
 
     Say('');
     Say('=== summary');
