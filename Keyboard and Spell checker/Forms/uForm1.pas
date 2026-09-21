@@ -35,6 +35,7 @@ uses
   Vcl.AppEvnts,
   ShellAPI,
   Winapi.CommCtrl,
+  Vcl.Themes,
   uAvroDirectoryWatcher,
   uAvroEngineStats;
 
@@ -75,8 +76,6 @@ type
     AvroPhonetic1: TMenuItem;
     EnableAutoCorrect1: TMenuItem;
     ManageAutoCorrectentries1: TMenuItem;
-    LayoutViewerShowactivekeyboardlayout1: TMenuItem;
-    AvroMouseClicknType1: TMenuItem;
     KeyboardLayoutEditorBuildcustomlayouts1: TMenuItem;
     SkinDesignerDesignyourownskin1: TMenuItem;
     N3: TMenuItem;
@@ -85,18 +84,13 @@ type
     N5: TMenuItem;
     CheckupdateforAvroKeyboard1: TMenuItem;
     N6: TMenuItem;
-    MoreFreeDownloads1: TMenuItem;
     FreeBanglaFonts1: TMenuItem;
-    UsefultoolsforBangla1: TMenuItem;
-    AvroKeyboardontheweb1: TMenuItem;
-    PortableAvroKeyboardontheweb1: TMenuItem;
     wwwOmicronLabcom1: TMenuItem;
     UserForum1: TMenuItem;
     AvroPhoneticEnglishtoBangla1: TMenuItem;
     N7: TMenuItem;
     Showactivekeyboardlayout1: TMenuItem;
     N8: TMenuItem;
-    AvroMouseClicknType2: TMenuItem;
     Jumptosystemtray1: TMenuItem;
     Exit1: TMenuItem;
     BeforeYouStart1: TMenuItem;
@@ -112,50 +106,8 @@ type
     Aboutcurrentkeyboardlayout1: TMenuItem;
     AboutAvroKeyboard1: TMenuItem;
     ogglekeyboardmode1: TMenuItem;
-    Docktotop1: TMenuItem;
+    Jumptotop1: TMenuItem;
     Jumptosystemtray2: TMenuItem;
-    N16: TMenuItem;
-    Selectkeyboardlayout1: TMenuItem;
-    AvroPhoneticEnglishtoBangla2: TMenuItem;
-    N17: TMenuItem;
-    Showactivekeyboardlayout2: TMenuItem;
-    AvroMouseClicknType3: TMenuItem;
-    N18: TMenuItem;
-    Ontheweb1: TMenuItem;
-    CheckupdateforAvroKeyboard2: TMenuItem;
-    N19: TMenuItem;
-    MoreFreeDownloads2: TMenuItem;
-    FreeBanglaFonts2: TMenuItem;
-    UsefultoolsforBangla2: TMenuItem;
-    AvroKeyboardontheweb2: TMenuItem;
-    PortableAvroKeyboardontheweb2: TMenuItem;
-    wwwOmicronLabcom2: TMenuItem;
-    UserForum2: TMenuItem;
-    N20: TMenuItem;
-    CustomizeAvroKeyboard1: TMenuItem;
-    N21: TMenuItem;
-    Helpfiles1: TMenuItem;
-    BeforeYouStart2: TMenuItem;
-    Overview2: TMenuItem;
-    CustomizingAvroKeyboard2: TMenuItem;
-    BanglaTypingwithAvroPhonetic2: TMenuItem;
-    BanglaTypingwithFixedKeyboardLayouts2: TMenuItem;
-    BanglaTypingwithAvroMouse2: TMenuItem;
-    FrequentlyAskedQuestionsFAQ2: TMenuItem;
-    N23: TMenuItem;
-    CreatingEditingFixedKeyboardLayouts2: TMenuItem;
-    N24: TMenuItem;
-    HowtoBanglaFileFolderName2: TMenuItem;
-    HowtoBanglaChat2: TMenuItem;
-    HowtoSearchingwebinBangla2: TMenuItem;
-    N25: TMenuItem;
-    HowtoDevelopBanglaWebPage2: TMenuItem;
-    HowtoEmbedBanglaFontinWebPages2: TMenuItem;
-    N26: TMenuItem;
-    GetAcrobatReader2: TMenuItem;
-    AboutAvroKeyboard2: TMenuItem;
-    N28: TMenuItem;
-    Exit2: TMenuItem;
     Popup_Tray: TPopupMenu;
     ogglekeyboardmode2: TMenuItem;
     RestoreAvroTopBar1: TMenuItem;
@@ -170,10 +122,9 @@ type
     AvroPhoneticEnglishtoBangla3: TMenuItem;
     N34: TMenuItem;
     Showactivekeyboardlayout3: TMenuItem;
+    LocateKeyboardLayout2: TMenuItem;
     WindowCheck: TTimer;
     InternetCheck: TTimer;
-    Spellcheck1: TMenuItem;
-    N41: TMenuItem;
     Spellcheck2: TMenuItem;
     Spellcheck3: TMenuItem;
     Spellcheck4: TMenuItem;
@@ -245,26 +196,22 @@ type
     OutputasANSIAreyousure2: TMenuItem;
     N52: TMenuItem;
     AvroKeyboardonFacebook1: TMenuItem;
-    OmicronLabonTwitter1: TMenuItem;
     N54: TMenuItem;
     AvroKeyboardonFacebook3: TMenuItem;
-    OmicronLabonTwitter3: TMenuItem;
     AppEvents: TApplicationEvents;
     procedure FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
     procedure FormCreate(Sender: TObject);
     procedure AvroPhoneticEnglishtoBangla3Click(Sender: TObject);
     procedure Exit1Click(Sender: TObject);
     procedure ogglekeyboardmode2Click(Sender: TObject);
-    procedure Docktotop1Click(Sender: TObject);
+    procedure Jumptotop1Click(Sender: TObject);
     procedure Showactivekeyboardlayout1Click(Sender: TObject);
+    procedure LocateKeyboardLayoutClick(Sender: TObject);
     procedure AvroMouseClicknType2Click(Sender: TObject);
-    procedure PortableAvroKeyboardontheweb1Click(Sender: TObject);
-    procedure AvroKeyboardontheweb1Click(Sender: TObject);
     procedure wwwOmicronLabcom1Click(Sender: TObject);
     procedure UserForum1Click(Sender: TObject);
     procedure CheckupdateforAvroKeyboard1Click(Sender: TObject);
     procedure FreeBanglaFonts1Click(Sender: TObject);
-    procedure UsefultoolsforBangla1Click(Sender: TObject);
     procedure Jumptosystemtray1Click(Sender: TObject);
     procedure Options1Click(Sender: TObject);
     procedure BeforeYouStart1Click(Sender: TObject);
@@ -310,7 +257,6 @@ type
     procedure OutputasUnicodeRecommended1Click(Sender: TObject);
     procedure OutputasANSIAreyousure1Click(Sender: TObject);
     procedure AvroKeyboardonFacebook1Click(Sender: TObject);
-    procedure OmicronLabonTwitter1Click(Sender: TObject);
     procedure AppEventsSettingChange(Sender: TObject; Flag: Integer; const Section: string; var Result: LongInt);
     private
       { Private declarations }
@@ -529,11 +475,6 @@ begin
   Execute_Something('https://www.omicronlab.com/go.php?id=39');
 end;
 
-procedure TAvroMainForm1.AvroKeyboardontheweb1Click(Sender: TObject);
-begin
-  Execute_Something('https://www.omicronlab.com/go.php?id=1');
-end;
-
 procedure TAvroMainForm1.AvroMouseClicknType2Click(Sender: TObject);
 begin
   CheckCreateForm(TfrmAvroMouse, frmAvroMouse, 'frmAvroMouse');
@@ -614,7 +555,7 @@ begin
   RefreshSettings;
 end;
 
-procedure TAvroMainForm1.Docktotop1Click(Sender: TObject);
+procedure TAvroMainForm1.Jumptotop1Click(Sender: TObject);
 begin
   TopBarDocToTop;
 end;
@@ -864,12 +805,11 @@ begin
 
     sCaption := RemoveExtension(KeyboardLayouts[I]);
 
-    /// ////
     ItemFound := False;
-    for J := 0 to Selectkeyboardlayout1.Count - 1 do
+    for J := 0 to Selectkeyboardlayout2.Count - 1 do
     begin
-      if Selectkeyboardlayout1.Items[J].Tag = 9903 then
-        if Lowercase((Selectkeyboardlayout1.Items[J] as TMenuItemExtended).Value) = Lowercase(sCaption) then
+      if Selectkeyboardlayout2.Items[J].Tag = 9903 then
+        if Lowercase((Selectkeyboardlayout2.Items[J] as TMenuItemExtended).Value) = Lowercase(sCaption) then
           ItemFound := True;
     end;
     if not(ItemFound) then
@@ -881,25 +821,6 @@ begin
       TempMenu1.Tag := 9903;
       TempMenu1.OnClick := MenuFixedLayoutClick;
       Selectkeyboardlayout2.Insert(AvroPhoneticEnglishtoBangla3.MenuIndex + 1, TempMenu1);
-    end;
-
-    /// ///
-    ItemFound := False;
-    for J := 0 to Selectkeyboardlayout1.Count - 1 do
-    begin
-      if Selectkeyboardlayout1.Items[J].Tag = 9903 then
-        if Lowercase((Selectkeyboardlayout1.Items[J] as TMenuItemExtended).Value) = Lowercase(sCaption) then
-          ItemFound := True;
-    end;
-    if not(ItemFound) then
-    begin
-      TempMenu2 := TMenuItemExtended.Create(Popup_Main);
-      TempMenu2.Caption := sCaption;
-      TempMenu2.Value := sCaption;
-      TempMenu2.RadioItem := True;
-      TempMenu2.Tag := 9903;
-      TempMenu2.OnClick := MenuFixedLayoutClick;
-      Selectkeyboardlayout1.Insert(AvroPhoneticEnglishtoBangla2.MenuIndex + 1, TempMenu2);
     end;
 
     /// ////
@@ -992,7 +913,6 @@ begin
   if Lowercase(CurrentKeyboardLayout) = 'avrophonetic*' then
   begin
     AvroPhoneticEnglishtoBangla3.Checked := True;
-    AvroPhoneticEnglishtoBangla2.Checked := True;
     AvroPhoneticEnglishtoBangla1.Checked := True;
   end
   else
@@ -1002,13 +922,6 @@ begin
       if Selectkeyboardlayout2.Items[I].Tag = 9903 then
         if Lowercase((Selectkeyboardlayout2.Items[I] as TMenuItemExtended).Value) = Lowercase(CurrentKeyboardLayout) then
           Selectkeyboardlayout2.Items[I].Checked := True;
-    end;
-
-    for I := 0 to Selectkeyboardlayout1.Count - 1 do
-    begin
-      if Selectkeyboardlayout1.Items[I].Tag = 9903 then
-        if Lowercase((Selectkeyboardlayout1.Items[I] as TMenuItemExtended).Value) = Lowercase(CurrentKeyboardLayout) then
-          Selectkeyboardlayout1.Items[I].Checked := True;
     end;
 
     for I := 0 to Popup_LayoutList.Items.Count - 1 do
@@ -1460,11 +1373,6 @@ end;
 
 { =============================================================================== }
 
-procedure TAvroMainForm1.OmicronLabonTwitter1Click(Sender: TObject);
-begin
-  Execute_Something('https://www.omicronlab.com/go.php?id=40');
-end;
-
 { =============================================================================== }
 
 procedure TAvroMainForm1.OpenHelpFile(const HelpID: Integer);
@@ -1546,20 +1454,14 @@ end;
 
 { =============================================================================== }
 
-procedure TAvroMainForm1.PortableAvroKeyboardontheweb1Click(Sender: TObject);
-begin
-  Execute_Something('https://www.omicronlab.com/go.php?id=22');
-end;
-
 { =============================================================================== }
 
 procedure TAvroMainForm1.RefreshSettings;
 begin
 
   // Update Spell Checker Shortcut in Menu
-  Spellcheck1.ShortCut := TextToShortcut('Ctrl+' + SpellerLauncherKey);
-  Spellcheck2.ShortCut := TextToShortcut('Ctrl+' + SpellerLauncherKey);
-  Spellcheck4.ShortCut := TextToShortcut('Ctrl+' + SpellerLauncherKey);
+  Spellcheck2.ShortCut := TextToShortcut(SpellerLauncherKey);
+  Spellcheck4.ShortCut := TextToShortcut(SpellerLauncherKey);
 
   if VowelFormating = 'NO' then
   begin
@@ -1934,6 +1836,14 @@ begin
   LayoutViewer.Show;
 end;
 
+procedure TAvroMainForm1.LocateKeyboardLayoutClick(Sender: TObject);
+var
+  LayoutDir: string;
+begin
+  LayoutDir := GetAvroDataDir + 'Keyboard Layouts\';
+  ShellExecute(0, 'open', PChar(LayoutDir), nil, nil, SW_SHOWNORMAL);
+end;
+
 { Marks the version item of AMenu that is currently in force. Only the items
   BuildAnsiVersionMenus tagged with GroupIndex = 10 are considered, so the
   separator and the "More Options" submenu are never touched; nothing is
@@ -2201,63 +2111,113 @@ end;
   on the right side. }
 procedure TAvroMainForm1.AnsiVersionItemAdvancedDrawItem(Sender: TObject; ACanvas: TCanvas; ARect: TRect; AState: TOwnerDrawState);
 var
-  Item:                 TMenuItem;
-  IconHandle:           HICON;
-  X, Y:                 Integer;
-  CapStr:               string;
-  TextH:                Integer;
-  GutterRect, TextRect: TRect;
+  Item:            TMenuItem;
+  IconHandle:      HICON;
+  X, Y:            Integer;
+  CapStr:          string;
+  TextRect:        TRect;
+  GutterRect:      TRect;
+  IsHovered:       Boolean;
+  CMenuBg, CMenuText, CHighlight, CHighlightText: TColor;
 const
   GUTTER_W = 26;
   ICON_SZ  = 16;
   ICON_PAD = 4;
 begin
   Item := Sender as TMenuItem;
-
-  { 1. Full background }
-  ACanvas.Brush.Color := CurrentPalette.Background;
-  ACanvas.FillRect(ARect);
-
-  { 2. Hover highlight for non-checked items }
-  if (not Item.Checked) and ((odSelected in AState) or (odHotLight in AState)) then
-  begin
-    ACanvas.Brush.Color := CurrentPalette.HoverFill;
-    ACanvas.FillRect(ARect);
-  end;
-
-  { 3. Left indicator gutter }
   GutterRect := Rect(ARect.Left, ARect.Top, ARect.Left + GUTTER_W, ARect.Bottom);
-  TextRect := Rect(ARect.Left + GUTTER_W, ARect.Top, ARect.Right, ARect.Bottom);
+  IsHovered := (odSelected in AState) or (odHotLight in AState);
 
-  if Item.Checked then
+  { Fetch VCL-theme-aware system colours so the rendering automatically
+    matches the active style (Windows10, Windows10 Dark, or any future
+    custom style). }
+  CMenuBg        := StyleServices.GetSystemColor(clMenu);
+  CMenuText      := StyleServices.GetSystemColor(clMenuText);
+  CHighlight     := StyleServices.GetSystemColor(clHighlight);
+  CHighlightText := StyleServices.GetSystemColor(clHighlightText);
+
+  if IsDarkAppTheme then
   begin
-    { Checked: dark gutter + lighter text area }
-    ACanvas.Brush.Color := CurrentPalette.SelectionFill;
-    ACanvas.FillRect(GutterRect);
+    { ===== Dark mode – full-row highlight for checked & hovered ===== }
+    if Item.Checked then
+    begin
+      { Checked: blue gutter + light-blue text area }
+      ACanvas.Brush.Color := RGB(0, 120, 215);
+      ACanvas.FillRect(GutterRect);
+      ACanvas.Brush.Color := RGB(218, 236, 255);
+      ACanvas.FillRect(Rect(ARect.Left + GUTTER_W, ARect.Top, ARect.Right, ARect.Bottom));
 
-    ACanvas.Brush.Color := CurrentPalette.HoverFill;
-    ACanvas.FillRect(TextRect);
-
-    { Restore gutter brush before drawing the checkmark }
-    ACanvas.Brush.Color := CurrentPalette.SelectionFill;
-    ACanvas.Font.Color := CurrentPalette.SelectionText;
-    ACanvas.Font.Style := [fsBold];
-    DrawText(ACanvas.Handle, #$2713, -1, GutterRect, DT_CENTER or DT_VCENTER or DT_SINGLELINE);
-    ACanvas.Font.Style := [];
-
-    ACanvas.Font.Color := CurrentPalette.Text;
+      ACanvas.Brush.Color := RGB(0, 120, 215);
+      ACanvas.Font.Color := clWhite;
+      ACanvas.Font.Style := [fsBold];
+      DrawText(ACanvas.Handle, #$2713, -1, GutterRect, DT_CENTER or DT_VCENTER or DT_SINGLELINE);
+      ACanvas.Font.Style := [];
+      ACanvas.Font.Color := RGB(51, 51, 51); { dark text on light blue }
+    end
+    else if IsHovered then
+    begin
+      ACanvas.Brush.Color := CHighlight;
+      ACanvas.FillRect(ARect);
+      ACanvas.Font.Color := CurrentPalette.SelectionText;
+    end
+    else
+    begin
+      ACanvas.Brush.Color := CMenuBg;
+      ACanvas.FillRect(ARect);
+    end;
   end
   else
-    ACanvas.Font.Color := CurrentPalette.Text;
+  begin
+    { ===== Light mode – gutter-only checkmark for checked items ===== }
+    ACanvas.Brush.Color := CMenuBg;
+    ACanvas.FillRect(ARect);
 
-  { 4. Caption text }
+    if (not Item.Checked) and IsHovered then
+    begin
+      ACanvas.Brush.Color := CHighlight;
+      ACanvas.FillRect(ARect);
+    end;
+
+    if Item.Checked then
+    begin
+      ACanvas.Brush.Color := CurrentPalette.SelectionFill;
+      ACanvas.FillRect(GutterRect);
+
+      ACanvas.Brush.Color := CurrentPalette.HoverFill;
+      ACanvas.FillRect(Rect(ARect.Left + GUTTER_W, ARect.Top, ARect.Right, ARect.Bottom));
+
+      ACanvas.Brush.Color := CurrentPalette.SelectionFill;
+      ACanvas.Font.Color := CurrentPalette.SelectionText;
+      ACanvas.Font.Style := [fsBold];
+      DrawText(ACanvas.Handle, #$2713, -1, GutterRect, DT_CENTER or DT_VCENTER or DT_SINGLELINE);
+      ACanvas.Font.Style := [];
+    end;
+
+    if (not Item.Checked) and IsHovered then
+      ACanvas.Font.Color := CHighlightText
+    else
+      ACanvas.Font.Color := CMenuText;
+  end;
+
+  { Caption text }
   CapStr := Item.Caption;
-  TextH := ACanvas.TextHeight(CapStr);
-  ACanvas.Brush.Style := bsClear;
-  ACanvas.TextOut(ARect.Left + GUTTER_W + 4, ARect.Top + ((ARect.Bottom - ARect.Top - TextH) div 2), CapStr);
-  ACanvas.Brush.Style := bsSolid;
+  if IsDarkAppTheme then
+  begin
+    if Item.Checked then
+      SetTextColor(ACanvas.Handle, RGB(51, 51, 51)) { dark text on light blue }
+    else if IsHovered then
+      SetTextColor(ACanvas.Handle, ColorToRGB(clWhite))
+    else
+      SetTextColor(ACanvas.Handle, ColorToRGB(CMenuText));
+  end
+  else
+    ACanvas.Font.Color := CMenuText;
+  SetBkMode(ACanvas.Handle, TRANSPARENT);
+  TextRect := Rect(ARect.Left + GUTTER_W + 4, ARect.Top, ARect.Right, ARect.Bottom);
+  DrawText(ACanvas.Handle, PChar(CapStr), -1, TextRect,
+    DT_LEFT or DT_VCENTER or DT_SINGLELINE);
 
-  { 5. Right-side icon badge }
+  { Right-side icon badge }
   IconHandle := 0;
   if (Item.Hint <> '') and (not SameText(Item.Hint, 'Default')) then
     IconHandle := GetAnsiTrayIcon(Item.Hint);
@@ -2638,11 +2598,6 @@ begin
   Execute_Something(ExtractFilePath(Application.ExeName) + 'Avro Text Converter.exe');
 end;
 
-procedure TAvroMainForm1.UsefultoolsforBangla1Click(Sender: TObject);
-begin
-  Execute_Something('https://www.omicronlab.com/go.php?id=15');
-end;
-
 procedure TAvroMainForm1.UseModernStyleTyping1Click(Sender: TObject);
 begin
   ChangeTypingStyle('ModernStyle');
@@ -2655,7 +2610,7 @@ end;
 
 procedure TAvroMainForm1.UserForum1Click(Sender: TObject);
 begin
-  Execute_Something('https://github.com/mugli/Avro-Keyboard/issues');
+  Execute_Something('https://t.me/AvroUsersCommunity');
 end;
 
 procedure TAvroMainForm1.UseTabforBrowsingSuggestions1Click(Sender: TObject);
