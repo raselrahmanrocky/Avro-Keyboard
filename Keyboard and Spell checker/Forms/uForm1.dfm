@@ -1334,27 +1334,10 @@ object AvroMainForm1: TAvroMainForm1
     object N6: TMenuItem
       Caption = '-'
     end
-    object MoreFreeDownloads1: TMenuItem
-      Caption = 'More Free Downloads'
-      object FreeBanglaFonts1: TMenuItem
-        Caption = 'Free Bangla Fonts...'
-        ImageIndex = 0
-        OnClick = FreeBanglaFonts1Click
-      end
-      object UsefultoolsforBangla1: TMenuItem
-        Caption = 'Useful tools for Bangla...'
-        OnClick = UsefultoolsforBangla1Click
-      end
-    end
-    object AvroKeyboardontheweb1: TMenuItem
-      Caption = 'Avro Keyboard on the web'
-      ImageIndex = 15
-      OnClick = AvroKeyboardontheweb1Click
-    end
-    object PortableAvroKeyboardontheweb1: TMenuItem
-      Caption = 'Portable Avro Keyboard on the web'
-      ImageIndex = 15
-      OnClick = PortableAvroKeyboardontheweb1Click
+    object FreeBanglaFonts1: TMenuItem
+      Caption = 'Free Bangla Fonts...'
+      ImageIndex = 0
+      OnClick = FreeBanglaFonts1Click
     end
     object wwwOmicronLabcom1: TMenuItem
       Caption = 'www.OmicronLab.com'
@@ -1362,7 +1345,7 @@ object AvroMainForm1: TAvroMainForm1
       OnClick = wwwOmicronLabcom1Click
     end
     object UserForum1: TMenuItem
-      Caption = 'Report an issue'
+      Caption = 'Avro on Telegram'
       ImageIndex = 10
       OnClick = UserForum1Click
     end
@@ -1373,11 +1356,6 @@ object AvroMainForm1: TAvroMainForm1
       Caption = 'Avro Keyboard on Facebook'
       ImageIndex = 29
       OnClick = AvroKeyboardonFacebook1Click
-    end
-    object OmicronLabonTwitter1: TMenuItem
-      Caption = 'OmicronLab on Twitter'
-      ImageIndex = 28
-      OnClick = OmicronLabonTwitter1Click
     end
   end
   object Popup_LayoutList: TPopupMenu
@@ -1394,18 +1372,15 @@ object AvroMainForm1: TAvroMainForm1
       Caption = '-'
     end
     object Showactivekeyboardlayout1: TMenuItem
-      Caption = 'Show active keyboard layout...'
-      ImageIndex = 22
-      OnClick = Showactivekeyboardlayout1Click
+      Caption = 'Locate keyboard layout...'
+      OnClick = LocateKeyboardLayoutClick
     end
-    object N8: TMenuItem
-      Caption = '-'
+    object Aboutcurrentkeyboardlayout1: TMenuItem
+      Caption = 'About current keyboard layout...'
+      OnClick = Aboutcurrentkeyboardlayout1Click
     end
-    object AvroMouseClicknType2: TMenuItem
-      Caption = 'Avro Mouse - Click '#39'n Type!'
-      ImageIndex = 9
-      OnClick = AvroMouseClicknType2Click
-    end
+
+
   end
   object Popup_Exit: TPopupMenu
     AutoHotkeys = maManual
@@ -1475,10 +1450,6 @@ object AvroMainForm1: TAvroMainForm1
     object N11: TMenuItem
       Caption = '-'
     end
-    object Aboutcurrentkeyboardlayout1: TMenuItem
-      Caption = 'About current keyboard layout...'
-      OnClick = Aboutcurrentkeyboardlayout1Click
-    end
     object AboutAvroKeyboard1: TMenuItem
       Caption = 'About Avro Keyboard...'
       ImageIndex = 20
@@ -1495,219 +1466,15 @@ object AvroMainForm1: TAvroMainForm1
       ImageIndex = 12
       OnClick = ogglekeyboardmode2Click
     end
-    object Docktotop1: TMenuItem
-      Caption = 'Dock to top'
-      OnClick = Docktotop1Click
+    object Jumptotop1: TMenuItem
+      Caption = 'Jump to top'
+      ImageIndex = 31
+      OnClick = Jumptotop1Click
     end
     object Jumptosystemtray2: TMenuItem
       Caption = 'Jump to system tray'
+      ImageIndex = 32
       OnClick = Jumptosystemtray1Click
-    end
-    object N16: TMenuItem
-      Caption = '-'
-    end
-    object Selectkeyboardlayout1: TMenuItem
-      Caption = 'Select keyboard layout'
-      ImageIndex = 22
-      object AvroPhoneticEnglishtoBangla2: TMenuItem
-        Caption = 'Avro Phonetic (English to Bangla)'
-        RadioItem = True
-        OnClick = AvroPhoneticEnglishtoBangla3Click
-      end
-      object N17: TMenuItem
-        Caption = '-'
-      end
-      object Showactivekeyboardlayout2: TMenuItem
-        Caption = 'Show active keyboard layout...'
-        ImageIndex = 22
-        OnClick = Showactivekeyboardlayout1Click
-      end
-    end
-    object AvroMouseClicknType3: TMenuItem
-      Caption = 'Avro Mouse - Click '#39'n Type!'
-      ImageIndex = 9
-      OnClick = AvroMouseClicknType2Click
-    end
-    object N18: TMenuItem
-      Caption = '-'
-    end
-    object Spellcheck1: TMenuItem
-      Caption = 'Spell checker...'
-      ImageIndex = 24
-      ShortCut = 16502
-      OnClick = Spellcheck1Click
-    end
-    object N41: TMenuItem
-      Caption = '-'
-    end
-    object Ontheweb1: TMenuItem
-      Caption = 'On the web'
-      ImageIndex = 23
-      object CheckupdateforAvroKeyboard2: TMenuItem
-        Caption = 'Check update for Avro Keyboard'
-        ImageIndex = 1
-        OnClick = CheckupdateforAvroKeyboard1Click
-      end
-      object N19: TMenuItem
-        Caption = '-'
-      end
-      object MoreFreeDownloads2: TMenuItem
-        Caption = 'More Free Downloads'
-        object FreeBanglaFonts2: TMenuItem
-          Caption = 'Free Bangla Fonts...'
-          ImageIndex = 0
-          OnClick = FreeBanglaFonts1Click
-        end
-        object UsefultoolsforBangla2: TMenuItem
-          Caption = 'Useful tools for Bangla...'
-          OnClick = UsefultoolsforBangla1Click
-        end
-      end
-      object AvroKeyboardontheweb2: TMenuItem
-        Caption = 'Avro Keyboard on the web'
-        ImageIndex = 15
-        OnClick = AvroKeyboardontheweb1Click
-      end
-      object PortableAvroKeyboardontheweb2: TMenuItem
-        Caption = 'Portable Avro Keyboard on the web'
-        ImageIndex = 15
-        OnClick = PortableAvroKeyboardontheweb1Click
-      end
-      object wwwOmicronLabcom2: TMenuItem
-        Caption = 'www.OmicronLab.com'
-        ImageIndex = 15
-        OnClick = wwwOmicronLabcom1Click
-      end
-      object UserForum2: TMenuItem
-        Caption = 'Report an issue'
-        ImageIndex = 10
-        OnClick = UserForum1Click
-      end
-      object N54: TMenuItem
-        Caption = '-'
-      end
-      object AvroKeyboardonFacebook3: TMenuItem
-        Caption = 'Avro Keyboard on Facebook'
-        ImageIndex = 29
-        OnClick = AvroKeyboardonFacebook1Click
-      end
-      object OmicronLabonTwitter3: TMenuItem
-        Caption = 'OmicronLab on Twitter'
-        ImageIndex = 28
-        OnClick = OmicronLabonTwitter1Click
-      end
-    end
-    object N20: TMenuItem
-      Caption = '-'
-    end
-    object CustomizeAvroKeyboard1: TMenuItem
-      Caption = 'Options...'
-      ImageIndex = 11
-      OnClick = Options1Click
-    end
-    object N21: TMenuItem
-      Caption = '-'
-    end
-    object Helpfiles1: TMenuItem
-      Caption = 'Help files'
-      ImageIndex = 18
-      object BeforeYouStart2: TMenuItem
-        Caption = 'Before You Start'
-        ImageIndex = 7
-        OnClick = BeforeYouStart1Click
-      end
-      object Overview2: TMenuItem
-        Caption = 'Overview'
-        ImageIndex = 7
-        OnClick = Overview1Click
-      end
-      object CustomizingAvroKeyboard2: TMenuItem
-        Caption = 'Customizing Avro Keyboard'
-        ImageIndex = 7
-        OnClick = CustomizingAvroKeyboard1Click
-      end
-      object BanglaTypingwithAvroPhonetic2: TMenuItem
-        Caption = 'Bangla Typing with Avro Phonetic'
-        ImageIndex = 7
-        OnClick = BanglaTypingwithAvroPhonetic1Click
-      end
-      object BanglaTypingwithFixedKeyboardLayouts2: TMenuItem
-        Caption = 'Bangla Typing with Fixed Keyboard Layouts'
-        ImageIndex = 7
-        OnClick = BanglaTypingwithFixedKeyboardLayouts1Click
-      end
-      object BanglaTypingwithAvroMouse2: TMenuItem
-        Caption = 'Bangla Typing with Avro Mouse'
-        ImageIndex = 7
-        OnClick = BanglaTypingwithAvroMouse1Click
-      end
-      object FrequentlyAskedQuestionsFAQ2: TMenuItem
-        Caption = 'Frequently Asked Questions (FAQ)'
-        ImageIndex = 7
-        Visible = False
-        OnClick = FrequentlyAskedQuestionsFAQ1Click
-      end
-      object N23: TMenuItem
-        Caption = '-'
-      end
-      object CreatingEditingFixedKeyboardLayouts2: TMenuItem
-        Caption = 'Creating/Editing Fixed Keyboard Layouts'
-        ImageIndex = 7
-        OnClick = CreatingEditingFixedKeyboardLayouts1Click
-      end
-      object N24: TMenuItem
-        Caption = '-'
-        Visible = False
-      end
-      object HowtoBanglaFileFolderName2: TMenuItem
-        Caption = 'How to: Bangla File/Folder Name'
-        ImageIndex = 7
-        Visible = False
-      end
-      object HowtoBanglaChat2: TMenuItem
-        Caption = 'How to: Bangla Chat!'
-        ImageIndex = 7
-        Visible = False
-      end
-      object HowtoSearchingwebinBangla2: TMenuItem
-        Caption = 'How to: Searching web in Bangla!'
-        ImageIndex = 7
-        Visible = False
-      end
-      object N25: TMenuItem
-        Caption = '-'
-        Visible = False
-      end
-      object HowtoDevelopBanglaWebPage2: TMenuItem
-        Caption = 'How to: Develop Bangla Web Page'
-        ImageIndex = 7
-        Visible = False
-      end
-      object HowtoEmbedBanglaFontinWebPages2: TMenuItem
-        Caption = 'How to: Embed Bangla Font in Web Pages'
-        ImageIndex = 7
-        Visible = False
-      end
-      object N26: TMenuItem
-        Caption = '-'
-      end
-      object GetAcrobatReader2: TMenuItem
-        Caption = 'Join Avro Community on Telegram'
-        OnClick = JoinTelegramCommunity
-      end
-    end
-    object AboutAvroKeyboard2: TMenuItem
-      Caption = 'About Avro Keyboard...'
-      ImageIndex = 20
-      OnClick = AboutAvroKeyboard1Click
-    end
-    object N28: TMenuItem
-      Caption = '-'
-    end
-    object Exit2: TMenuItem
-      Caption = 'Exit'
-      ImageIndex = 5
-      OnClick = Exit1Click
     end
   end
   object Popup_Tools: TPopupMenu
@@ -1715,22 +1482,13 @@ object AvroMainForm1: TAvroMainForm1
     Images = ImageList1
     Left = 256
     Top = 72
-    object Spellcheck2: TMenuItem
-      Caption = 'Spell checker...'
-      ImageIndex = 24
-      ShortCut = 16502
-      OnClick = Spellcheck1Click
-    end
-    object N3: TMenuItem
-      Caption = '-'
-    end
     object OutputasUnicodeRecommended1: TMenuItem
-      Caption = 'Output as Unicode (Recommended)'
+      Caption = 'Output as Unicode'
       RadioItem = True
       OnClick = OutputasUnicodeRecommended1Click
     end
     object OutputasANSIAreyousure1: TMenuItem
-      Caption = 'Output as ANSI (Are you sure?)'
+      Caption = 'Output as ANSI'
       RadioItem = True
       OnClick = OutputasANSIAreyousure1Click
     end
@@ -1743,24 +1501,20 @@ object AvroMainForm1: TAvroMainForm1
       OnClick = UnicodetoBijoytextconverter1Click
     end
     object KeyboardLayoutEditorBuildcustomlayouts1: TMenuItem
-      Caption = 'Keyboard Layout Editor : Build custom layouts'
+      Caption = 'Keyboard Layout Editor'
       ImageIndex = 3
       OnClick = KeyboardLayoutEditorBuildcustomlayouts1Click
     end
     object SkinDesignerDesignyourownskin1: TMenuItem
-      Caption = 'Skin Designer : Design your own skin'
+      Caption = 'Skin Designer'
       ImageIndex = 4
       OnClick = SkinDesignerDesignyourownskin1Click
     end
-    object LayoutViewerShowactivekeyboardlayout1: TMenuItem
-      Caption = 'Layout Viewer : Show active keyboard layout...'
-      ImageIndex = 22
-      OnClick = Showactivekeyboardlayout1Click
-    end
-    object AvroMouseClicknType1: TMenuItem
-      Caption = 'Avro Mouse : Click '#39'n Type!'
-      ImageIndex = 9
-      OnClick = AvroMouseClicknType2Click
+    object Spellcheck2: TMenuItem
+      Caption = 'Spell checker...'
+      ImageIndex = 24
+      ShortCut = 16502
+      OnClick = Spellcheck1Click
     end
     object N5: TMenuItem
       Caption = '-'
@@ -1893,8 +1647,11 @@ object AvroMainForm1: TAvroMainForm1
       end
       object Showactivekeyboardlayout3: TMenuItem
         Caption = 'Show active keyboard layout...'
-        ImageIndex = 22
         OnClick = Showactivekeyboardlayout1Click
+      end
+      object LocateKeyboardLayout2: TMenuItem
+        Caption = 'Locate keyboard layout...'
+        OnClick = LocateKeyboardLayoutClick
       end
       object Aboutcurrentkeyboardlayout2: TMenuItem
         Caption = 'About current keyboard layout...'
@@ -1929,12 +1686,12 @@ object AvroMainForm1: TAvroMainForm1
       Caption = 'Tools'
       ImageIndex = 11
       object OutputasUnicodeRecommended2: TMenuItem
-        Caption = 'Output as Unicode (Recommended)'
+        Caption = 'Output as Unicode'
         RadioItem = True
         OnClick = OutputasUnicodeRecommended1Click
       end
       object OutputasANSIAreyousure2: TMenuItem
-        Caption = 'Output as ANSI (Are you sure?)'
+        Caption = 'Output as ANSI'
         RadioItem = True
         OnClick = OutputasANSIAreyousure1Click
       end
@@ -1942,12 +1699,12 @@ object AvroMainForm1: TAvroMainForm1
         Caption = '-'
       end
       object KeyboardLayoutEditorBuildcustomlayouts2: TMenuItem
-        Caption = 'Keyboard Layout Editor : Build custom layouts'
+        Caption = 'Keyboard Layout Editor'
         ImageIndex = 3
         OnClick = KeyboardLayoutEditorBuildcustomlayouts1Click
       end
       object SkinDesignerDesignyourownskin2: TMenuItem
-        Caption = 'Skin Designer : Design your own skin'
+        Caption = 'Skin Designer'
         ImageIndex = 4
         OnClick = SkinDesignerDesignyourownskin1Click
       end
@@ -1996,7 +1753,7 @@ object AvroMainForm1: TAvroMainForm1
           Caption = '-'
         end
         object GetAcrobatReader3: TMenuItem
-          Caption = 'Join Avro Community on Telegram'
+          Caption = 'Avro on Telegram'
           OnClick = JoinTelegramCommunity
         end
       end
