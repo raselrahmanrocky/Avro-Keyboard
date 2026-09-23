@@ -71,6 +71,7 @@ uses
   WindowsDarkMode in 'Units\WindowsDarkMode.pas',
   uThemeManager in 'Units\uThemeManager.pas',
   uKeyboardMacro in 'Units\uKeyboardMacro.pas',
+  uPickerSupport in 'Units\uPickerSupport.pas',
   Avro.Types in 'Units\Avro.Types.pas',
   uAvroCryptoUtils in 'Units\uAvroCryptoUtils.pas',
   uAvroSecureMem in 'Units\uAvroSecureMem.pas',

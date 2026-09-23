@@ -258,6 +258,7 @@ type
     procedure OutputasANSIAreyousure1Click(Sender: TObject);
     procedure AvroKeyboardonFacebook1Click(Sender: TObject);
     procedure AppEventsSettingChange(Sender: TObject; Flag: Integer; const Section: string; var Result: LongInt);
+    procedure AppEventsException(Sender: TObject; E: Exception);
     private
       { Private declarations }
       WindowDict:                   TDictionary<HWND, TWindowRecord>;
@@ -271,6 +272,8 @@ type
       FMappingListCheckCountdown:   Integer; // throttles the ANSI mapping folder-list poll
       FAnsiMappingSnapshot:         string;  // last seen file-name list of AnsiMappingDir
       FDirectoryWatcher:            TAvroDirectoryWatcher;
+      { Application.OnException reports once per session, not once per fault. }
+      FUnhandledReported:           Boolean;
 
       { Per-layout icons, decoded from the payload each container carries.
 
@@ -372,6 +375,8 @@ type
       procedure ToggleAnsiVersionPicker;
       procedure ToggleLayoutPicker;
       procedure TopBarDocToTop;
+      function RouteKeyToPicker(AVkCode: Integer): Boolean;
+      procedure ReportUnhandledException(E: Exception);
       function TransferKeyDown(const KeyCode: Integer; var Block: Boolean): string;
       procedure TransferKeyUp(const KeyCode: Integer; var Block: Boolean);
       function IsPickerOpen: Boolean;
@@ -394,6 +399,7 @@ implementation
 
 uses
   uRegistrySettings,
+  uPickerSupport,
   ufrmAnsiVersionPicker,
   ufrmLayoutPicker,
   uAvroPasswordDlg,
@@ -458,6 +464,18 @@ procedure TAvroMainForm1.AppEventsSettingChange(Sender: TObject; Flag: Integer; 
 begin
   if SameText('ImmersiveColorSet', string(Section)) then
     HandleThemes;
+end;
+
+{ Application.OnException, through the AppEvents component the form already
+  hosts (Vcl.AppEvnts' multi-caster routes Application.OnException here).
+
+  It exists because an unhandled VCL exception in this application - a hidden
+  owner window with MainFormOnTaskBar = False - can end the process with no
+  dialog and no tray icon at all, which is what "Avro Keyboard just
+  disappeared" looks like from the outside. }
+procedure TAvroMainForm1.AppEventsException(Sender: TObject; E: Exception);
+begin
+  ReportUnhandledException(E);
 end;
 
 procedure TAvroMainForm1.AutomaticallyfixChandrapositionInModernTypingStyle1Click(Sender: TObject);
@@ -610,10 +628,14 @@ begin
 
   FreeAndNil(WindowDict);
   FreeAndNil(AnsiMappingNames);
-  FreeAndNil(KeyLayout);
-  Log('FreeAndNil: WindowDict, KeyLayout');
+  { Unhook BEFORE the engine goes: the callback dereferences KeyLayout
+    (TransferKeyDown/Up), so a keystroke arriving in that window would land on a
+    freed TLayout. RemoveHook is idempotent now, and TLayout.Destroy unhooks
+    again harmlessly. }
   RemoveHook;
   Log('RemoveHook');
+  FreeAndNil(KeyLayout);
+  Log('FreeAndNil: WindowDict, KeyLayout');
   FreeAndNil(Updater);
   Log('FreeAndNil: Updater');
 
@@ -2448,6 +2470,10 @@ end;
 
 procedure TAvroMainForm1.ToggleAnsiVersionPicker;
 begin
+  { One popup at a time: the hook routes keys to a single picker and the mouse
+    dismiss hook belongs to a single window. }
+  if (CurrentLayoutPicker <> nil) and (not CurrentLayoutPicker.Closing) then
+    CurrentLayoutPicker.RequestDismiss;
   ShowAnsiVersionPicker;
 end;
 
@@ -2455,6 +2481,8 @@ end;
 
 procedure TAvroMainForm1.ToggleLayoutPicker;
 begin
+  if (CurrentPicker <> nil) and (not CurrentPicker.Closing) then
+    CurrentPicker.RequestDismiss;
   ShowLayoutPickerPopup;
 end;
 
@@ -2540,21 +2568,87 @@ end;
 
 { =============================================================================== }
 
+{ Both of these are called from the keyboard hook for every keystroke, so they
+  must survive the window in which FormClose has nilled AvroMainForm1 - and the
+  one in which ExitApp has freed KeyLayout. "Not handled" is the only sane
+  answer there: the key then passes through untouched. }
 function TAvroMainForm1.TransferKeyDown(const KeyCode: Integer; var Block: Boolean): string;
 begin
-  Result := KeyLayout.ProcessVKeyDown(KeyCode, Block);
+  Result := '';
+  Block := False;
+  if Assigned(KeyLayout) then
+    Result := KeyLayout.ProcessVKeyDown(KeyCode, Block);
 end;
 
 { =============================================================================== }
 
 procedure TAvroMainForm1.TransferKeyUp(const KeyCode: Integer; var Block: Boolean);
 begin
-  KeyLayout.ProcessVKeyUP(KeyCode, Block);
+  Block := False;
+  if Assigned(KeyLayout) then
+    KeyLayout.ProcessVKeyUP(KeyCode, Block);
 end;
 
+{ True while either popup is on screen.
+
+  The hook stops feeding the layout engine and takes the navigation keys over
+  from the popup's own keyboard handlers only while this is True, so it has to
+  cover BOTH popups - and it has to go False the instant one starts closing:
+  BeginClose unregisters the picker before the modal dialog its own apply path
+  may raise (a mapping password, a layout-load failure), otherwise the hook
+  would keep eating the Enter, letters and digits that dialog needs. }
 function TAvroMainForm1.IsPickerOpen: Boolean;
 begin
-  Result := CurrentPicker <> nil;
+  Result := ((CurrentPicker <> nil) and (not CurrentPicker.Closing) and CurrentPicker.HandleAllocated and IsWindow(CurrentPicker.Handle)) or
+    ((CurrentLayoutPicker <> nil) and (not CurrentLayoutPicker.Closing) and CurrentLayoutPicker.HandleAllocated and IsWindow(CurrentLayoutPicker.Handle));
+end;
+
+{ =============================================================================== }
+
+{ Hands a navigation key to whichever popup is on screen.
+
+  This is what makes the keyboard work on a machine where the popup can not
+  steal the foreground: the hook runs in this process regardless of who owns the
+  foreground, and PostMessage puts the key on this thread's own queue, where the
+  popup's message loop will dispatch it. Focus is never consulted. }
+function TAvroMainForm1.RouteKeyToPicker(AVkCode: Integer): Boolean;
+begin
+  Result := False;
+  if (CurrentPicker <> nil) and (not CurrentPicker.Closing) and CurrentPicker.HandleAllocated and IsWindow(CurrentPicker.Handle) then
+    Result := PostMessage(CurrentPicker.Handle, WM_PICKER_KEY, AVkCode, 0) <> False
+  else if (CurrentLayoutPicker <> nil) and (not CurrentLayoutPicker.Closing) and CurrentLayoutPicker.HandleAllocated and
+    IsWindow(CurrentLayoutPicker.Handle) then
+    Result := PostMessage(CurrentLayoutPicker.Handle, WM_PICKER_KEY, AVkCode, 0) <> False;
+end;
+
+{ =============================================================================== }
+
+{ The process-wide last resort, installed as Application.OnException by the
+  program file.
+
+  It must never raise and never block: one debugger line, and at most one tray
+  balloon per session. Nothing here touches a file and no keystroke is ever
+  recorded (DebugLog writes to the debugger only). }
+procedure TAvroMainForm1.ReportUnhandledException(E: Exception);
+begin
+  try
+    if Assigned(E) then
+      Log('Unhandled ' + E.ClassName + ': ' + E.Message);
+
+    if FUnhandledReported then
+      Exit;
+    FUnhandledReported := True;
+
+    if Assigned(Tray) and Tray.Visible then
+    begin
+      Tray.BalloonTitle := 'Avro Keyboard';
+      Tray.BalloonHint := 'An internal error was handled and Avro is still running.' + sLineBreak + 'Restart Avro if typing misbehaves.';
+      Tray.BalloonTimeout := 5000;
+      Tray.ShowBalloonHint;
+    end;
+  except
+    { A crash reporter that raises is worse than the fault it reports. }
+  end;
 end;
 
 procedure TAvroMainForm1.TrayClick(Sender: TObject);

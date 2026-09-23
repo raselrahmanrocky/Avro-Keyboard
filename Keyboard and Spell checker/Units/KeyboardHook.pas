@@ -20,7 +20,11 @@ uses
 
 function Sethook(): Integer;
 procedure Removehook();
-function LowLevelKeyboardProc(nCode: Integer; wParam: wParam; lParam: lParam): longword; stdcall;
+
+{ The one hook procedure Windows ever calls. It is a thin, total wrapper around
+  LLHookBody below: nothing may escape a WH_KEYBOARD_LL callback, and the real
+  body keeps its own goto-based structure untouched. }
+function LowLevelKeyboardProc(nCode: Integer; wParam: WPARAM; lParam: LPARAM): LRESULT; stdcall;
 
 type
   pKBDLLHOOKSTRUCT = ^TKBDLLHOOKSTRUCT;
@@ -34,7 +38,11 @@ type
   end;
 
 var
-  HookRetVal: Integer;
+  { HHOOK, not Integer. On Win64 a hook handle is a pointer, and a truncated one
+    makes UnhookWindowsHookEx fail - so Removehook would not actually remove
+    anything, and every Removehook/Sethook pair (a layout switch, every window
+    z-order change) would stack another live copy of this hook. }
+  HookRetVal: HHOOK;
 
 const
   LLKHF_INJECTED = $10;
@@ -48,7 +56,9 @@ uses
   clsLayout,
   uRegistrySettings,
   uWindowHandlers,
-  uKeyboardMacro;
+  uKeyboardMacro,
+  DebugLog,
+  uPickerSupport;
 
 { =============================================================================== }
 
@@ -81,7 +91,9 @@ begin
     HookRetVal := SetWindowsHookEx(WH_KEYBOARD_LL, @LowLevelKeyboardProc, hInstance, 0);
     if HookRetVal <> 0 then
     begin
-      Result := HookRetVal;
+      { Every caller only tests "> 0". A hook handle is a pointer and must not
+        travel through an Integer. }
+      Result := 1;
       IsHook := True;
     end
     else
@@ -103,7 +115,13 @@ end;
 
 procedure Removehook();
 begin
-  UnhookWindowsHookEx(HookRetVal);
+  { Idempotent, and safe when nothing was ever installed: Sethook calls it
+    before every install, and so do a layout switch and each window z-order
+    change. }
+  if HookRetVal <> 0 then
+    UnhookWindowsHookEx(HookRetVal);
+  HookRetVal := 0;
+  IsHook := False;
 end;
 
 { =============================================================================== }
@@ -166,14 +184,16 @@ end;
 
 { =============================================================================== }
 
-function LowLevelKeyboardProc(nCode: Integer; wParam: wParam; lParam: lParam): longword; stdcall;
+function LLHookBody(nCode: Integer; wParam: WPARAM; lParam: LPARAM): LRESULT; stdcall;
 var
-  kbdllhs:      pKBDLLHOOKSTRUCT;
-  ShouldBlock:  Boolean;
-  T:            string;
-  ShortcutText: string;
-  ConflictIdx:  Integer;
-  IsModifier:   Boolean;
+  kbdllhs:         pKBDLLHOOKSTRUCT;
+  ShouldBlock:     Boolean;
+  T:               string;
+  ShortcutText:    string;
+  ConflictIdx:     Integer;
+  IsModifier:      Boolean;
+  PickerOpen:      Boolean;
+  CommandModifier: Boolean;
 label
   ExitHere;
 
@@ -193,7 +213,7 @@ begin
     // ----------------------------------------------
     if kbdllhs.flags and LLKHF_INJECTED <> 0 then
     begin
-      LowLevelKeyboardProc := CallNextHookEx(HookRetVal, nCode, wParam, lParam);
+      Result := CallNextHookEx(HookRetVal, nCode, wParam, lParam);
       Exit;
     end;
 
@@ -202,9 +222,18 @@ begin
     // ----------------------------------------------
     if kbdllhs.vkCode = VK_PACKET then
     begin
-      LowLevelKeyboardProc := CallNextHookEx(HookRetVal, nCode, wParam, lParam);
+      Result := CallNextHookEx(HookRetVal, nCode, wParam, lParam);
       Exit;
     end;
+
+    // ----------------------------------------------
+    // The main form owns every path below: the layout engine, the hotkeys and
+    // both popups. FormClose nils it before the form is freed, so a key that
+    // arrives in that window must pass straight through rather than touch a
+    // freed form - or a layout engine that was just freed with it.
+    // ----------------------------------------------
+    if not Assigned(AvroMainForm1) then
+      goto ExitHere;
 
     // ----------------------------------------------
     // Clean state reset: After a hotkey was finalized, reset all tracked
@@ -255,7 +284,7 @@ begin
       if MatchesHotkeySettingTracked(ModeSwitchKey, kbdllhs.vkCode) or MatchesHotkeySettingTracked(ToggleOutputModeKey, kbdllhs.vkCode) or
         MatchesHotkeySettingTracked(SpellerLauncherKey, kbdllhs.vkCode) or MatchesHotkeySettingTracked(AnsiVersionSwitchKey, kbdllhs.vkCode) then
       begin
-        LowLevelKeyboardProc := 1;
+        Result := 1;
         Exit;
       end;
     end;
@@ -293,7 +322,7 @@ begin
         if (not TrackedCtrl) and (not TrackedShift) and (not TrackedAlt) and (not TrackedWin) and ((kbdllhs.vkCode < $70) or (kbdllhs.vkCode > $7B)) then
         begin
           // Reject this keypress but keep recording session alive
-          LowLevelKeyboardProc := CallNextHookEx(HookRetVal, nCode, wParam, lParam);
+          Result := CallNextHookEx(HookRetVal, nCode, wParam, lParam);
           Exit;
         end;
 
@@ -312,7 +341,7 @@ begin
             IsRecordingHotkey := False;
             RecordingTargetEdit := nil;
             RecordingFinalized := False;
-            LowLevelKeyboardProc := CallNextHookEx(HookRetVal, nCode, wParam, lParam);
+            Result := CallNextHookEx(HookRetVal, nCode, wParam, lParam);
             Exit;
           end;
           ClearConflictByIndex(ConflictIdx);
@@ -360,7 +389,7 @@ begin
         end;
       end;
 
-      LowLevelKeyboardProc := CallNextHookEx(HookRetVal, nCode, wParam, lParam);
+      Result := CallNextHookEx(HookRetVal, nCode, wParam, lParam);
       Exit;
     end;
 
@@ -369,16 +398,22 @@ begin
     // ----------------------------------------------
     if kbdllhs.vkCode = 144 then
     begin
-      LowLevelKeyboardProc := CallNextHookEx(HookRetVal, nCode, wParam, lParam);
+      Result := CallNextHookEx(HookRetVal, nCode, wParam, lParam);
       Exit;
     end;
 
     {$ENDREGION}
     {$REGION 'Keyboard layout management'}
-    // When the ANSI version picker is open, skip layout engine processing so
-    // letter/number keys reach the picker's own keyboard handlers instead of
-    // being consumed by the Bangla engine.
-    if not AvroMainForm1.IsPickerOpen then
+    // A visible picker owns the keyboard: it is the only surface the user is
+    // meant to be typing into, so neither the Bangla engine nor the application
+    // underneath may see the keys that are pressed while it is up.
+    //
+    // IsPickerOpen covers BOTH popups and goes False the instant one starts
+    // closing - before any modal dialog its own apply path raises (a mapping
+    // password, a layout-load failure) - so those dialogs still get their keys.
+    PickerOpen := AvroMainForm1.IsPickerOpen;
+
+    if not PickerOpen then
     begin
       if (wParam = 257) or (wParam = 261) then
       begin // Key Up
@@ -393,6 +428,38 @@ begin
           SendKey_Char(T);
         if ShouldBlock = True then
           goto ExitHere;
+      end;
+    end
+    else
+    begin
+      { The picker has no Win32 focus on the machines this exists for, so the
+        key is swallowed here and handed to it by PostMessage instead. Blocking
+        the physical key is also what guarantees a key is never handled twice:
+        the popup can not receive it through the window manager as well.
+
+        Keys pressed with Ctrl/Alt/Win are deliberately left alone - they are
+        application shortcuts or the configured hotkeys, which the region below
+        still handles, and that is what keeps the very hotkey that opened the
+        popup working as the toggle that closes it. Shift is allowed, so `B`
+        and `b` both reach the first-letter shortcut. }
+      CommandModifier := TrackedCtrl or TrackedAlt or TrackedWin or ((GetAsyncKeyState(VK_CONTROL) and $8000) <> 0) or
+        ((GetAsyncKeyState(VK_MENU) and $8000) <> 0) or ((GetAsyncKeyState(VK_LWIN) and $8000) <> 0) or ((GetAsyncKeyState(VK_RWIN) and $8000) <> 0);
+
+      if (not CommandModifier) and IsPickerNavigableKey(kbdllhs.vkCode) then
+      begin
+        if (wParam = 256) or (wParam = 260) then
+        begin // KeyDown
+          if AvroMainForm1.RouteKeyToPicker(kbdllhs.vkCode) then
+          begin
+            ShouldBlock := True;
+            goto ExitHere;
+          end;
+        end
+        else if (wParam = 257) or (wParam = 261) then
+        begin // KeyUp for a KeyDown that was swallowed above
+          ShouldBlock := True;
+          goto ExitHere;
+        end;
       end;
     end;
 
@@ -551,12 +618,39 @@ begin
 
 ExitHere:
   if ShouldBlock = True then
-    LowLevelKeyboardProc := 1
+    Result := 1
   else
   begin
-    LowLevelKeyboardProc := CallNextHookEx(HookRetVal, nCode, wParam, lParam);
+    Result := CallNextHookEx(HookRetVal, nCode, wParam, lParam);
   end;
 
+end;
+
+{ =============================================================================== }
+
+{ The exported hook procedure, and the only function Windows ever calls into.
+
+  Nothing may escape a WH_KEYBOARD_LL callback. It runs on the message-loop
+  thread for every keystroke on the machine, so an exception raised here is
+  raised inside GetMessage/DispatchMessage - and inside the modal loops of the
+  popups' own prompts - which on some Windows builds ends the process with no
+  dialog and no tray icon. So: swallow it, note the class and message (never the
+  key that was pressed), and let the key through untouched. }
+function LowLevelKeyboardProc(nCode: Integer; wParam: WPARAM; lParam: LPARAM): LRESULT; stdcall;
+begin
+  try
+    Result := LLHookBody(nCode, wParam, lParam);
+  except
+    on E: Exception do
+    begin
+      Log('KeyboardHook: ' + E.ClassName + ': ' + E.Message);
+      try
+        Result := CallNextHookEx(HookRetVal, nCode, wParam, lParam);
+      except
+        Result := 0;
+      end;
+    end;
+  end;
 end;
 
 end.

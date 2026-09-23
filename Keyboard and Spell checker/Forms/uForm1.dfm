@@ -1884,6 +1884,7 @@ object AvroMainForm1: TAvroMainForm1
     Top = 136
   end
   object AppEvents: TApplicationEvents
+    OnException = AppEventsException
     OnSettingChange = AppEventsSettingChange
     Left = 636
     Top = 288
