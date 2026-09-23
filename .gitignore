@@ -105,3 +105,8 @@ keys/
 # shell rewrites a file name there (the layout icons are regenerated at
 # runtime), it is read by nothing in the code and nothing in the build.
 desktop.ini
+
+# Ai agent
+.freebuff
+.kilo
+

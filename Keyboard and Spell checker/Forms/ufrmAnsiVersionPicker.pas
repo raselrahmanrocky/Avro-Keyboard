@@ -26,6 +26,7 @@ uses
   uRegistrySettings,
   clsUnicodeToBijoy2000,
   uThemeManager,
+  uPickerSupport,
   System.IOUtils;
 
 const
@@ -65,22 +66,49 @@ type
       // Resolved once per open (the form is created fresh every time it is
       // shown), so the draw handler never reads the registry.
       FTheme: TAppThemePalette;
-      function GetSelectedVersion: string;
+
+      { Lifetime. A selection can be applied from four places (its own keys, its
+        own mouse, the hotkey, a context-menu command), and the apply path can
+        raise a modal password prompt or message box - so every one of them goes
+        through BeginClose/FinishClose and the state is explicit. }
+      FClosing:      Boolean; // no longer accepts input; unregistered; hidden
+      FFinished:     Boolean; // destruction has been asked for
+      FApplying:     Boolean; // a selection is being applied on this stack
+      FInMenuLoop:   Boolean; // our own popup menu owns the stack right now
+      FPendingFree:  Boolean; // FinishClose was requested while the menu was up
+
+      { Focus is best effort only - the keyboard hook delivers the navigation
+        keys whether or not this popup ever owns the foreground. }
+      FShownAt:       DWORD;
+      FWasForeground: Boolean;
+      FFocusTries:    Integer;
+
       function RowIconHandle(const AVersionName: string): HICON;
       procedure AutoSizeForm;
-      procedure CloseAndRestoreTarget;
-      function HandlePickerKey(var AKey: Word): Boolean;
-      function HandlePickerChar(var AChar: Char): Boolean;
-      procedure MoveSelection(ADelta: Integer);
-      procedure ActivateIndex(AIndex: Integer);
+      procedure TryActivateSelf;
+      procedure ApplySelection(const ASelectedVersion: string);
       procedure FormPaint(Sender: TObject);
       procedure WMNCActivate(var Msg: TWMNCActivate); message WM_NCACTIVATE;
       procedure WMFocusPicker(var Msg: TMessage); message WM_FOCUS_PICKER;
+      procedure WMPickerKey(var Msg: TMessage); message WM_PICKER_KEY;
+      procedure WMPickerDismiss(var Msg: TMessage); message WM_PICKER_DISMISS;
       procedure WMTimer(var Msg: TMessage); message WM_TIMER;
     public
       procedure Setup;
       procedure PopulateVersions;
       procedure PositionFormNearCursor;
+
+      { Snapshot the selection, close, then apply on the main form. }
+      procedure ActivateIndex(AIndex: Integer);
+      function HandlePickerKey(var AKey: Word): Boolean;
+      procedure HandlePickerChar(var AChar: Char);
+
+      { Close with no change. }
+      procedure RequestDismiss;
+      procedure BeginClose;
+      procedure FinishClose;
+
+      property Closing: Boolean read FClosing;
     protected
       procedure CreateParams(var Params: TCreateParams); override;
       destructor Destroy; override;
@@ -99,57 +127,38 @@ uses
   uAvroEncoManager,
   uAvroEncoImporter,
   uAvroEncoCrypto,
-  uAnsiEngineManager;
-
-procedure ForceForegroundWindow(HWND: HWND);
-var
-  ForeThread, ThisThread: DWORD;
-begin
-  if not IsWindow(HWND) then
-    Exit;
-  ForeThread := GetWindowThreadProcessId(GetForegroundWindow, nil);
-  ThisThread := GetCurrentThreadId;
-  if ForeThread <> ThisThread then
-  begin
-    AttachThreadInput(ForeThread, ThisThread, True);
-    try
-      SetForegroundWindow(HWND);
-      BringWindowToTop(HWND);
-      Windows.SetFocus(HWND);
-    finally
-      AttachThreadInput(ForeThread, ThisThread, False);
-    end;
-  end
-  else
-  begin
-    SetForegroundWindow(HWND);
-    BringWindowToTop(HWND);
-    Windows.SetFocus(HWND);
-  end;
-end;
+  uAnsiEngineManager,
+  DebugLog;
 
 procedure ShowAnsiVersionPicker;
 var
   Picker: TfrmAnsiVersionPicker;
 begin
+  // The hotkey that got here has already been swallowed by the hook, so opening
+  // the popup is the whole job. Pressing it again while the popup is up closes
+  // it: that is the toggle.
   if Assigned(CurrentPicker) then
   begin
-    CurrentPicker.Close;
-    CurrentPicker := nil;
+    CurrentPicker.RequestDismiss;
     Exit;
   end;
+
   Picker := TfrmAnsiVersionPicker.CreateNew(Application);
   try
     Picker.Setup;
     Picker.PositionFormNearCursor;
     CurrentPicker := Picker;
     Picker.Show;
-    ForceForegroundWindow(Picker.Handle);
   except
-    Picker.Free;
-    if CurrentPicker = Picker then
-      CurrentPicker := nil;
-    raise;
+    on E: Exception do
+    begin
+      // A popup that fails to open must not take the process down with it (the
+      // hotkey has already been swallowed, so nothing else would report this).
+      Log('AnsiPicker: open failed - ' + E.ClassName + ': ' + E.Message);
+      if CurrentPicker = Picker then
+        CurrentPicker := nil;
+      Picker.Free;
+    end;
   end;
 end;
 
@@ -163,16 +172,17 @@ begin
   Params.ExStyle := WS_EX_TOPMOST or WS_EX_TOOLWINDOW;
 end;
 
-procedure TfrmAnsiVersionPicker.WMNCActivate(var Msg: TWMNCActivate);
-begin
-  inherited;
-  if not Msg.Active then
-    PostMessage(Handle, WM_CLOSE, 0, 0);
-end;
-
 procedure TfrmAnsiVersionPicker.Setup;
 begin
   FHoverIndex := -1;
+  FClosing := False;
+  FFinished := False;
+  FApplying := False;
+  FInMenuLoop := False;
+  FPendingFree := False;
+  FShownAt := GetTickCount;
+  FWasForeground := False;
+  FFocusTries := 0;
   FPrevFocusedWindow := GetFocus;
   FPrevForegroundWindow := GetForegroundWindow;
   // Resolve the theme palette here, once: the picker is created fresh on every
@@ -209,6 +219,10 @@ begin
   // (Vcl.Controls.DoKeyDown/DoKeyPress return True), so a key that the form
   // handles can never reach the list box handlers as well.
   //
+  // These are the fallback path: while the keyboard hook is live it blocks the
+  // physical key and posts WM_PICKER_KEY instead, and both paths run the same
+  // HandlePickerKey - so a key is handled exactly once either way.
+  //
   // ActiveControl is deliberately NOT set here: the form is still invisible in
   // Setup, so TWinControl.CanFocus is False and TCustomForm.SetActiveControl
   // would raise EInvalidOperation (SCannotFocus). Focus is established after
@@ -234,62 +248,133 @@ end;
 
 procedure TfrmAnsiVersionPicker.FormShow(Sender: TObject);
 begin
+  FShownAt := GetTickCount;
+  FWasForeground := False;
+  FFocusTries := 0;
   SetTimer(Handle, 1, 200, nil);
+  // Outside clicks have to be noticed even when this popup never becomes the
+  // foreground window, which is exactly the case on the machines this fixes.
+  PickerMouseHookInstall(Handle);
   PostMessage(Handle, WM_FOCUS_PICKER, 0, 0);
 end;
 
 procedure TfrmAnsiVersionPicker.WMFocusPicker(var Msg: TMessage);
 begin
-  if not IsWindow(Handle) then
+  if FClosing or (not IsWindow(Handle)) then
     Exit;
-  ForceForegroundWindow(Handle);
+  TryActivateSelf;
   // CanFocus only walks the visible/enabled chain - it says nothing about who
-  // really owns the input focus, which is why this check made the shortcuts go
-  // dead while mouse clicks kept working. Move the focus, then verify.
+  // really owns the input focus. Move the focus, then verify - but never make
+  // anything depend on it: the fallback is the hook, not this.
   if ListBox.CanFocus then
     ListBox.SetFocus;
-  if GetFocus <> ListBox.Handle then
-  begin
-    // ListBox.SetFocus may have failed (activation race): ensure the form
-    // itself holds focus so KeyPreview can route keys to FormKeyDown.
-    if GetFocus <> Handle then
-      Windows.SetFocus(Handle);
-    // Last-resort fallback: post WM_SETFOCUS to the ListBox.
-    if GetFocus <> ListBox.Handle then
-      PostMessage(ListBox.Handle, WM_SETFOCUS, 0, 0);
-  end;
+end;
+
+{ Best effort, and never a precondition: if Windows refuses this popup the
+  foreground (foreground lock, UIPI, an elevated or fullscreen target), the
+  window stays visible and the hook still delivers every navigation key. }
+procedure TfrmAnsiVersionPicker.TryActivateSelf;
+var
+  BecameForeground: Boolean;
+begin
+  if FClosing or (not IsWindow(Handle)) then
+    Exit;
+  PickerBringToForeground(Handle, BecameForeground);
+  // Only ever set, never cleared: it records that the foreground was granted at
+  // least once, which is what makes a later loss of it a real deactivation.
+  if BecameForeground then
+    FWasForeground := True;
 end;
 
 procedure TfrmAnsiVersionPicker.WMTimer(var Msg: TMessage);
 begin
-  // Never close the picker while an app-modal dialog (e.g. the password
-  // prompt) is up: closing+freeing the picker from the timer during
-  // ListBoxClick's ShowModal would continue executing on a freed form.
+  if FClosing then
+    Exit;
+
+  // Never touch a popup while one of our own modal dialogs is up (the mapping
+  // password prompt): closing here is what used to free the form while its own
+  // ListBoxClick was still on the stack.
   if Application.ModalLevel <> 0 then
     Exit;
 
-  if GetForegroundWindow <> Handle then
+  if not IsWindowVisible(Handle) then
   begin
-    KillTimer(Handle, 1);
-    Close;
+    RequestDismiss;
     Exit;
   end;
 
-  // Foreground, but the focus went elsewhere (activation raced with the menu
-  // that opened the picker): the window looks alive and simply ignores the
-  // keyboard. Re-assert the focus; SetFocus is idempotent once it holds.
-  //
-  // If focus is not on either the form or the ListBox, restore it to the form
-  // first (KeyPreview routes keys to FormKeyDown), then promote to the ListBox.
-  if (GetFocus <> Handle) and (GetFocus <> ListBox.Handle) then
-    Windows.SetFocus(Handle);
-  if (GetFocus <> ListBox.Handle) and ListBox.CanFocus then
-    ListBox.SetFocus;
+  // Close on a REAL deactivation only: the popup did hold the foreground at
+  // least once and no longer does. A popup that was never granted the
+  // foreground must not be closed for it - that rule is what made the popups
+  // unusable on those machines.
+  if GetForegroundWindow = Handle then
+    FWasForeground := True
+  else if FWasForeground and (GetTickCount - FShownAt > PICKER_ACTIVATION_GRACE_MS) then
+  begin
+    RequestDismiss;
+    Exit;
+  end;
+
+  if (not FWasForeground) and (FFocusTries < PICKER_FOCUS_ATTEMPTS) then
+  begin
+    Inc(FFocusTries);
+    TryActivateSelf;
+  end;
+end;
+
+procedure TfrmAnsiVersionPicker.WMNCActivate(var Msg: TWMNCActivate);
+begin
+  inherited;
+
+  if Msg.Active then
+  begin
+    FWasForeground := True;
+    Exit;
+  end;
+
+  // Same predicate as the timer: ignoring the first activation flicker is the
+  // whole point, because closing on it is what made the popup vanish the
+  // instant it appeared.
+  if (not FClosing) and FWasForeground and (Application.ModalLevel = 0) and
+    (GetTickCount - FShownAt > PICKER_ACTIVATION_GRACE_MS) then
+    RequestDismiss;
+end;
+
+procedure TfrmAnsiVersionPicker.WMPickerKey(var Msg: TMessage);
+var
+  Key: Word;
+begin
+  Key := Word(Msg.WParam);
+  HandlePickerKey(Key);
+end;
+
+procedure TfrmAnsiVersionPicker.WMPickerDismiss(var Msg: TMessage);
+begin
+  RequestDismiss;
 end;
 
 procedure TfrmAnsiVersionPicker.FormClose(Sender: TObject; var Action: TCloseAction);
 begin
-  KillTimer(Handle, 1);
+  if FApplying then
+  begin
+    // A selection is being applied on this form's stack (and may pump messages
+    // in a password prompt or the switch toast). Do not destroy the form under
+    // it - the caller's FinishClose owns the destruction.
+    Action := caHide;
+    if CurrentPicker = Self then
+      CurrentPicker := nil;
+    Exit;
+  end;
+
+  // Every close route ends here: Escape, a selection, an outside click, the
+  // hotkey, or the VCL's own WM_CLOSE handling. Stopping the timer and the
+  // mouse hook here as well keeps that single-shot whichever way it arrived.
+  FClosing := True;
+  if HandleAllocated then
+  begin
+    KillTimer(Handle, 1);
+    PickerMouseHookRemove(Handle);
+  end;
   Action := caFree;
   if CurrentPicker = Self then
     CurrentPicker := nil;
@@ -297,9 +382,80 @@ end;
 
 destructor TfrmAnsiVersionPicker.Destroy;
 begin
+  if HandleAllocated then
+  begin
+    KillTimer(Handle, 1);
+    PickerMouseHookRemove(Handle);
+  end;
   if CurrentPicker = Self then
     CurrentPicker := nil;
   inherited;
+end;
+
+procedure TfrmAnsiVersionPicker.BeginClose;
+begin
+  if FClosing then
+    Exit;
+  FClosing := True;
+
+  // Unregister FIRST, before anything this popup may do from here on. The hook
+  // asks IsPickerOpen / RouteKeyToPicker, and the apply path below raises a
+  // modal password prompt or message box: as long as the popup is still
+  // registered the hook would keep swallowing the Enter, letters and digits
+  // that prompt needs.
+  if CurrentPicker = Self then
+    CurrentPicker := nil;
+
+  if HandleAllocated then
+  begin
+    KillTimer(Handle, 1);
+    PickerMouseHookRemove(Handle);
+  end;
+
+  Hide;
+end;
+
+procedure TfrmAnsiVersionPicker.FinishClose;
+begin
+  if FFinished then
+    Exit;
+
+  if FInMenuLoop then
+  begin
+    // One of our own popup menus owns the stack: destroying this form now would
+    // destroy the very control TrackPopupMenu is going to return into. The
+    // command handler that asked for this will be finished when the menu loop
+    // unwinds, and ListBoxMouseUp closes the popup then.
+    FPendingFree := True;
+    Exit;
+  end;
+
+  FFinished := True;
+  if not FClosing then
+    FClosing := True;
+
+  if HandleAllocated then
+  begin
+    KillTimer(Handle, 1);
+    PickerMouseHookRemove(Handle);
+  end;
+
+  PickerRestoreForeground(FPrevFocusedWindow, FPrevForegroundWindow);
+
+  // FormClose sets caFree; the VCL defers the destruction (Release) until after
+  // the message being processed now returns, so whatever handler is still on
+  // this stack finishes on a live object.
+  Close;
+end;
+
+procedure TfrmAnsiVersionPicker.RequestDismiss;
+begin
+  // A pending apply owns the lifetime: its own FinishClose will release this
+  // form, and closing again from here could destroy it mid-apply.
+  if FClosing then
+    Exit;
+  BeginClose;
+  FinishClose;
 end;
 
 procedure TfrmAnsiVersionPicker.PopulateVersions;
@@ -313,7 +469,7 @@ begin
     // The name list is cached on the main form and kept fresh by the
     // directory watcher / periodic poll / import / delete flows - opening
     // the picker costs no disk I/O and no duplicate-cleanup side effects.
-    if Assigned(AvroMainForm1.AnsiMappingNames) then
+    if Assigned(AvroMainForm1) and Assigned(AvroMainForm1.AnsiMappingNames) then
       for I := 0 to AvroMainForm1.AnsiMappingNames.Count - 1 do
         ListBox.Items.Add(AvroMainForm1.AnsiMappingNames[I]);
   finally
@@ -381,14 +537,6 @@ begin
     Top := Monitor.WorkAreaRect.Top;
 end;
 
-function TfrmAnsiVersionPicker.GetSelectedVersion: string;
-begin
-  if ListBox.ItemIndex < 0 then
-    Result := ''
-  else
-    Result := ListBox.Items[ListBox.ItemIndex];
-end;
-
 { Fills the thin band the list box does not cover and draws the themed 1px
   frame around it; AutoSizeForm insets the list box by one pixel so that frame
   stays visible on all four sides. }
@@ -422,14 +570,14 @@ var
   DisplayText:         string;
   IconHandle:          HICON;
 begin
-  if (index < 0) or (index >= ListBox.Items.Count) then
+  if (Index < 0) or (Index >= ListBox.Items.Count) then
   begin
     ListBox.Canvas.Brush.Color := FTheme.Background;
     ListBox.Canvas.FillRect(Rect);
     Exit;
   end;
-  IsActive := SameText(AnsiVersion, ListBox.Items[index]);
-  IsHovered := (index = FHoverIndex) or (odSelected in State);
+  IsActive := SameText(AnsiVersion, ListBox.Items[Index]);
+  IsHovered := (Index = FHoverIndex) or (odSelected in State);
 
   // 1. Base background
   ListBox.Canvas.Brush.Color := FTheme.Background;
@@ -461,10 +609,10 @@ begin
   // 5. Draw item text
   ListBox.Canvas.Brush.Style := bsClear;
   ListBox.Canvas.Font.Color := FTheme.Text;
-  if index < 9 then
-    DisplayText := IntToStr(index + 1) + '. ' + ListBox.Items[index]
+  if Index < 9 then
+    DisplayText := IntToStr(Index + 1) + '. ' + ListBox.Items[Index]
   else
-    DisplayText := ListBox.Items[index];
+    DisplayText := ListBox.Items[Index];
   ListBox.Canvas.TextOut(Rect.Left + 34, Rect.Top + 4, DisplayText);
 
   ListBox.Canvas.Brush.Style := bsSolid;
@@ -473,7 +621,7 @@ begin
   // Encoding" submenu shows, so the picker and the menu agree about which
   // encoding carries which icon. Rows without an icon ('Default', or a
   // container whose icon section is missing) stay badge-free.
-  IconHandle := RowIconHandle(ListBox.Items[index]);
+  IconHandle := RowIconHandle(ListBox.Items[Index]);
   if IconHandle <> 0 then
     DrawIconEx(ListBox.Canvas.Handle, Rect.Right - BADGE_RIGHT_GAP - BADGE_SIZE, Rect.Top + ((Rect.Bottom - Rect.Top - BADGE_SIZE) div 2), IconHandle,
       BADGE_SIZE, BADGE_SIZE, 0, 0, DI_NORMAL);
@@ -497,38 +645,56 @@ begin
   ListBox.Invalidate;
 end;
 
-procedure TfrmAnsiVersionPicker.CloseAndRestoreTarget;
+{ Mouse selection is unchanged: a click applies that row and closes. }
+procedure TfrmAnsiVersionPicker.ListBoxClick(Sender: TObject);
 begin
-  KillTimer(Handle, 1);
-  Hide;
-  if CurrentPicker = Self then
-    CurrentPicker := nil;
-  if IsWindow(FPrevForegroundWindow) then
-    ForceForegroundWindow(FPrevForegroundWindow)
-  else if IsWindow(FPrevFocusedWindow) then
-    ForceForegroundWindow(FPrevFocusedWindow);
-  Release;
+  ActivateIndex(ListBox.ItemIndex);
 end;
 
-procedure TfrmAnsiVersionPicker.ListBoxClick(Sender: TObject);
+{ The one activation path, shared by the mouse, the posted key message and the
+  fallback key handlers.
+
+  The choice is snapshotted first and the popup is unregistered and hidden
+  before any of the engine work runs, so nothing that work does - including the
+  modal password prompt and the switch toast - can come back to a popup that has
+  already been released. The form is destroyed only after that work returns. }
+procedure TfrmAnsiVersionPicker.ActivateIndex(AIndex: Integer);
 var
-  SelectedVersion, ErrorMsg, TargetPath: string;
-  Password:                              AnsiString;
-  PreloadThread:                         TAnsiPreloadThread;
-  ErrList:                               TStringList;
+  SelectedVersion: string;
 begin
-  if not Assigned(CurrentPicker) then
+  if FClosing then
+    Exit;
+  if (AIndex < 0) or (AIndex >= ListBox.Items.Count) then
     Exit;
 
-  SelectedVersion := GetSelectedVersion;
+  SelectedVersion := ListBox.Items[AIndex];
   if SelectedVersion = '' then
     Exit;
 
-  // End the popup/focus lifetime before any engine/settings operation.
-  CloseAndRestoreTarget;
+  ListBox.ItemIndex := AIndex;
+
+  BeginClose;
+  FApplying := True;
+  try
+    ApplySelection(SelectedVersion);
+  finally
+    FApplying := False;
+    FinishClose;
+  end;
+end;
+
+procedure TfrmAnsiVersionPicker.ApplySelection(const ASelectedVersion: string);
+var
+  ErrorMsg, TargetPath: string;
+  Password:             AnsiString;
+  PreloadThread:        TAnsiPreloadThread;
+  ErrList:              TStringList;
+begin
+  if not Assigned(AvroMainForm1) then
+    Exit;
 
   // Default
-  if SameText(SelectedVersion, 'Default') then
+  if SameText(ASelectedVersion, 'Default') then
   begin
     ErrorMsg := '';
     if not AnsiEngineManager.TrySwitchCached('Default') then
@@ -557,10 +723,10 @@ begin
     Exit;
   end;
 
-  TargetPath := GetActiveEncoFilePath(SelectedVersion, AnsiMappingDir);
+  TargetPath := GetActiveEncoFilePath(ASelectedVersion, AnsiMappingDir);
   if TargetPath = '' then
   begin
-    Application.MessageBox(PChar('Mapping file not found: ' + SelectedVersion), 'ANSI Mapping Error', MB_ICONWARNING or MB_OK or MB_TOPMOST or
+    Application.MessageBox(PChar('Mapping file not found: ' + ASelectedVersion), 'ANSI Mapping Error', MB_ICONWARNING or MB_OK or MB_TOPMOST or
         MB_SETFOREGROUND);
     Exit;
   end;
@@ -572,10 +738,14 @@ begin
   // Ask only when THIS encoding was never unlocked on this computer; the
   // per-file cache then unlocks every later switch silently (even after a
   // full restart). Default-key files never prompt.
+  //
+  // The prompt is modal and this form is unregistered and hidden by then, so
+  // the keyboard hook no longer intercepts the keys the user types into it and
+  // the deferred destruction can not run while this stack is still live.
   if IsEncoFile(TargetPath) and (GetEncoCachedPassword(TargetPath) = '') and (GetAvroEncoProtectionFlag(TargetPath) = AVROENCO_FLAG_USER_PASSWORD) then
   begin
     if not PromptForPasswordAndValidate(TargetPath, Password) then
-      Exit; // Cancelled - keep the picker open so another version can be chosen.
+      Exit; // Cancelled - the picker stays closed and the encoding is unchanged.
     CachedEncoPassword := Password;
     RememberEncoPassword(TargetPath, Password);
     SaveSettings;
@@ -586,7 +756,7 @@ begin
     // other container was being parsed just for the privilege of sitting in
     // RAM. CapturePreloadItem returns a single item - the one the user is
     // about to select.
-    PreloadThread := TAnsiPreloadThread.Create(AnsiEngineManager.CapturePreloadItem(SelectedVersion));
+    PreloadThread := TAnsiPreloadThread.Create(AnsiEngineManager.CapturePreloadItem(ASelectedVersion));
     PreloadThread.FreeOnTerminate := True;
     PreloadThread.Start;
   end;
@@ -604,12 +774,12 @@ begin
   // path first, blocking repair parse second. The hourglass covers the
   // repair (decrypt + heavy V3 parse can take a moment on cold start).
   ErrorMsg := '';
-  if not AnsiEngineManager.TrySwitchCached(SelectedVersion) then
+  if not AnsiEngineManager.TrySwitchCached(ASelectedVersion) then
   begin
     Screen.Cursor := crHourGlass;
     ErrList := TStringList.Create;
     try
-      if not AnsiEngineManager.SwitchEngine(SelectedVersion, ErrList) then
+      if not AnsiEngineManager.SwitchEngine(ASelectedVersion, ErrList) then
         ErrorMsg := 'Encoding is still being prepared. Please select it again.';
     finally
       ErrList.Free;
@@ -618,13 +788,13 @@ begin
   end;
   if ErrorMsg = '' then
   begin
-    AnsiVersion := SelectedVersion;
-    AvroMainForm1.SyncActiveMappingTimestamp(SelectedVersion);
+    AnsiVersion := ASelectedVersion;
+    AvroMainForm1.SyncActiveMappingTimestamp(ASelectedVersion);
     SaveAnsiVersionOnly;
-    AvroMainForm1.UpdateAnsiVersionMenuChecks(SelectedVersion);
+    AvroMainForm1.UpdateAnsiVersionMenuChecks(ASelectedVersion);
     AvroMainForm1.UpdateTrayIcon;
     if ShowAnsiSwitchNotification = 'YES' then
-      ShowAnsiToastNotification('ANSI Version: ' + SelectedVersion);
+      ShowAnsiToastNotification('ANSI Version: ' + ASelectedVersion);
 
     Exit;
   end;
@@ -636,81 +806,58 @@ begin
   // while typing still produces the previous engine's output.
   ShowAnsiToastNotification('ANSI encoding failed to load - try again');
 end;
+
 { =============================================================================== }
 { Keyboard shortcuts }
 { =============================================================================== }
-
-{ Confirms AIndex exactly like a mouse click does: select the row, switch the
-  engine, persist the setting and close the picker. }
-procedure TfrmAnsiVersionPicker.ActivateIndex(AIndex: Integer);
-begin
-  if (AIndex < 0) or (AIndex >= ListBox.Items.Count) then
-    Exit;
-  ListBox.ItemIndex := AIndex;
-  ListBoxClick(nil);
-end;
-
-{ Wrapping selection move. Needed at form level too: when the form window holds
-  the focus, the list box never sees VK_UP / VK_DOWN at all. }
-procedure TfrmAnsiVersionPicker.MoveSelection(ADelta: Integer);
-begin
-  if ListBox.Items.Count = 0 then
-    Exit;
-  if ListBox.ItemIndex < 0 then
-    ListBox.ItemIndex := 0
-  else
-    ListBox.ItemIndex := (ListBox.ItemIndex + ADelta + ListBox.Items.Count) mod ListBox.Items.Count;
-end;
 
 { The single key implementation. Returns True when the key was consumed, and the
   caller is expected to zero it - which is also what makes VCL skip the other
   handler for the same key, so a shortcut can never be handled twice. }
 function TfrmAnsiVersionPicker.HandlePickerKey(var AKey: Word): Boolean;
 var
-  TargetIdx: Integer;
-begin
-  Result := True;
-  case AKey of
-    VK_ESCAPE:
-      if Assigned(CurrentPicker) then
-        Close;
-    VK_RETURN:
-      if ListBox.ItemIndex >= 0 then
-        ListBoxClick(nil);
-    VK_UP:
-      MoveSelection(-1);
-    VK_DOWN:
-      MoveSelection(1);
-    else
-      begin
-        // Number row (VK_1..VK_9) and numpad (VK_NUMPAD1..VK_NUMPAD9), mapping
-        // to the very numbers the list draws next to the rows.
-        TargetIdx := MappingIndexForKey(ListBox.Items, AKey);
-        if TargetIdx < 0 then
-          Result := False
-        else
-          ActivateIndex(TargetIdx);
-      end;
-  end;
-  if Result then
-    AKey := 0;
-end;
-
-{ First-letter navigation. Zeroing AChar also suppresses the list box's own
-  type-ahead for the same letter, so the selection happens exactly once. }
-function TfrmAnsiVersionPicker.HandlePickerChar(var AChar: Char): Boolean;
-var
-  TargetIdx: Integer;
+  Consumed:    Boolean;
+  ActivateIdx: Integer;
 begin
   Result := False;
-  if AChar < ' ' then
+  if FClosing then
     Exit;
-  TargetIdx := MappingIndexForChar(ListBox.Items, AChar);
-  if TargetIdx < 0 then
+
+  HandlePickerNavigation(ListBox, AKey, Consumed, ActivateIdx);
+  if not Consumed then
     Exit;
-  AChar := #0;
+
   Result := True;
-  ActivateIndex(TargetIdx);
+  AKey := 0;
+
+  if ActivateIdx = -2 then
+    RequestDismiss
+  else if ActivateIdx >= 0 then
+    ActivateIndex(ActivateIdx);
+end;
+
+{ First-letter navigation for the real-keypress fallback: the hook path maps the
+  VK code itself (see PickerIndexForKey), this maps the character it produced.
+  Zeroing AChar also suppresses the list box's own type-ahead for the same
+  letter, so the selection happens exactly once. }
+procedure TfrmAnsiVersionPicker.HandlePickerChar(var AChar: Char);
+var
+  Key:         Word;
+  Consumed:    Boolean;
+  ActivateIdx: Integer;
+begin
+  // CharInSet, not `in`: a set of Char is a byte set, so a Bangla character
+  // whose low byte happens to land in one of these ranges would match.
+  if FClosing or (not CharInSet(AChar, ['0' .. '9', 'A' .. 'Z', 'a' .. 'z'])) then
+    Exit;
+
+  Key := Ord(UpCase(AChar));
+  HandlePickerNavigation(ListBox, Key, Consumed, ActivateIdx);
+  if Consumed then
+    AChar := #0;
+
+  if ActivateIdx >= 0 then
+    ActivateIndex(ActivateIdx);
 end;
 
 procedure TfrmAnsiVersionPicker.FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
@@ -772,7 +919,21 @@ begin
   begin
     ListBox.ItemIndex := Idx;
     BuildPopupMenu(ListBox.Items[Idx]);
-    FPopup.Popup(Mouse.CursorPos.X, Mouse.CursorPos.Y);
+    // The menu is a separate top-level window that is not a child of this form,
+    // so a click on it would otherwise look exactly like a click outside and
+    // tear the popup down mid-selection.
+    PickerMouseHookSuspend;
+    FInMenuLoop := True;
+    try
+      FPopup.Popup(Mouse.CursorPos.X, Mouse.CursorPos.Y);
+    finally
+      FInMenuLoop := False;
+      PickerMouseHookResume;
+      // A menu command may have asked to close while this loop was up; that is
+      // the only moment it is safe to destroy the form.
+      if FPendingFree then
+        FinishClose;
+    end;
   end;
 end;
 
@@ -783,37 +944,46 @@ var
 begin
   if not(Sender is TMenuItem) then
     Exit;
-  Close;
   MapName := (Sender as TMenuItem).Hint;
-
-  if SameText(MapName, 'Default') then
-  begin
-    MessageDlg('Built-in Default mapping cannot be exported as a file.' + sLineBreak + 'It is compiled into Avro Keyboard.', mtInformation, [mbOK], 0);
+  if MapName = '' then
     Exit;
-  end;
 
-  SourcePath := AnsiMappingDir + MapName + '.AvroEnco';
-  if not FileExists(SourcePath) then
-  begin
-    MessageDlg('Mapping file not found: ' + MapName, mtError, [mbOK], 0);
-    Exit;
-  end;
-
-  SaveDlg := TSaveDialog.Create(nil);
+  // Snapshot the name, unregister and hide - then do the work. The save dialog
+  // below pumps messages, and no handler may run on a form that has already
+  // been freed.
+  BeginClose;
   try
-    SaveDlg.Filter := 'Avro Encoded Mapping|*.AvroEnco';
-    SaveDlg.DefaultExt := 'AvroEnco';
-    SaveDlg.Title := 'Export ' + MapName + ' Mapping';
-    SaveDlg.FileName := MapName + '.AvroEnco';
-    if SaveDlg.Execute then
+    if SameText(MapName, 'Default') then
     begin
-      if Windows.CopyFile(PChar(SourcePath), PChar(SaveDlg.FileName), False) then
-        MessageDlg('Mapping exported to: '#13#10 + SaveDlg.FileName, mtInformation, [mbOK], 0)
-      else
-        MessageDlg('Failed to export file: ' + SysErrorMessage(GetLastError), mtError, [mbOK], 0);
+      MessageDlg('Built-in Default mapping cannot be exported as a file.' + sLineBreak + 'It is compiled into Avro Keyboard.', mtInformation, [mbOK], 0);
+      Exit;
+    end;
+
+    SourcePath := AnsiMappingDir + MapName + '.AvroEnco';
+    if not FileExists(SourcePath) then
+    begin
+      MessageDlg('Mapping file not found: ' + MapName, mtError, [mbOK], 0);
+      Exit;
+    end;
+
+    SaveDlg := TSaveDialog.Create(nil);
+    try
+      SaveDlg.Filter := 'Avro Encoded Mapping|*.AvroEnco';
+      SaveDlg.DefaultExt := 'AvroEnco';
+      SaveDlg.Title := 'Export ' + MapName + ' Mapping';
+      SaveDlg.FileName := MapName + '.AvroEnco';
+      if SaveDlg.Execute then
+      begin
+        if Windows.CopyFile(PChar(SourcePath), PChar(SaveDlg.FileName), False) then
+          MessageDlg('Mapping exported to: '#13#10 + SaveDlg.FileName, mtInformation, [mbOK], 0)
+        else
+          MessageDlg('Failed to export file: ' + SysErrorMessage(GetLastError), mtError, [mbOK], 0);
+      end;
+    finally
+      SaveDlg.Free;
     end;
   finally
-    SaveDlg.Free;
+    FinishClose;
   end;
 end;
 
@@ -825,91 +995,99 @@ var
 begin
   if not(Sender is TMenuItem) then
     Exit;
-  // The picker is a transient popup: choosing any context-menu action
-  // dismisses it (Close -> FormClose -> caFree; the form is released
-  // asynchronously, so the rest of this handler keeps running safely).
-  Close;
   MapName := (Sender as TMenuItem).Hint;
-  IsProtected := False;
-
-  if SameText(MapName, 'Default') then
-  begin
-    MessageDlg('Default Bijoy 2000 compatible ANSI mapping built into Avro Keyboard.', mtInformation, [mbOK], 0);
+  if MapName = '' then
     Exit;
-  end;
 
-  FilePath := AnsiMappingDir + MapName + '.AvroEnco';
-  if not FileExists(FilePath) then
-    FilePath := AnsiMappingDir + MapName + '.json';
-  if FileExists(FilePath) then
-  begin
-    try
-      if IsEncoFile(FilePath) then
-      begin
-        // Captured here, before the metadata fallback may swap in a same-named
-        // .json file below: mark the card when this container is protected by
-        // a user password (flag $01 / legacy v1).
-        IsProtected := (GetAvroEncoProtectionFlag(FilePath) = AVROENCO_FLAG_USER_PASSWORD);
-        // Only password-protected files (flag $01 / legacy v1) prompt, and
-        // only the very first time on this computer - the per-file cache
-        // decrypts silently afterwards. Default-key files never prompt.
-        if (GetEncoCachedPassword(FilePath) = '') and (GetAvroEncoProtectionFlag(FilePath) = AVROENCO_FLAG_USER_PASSWORD) then
-        begin
-          if not PromptForPasswordAndValidate(FilePath, Password) then
-            Exit;
-          CachedEncoPassword := Password;
-          RememberEncoPassword(FilePath, Password);
-          SaveSettings;
-        end;
-        Content := DecryptAvroEncoToString(FilePath, GetEncoCachedPassword(FilePath));
-        if Content = '' then
-        begin
-          CachedEncoPassword := '';
-          ForgetEncoPassword(FilePath);
-          MessageDlg('Failed to decrypt mapping. Password may be incorrect.', mtError, [mbOK], 0);
-          Exit;
-        end;
-      end
-      else
-        Content := TFile.ReadAllText(FilePath, TEncoding.UTF8);
+  // Choosing any context-menu action dismisses the transient popup. The form is
+  // unregistered and hidden first so the password prompt below - which is modal
+  // and pumps messages - is neither starved of keystrokes by the hook nor able
+  // to free the form this handler is still running on.
+  BeginClose;
+  try
+    IsProtected := False;
 
-      // Prefer the structured Metadata block (Encoding/Type/Version/Developer/Font);
-      MetaText := ExtractMetadataFromJSON(Content, FilePath);
-      if (MetaText = '') and SameText(ExtractFileExt(FilePath), '.AvroEnco') then
-      begin
-        // Old .AvroEnco files (encrypted before Metadata existed) have none;
-        // fall back to the same-named .json in the mapping folder or assets.
-        FilePath := FindMetadataJsonPath(MapName, AnsiMappingDir);
-        if FilePath <> '' then
-        begin
-          Content := TFile.ReadAllText(FilePath, TEncoding.UTF8);
-          MetaText := ExtractMetadataFromJSON(Content, FilePath);
-        end;
-      end;
-      if MetaText <> '' then
-        DescText := MetaText
-      else
-        // No Metadata at all - show a raw JSON preview.
-        DescText := 'Preview:' + sLineBreak + Copy(Content, 1, 350) + '...';
-
-      // Password-protected .AvroEnco containers get a footer line at the very
-      // bottom of the card; plain .json and default-key files do not.
-      if IsProtected then
-      begin
-        DescText := TrimRight(DescText);
-        if DescText = '' then
-          DescText := 'Encrypted Avro ANSI Encoding'
-        else
-          DescText := DescText + sLineBreak + sLineBreak + 'Encrypted Avro ANSI Encoding';
-      end;
-      MessageDlg(DescText, mtInformation, [mbOK], 0);
-    except
-      on E: Exception do
-        MessageDlg('Could not read description: ' + E.Message, mtError, [mbOK], 0);
+    if SameText(MapName, 'Default') then
+    begin
+      MessageDlg('Default Bijoy 2000 compatible ANSI mapping built into Avro Keyboard.', mtInformation, [mbOK], 0);
+      Exit;
     end;
-  end
-  else
-    MessageDlg('Mapping file not found.', mtError, [mbOK], 0);
+
+    FilePath := AnsiMappingDir + MapName + '.AvroEnco';
+    if not FileExists(FilePath) then
+      FilePath := AnsiMappingDir + MapName + '.json';
+    if FileExists(FilePath) then
+    begin
+      try
+        if IsEncoFile(FilePath) then
+        begin
+          // Captured here, before the metadata fallback may swap in a same-named
+          // .json file below: mark the card when this container is protected by
+          // a user password (flag $01 / legacy v1).
+          IsProtected := (GetAvroEncoProtectionFlag(FilePath) = AVROENCO_FLAG_USER_PASSWORD);
+          // Only password-protected files (flag $01 / legacy v1) prompt, and
+          // only the very first time on this computer - the per-file cache
+          // decrypts silently afterwards. Default-key files never prompt.
+          if (GetEncoCachedPassword(FilePath) = '') and (GetAvroEncoProtectionFlag(FilePath) = AVROENCO_FLAG_USER_PASSWORD) then
+          begin
+            if not PromptForPasswordAndValidate(FilePath, Password) then
+              Exit;
+            CachedEncoPassword := Password;
+            RememberEncoPassword(FilePath, Password);
+            SaveSettings;
+          end;
+          Content := DecryptAvroEncoToString(FilePath, GetEncoCachedPassword(FilePath));
+          if Content = '' then
+          begin
+            CachedEncoPassword := '';
+            ForgetEncoPassword(FilePath);
+            MessageDlg('Failed to decrypt mapping. Password may be incorrect.', mtError, [mbOK], 0);
+            Exit;
+          end;
+        end
+        else
+          Content := TFile.ReadAllText(FilePath, TEncoding.UTF8);
+
+        // Prefer the structured Metadata block (Encoding/Type/Version/Developer/Font);
+        MetaText := ExtractMetadataFromJSON(Content, FilePath);
+        if (MetaText = '') and SameText(ExtractFileExt(FilePath), '.AvroEnco') then
+        begin
+          // Old .AvroEnco files (encrypted before Metadata existed) have none;
+          // fall back to the same-named .json in the mapping folder or assets.
+          FilePath := FindMetadataJsonPath(MapName, AnsiMappingDir);
+          if FilePath <> '' then
+          begin
+            Content := TFile.ReadAllText(FilePath, TEncoding.UTF8);
+            MetaText := ExtractMetadataFromJSON(Content, FilePath);
+          end;
+        end;
+        if MetaText <> '' then
+          DescText := MetaText
+        else
+          // No Metadata at all - show a raw JSON preview.
+          DescText := 'Preview:' + sLineBreak + Copy(Content, 1, 350) + '...';
+
+        // Password-protected .AvroEnco containers get a footer line at the very
+        // bottom of the card; plain .json and default-key files do not.
+        if IsProtected then
+        begin
+          DescText := TrimRight(DescText);
+          if DescText = '' then
+            DescText := 'Encrypted Avro ANSI Encoding'
+          else
+            DescText := DescText + sLineBreak + sLineBreak + 'Encrypted Avro ANSI Encoding';
+        end;
+        MessageDlg(DescText, mtInformation, [mbOK], 0);
+      except
+        on E: Exception do
+          MessageDlg('Could not read description: ' + E.Message, mtError, [mbOK], 0);
+      end;
+    end
+    else
+      MessageDlg('Mapping file not found.', mtError, [mbOK], 0);
+  finally
+    FinishClose;
+  end;
 end;
 
 procedure TfrmAnsiVersionPicker.PopupDeleteClick(Sender: TObject);
@@ -918,27 +1096,37 @@ var
 begin
   if not(Sender is TMenuItem) then
     Exit;
-  // Dismiss the transient picker as soon as the action is chosen.
-  Close;
   MapName := (Sender as TMenuItem).Hint;
+  if MapName = '' then
+    Exit;
 
-  if MessageDlg('Delete mapping "' + MapName + '"?', mtConfirmation, [mbYes, mbNo], 0) = mrYes then
-  begin
-    if DeleteFile(AnsiMappingDir + MapName + '.AvroEnco') or DeleteFile(AnsiMappingDir + MapName + '.json') then
+  // Dismiss the transient popup as soon as the action is chosen, before the
+  // confirmation dialog pumps messages.
+  BeginClose;
+  try
+    if MessageDlg('Delete mapping "' + MapName + '"?', mtConfirmation, [mbYes, mbNo], 0) = mrYes then
     begin
-      if SameText(AnsiVersion, MapName) then
+      if DeleteFile(AnsiMappingDir + MapName + '.AvroEnco') or DeleteFile(AnsiMappingDir + MapName + '.json') then
       begin
-        AnsiVersion := 'Default';
-        SaveSettings;
-        AnsiEngineManager.SwitchEngine('Default');
+        if SameText(AnsiVersion, MapName) then
+        begin
+          AnsiVersion := 'Default';
+          SaveSettings;
+          AnsiEngineManager.SwitchEngine('Default');
+        end;
+        // Drop the deleted engine from the cache so it cannot be restored.
+        AnsiEngineManager.RemoveEngine(MapName);
+        if Assigned(AvroMainForm1) then
+        begin
+          AvroMainForm1.BuildAnsiVersionMenus;
+          AvroMainForm1.UpdateTrayIcon;
+        end;
+        // The row list is deliberately NOT rebuilt here: this popup is closing,
+        // and repopulating it is what used to touch a freed form.
       end;
-      // Drop the deleted engine from the cache so it cannot be restored.
-      AnsiEngineManager.RemoveEngine(MapName);
-      AvroMainForm1.BuildAnsiVersionMenus;
-      AvroMainForm1.UpdateTrayIcon;
-      PopulateVersions;
-      AutoSizeForm;
     end;
+  finally
+    FinishClose;
   end;
 end;
 
