@@ -75,7 +75,7 @@ procedure RebuildAnviVersionMenus;
       AParentMenu.Add(MItem);
     end;
 
-    procedure AddMappingActionSubmenu(ParentMore: TMenuItem; const AName: string; IsDefault: Boolean);
+    procedure AddMappingActionSubmenu(ParentMore: TMenuItem; const AName: string);
     var
       MSub, ActionItem: TMenuItem;
     begin
@@ -96,21 +96,17 @@ procedure RebuildAnviVersionMenus;
       ActionItem.OnClick := AvroMainForm1.ExportSpecificMappingClick;
       MSub.Add(ActionItem);
 
-      if not IsDefault then
-      begin
-        ActionItem := TMenuItem.Create(MSub);
-        ActionItem.Caption := 'Delete Mapping';
-        ActionItem.Hint := AName;
-        ActionItem.OnClick := AvroMainForm1.DeleteAnsiMappingClick;
-        MSub.Add(ActionItem);
-      end;
+      ActionItem := TMenuItem.Create(MSub);
+      ActionItem.Caption := 'Delete Mapping';
+      ActionItem.Hint := AName;
+      ActionItem.OnClick := AvroMainForm1.DeleteAnsiMappingClick;
+      MSub.Add(ActionItem);
     end;
 
   begin
     AMenu.Clear;
 
-    AddDirectItem(AMenu, 'Default', SameText(AnsiVersion, 'Default'));
-
+    // Full scanned catalog only - no prepended "Default" row.
     // AnsiMappingNames is the shared, naturally sorted list of display names
     // that TAvroMainForm1.BuildAnsiVersionMenus and the version picker both
     // use. Enumerating AvroEncoFiles.Keys here read a hash table, whose bucket
@@ -119,11 +115,8 @@ procedure RebuildAnviVersionMenus;
       for I := 0 to AvroMainForm1.AnsiMappingNames.Count - 1 do
       begin
         DisplayName := AvroMainForm1.AnsiMappingNames[I];
-        if not SameText(DisplayName, 'Default') then
-        begin
-          Checked := SameText(AnsiVersion, DisplayName);
-          AddDirectItem(AMenu, DisplayName, Checked);
-        end;
+        Checked := SameText(AnsiVersion, DisplayName);
+        AddDirectItem(AMenu, DisplayName, Checked);
       end;
 
     Sep := TMenuItem.Create(AMenu);
@@ -134,14 +127,11 @@ procedure RebuildAnviVersionMenus;
     MoreOptMenu.Caption := 'More Options';
     AMenu.Add(MoreOptMenu);
 
-    AddMappingActionSubmenu(MoreOptMenu, 'Default', True);
-
     if Assigned(AvroMainForm1.AnsiMappingNames) then
       for I := 0 to AvroMainForm1.AnsiMappingNames.Count - 1 do
       begin
         DisplayName := AvroMainForm1.AnsiMappingNames[I];
-        if not SameText(DisplayName, 'Default') then
-          AddMappingActionSubmenu(MoreOptMenu, DisplayName, False);
+        AddMappingActionSubmenu(MoreOptMenu, DisplayName);
       end;
 
     Sep := TMenuItem.Create(MoreOptMenu);
@@ -181,12 +171,6 @@ var
   SaveDialog: TSaveDialog;
   SourcePath: string;
 begin
-  if SameText(AMapName, 'Default') then
-  begin
-    MessageDlg('Built-in Default mapping cannot be exported as a file.' + sLineBreak + 'It is compiled into Avro Keyboard.', mtInformation, [mbOK], 0);
-    Exit;
-  end;
-
   SourcePath := GetActiveEncoFilePath(AMapName, GetAvroDataDir + 'AnsiMapping\');
   if SourcePath = '' then
   begin
@@ -229,13 +213,6 @@ var
   Password:                                                              AnsiString;
   IsProtected:                                                           Boolean;
 begin
-  if SameText(AMapName, 'Default') then
-  begin
-    MessageDlg('Mapping: Default' + sLineBreak + 'Built-in Bijoy 2000 compatible ANSI mapping.' + sLineBreak + sLineBreak +
-        'Features automatic contextual post-base & pre-base kar mapping.', mtInformation, [mbOK], 0);
-    Exit;
-  end;
-
   AnsiMappingDir := GetAvroDataDir + 'AnsiMapping\';
   SourcePath := GetActiveEncoFilePath(AMapName, AnsiMappingDir);
   if SourcePath = '' then
@@ -331,12 +308,6 @@ procedure DeleteMappingFile(const AMapName: string);
 var
   AnsiDir, EncPath, JsonPath: string;
 begin
-  if SameText(AMapName, 'Default') then
-  begin
-    MessageDlg('Built-in Default mapping cannot be deleted.', mtInformation, [mbOK], 0);
-    Exit;
-  end;
-
   if MessageDlg('Are you sure you want to delete the mapping "' + AMapName + '"?', mtConfirmation, [mbYes, mbNo], 0) <> mrYes then
     Exit;
 
@@ -349,16 +320,23 @@ begin
   if FileExists(JsonPath) then
     DeleteFile(JsonPath);
 
+  // Drop the deleted engine from the cache so it cannot be restored.
+  AnsiEngineManager.RemoveEngine(AMapName);
+
+  // Active mapping deleted: migrate to the next remaining file, or clear
+  // AnsiVersion and stay on Unicode. Never fall back to a compiled-in Default.
   if SameText(AnsiVersion, AMapName) then
   begin
-    AnsiVersion := 'Default';
+    AnsiVersion := FirstAvailableMappingName;
     SaveSettings;
-    AnsiEngineManager.SwitchEngine('Default');
+    if AnsiVersion <> '' then
+      AnsiEngineManager.SwitchEngine(AnsiVersion);
   end;
-  AnsiEngineManager.RemoveEngine(AMapName);
 
   ScanAvroEncoFiles(AnsiDir);
   AvroMainForm1.BuildAnsiVersionMenus;
+  AvroMainForm1.UpdateAnsiVersionMenuChecks(AnsiVersion);
+  AvroMainForm1.UpdateTrayIcon;
   ShowAnsiToastNotification('Mapping deleted: ' + AMapName);
   Log('Deleted mapping: ' + AMapName);
 end;

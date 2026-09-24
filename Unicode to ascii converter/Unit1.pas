@@ -239,6 +239,7 @@ implementation
 
 uses
   uFileFolderHandling,
+  uAvroEncoManager,
   WindowsDarkMode,
   Winapi.RichEdit,
   Themes;
@@ -316,7 +317,8 @@ end;
 
 function IsCheckedMapping(const AText: string): Boolean;
 begin
-  Result := SameText(AnsiVersion, AText) or ((AnsiVersion = '') and SameText(AText, 'Default'));
+  // Empty AnsiVersion means "none selected" - not a built-in Default row.
+  Result := (AnsiVersion <> '') and SameText(AnsiVersion, AText);
 end;
 
 procedure DrawAnsiGlyphBullet(C: TCanvas; const ARect: TRect; AColor: TColor);
@@ -465,8 +467,6 @@ begin
     C.Font.Color := TextC;
     C.Font.Style := [];
     S := Text;
-    if S = '' then
-      S := 'Default';
     TextR := Rect(R.Left + 27, R.Top, R.Right - 24, R.Bottom);
     DrawText(C.Handle, PChar(S), Length(S), TextR, DT_SINGLELINE or DT_VCENTER or DT_END_ELLIPSIS or DT_NOPREFIX);
 
@@ -1881,23 +1881,26 @@ begin
   cbAnsiVersion.Items.BeginUpdate;
   try
     cbAnsiVersion.Items.Clear;
-    cbAnsiVersion.Items.Add('Default');
-
+    // Same scan/sort as the keyboard app: file mappings only, no compiled-in
+    // Default row. A real Default.json on disk appears like any other name.
+    ScanAvroEncoFiles(AnsiMappingDir);
     Versions := TStringList.Create;
     try
-      Versions.Sorted := True;
-      Versions.Duplicates := dupIgnore;
-      Versions.CaseSensitive := False;
+      GetSortedMappingDisplayNames(Versions);
+      // The shared scan also lists .AvroEnco containers; this combo only
+      // needs plain .json names that the converter loads directly.
       if DirectoryExists(AnsiMappingDir) and (FindFirst(AnsiMappingDir + '*.json', faAnyFile, SR) = 0) then
         try
           repeat
-            if (SR.Attr and faDirectory <> 0) or SameText(SR.Name, 'Default.json') then
+            if SR.Attr and faDirectory <> 0 then
               Continue;
-            Versions.Add(ChangeFileExt(SR.Name, ''));
+            if Versions.IndexOf(ChangeFileExt(SR.Name, '')) < 0 then
+              Versions.Add(ChangeFileExt(SR.Name, ''));
           until FindNext(SR) <> 0;
         finally
           FindClose(SR);
         end;
+      SortMappingDisplayNames(Versions);
       for I := 0 to Versions.Count - 1 do
         cbAnsiVersion.Items.Add(Versions[I]);
     finally
@@ -2798,13 +2801,12 @@ var
   Text:                          string;
   GlyphR, TextR:                 TRect;
   Bg:                            TColor;
-  IsHover, IsChecked, IsDefault: Boolean;
+  IsHover, IsChecked:            Boolean;
 begin
   Combo := TComboBox(Control);
   Text := Combo.Items[index];
   IsHover := odSelected in State;
   IsChecked := IsCheckedMapping(Text);
-  IsDefault := SameText(Text, 'Default');
 
   with Combo.Canvas do
   begin
@@ -2829,15 +2831,6 @@ begin
       Font.Style := [fsBold];
     TextR := System.Classes.Rect(Rect.Left + 26, Rect.Top, Rect.Right - 6, Rect.Bottom);
     DrawText(Handle, PChar(Text), Length(Text), TextR, DT_SINGLELINE or DT_VCENTER or DT_END_ELLIPSIS or DT_NOPREFIX);
-
-    if IsDefault and (index < Combo.Items.Count - 1) then
-    begin
-      Pen.Color := MixColor(SysColor(clBtnShadow), SysColor(clWindow), 45);
-      Pen.Style := psSolid;
-      Pen.Width := 1;
-      MoveTo(Rect.Left + 8, Rect.Bottom - 1);
-      LineTo(Rect.Right - 8, Rect.Bottom - 1);
-    end;
   end;
 end;
 
@@ -3090,7 +3083,7 @@ begin
   // Restore the "last used" ANSI mapping version and font from the registry
   // (AnsiVersion is shared with the main Avro Keyboard app).
   ReadConverterSettings(SavedAnsiVersion, SavedFont);
-  if SavedAnsiVersion <> '' then
+  if (SavedAnsiVersion <> '') and (cbAnsiVersion.Items.Count > 0) then
   begin
     TrySetAnsiVersion(SavedAnsiVersion, ErrMsg);
     Idx := cbAnsiVersion.Items.IndexOf(SavedAnsiVersion);
@@ -3099,8 +3092,10 @@ begin
     else
       cbAnsiVersion.ItemIndex := 0;
   end
+  else if cbAnsiVersion.Items.Count > 0 then
+    cbAnsiVersion.ItemIndex := 0
   else
-    cbAnsiVersion.ItemIndex := 0;
+    cbAnsiVersion.ItemIndex := -1;
 
   // Load all system fonts into cbFontPicker
   cbFontPicker.LoadFonts;
