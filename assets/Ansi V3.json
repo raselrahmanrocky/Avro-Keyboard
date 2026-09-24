@@ -2093,6 +2093,11 @@
       "Key": "#$0029",
       "Value": "#$0056",
       "Comment": ")"
+    },
+    {
+      "Key": "#$005D",
+      "Value": "#$003C",
+      "Comment": "]"
     }
   ],
   "PostReplacements": [
