@@ -465,10 +465,8 @@ begin
   ListBox.Items.BeginUpdate;
   try
     ListBox.Clear;
-    ListBox.Items.Add('Default');
-    // The name list is cached on the main form and kept fresh by the
-    // directory watcher / periodic poll / import / delete flows - opening
-    // the picker costs no disk I/O and no duplicate-cleanup side effects.
+    // Full scanned catalog only - no prepended "Default" row. Empty list
+    // (zero mapping files) shows an empty picker; Esc still closes.
     if Assigned(AvroMainForm1) and Assigned(AvroMainForm1.AnsiMappingNames) then
       for I := 0 to AvroMainForm1.AnsiMappingNames.Count - 1 do
         ListBox.Items.Add(AvroMainForm1.AnsiMappingNames[I]);
@@ -551,13 +549,12 @@ end;
 { The row's badge handle, or 0 when that row draws none. The handle is borrowed
   from the main form's icon cache (DPI-keyed, filled by the startup preload and
   released by ReleaseAnsiIconCache), so it must never be destroyed here - there
-  is nothing to free, and therefore nothing that can leak.
-  'Default' is the built-in mapping with no container of its own, so it has no
-  icon, exactly as in the tray's ANSI submenu. }
+  is nothing to free, and therefore nothing that can leak. An empty name (or a
+  mapping that carries no icon) draws none. }
 function TfrmAnsiVersionPicker.RowIconHandle(const AVersionName: string): HICON;
 begin
   Result := 0;
-  if SameText(AVersionName, 'Default') then
+  if AVersionName = '' then
     Exit;
   if Assigned(AvroMainForm1) then
     Result := AvroMainForm1.GetAnsiTrayIcon(AVersionName);
@@ -619,7 +616,7 @@ begin
 
   // 6. Trailing layout badge - the same 16 px icon the tray's "Select ANSI
   // Encoding" submenu shows, so the picker and the menu agree about which
-  // encoding carries which icon. Rows without an icon ('Default', or a
+  // encoding carries which icon. Rows without an icon (empty name, or a
   // container whose icon section is missing) stay badge-free.
   IconHandle := RowIconHandle(ListBox.Items[Index]);
   if IconHandle <> 0 then
@@ -692,37 +689,12 @@ var
 begin
   if not Assigned(AvroMainForm1) then
     Exit;
-
-  // Default
-  if SameText(ASelectedVersion, 'Default') then
-  begin
-    ErrorMsg := '';
-    if not AnsiEngineManager.TrySwitchCached('Default') then
-    begin
-      Screen.Cursor := crHourGlass;
-      ErrList := TStringList.Create;
-      try
-        if not AnsiEngineManager.SwitchEngine('Default', ErrList) then
-          ErrorMsg := 'Encoding is still being prepared. Please select it again.';
-      finally
-        ErrList.Free;
-        Screen.Cursor := crDefault;
-      end;
-    end;
-    if ErrorMsg = '' then
-    begin
-      AvroMainForm1.SyncActiveMappingTimestamp('Default');
-      SaveAnsiVersionOnly;
-      AvroMainForm1.UpdateAnsiVersionMenuChecks('Default');
-      AvroMainForm1.UpdateTrayIcon;
-      if ShowAnsiSwitchNotification = 'YES' then
-        ShowAnsiToastNotification('ANSI Version: Default');
-    end
-    else
-      ShowAnsiToastNotification(ErrorMsg);
+  if ASelectedVersion = '' then
     Exit;
-  end;
 
+  // One path for every selection: resolve the file, prompt for a password if
+  // this container needs one and none is cached, then switch. There is no
+  // compiled-in Default branch.
   TargetPath := GetActiveEncoFilePath(ASelectedVersion, AnsiMappingDir);
   if TargetPath = '' then
   begin
@@ -880,11 +852,9 @@ end;
 
 procedure TfrmAnsiVersionPicker.BuildPopupMenu(const MappingName: string);
 var
-  Item:      TMenuItem;
-  IsDefault: Boolean;
+  Item: TMenuItem;
 begin
   FPopup.Items.Clear;
-  IsDefault := SameText(MappingName, 'Default');
 
   Item := TMenuItem.Create(FPopup);
   Item.Caption := 'Information';
@@ -898,14 +868,11 @@ begin
   Item.OnClick := PopupExportClick;
   FPopup.Items.Add(Item);
 
-  if not IsDefault then
-  begin
-    Item := TMenuItem.Create(FPopup);
-    Item.Caption := 'Delete Mapping';
-    Item.Hint := MappingName;
-    Item.OnClick := PopupDeleteClick;
-    FPopup.Items.Add(Item);
-  end;
+  Item := TMenuItem.Create(FPopup);
+  Item.Caption := 'Delete Mapping';
+  Item.Hint := MappingName;
+  Item.OnClick := PopupDeleteClick;
+  FPopup.Items.Add(Item);
 end;
 
 procedure TfrmAnsiVersionPicker.ListBoxMouseUp(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
@@ -953,12 +920,6 @@ begin
   // been freed.
   BeginClose;
   try
-    if SameText(MapName, 'Default') then
-    begin
-      MessageDlg('Built-in Default mapping cannot be exported as a file.' + sLineBreak + 'It is compiled into Avro Keyboard.', mtInformation, [mbOK], 0);
-      Exit;
-    end;
-
     SourcePath := AnsiMappingDir + MapName + '.AvroEnco';
     if not FileExists(SourcePath) then
     begin
@@ -1006,12 +967,6 @@ begin
   BeginClose;
   try
     IsProtected := False;
-
-    if SameText(MapName, 'Default') then
-    begin
-      MessageDlg('Default Bijoy 2000 compatible ANSI mapping built into Avro Keyboard.', mtInformation, [mbOK], 0);
-      Exit;
-    end;
 
     FilePath := AnsiMappingDir + MapName + '.AvroEnco';
     if not FileExists(FilePath) then
@@ -1108,17 +1063,24 @@ begin
     begin
       if DeleteFile(AnsiMappingDir + MapName + '.AvroEnco') or DeleteFile(AnsiMappingDir + MapName + '.json') then
       begin
-        if SameText(AnsiVersion, MapName) then
-        begin
-          AnsiVersion := 'Default';
-          SaveSettings;
-          AnsiEngineManager.SwitchEngine('Default');
-        end;
         // Drop the deleted engine from the cache so it cannot be restored.
         AnsiEngineManager.RemoveEngine(MapName);
+        // Active mapping deleted: migrate to the next remaining file, or
+        // clear AnsiVersion and stay on Unicode. Never fall back to a
+        // compiled-in Default engine.
+        if SameText(AnsiVersion, MapName) then
+        begin
+          AnsiVersion := FirstAvailableMappingName;
+          SaveSettings;
+          if AnsiVersion <> '' then
+            AnsiEngineManager.SwitchEngine(AnsiVersion)
+          else
+            AvroMainForm1.SyncActiveMappingTimestamp('');
+        end;
         if Assigned(AvroMainForm1) then
         begin
           AvroMainForm1.BuildAnsiVersionMenus;
+          AvroMainForm1.UpdateAnsiVersionMenuChecks(AnsiVersion);
           AvroMainForm1.UpdateTrayIcon;
         end;
         // The row list is deliberately NOT rebuilt here: this popup is closing,

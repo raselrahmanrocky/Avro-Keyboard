@@ -78,7 +78,6 @@ type
     ManageAutoCorrectentries1: TMenuItem;
     KeyboardLayoutEditorBuildcustomlayouts1: TMenuItem;
     SkinDesignerDesignyourownskin1: TMenuItem;
-    N3: TMenuItem;
     Options1: TMenuItem;
     N4: TMenuItem;
     N5: TMenuItem;
@@ -90,7 +89,6 @@ type
     AvroPhoneticEnglishtoBangla1: TMenuItem;
     N7: TMenuItem;
     Showactivekeyboardlayout1: TMenuItem;
-    N8: TMenuItem;
     Jumptosystemtray1: TMenuItem;
     Exit1: TMenuItem;
     BeforeYouStart1: TMenuItem;
@@ -196,8 +194,6 @@ type
     OutputasANSIAreyousure2: TMenuItem;
     N52: TMenuItem;
     AvroKeyboardonFacebook1: TMenuItem;
-    N54: TMenuItem;
-    AvroKeyboardonFacebook3: TMenuItem;
     AppEvents: TApplicationEvents;
     procedure FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
     procedure FormCreate(Sender: TObject);
@@ -274,6 +270,8 @@ type
       FDirectoryWatcher:            TAvroDirectoryWatcher;
       { Application.OnException reports once per session, not once per fault. }
       FUnhandledReported:           Boolean;
+      { One-shot tray balloon when the mapping folder is empty at startup. }
+      FNoMappingBalloonShown:       Boolean;
 
       { Per-layout icons, decoded from the payload each container carries.
 
@@ -331,9 +329,9 @@ type
       KeyLayout:           TLayout;
       Updater:             TUpdateCheck;
       AnsiVersionSubmenu1: TMenuItem;
-      { Cached, sorted list of mapping display names (excluding 'Default'),
-        kept fresh by the directory watcher / periodic poll. The ANSI picker
-        opens from this list with zero disk I/O. }
+      { Cached, sorted list of mapping display names (the full catalog from
+        GetSortedMappingDisplayNames), kept fresh by the directory watcher /
+        periodic poll. The ANSI picker opens from this list with zero disk I/O. }
       AnsiMappingNames: TStringList;
       IgnoreCapsLock1:  TMenuItem;
       IgnoreCapsLock2:  TMenuItem;
@@ -346,7 +344,7 @@ type
       procedure AnsiVersionItemAdvancedDrawItem(Sender: TObject; ACanvas: TCanvas; ARect: TRect; AState: TOwnerDrawState);
       procedure AnsiVersionItemMeasureItem(Sender: TObject; ACanvas: TCanvas; var Width, Height: Integer);
       { The cached HICON for a mapping at the CURRENT small-icon metric, or 0
-        when that mapping carries no icon ('Default', a legacy container, a
+        when that mapping carries no icon (empty name, a legacy container, a
         plain .json, or one whose icon failed to decode).
 
         The handle is BORROWED: it belongs to the DPI-keyed cache filled by the
@@ -1176,13 +1174,17 @@ begin
   end;
 
   // --- Record initial file write time for auto-refresh ---
-  if (AnsiVersion <> 'Default') and (AnsiMappingDir <> '') then
+  // Path-based, not name-based: any active name that resolves to a file
+  // (including a user file literally named Default) is watched.
+  if (AnsiMappingDir <> '') and (GetActiveEncoFilePath(AnsiVersion, AnsiMappingDir) <> '') then
   begin
     FActiveMappingLastWriteTime := 0;
-    if TFile.Exists(AnsiMappingDir + AnsiVersion + '.AvroEnco') then
-      FActiveMappingLastWriteTime := TFile.GetLastWriteTime(AnsiMappingDir + AnsiVersion + '.AvroEnco')
-    else if TFile.Exists(AnsiMappingDir + AnsiVersion + '.json') then
-      FActiveMappingLastWriteTime := TFile.GetLastWriteTime(AnsiMappingDir + AnsiVersion + '.json');
+    MappingPath := GetActiveEncoFilePath(AnsiVersion, AnsiMappingDir);
+    try
+      FActiveMappingLastWriteTime := TFile.GetLastWriteTime(MappingPath);
+    except
+      FActiveMappingLastWriteTime := 0;
+    end;
   end
   else
     FActiveMappingLastWriteTime := 0;
@@ -1198,12 +1200,12 @@ begin
   // Wire up the .AvroEnco loader BEFORE the first engine switch: otherwise
   // an active .AvroEnco mapping (e.g. a password-protected one persisted
   // from the previous session) is silently skipped at startup and ANSI
-  // typing falls back to the built-in defaults.
+  // typing stays unavailable.
   OnLoadEncoMapping := HandleLoadEncoMapping;
   // Prime the session password for a password-protected ACTIVE version from
   // the persisted per-file cache (never prompts), so SwitchEngine below can
   // parse it on demand without user interaction.
-  if (AnsiVersion <> 'Default') and (AnsiMappingDir <> '') then
+  if (AnsiMappingDir <> '') and (AnsiVersion <> '') then
   begin
     MappingPath := GetActiveEncoFilePath(AnsiVersion, AnsiMappingDir);
     if (MappingPath <> '') and IsEncoFile(MappingPath) and (GetAvroEncoProtectionFlag(MappingPath) = AVROENCO_FLAG_USER_PASSWORD) then
@@ -1224,19 +1226,41 @@ begin
   WindowCheck.Enabled := False; // never re-install the hook mid-parse
   RemoveHook;
   try
-    // DesiredVersion is captured BEFORE the Default fallback, because the
-    // fallback itself overwrites the AnsiVersion global.
+    // DesiredVersion: migrate once when settings say Default / empty, or when
+    // the stored name no longer resolves to a file on disk.
     DesiredVersion := AnsiVersion;
-    if not Application.Terminated then
-      if (not AnsiEngineManager.SwitchEngine(DesiredVersion)) and (not AnsiEngineManager.SwitchEngine(DesiredVersion)) then
-      begin
-        // Two attempts, then Default: the retry covers the first-run case
-        // (cache directory missing, container just installed and still being
-        // written) without ever leaving the app without a usable engine.
-        Log('Startup: could not activate "' + DesiredVersion + '" - falling back to Default');
-        AnsiEngineManager.SwitchEngine('Default');
-      end;
+    if (DesiredVersion = '') or SameText(DesiredVersion, 'Default') or (GetActiveEncoFilePath(DesiredVersion, AnsiMappingDir) = '') then
+      DesiredVersion := FirstAvailableMappingName;
+
+    if DesiredVersion <> '' then
+    begin
+      if not Application.Terminated then
+        if (not AnsiEngineManager.SwitchEngine(DesiredVersion)) and (not AnsiEngineManager.SwitchEngine(DesiredVersion)) then
+        begin
+          // Two attempts cover the first-run race (cache directory missing,
+          // container just installed and still being written). No compiled-in
+          // Default fallback - if both fail, stay on Unicode and log.
+          Log('Startup: could not activate "' + DesiredVersion + '"');
+          DesiredVersion := '';
+        end;
+    end
+    else
+      Log('Startup: no ANSI mapping files - Unicode only');
+
+    if AnsiVersion <> DesiredVersion then
+    begin
+      AnsiVersion := DesiredVersion;
+      SaveAnsiVersionOnly;
+    end;
     SyncActiveMappingTimestamp(AnsiVersion);
+    if (AnsiVersion = '') and (not FNoMappingBalloonShown) and Assigned(Tray) and Tray.Visible then
+    begin
+      FNoMappingBalloonShown := True;
+      Tray.BalloonTitle := 'Avro Keyboard';
+      Tray.BalloonHint := 'No ANSI mapping files found.' + sLineBreak + 'Unicode output stays active until a mapping is added.';
+      Tray.BalloonTimeout := 5000;
+      Tray.ShowBalloonHint;
+    end;
   finally
     Sethook;
     WindowCheck.Enabled := True;
@@ -1270,7 +1294,7 @@ var
 begin
   ScanAvroEncoFiles(AnsiMappingDir);
 
-  if (AnsiVersion <> 'Default') and (AnsiMappingDir <> '') then
+  if (AnsiMappingDir <> '') and (AnsiVersion <> '') and (GetActiveEncoFilePath(AnsiVersion, AnsiMappingDir) <> '') then
   begin
     TargetPath := GetActiveEncoFilePath(AnsiVersion, AnsiMappingDir);
     if TargetPath <> '' then
@@ -1479,6 +1503,8 @@ end;
 { =============================================================================== }
 
 procedure TAvroMainForm1.RefreshSettings;
+var
+  DesiredVersion: string;
 begin
 
   // Update Spell Checker Shortcut in Menu
@@ -1786,11 +1812,24 @@ begin
     OutputasANSIAreyousure2.Checked := False;
   end;
 
-  // ANSI Mapping version (engines are already preloaded; this switch is O(1))
+  // ANSI Mapping version (engines are already preloaded; this switch is O(1)).
+  // No compiled-in Default: migrate empty / Default / missing-file to the
+  // first usable file mapping, or stay on Unicode with none.
   AnsiMappingDir := GetAvroDataDir + 'AnsiMapping\';
   ForceDirectories(AnsiMappingDir);
-  if not AnsiEngineManager.SwitchEngine(AnsiVersion) then
-    AnsiEngineManager.SwitchEngine('Default');
+  if (AnsiVersion = '') or SameText(AnsiVersion, 'Default') or (GetActiveEncoFilePath(AnsiVersion, AnsiMappingDir) = '') then
+  begin
+    DesiredVersion := FirstAvailableMappingName;
+    if DesiredVersion <> AnsiVersion then
+    begin
+      AnsiVersion := DesiredVersion;
+      SaveAnsiVersionOnly;
+    end;
+  end;
+  if AnsiVersion <> '' then
+    AnsiEngineManager.SwitchEngine(AnsiVersion)
+  else
+    Log('RefreshSettings: no ANSI mapping files - Unicode only');
   BuildAnsiVersionMenus;
   Popup_Tools.OnPopup := PopupToolsPopup;
   Popup_Tray.OnPopup := PopupTrayPopup;
@@ -1918,7 +1957,7 @@ end;
 { The ImageList1 slot holding AName's layout badge, adding it on first use and
   overwriting it in place when the active layout changes.
 
-  -1 means "no badge for this name": an empty name, 'Default', an unassigned
+  -1 means "no badge for this name": an empty name, an unassigned
   list, or a mapping that carries no icon (a legacy container, a plain .json, a
   damaged one, or a password-protected container that has not been unlocked
   yet). The caller then falls back to the built-in ANSI icon deliberately -
@@ -1950,7 +1989,7 @@ var
   Cols, Rows, R: Integer;
 begin
   Result := -1;
-  if (AName = '') or SameText(AName, 'Default') then
+  if AName = '' then
     Exit;
   if not Assigned(ImageList1) then
     Exit;
@@ -2033,7 +2072,7 @@ var
   Key:       string;
 begin
   Result := 0;
-  if (AName = '') or SameText(AName, 'Default') then
+  if AName = '' then
     Exit;
   if not Assigned(AnsiIconHandles) then
     Exit;
@@ -2103,7 +2142,7 @@ end;
   SyncAnsiVersionChecks draws: it identifies WHICH encoding is selected, not
   whether ANSI output happens to be switched on right now. Slot 30, the
   built-in ANSI icon, is the deliberate fallback when nothing is selected (an
-  empty name or 'Default') or when the mapping carries no icon. }
+  empty name) or when the mapping carries no icon. }
 procedure TAvroMainForm1.ReplaceAnsiMenuParentIcon;
 const
   ANSI_ROOT_IMAGE_INDEX = 30;
@@ -2115,7 +2154,7 @@ begin
 
   // The active layout's own bytes: normally already cached by the parse that
   // activated it, resolved on demand after an idle release cleared the cache.
-  // Guarded for '' and 'Default', which carry no icon by design.
+  // Guarded for '' (no active mapping), which carries no icon by design.
   EnsureMappingIcon(AnsiVersion);
 
   Slot := AnsiRootIconSlot(AnsiVersion);
@@ -2241,7 +2280,7 @@ begin
 
   { Right-side icon badge }
   IconHandle := 0;
-  if (Item.Hint <> '') and (not SameText(Item.Hint, 'Default')) then
+  if Item.Hint <> '' then
     IconHandle := GetAnsiTrayIcon(Item.Hint);
   if IconHandle <> 0 then
   begin
@@ -2262,7 +2301,7 @@ var
   HasIcon: Boolean;
 begin
   Item := Sender as TMenuItem;
-  HasIcon := (Item.Hint <> '') and (not SameText(Item.Hint, 'Default'));
+  HasIcon := Item.Hint <> '';
 
   Width := GUTTER_W + 4 + ACanvas.TextWidth(Item.Caption) + 12;
   if HasIcon then
@@ -2732,16 +2771,14 @@ var
   MapPath:      string;    // cached: this path used to be rebuilt 3x per tick
   MapWriteTime: TDateTime; // one disk stat per throttled tick
 begin
-  if (AnsiVersion <> 'Default') and (AnsiMappingDir <> '') then
+  if (AnsiMappingDir <> '') and (AnsiVersion <> '') and (GetActiveEncoFilePath(AnsiVersion, AnsiMappingDir) <> '') then
   begin
     Dec(FMappingCheckCountdown);
     if FMappingCheckCountdown <= 0 then
     begin
       FMappingCheckCountdown := 10; // ~1 second at Interval = 100 ms
       try
-        MapPath := AnsiMappingDir + AnsiVersion + '.AvroEnco';
-        if not FileExists(MapPath) then
-          MapPath := AnsiMappingDir + AnsiVersion + '.json';
+        MapPath := GetActiveEncoFilePath(AnsiVersion, AnsiMappingDir);
         MapWriteTime := TFile.GetLastWriteTime(MapPath);
         if (MapWriteTime <> 0) and (MapWriteTime <> FActiveMappingLastWriteTime) then
         begin
@@ -2893,39 +2930,9 @@ begin
     SelectedVersion := StringReplace(SelectedVersion, '&', '', [rfReplaceAll]);
   end;
 
-  // Default সিলেকশন
-  if SameText(SelectedVersion, 'Default') then
-  begin
-    if not AnsiEngineManager.TrySwitchCached('Default') then
-    begin
-      Screen.Cursor := crHourGlass;
-      ErrorLog := TStringList.Create;
-      try
-        if not AnsiEngineManager.SwitchEngine('Default', ErrorLog) then
-        begin
-          ShowAnsiToastNotification('ANSI encoding failed to load - try again');
-          Exit;
-        end;
-      finally
-        ErrorLog.Free;
-        Screen.Cursor := crDefault;
-      end;
-    end;
-    AnsiVersion := 'Default';
-    SyncActiveMappingTimestamp('Default');
-    SaveAnsiVersionOnly;
-    UpdateAnsiVersionMenuChecks('Default');
-    // 'Default' has no container of its own, so this restores the built-in
-    // icon rather than a layout's. AnsiVersion is committed above, so the
-    // parent badge is resolved from it in this same event cycle instead of
-    // lagging one click behind the checkmark.
-    ReplaceAnsiMenuParentIcon;
-    UpdateTrayIcon;
-    if ShowAnsiSwitchNotification = 'YES' then
-      ShowAnsiToastNotification('ANSI Encoding: Default');
-    Exit;
-  end;
-
+  // One path for every selection: resolve the file, prompt for a password if
+  // this container needs one and none is cached, then switch. There is no
+  // compiled-in Default row - a name only appears here when its file exists.
   TargetPath := GetActiveEncoFilePath(SelectedVersion, AnsiMappingDir);
   if TargetPath = '' then
   begin
@@ -3147,7 +3154,7 @@ var
   P: string;
 begin
   FActiveMappingLastWriteTime := 0;
-  if SameText(AName, 'Default') or (AnsiMappingDir = '') then
+  if (AName = '') or (AnsiMappingDir = '') then
     Exit;
   P := GetActiveEncoFilePath(AName, AnsiMappingDir);
   if P = '' then
@@ -3207,7 +3214,7 @@ var
     ParentMenu.Add(MItem);
   end;
 
-  procedure AddMappingActionSubmenu(ParentMore: TMenuItem; const AName: string; IsDefault: Boolean);
+  procedure AddMappingActionSubmenu(ParentMore: TMenuItem; const AName: string);
   var
     MSub, ActionItem: TMenuItem;
   begin
@@ -3228,14 +3235,11 @@ var
     ActionItem.OnClick := ExportSpecificMappingClick;
     MSub.Add(ActionItem);
 
-    if not IsDefault then
-    begin
-      ActionItem := TMenuItem.Create(MSub);
-      ActionItem.Caption := 'Delete Mapping';
-      ActionItem.Hint := AName;
-      ActionItem.OnClick := DeleteAnsiMappingClick;
-      MSub.Add(ActionItem);
-    end;
+    ActionItem := TMenuItem.Create(MSub);
+    ActionItem.Caption := 'Delete Mapping';
+    ActionItem.Hint := AName;
+    ActionItem.OnClick := DeleteAnsiMappingClick;
+    MSub.Add(ActionItem);
   end;
 
   procedure BuildSingleMenu(AMenu: TMenuItem);
@@ -3247,21 +3251,15 @@ var
       Exit;
     AMenu.Clear;
 
-    // ১. Default
-    AddDirectItem(AMenu, 'Default', SameText(AnsiVersion, 'Default'));
-
-    // ২. স্ক্যান করা সব ফাইল
-    // AnsiMappingNames is sorted in the shared natural order by
+    // The full scanned catalog in shared natural order - no prepended
+    // "Default" row. AnsiMappingNames is sorted by
     // RefreshAnsiMappingNames (called just before this) and is the very same
-    // list the version picker shows. Enumerating AvroEncoFiles.Keys instead
-    // meant reading a hash table, which is why this menu could show
-    // Default, V1, V4, V2, V3 while the picker looked sorted.
+    // list the version picker shows.
     if Assigned(AnsiMappingNames) then
       for I := 0 to AnsiMappingNames.Count - 1 do
       begin
         DisplayName := AnsiMappingNames[I];
-        if not SameText(DisplayName, 'Default') then
-          AddDirectItem(AMenu, DisplayName, SameText(AnsiVersion, DisplayName));
+        AddDirectItem(AMenu, DisplayName, SameText(AnsiVersion, DisplayName));
       end;
 
     // Separator
@@ -3269,20 +3267,17 @@ var
     Sep.Caption := '-';
     AMenu.Add(Sep);
 
-    // ৩. More Options
+    // More Options
     MoreOptMenu := TMenuItem.Create(AMenu);
     MoreOptMenu.Caption := 'More Options';
     AMenu.Add(MoreOptMenu);
-
-    AddMappingActionSubmenu(MoreOptMenu, 'Default', True);
 
     // Same sorted order as the submenu above (and as the picker).
     if Assigned(AnsiMappingNames) then
       for I := 0 to AnsiMappingNames.Count - 1 do
       begin
         DisplayName := AnsiMappingNames[I];
-        if not SameText(DisplayName, 'Default') then
-          AddMappingActionSubmenu(MoreOptMenu, DisplayName, False);
+        AddMappingActionSubmenu(MoreOptMenu, DisplayName);
       end;
 
     // Separator

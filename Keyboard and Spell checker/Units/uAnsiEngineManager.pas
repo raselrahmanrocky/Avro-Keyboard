@@ -13,13 +13,13 @@ unit uAnsiEngineManager;
   uAnsiEngineManager - in-memory ANSI engine cache (instant version switch).
 
   The ANSI parser in clsUnicodeToBijoy2000 keeps its mapping state in unit
-  globals. This manager pre-parses every engine that can unlock without user
-  interaction (the built-in Default engine, default-key .AvroEnco containers,
-  plain .json mappings, and password-protected containers whose password was
-  already cached on this computer) - once, during application initialization,
-  on a BACKGROUND thread while the splash screen is still visible - and parks
-  each engine's complete state in a TAnsiEngineState record
-  (CaptureEngineState).
+  globals. This manager pre-parses every FILE mapping that can unlock without
+  user interaction (default-key .AvroEnco containers, plain .json mappings,
+  and password-protected containers whose password was already cached on this
+  computer) - once, during application initialization, on a BACKGROUND thread
+  while the splash screen is still visible - and parks each engine's complete
+  state in a TAnsiEngineState record (CaptureEngineState). There is no
+  compiled-in version: a name only becomes an engine when its file parses.
 
   Switching versions is then O(1): the previously active state is parked back
   and the target state is restored with plain pointer moves
@@ -42,9 +42,10 @@ unit uAnsiEngineManager;
   the running engine and leave its slot hollow (an engine with no registry and
   no rule tables: the version looked selected while every kar emitted nothing
   and consonants fell back to the compiled-in default glyph scheme).
-  ParkLive enforces the invariant before every parse, EnsureLiveEngine keeps
-  the app from ever running without an engine, and a hollow slot is treated as
-  a cache MISS (rebuilt from its file) instead of being served.
+  ParkLive enforces the invariant before every parse, EnsureLiveEngine repairs
+  an empty global state from a parked file slot or from disk (never from a
+  compiled-in Default engine), and a hollow slot is treated as a cache MISS
+  (rebuilt from its file) instead of being served.
 
   Memory: every parked state owns its containers; the manager frees them in
   Destroy (initialization/finalization of this unit), so FastMM reports no
@@ -62,14 +63,10 @@ uses
   uAvroEncoIconSection;
 
 const
-  { Slot key of the compiled-in default engine (FCurrentKey / AddOrSetValue
-    compare against this lowercase form). }
-  DefaultEngineSlotKey = 'default';
-
   { Parked (non-active) engines allowed to stay in RAM beside the live one.
 
-    1 keeps exactly the layout you just left - usually Default - switchable in
-    O(1) and parses everything else on first switch instead of preloading it.
+    1 keeps exactly the layout you just left - switchable in O(1) and parses
+    everything else on first switch instead of preloading it.
     That is the whole idle-footprint fix: the live engine is the only one
     typing ever reads, so nothing else needs to be resident. Raise it to trade
     RAM back for instant switching between more layouts.
@@ -157,10 +154,12 @@ type
       function TryRestoreSlot(const AKey, AName: string): Boolean;
       { True when AName's parked state is missing or hollow. }
       function IsSlotHollow(const AKey: string): Boolean;
-      { Fail-closed safety net: when the globals hold no engine, put the active
-        slot back (or Default) so the app is never left engine-less. Never
-        changes AnsiVersion - callers that genuinely switch publish the name
-        themselves, and the startup restore path reads that global. }
+      { Fail-closed safety net: when the globals hold no engine, restore the
+        active or last-used parked FILE slot, else parse one file mapping from
+        disk. Never builds a compiled-in engine and never changes AnsiVersion -
+        callers that genuinely switch publish the name themselves. With zero
+        usable files it only logs and leaves the globals empty (Unicode still
+        works). }
       procedure EnsureLiveEngine;
       { Puts a live engine the caller just parked by hand back in place after a
         failed parse. }
@@ -173,8 +172,9 @@ type
         usable mapping rules. Caller must hold FLock. }
       function ParseJSONIntoSlot(const AName, AFilePath, AJSON: string; ErrorLog: TStringList = nil): Boolean;
       { Decrypts AFilePath (Shield/legacy container with APassword, or reads
-        plain .json) and parks the parsed result. AFilePath = '' builds the
-        built-in Default engine. Caller must hold FLock. }
+        plain .json) and parks the parsed result. AFilePath must be a real
+        file path - empty is not an engine and returns False. Caller must
+        hold FLock. }
       function ParseIntoSlot(const AName, AFilePath: string; ErrorLog: TStringList = nil; const APassword: AnsiString = ''): Boolean;
       { Moves the currently active engine's globals back into its parked slot.
         Caller must hold FLock. }
@@ -195,12 +195,12 @@ type
       function LiveEngineReady: Boolean;
       { True when AName's parked engine is complete (cached and not hollow). }
       function CachedEngineReady(const AName: string): Boolean;
-      { Snapshots the engines that can unlock without user interaction
-        (built-in Default, default-key containers, plain .json mappings and
-        password-protected containers with a persisted password). Call on the
-        main thread BEFORE starting the preload thread: the snapshot decouples
-        the worker from the AvroEncoFiles dictionary, which the folder-change
-        timers clear/refill while the worker runs. }
+      { Snapshots the file mappings that can unlock without user interaction
+        (default-key containers, plain .json mappings and password-protected
+        containers with a persisted password). Call on the main thread BEFORE
+        starting the preload thread: the snapshot decouples the worker from
+        the AvroEncoFiles dictionary, which the folder-change timers clear/
+        refill while the worker runs. }
       function CapturePreloadList: TArray<TPreloadItem>;
       { Same snapshot, narrowed to ONE mapping: zero items when it is already
         cached, is not a known file, or is a password container that was never
@@ -208,10 +208,9 @@ type
         picker, import) warms before the user clicks it - warming the whole
         folder for one unlock is the eager behaviour the cache no longer does. }
       function CapturePreloadItem(const AName: string): TArray<TPreloadItem>;
-      { Parses the built-in Default engine (if missing) and every decrypted
-        snapshot result into the cache. Runs on the preload thread; takes
-        FLock, so it can never interleave with a main-thread switch. Returns
-        the number of engines committed.
+      { Parses every decrypted snapshot result into the cache. Runs on the
+        preload thread; takes FLock, so it can never interleave with a
+        main-thread switch. Returns the number of engines committed.
 
         The warm limit is NOT applied here: a batch commits exactly what it was
         asked for, and the LRU release is what keeps the ordinary session
@@ -231,8 +230,8 @@ type
       procedure WarmAllEngines(const AReturnTo: string);
       { Re-parses one cached engine from its file (directory watcher /
         auto-refresh on file change / import). If the engine is active it is
-        re-activated in place; on re-parse failure the active engine falls back
-        to Default so the app never loses a working engine. }
+        re-activated in place; on re-parse failure EnsureLiveEngine repairs
+        from another file mapping or leaves Unicode-only mode. }
       procedure InvalidateEngine(const AName: string);
       { Reconciles the cache with the file system: drops engines whose files
         disappeared (never the active one), re-parses default-key engines whose
@@ -516,33 +515,54 @@ end;
 
 procedure TAnsiEngineManager.EnsureLiveEngine;
 var
-  PrevKey: string;
+  PrevKey, BestKey, FallbackName, Path: string;
+  BestStamp: Cardinal;
+  Key: string;
+  Slot: TEngineSlot;
 begin
   if GlobalsHoldEngine then
     Exit;
 
   PrevKey := FCurrentKey;
-  if (PrevKey <> '') and (PrevKey <> DefaultEngineSlotKey) and RestoreSlotState(PrevKey) then
+  if (PrevKey <> '') and RestoreSlotState(PrevKey) then
   begin
     Log('Engine state repaired: restored active engine "' + PrevKey + '"');
     Exit;
   end;
 
-  // Nothing usable to restore: Default always renders, so the app can never be
-  // left with no engine at all. Its slot may legitimately be missing - the LRU
-  // release drops parked engines - but Default is compiled in, so it can be
-  // rebuilt here without touching a file or the crypto stack. (The globals are
-  // empty on this path, so the parse cannot park anything.)
-  if (not RestoreSlotState(DefaultEngineSlotKey)) and ParseIntoSlot('Default', '', nil) then
-    RestoreSlotState(DefaultEngineSlotKey);
-
-  if GlobalsHoldEngine then
+  // Restore any non-hollow parked FILE slot, preferring the last-used stamp
+  // so the layout the user just left comes back first.
+  BestKey := '';
+  BestStamp := 0;
+  for Key in FCache.Keys do
   begin
-    if PrevKey <> '' then
-      Log('WARNING: live engine "' + PrevKey + '" was empty - fell back to Default (repair pending)')
-    else
-      Log('Engine state: no engine active - Default activated');
+    if IsSlotHollow(Key) then
+      Continue;
+    Slot := FCache[Key];
+    if (BestKey = '') or (Slot.LastUseStamp > BestStamp) then
+    begin
+      BestKey := Key;
+      BestStamp := Slot.LastUseStamp;
+    end;
+  end;
+  if (BestKey <> '') and RestoreSlotState(BestKey) then
+  begin
+    Log('Engine state repaired: restored parked engine "' + BestKey + '"');
     Exit;
+  end;
+
+  // Nothing parked: parse ONE file mapping from disk (natural-sort first
+  // usable name). Never a compiled-in Default - with zero files the app stays
+  // on Unicode output.
+  FallbackName := FirstAvailableMappingName;
+  if FallbackName <> '' then
+  begin
+    Path := GetActiveEncoFilePath(FallbackName, AnsiMappingDir);
+    if (Path <> '') and ParseIntoSlot(FallbackName, Path, nil) and RestoreSlotState(SlotKey(FallbackName)) then
+    begin
+      Log('Engine state repaired: parsed file mapping "' + FallbackName + '"');
+      Exit;
+    end;
   end;
 
   Log('WARNING: no usable ANSI engine available');
@@ -642,25 +662,17 @@ end;
 function TAnsiEngineManager.ParseIntoSlot(const AName, AFilePath: string; ErrorLog: TStringList = nil; const APassword: AnsiString = ''): Boolean;
 var
   JSON:        string;
-  Slot:        TEngineSlot;
   UsePassword: AnsiString;
 begin
   Result := False;
 
-  // Built-in Default engine: the compiled-in mapping, no file involved.
+  // Empty path is not an engine: every successful parse goes through a real
+  // .json / .AvroEnco file (the compiled glyph canvas is only the scratch
+  // surface LoadAnsiMappingFromJSON resets onto before overlaying that file).
   if AFilePath = '' then
   begin
-    Slot := TEngineSlot.Create;
-    Slot.DisplayName := AName;
-    Slot.LastUseStamp := NextUseStamp;
-    ParkLive; // same quarantine as the JSON path: never reset over a live engine
-    ResetAnsiToDefaults;
-    CaptureEngineState(Slot.State);
-    Slot.State.DisplayName := AName;
-    if FCache.ContainsKey(SlotKey(AName)) then
-      DropSlot(SlotKey(AName));
-    FCache.Add(SlotKey(AName), Slot);
-    Result := True;
+    if Assigned(ErrorLog) then
+      ErrorLog.Add('Error: Mapping file path is empty for ' + AName);
     Exit;
   end;
 
@@ -774,7 +786,7 @@ var
   Flag: Byte;
 begin
   SetLength(Result, 0);
-  if (AName = '') or SameText(AName, 'Default') then
+  if AName = '' then
     Exit;
 
   FLock.Enter;
@@ -815,13 +827,7 @@ begin
   try
     Err := TStringList.Create;
     try
-      // 1. Built-in Default engine - always available, switchable in O(1).
-      if not FCache.ContainsKey(DefaultEngineSlotKey) then
-      begin
-        Err.Clear;
-        ParseIntoSlot('Default', '', Err);
-      end;
-      // 2. Every decrypted snapshot engine. Each parse parks the engine that
+      // Every decrypted snapshot engine. Each parse parks the engine that
       // is live (mid-session preload) and leaves it parked on success, so
       // EnsureLiveEngine puts it back once the batch is done.
       for R in AResults do
@@ -893,14 +899,11 @@ begin
     // Load on demand (password-protected engine, file added at runtime, or the
     // hollow-repair case above). ParseIntoSlot parks the live engine first and
     // puts it back when the parse fails, so the active engine survives either
-    // way (fail-closed).
+    // way (fail-closed). Empty path is never an engine - no compiled Default.
     if (not FCache.ContainsKey(Key)) or IsSlotHollow(Key) then
     begin
-      if Key = DefaultEngineSlotKey then
-        Path := ''
-      else
-        Path := GetActiveEncoFilePath(AName, AnsiMappingDir);
-      if (Path = '') and (Key <> DefaultEngineSlotKey) then
+      Path := GetActiveEncoFilePath(AName, AnsiMappingDir);
+      if Path = '' then
       begin
         if Assigned(ErrorLog) then
           ErrorLog.Add('Mapping file not found: ' + AName);
@@ -1074,17 +1077,9 @@ begin
     if not ParseIntoSlot(AName, Path, Err) then
     begin
       Log('InvalidateEngine failed for ' + AName + ': ' + Err.Text);
-      if WasActive then
-      begin
-        // Never leave the app without a working engine: fall back to Default.
-        if TryRestoreSlot(DefaultEngineSlotKey, 'Default') then
-          Log('WARNING: active engine "' + AName + '" could not be reparsed - fell back to Default')
-        else
-          EnsureLiveEngine;
-      end
-      else
-        // The failed parse parked the still-live engine; put it back.
-        EnsureLiveEngine;
+      // Repair from another file mapping or leave Unicode-only - never a
+      // silent fall back to a compiled-in engine.
+      EnsureLiveEngine;
       Exit;
     end;
 
@@ -1135,8 +1130,6 @@ begin
         Keys.Add(Key);
       for Key in Keys do
       begin
-        if Key = 'default' then
-          Continue;
         if FCache.TryGetValue(Key, Slot) and (Slot.FilePath <> '') and (not FileExists(Slot.FilePath)) then
         begin
           if Key = FCurrentKey then

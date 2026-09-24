@@ -1,4 +1,4 @@
-﻿{
+{
     "Metadata": {
         "Encoding": "ANSI V2",
         "Type": "ANSI Encoding",
@@ -744,9 +744,9 @@
                 "Comment": "ষ্ঠ"
             },
             "A_Ss_Ph": {
-                "UnicodeKey": "#$09B8#$09CD#$09AB",
+                "UnicodeKey": "#$09B7#$09CD#$09AB",
                 "Value": "#$00F5",
-                "Comment": "স্ফ"
+                "Comment": "ষ্ফ"
             },
             "A_S_Kh": {
                 "UnicodeKey": "#$09B8#$09CD#$0996",
@@ -789,9 +789,9 @@
                 "Comment": "হ্ম"
             },
             "A_Rr_G": {
-                "UnicodeKey": "#$09B0#$09CD#$0997",
+                "UnicodeKey": "#$09DC#$09CD#$0997",
                 "Value": "#$00FF",
-                "Comment": "র্গ"
+                "Comment": "ড়্গ"
             }
         },
         "FirstHalfForms": {
@@ -906,8 +906,9 @@
                 "Comment": "ক্র-এর দ্বিতীয় খন্ড"
             },
             "A_Nn_2H_2": {
+                "UnicodeKey": "#$09A8",
                 "Value": "#$0153",
-                "Comment": "ণ-এর দ্বিতীয় খন্ড ২"
+                "Comment": "ন-এর দ্বিতীয় খন্ড"
             },
             "A_B_2H_4": {
                 "Value": "#$0178",
@@ -1072,11 +1073,6 @@
             "Comment": "ফ্লু → d¬z"
         },
         {
-            "Key": "#$09B7#$09CD#$09AB",
-            "Value": "#$00F5",
-            "Comment": "ষ্ফ → õ"
-        },
-        {
             "Key": "#$09B8#$09CD#$09A8",
             "Value": "#$00AF#$0153",
             "Comment": "স্ন → ¯œ"
@@ -1105,6 +1101,76 @@
             "Key": "#$09B9#$09CD#$09A3",
             "Value": "#$006E#$00E8",
             "Comment": "হ্ণ"
+        },
+        {
+            "Key": "#$09B8#$09CD#$09AA",
+            "Value": "#$00AF#$00FA",
+            "Comment": "স্প"
+        },
+        {
+            "Key": "#$09B8#$09CD#$09AB",
+            "Value": "#$00F9",
+            "Comment": "স্ফ"
+        },
+        {
+            "Key": "#$09B7#$09CD#$09AA",
+            "Value": "#$00AE#$00FA",
+            "Comment": "ষ্প"
+        },
+        {
+            "Key": "#$09B7#$09CD#$09AB",
+            "Value": "#$00F5",
+            "Comment": "ষ্ফ"
+        },
+        {
+            "Key": "#$0997#$09CD#$09A8",
+            "Value": "#$004D#$0153",
+            "Comment": "গ্ন"
+        },
+        {
+            "Key": "#$0998#$09CD#$09A8",
+            "Value": "#$004E#$0153",
+            "Comment": "ঘ্ন"
+        },
+        {
+            "Key": "#$0999#$09CD#$0995#$09CD#$09B7",
+            "Value": "#$2022#$00B6",
+            "Comment": "ঙ্ক্ষ"
+        },
+        {
+            "Key": "#$09A4#$09CD#$09A8",
+            "Value": "#$005A#$0153",
+            "Comment": "ত্ন"
+        },
+        {
+            "Key": "#$09A7#$09CD#$09A8",
+            "Value": "#$0061#$0153",
+            "Comment": "ধ্ন"
+        },
+        {
+            "Key": "#$09A7#$09CD#$09A3",
+            "Value": "#$0061#$0026#$0059",
+            "Comment": "ধ্ণ"
+        },
+        {
+            "Key": "#$09A8#$09CD#$09A3",
+            "Value": "#$0062#$0026#$0059",
+            "Comment": "ন্ণ → b&Y"
+        },
+        {
+            "Key": "#$09AA#$09CD#$09A3",
+            "Value": "#$0063#$0026#$0059",
+            "Comment": "প্ণ → c&Y"
+        },
+        {
+            "Key": "#$0995#$09CD#$09A3",
+            "Value": "#$004B#$0026#$0059",
+            "Comment": "ক্ণ → K&Y"
+        },
+        {
+            "Key": "#$09DC#$09CD#$0997",
+            "Value": "#$2014#$004D",
+            "Comment": "ড়্গ"
         }
     ],
     "PreReplacements": [

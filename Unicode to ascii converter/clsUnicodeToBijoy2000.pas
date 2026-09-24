@@ -232,7 +232,7 @@ var
   CustomFullForms:          TArray<TReplacementPair>;
   CustomPreReplacements:    TArray<TReplacementPair>;
   CustomPostReplacements:   TArray<TReplacementPair>;
-  AnsiVersion:              string = 'Default';
+  AnsiVersion:              string = '';
   AnsiMappingDir:           string = '';
   AnsiRegistry:             TList<TAnsiVarRec>;
   AnsiRegistryMap:          TDictionary<string, TAnsiVarRec>;
@@ -772,7 +772,7 @@ begin
   RegVar('A_T_R_2H', 'SecondHalfForms', avChar, @A_T_R_2H, '#$BF', 'ত্র-এর দ্বিতীয় খন্ড');
   RegVar('A_Nn_2H_1', 'SecondHalfForms', avChar, @A_Nn_2H_1, '#$E8', 'ণ-এর দ্বিতীয় খন্ড ১');
   RegVar('A_K_R_2H', 'SecondHalfForms', avChar, @A_K_R_2H, '#$152', 'ক্র-এর দ্বিতীয় খন্ড');
-  RegVar('A_Nn_2H_2', 'SecondHalfForms', avChar, @A_Nn_2H_2, '#$153', 'ণ-এর দ্বিতীয় খন্ড ২');
+  RegVar('A_Nn_2H_2', 'SecondHalfForms', avChar, @A_Nn_2H_2, '#$153', 'ন-এর দ্বিতীয় খন্ড');
   RegVar('A_B_2H_4', 'SecondHalfForms', avChar, @A_B_2H_4, '#$178', 'ব-এর দ্বিতীয় খন্ড ৪');
   RegVar('A_T_2H', 'SecondHalfForms', avChar, @A_T_2H, '#$2014', 'ত-এর দ্বিতীয় খন্ড');
   RegVar('A_T_UKar_2H', 'SecondHalfForms', avChar, @A_T_UKar_2H, '#$2018', 'তু-এর দ্বিতীয় খন্ড');
@@ -5156,30 +5156,28 @@ procedure LoadCurrentActiveMapping(ErrorLog: TStringList = nil);
 var
   FilePath: string;
 begin
-  if AnsiVersion = 'Default' then
-    ResetAnsiToDefaults
-  else
-  begin
-    // Use multi-directory resolver to find the file
-    FilePath := GetActiveEncoFilePath(AnsiVersion, AnsiMappingDir);
-    if FilePath = '' then
-      Exit;
+  // Always resolve the active name to a file. Missing file / empty name:
+  // leave state alone and return (caller decides fallback). There is no
+  // compiled-in Default version - ResetAnsiToDefaults only clears the parse
+  // canvas when a real mapping file is about to overlay it.
+  FilePath := GetActiveEncoFilePath(AnsiVersion, AnsiMappingDir);
+  if FilePath = '' then
+    Exit;
 
-    if IsEncoFile(FilePath) then
+  if IsEncoFile(FilePath) then
+  begin
+    if Assigned(OnLoadEncoMapping) then
     begin
-      if Assigned(OnLoadEncoMapping) then
+      if not OnLoadEncoMapping(FilePath) then
       begin
-        if not OnLoadEncoMapping(FilePath) then
-        begin
-          // Fall back to checking for a .json version
-          if FileExists(AnsiMappingDir + AnsiVersion + '.json') then
-            LoadAnsiMapping(AnsiMappingDir + AnsiVersion + '.json', ErrorLog);
-        end;
+        // Fall back to checking for a .json version
+        if FileExists(AnsiMappingDir + AnsiVersion + '.json') then
+          LoadAnsiMapping(AnsiMappingDir + AnsiVersion + '.json', ErrorLog);
       end;
-    end
-    else
-      LoadAnsiMapping(FilePath, ErrorLog);
-  end;
+    end;
+  end
+  else
+    LoadAnsiMapping(FilePath, ErrorLog);
 end;
 
 { =============================================================================== }
@@ -5191,16 +5189,9 @@ begin
   Result := False;
   ErrorMessage := '';
 
-  if NewVersion = 'Default' then
-  begin
-    AnsiVersion := 'Default';
-    ResetAnsiToDefaults;
-    OptimizeMemoryUsage;
-    Result := True;
-    Exit;
-  end;
-
-  // Resolve file path using multi-directory resolver
+  // Resolve file path using multi-directory resolver. There is no compiled-in
+  // Default shortcut - a name is only valid when a file resolves (including
+  // a file the user happens to have named Default.json / Default.AvroEnco).
   FilePath := GetActiveEncoFilePath(NewVersion, AnsiMappingDir);
   if FilePath = '' then
   begin

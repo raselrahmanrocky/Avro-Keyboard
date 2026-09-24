@@ -95,7 +95,7 @@ begin
   Err := TStringList.Create;
   try
     AnsiMappingDir := MappingDir;
-    AnsiVersion := 'Default';
+    AnsiVersion := '';
 
     InitializeEncoManager;
     ScanAvroEncoFiles(MappingDir);
@@ -125,8 +125,7 @@ begin
     BatchWarm := AnsiEngineManager.WarmEngineCount;
     WriteLn('the batch parked ' + IntToStr(BatchWarm) + ' engine(s)');
 
-    // ---- 2. switch through every engine, capture output -------------------
-    EngineList.Add('Default');
+    // ---- 2. switch through every FILE engine, capture output --------------
     if Assigned(AvroEncoFiles) then
       for V in AvroEncoFiles.Keys do
         EngineList.Add(AvroEncoFiles[V].DisplayName);
@@ -243,14 +242,16 @@ begin
     end;
 
     // ---- 5. invalidation + refresh + remove --------------------------------
-    AnsiEngineManager.InvalidateEngine('Default'); // no file: no-op safety
+    AnsiEngineManager.InvalidateEngine('NoSuchMappingFile'); // unknown: no-op
     AnsiEngineManager.RefreshFromDisk;
-    AnsiEngineManager.RemoveEngine('Default'); // no-op (active guard)
-    AnsiEngineManager.SwitchEngine('Default');
+    // RemoveEngine of the active name is a no-op by design (caller switches away first).
+    AnsiEngineManager.RemoveEngine(ActiveName);
+    AnsiEngineManager.SwitchEngine(ActiveName);
     Check('invalidate/refresh/remove smoke', True);
 
-    // ---- 6. final active engine is Default --------------------------------
-    Check('active engine is Default', SameText(AnsiEngineManager.CurrentEngineName, 'default'));
+    // ---- 6. final active engine is a real file mapping --------------------
+    Check('active engine is a file mapping', AnsiEngineManager.LiveEngineReady and (ActiveName <> '') and
+      SameText(AnsiEngineManager.CurrentEngineName, Lowercase(ActiveName)));
 
     // ---- 7. idle release --------------------------------------------------
     // Time-gated: a day of "idle" is never reached, so nothing may be dropped.
@@ -269,7 +270,7 @@ begin
     Check('the live engine survived the release', AnsiEngineManager.LiveEngineReady);
     Check('the live engine still converts after the release', Converter.Convert(#$0995#$09BF) <> '');
     // And the released engine comes back on demand, not as a failure.
-    Ok := AnsiEngineManager.SwitchEngine('Default', Err);
+    Ok := AnsiEngineManager.SwitchEngine(ActiveName, Err);
     Check('a released engine switches back on demand', Ok, Err.Text);
   finally
     Err.Free;

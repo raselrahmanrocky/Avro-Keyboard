@@ -1,4 +1,4 @@
-﻿{
+{
     "Metadata": {
         "Encoding": "ANSI V1",
         "Type": "ANSI Encoding",
@@ -6,7 +6,7 @@
         "Company": "Ananda Computers",
         "Developer": "Mustafa Jabbar",
         "Modified By": "Md Rasel Rahman Rocky & Sherlock",
-        "Suggested Font": "Kalpurush ANSI, Siyam Rupali ANSI"
+        "Suggested Font": "Lekhoni ANSI V1, Kalpurush ANSI, Siyam Rupali ANSI"
     },
     "Constants": {
         "Numbers": {
@@ -615,7 +615,7 @@
             },
             "A_N_Tth": {
                 "UnicodeKey": "#$09A8#$09CD#$09A5",
-                "Value": "#$00DA",
+                "Value": "#$0161#$2019",
                 "Comment": "ন্থ"
             },
             "A_N_Dd": {
@@ -745,7 +745,7 @@
             },
             "A_Ss_Ph": {
                 "UnicodeKey": "#$09B8#$09CD#$09AB",
-                "Value": "#$00F5",
+                "Value": "#$00F9",
                 "Comment": "স্ফ"
             },
             "A_S_Kh": {
@@ -789,9 +789,9 @@
                 "Comment": "হ্ম"
             },
             "A_Rr_G": {
-                "UnicodeKey": "#$09B0#$09CD#$0997",
+                "UnicodeKey": "#$09DC#$09CD#$0997",
                 "Value": "#$00FF",
-                "Comment": "র্গ"
+                "Comment": "ড়্গ"
             }
         },
         "FirstHalfForms": {
@@ -906,8 +906,9 @@
                 "Comment": "ক্র-এর দ্বিতীয় খন্ড"
             },
             "A_Nn_2H_2": {
+                "UnicodeKey": "#$09A8",
                 "Value": "#$0153",
-                "Comment": "ণ-এর দ্বিতীয় খন্ড ২"
+                "Comment": "ন-এর দ্বিতীয় খন্ড"
             },
             "A_B_2H_4": {
                 "Value": "#$0178",
@@ -983,7 +984,7 @@
         },
         {
             "Key": "#$0995#$09CD#$09B7#$09CD#$09A8",
-            "Value": "¶&b",
+            "Value": "#$00B6#$0026#$0062",
             "Comment": "ক্ষ্ন"
         },
         {
@@ -1038,8 +1039,8 @@
         },
         {
             "Key": "#$0995#$09CD#$09A8",
-            "Value": "#$004B#$00E8",
-            "Comment": "ক্ন"
+            "Value": "#$004B#$0153",
+            "Comment": "ক্ন → Kœ"
         },
         {
             "Key": "#$09B8#$09CD#$09A4#$09CD#$09B0",
@@ -1113,8 +1114,63 @@
         },
         {
             "Key": "#$09B9#$09CD#$09A3",
-            "Value": "#$006E#$00E8",
-            "Comment": "হ্ণ"
+            "Value": "#$006E#$0026#$0059",
+            "Comment": "হ্ণ → n&Y"
+        },
+        {
+            "Key": "#$09B7#$09CD#$09AA",
+            "Value": "#$00AE#$00FA",
+            "Comment": "ষ্প"
+        },
+        {
+            "Key": "#$0997#$09CD#$09A8",
+            "Value": "#$004D#$0153",
+            "Comment": "গ্ন"
+        },
+        {
+            "Key": "#$0998#$09CD#$09A8",
+            "Value": "#$004E#$0153",
+            "Comment": "ঘ্ন"
+        },
+        {
+            "Key": "#$0999#$09CD#$0995#$09CD#$09B7",
+            "Value": "#$2022#$00B6",
+            "Comment": "ঙ্ক্ষ"
+        },
+        {
+            "Key": "#$09A4#$09CD#$09A8",
+            "Value": "#$005A#$0153",
+            "Comment": "ত্ন"
+        },
+        {
+            "Key": "#$09A7#$09CD#$09A8",
+            "Value": "#$0061#$0153",
+            "Comment": "ধ্ন"
+        },
+        {
+            "Key": "#$09A7#$09CD#$09A3",
+            "Value": "#$0061#$0026#$0059",
+            "Comment": "ধ্ণ"
+        },
+        {
+            "Key": "#$09A8#$09CD#$09A3",
+            "Value": "#$0062#$0026#$0059",
+            "Comment": "ন্ণ → b&Y"
+        },
+        {
+            "Key": "#$09AA#$09CD#$09A3",
+            "Value": "#$0063#$0026#$0059",
+            "Comment": "প্ণ → c&Y"
+        },
+        {
+            "Key": "#$0995#$09CD#$09A3",
+            "Value": "#$004B#$0026#$0059",
+            "Comment": "ক্ণ → K&Y"
+        },
+        {
+            "Key": "#$09DC#$09CD#$0997",
+            "Value": "#$00FF",
+            "Comment": "ড়্গ"
         }
     ],
     "PreReplacements": [
@@ -1151,12 +1207,12 @@
             "Comment": "ণ্ব: সংশোধন Y¡ → Y¦"
         },
         {
-            "Key": "š—y",
+            "Key": "#$0161#$2014#$0079",
             "Value": "#$0161#$2018",
             "Comment": "স্তু"
         },
         {
-            "Key": "¯—y",
+            "Key": "#$00AF#$2014#$0079",
             "Value": "#$00AF#$2018",
             "Comment": "ন্তু"
         }

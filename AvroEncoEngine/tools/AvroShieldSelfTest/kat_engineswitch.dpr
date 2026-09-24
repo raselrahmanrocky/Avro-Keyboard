@@ -491,10 +491,10 @@ var
   Scratch:                                   TAnsiEngineState;
   Count:                                     Integer;
   Bytes:                                     TBytes;
-  Prev:                                      string;
+  Prev, PrevWarm:                           string;
   Shortcuts:                                 TStringList;
   I:                                         Integer;
-  SortedOk, HasDefault:                      Boolean;
+  SortedOk, HasRealName:                   Boolean;
   PaletteDark, PaletteLight:                 TAppThemePalette;
   DfmText, PasText, TrayChildren:            TStringList;
   DfmPath, PasPath, CaptionLine:             string;
@@ -558,6 +558,8 @@ begin
     // more engines than the budget allows, so "at most one parked" cannot hold
     // by construction - something has to drop engines for it to pass.
     Check(Count > MaxWarmEngines, '1: the batch filled more engines than the warm limit (' + IntToStr(Count) + ')');
+    // The engine EnsureLiveEngine left live is the one the next switch parks warm.
+    PrevWarm := AnsiEngineManager.CurrentEngineName;
     Check(AnsiEngineManager.SwitchEngine(TAG_COLD_B), '1: first switch parses on demand');
     ExpectLive(TAG_COLD_B, '1 (after cold preload + switch)');
 
@@ -573,16 +575,16 @@ begin
     // layout the user was just in comes back in O(1) while mappings nobody
     // touched are the ones dropped. (The alternating click pattern that gets
     // the fast path on BOTH sides is section 3's job.)
-    Check(AnsiEngineManager.CachedEngineReady('Default'), '1: the engine the switch left behind is the one kept warm');
-    Check(AnsiEngineManager.TrySwitchCached('Default'), '1: clicking back to it takes the fast path');
-    Check(AnsiEngineManager.LiveEngineReady and (AnsiEngineManager.CurrentEngineName = DefaultEngineSlotKey), '1: the built-in engine is live again (got "' +
+    Check(AnsiEngineManager.CachedEngineReady(PrevWarm), '1: the engine the switch left behind is the one kept warm');
+    Check(AnsiEngineManager.TrySwitchCached(PrevWarm), '1: clicking back to it takes the fast path');
+    Check(AnsiEngineManager.LiveEngineReady and (AnsiEngineManager.CurrentEngineName = PrevWarm), '1: that file engine is live again (got "' +
         AnsiEngineManager.CurrentEngineName + '")');
 
     // A trimmed leftover is no longer resident, so reaching it parses again -
     // and must still land as exactly the fresh-loaded reference.
     Check(AnsiEngineManager.SwitchEngine(TAG_COLD_A), '1: a trimmed sibling still activates (cold re-parse)');
     ExpectLive(TAG_COLD_A, '1 (cold re-parse of a trimmed sibling)');
-    Check(AnsiEngineManager.CachedEngineReady('Default'), '1: and the engine THAT switch left is the one kept warm');
+    Check(AnsiEngineManager.CachedEngineReady(PrevWarm), '1: and the engine THAT switch left is the one kept warm');
     Check(AnsiEngineManager.WarmEngineCount <= MaxWarmEngines, '1: still one parked engine after three switches (warm=' +
         IntToStr(AnsiEngineManager.WarmEngineCount) + ')');
 
@@ -663,7 +665,7 @@ begin
     // ---- 9. encoding list order + picker shortcuts -----------------------
     // The two encoding menus and the version picker must present one single
     // order (the shipped bug: the menus enumerated the AvroEncoFiles hash table
-    // and showed Default, V1, V4, V2, V3 next to a correctly sorted picker),
+    // and showed V1, V4, V2, V3 next to a correctly sorted picker),
     // and the picker's number/letter shortcuts must land on exactly the rows
     // the owner-drawn list numbers.
     Say('--- 9. mapping order + picker shortcut resolution ---');
@@ -672,11 +674,11 @@ begin
       // No zero-padded duplicate here: names that are numerically equal (V1 /
       // V01) compare equal, so their relative order is unspecified on purpose.
       Shortcuts.Add('Ansi V10');
+      Shortcuts.Add('Ansi V4');
       Shortcuts.Add('Ansi V2');
-      Shortcuts.Add('Default');
       Shortcuts.Add('Ansi V1');
       SortMappingDisplayNames(Shortcuts);
-      Check(Joined(Shortcuts) = 'Ansi V1,Ansi V2,Ansi V10,Default', '9: natural order puts V2 before V10 (' + Joined(Shortcuts) + ')');
+      Check(Joined(Shortcuts) = 'Ansi V1,Ansi V2,Ansi V4,Ansi V10', '9: natural order puts V2 before V10 (' + Joined(Shortcuts) + ')');
       Check(CompareMappingDisplayNames('Ansi V2', 'Ansi V10') < 0, '9: V2 < V10');
       Check(CompareMappingDisplayNames('Ansi V10', 'Ansi V2') > 0, '9: V10 > V2');
       Check(CompareMappingDisplayNames('Ansi V1', 'Ansi V1') = 0, '9: identical names compare equal');
@@ -690,46 +692,44 @@ begin
       // satisfied by the list merely happening to be pre-sorted.
       Names.Assign(Shortcuts);
       Names.Sort;
-      Check(Joined(Names) = 'Ansi V1,Ansi V10,Ansi V2,Default', '9: the alphabetical sort this replaced really was wrong (' + Joined(Names) + ')');
+      Check(Joined(Names) = 'Ansi V1,Ansi V10,Ansi V2,Ansi V4', '9: the alphabetical sort this replaced really was wrong (' + Joined(Names) + ')');
 
-      // Exactly the list the picker draws: 1. Default, 2. Ansi V1, ...
+      // Exactly the list the picker draws (no built-in Default row): file names only.
       Shortcuts.Clear;
-      Shortcuts.Add('Default');
       Shortcuts.Add('Ansi V1');
       Shortcuts.Add('Ansi V2');
       Shortcuts.Add('Ansi V3');
-      Check(MappingIndexForKey(Shortcuts, Ord('1')) = 0, '9: number row 1 -> Default');
+      Shortcuts.Add('Ansi V4');
+      Check(MappingIndexForKey(Shortcuts, Ord('1')) = 0, '9: number row 1 -> first row');
       Check(MappingIndexForKey(Shortcuts, Ord('4')) = 3, '9: number row 4 -> last row');
       Check(MappingIndexForKey(Shortcuts, Ord('9')) = -1, '9: a number past the last row is not a shortcut');
       Check(MappingIndexForKey(Shortcuts, Ord('0')) = -1, '9: 0 is not a shortcut');
-      Check(MappingIndexForKey(Shortcuts, VK_NUMPAD1) = 0, '9: numpad 1 -> Default');
+      Check(MappingIndexForKey(Shortcuts, VK_NUMPAD1) = 0, '9: numpad 1 -> first row');
       Check(MappingIndexForKey(Shortcuts, VK_NUMPAD4) = 3, '9: numpad 4 -> last row');
       Check(MappingIndexForKey(Shortcuts, VK_NUMPAD9) = -1, '9: numpad past the last row is not a shortcut');
       Check(MappingIndexForKey(Shortcuts, VK_F1) = -1, '9: function keys are not shortcuts');
       Check(MappingIndexForKey(Shortcuts, VK_ESCAPE) = -1, '9: Escape is not a number shortcut');
-      Check(MappingIndexForChar(Shortcuts, 'd') = 0, '9: ''d'' selects Default');
-      Check(MappingIndexForChar(Shortcuts, 'D') = 0, '9: ''D'' matches Default as well');
-      Check(MappingIndexForChar(Shortcuts, 'a') = 1, '9: ''a'' selects the first Ansi entry');
-      Check(MappingIndexForChar(Shortcuts, 'A') = 1, '9: ''A'' matches as well');
+      Check(MappingIndexForChar(Shortcuts, 'a') = 0, '9: ''a'' selects the first Ansi entry');
+      Check(MappingIndexForChar(Shortcuts, 'A') = 0, '9: ''A'' matches as well');
       Check(MappingIndexForChar(Shortcuts, 'v') = -1, '9: only the first character matches');
       Check(MappingIndexForChar(Shortcuts, #0) = -1, '9: control characters are ignored');
       Shortcuts.Insert(0, '');
-      Check(MappingIndexForChar(Shortcuts, 'd') = 1, '9: an empty row is skipped by letter search');
+      Check(MappingIndexForChar(Shortcuts, 'a') = 1, '9: an empty row is skipped by letter search');
       Check(MappingIndexForKey(Shortcuts, Ord('1')) = 0, '9: numbering still follows the rows');
 
-      // The registry hands out the same order the menus iterate, and never
-      // 'Default' - the menus and the picker pin that row at the top themselves.
+      // The registry hands out the same order the menus iterate: every on-disk
+      // mapping, including a real Default.json if one exists, in shared order.
       GetSortedMappingDisplayNames(Names);
       SortedOk := Names.Count > 0;
       for I := 0 to Names.Count - 2 do
         if CompareMappingDisplayNames(Names[I], Names[I + 1]) > 0 then
           SortedOk := False;
-      HasDefault := False;
+      HasRealName := False;
       for I := 0 to Names.Count - 1 do
-        if SameText(Names[I], 'Default') then
-          HasDefault := True;
+        if Names[I] <> '' then
+          HasRealName := True;
       Check(SortedOk, '9: registry names come back in the shared order (' + IntToStr(Names.Count) + ' names)');
-      Check(not HasDefault, '9: the registry list excludes Default');
+      Check(HasRealName, '9: the registry list is not empty');
     finally
       Shortcuts.Free;
     end;

@@ -102,11 +102,16 @@ function CompareMappingDisplayNames(const ALeft, ARight: string): Integer;
   implementations without CustomSort (only TStringList has it). }
 procedure SortMappingDisplayNames(ANames: TStrings);
 
-{ Fills ANames with every mapping display name in the shared natural order,
-  excluding 'Default' (which is built into the application and is always listed
-  first by the caller). This is the single source of truth for menu and picker
-  order. }
+{ Fills ANames with every mapping display name in the shared natural order.
+  This is the full catalog (no extra "Default" row) and the single source of
+  truth for menu and picker order. }
 procedure GetSortedMappingDisplayNames(ANames: TStrings);
+
+{ Name of the first mapping that can be activated without a user prompt:
+  natural-sorted from GetSortedMappingDisplayNames, skipping password-protected
+  .AvroEnco containers that have no cached password on this computer. Returns
+  '' when nothing is usable (empty folder / only locked containers). }
+function FirstAvailableMappingName: string;
 
 { Shortcut resolution used by the picker's key handlers (form-level and list
   box level share one implementation). Maps the 1-based number the picker draws
@@ -132,6 +137,7 @@ uses
   uAvroEncoCrypto,
   clsUnicodeToBijoy2000,
   uFileFolderHandling,
+  uRegistrySettings,
   System.Win.Registry,
   System.IOUtils,
   DebugLog;
@@ -401,7 +407,7 @@ procedure EnsureMappingIcon(const ADisplayName: string);
 var
   Info: TAvroEncoFileInfo;
 begin
-  if (ADisplayName = '') or SameText(ADisplayName, 'Default') then
+  if ADisplayName = '' then
     Exit;
   if not Assigned(AvroEncoFiles) then
     Exit;
@@ -777,9 +783,34 @@ begin
   // unordered source the encoding menus used to build themselves from.
   if Assigned(AvroEncoFiles) then
     for Key in AvroEncoFiles.Keys do
-      if not SameText(Key, 'default') then
-        ANames.Add(AvroEncoFiles[Key].DisplayName);
+      ANames.Add(AvroEncoFiles[Key].DisplayName);
   SortMappingDisplayNames(ANames);
+end;
+
+function FirstAvailableMappingName: string;
+var
+  Names: TStringList;
+  I:     Integer;
+  Path:  string;
+begin
+  Result := '';
+  Names := TStringList.Create;
+  try
+    GetSortedMappingDisplayNames(Names);
+    for I := 0 to Names.Count - 1 do
+    begin
+      Path := GetActiveEncoFilePath(Names[I], AnsiMappingDir);
+      if Path = '' then
+        Continue;
+      // A password container with no cached password cannot be activated at
+      // startup without a prompt - skip it; the picker still lists it.
+      if IsEncoFile(Path) and (GetAvroEncoProtectionFlag(Path) = AVROENCO_FLAG_USER_PASSWORD) and (GetEncoCachedPassword(Path) = '') then
+        Continue;
+      Exit(Names[I]);
+    end;
+  finally
+    Names.Free;
+  end;
 end;
 
 function MappingIndexForKey(const ANames: TStrings; AKey: Word): Integer;

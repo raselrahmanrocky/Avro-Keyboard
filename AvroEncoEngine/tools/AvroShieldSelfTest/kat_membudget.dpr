@@ -22,8 +22,8 @@ program kat_membudget;
   ------------
   1. Scanning a mapping directory is CHEAP (no decrypt, no parse, no icon
   extraction) - the sweep moved out of ScanAvroEncoFiles.
-  2. Live engine only: activating Default costs almost nothing, activating a
-  container costs one parse, and nothing else becomes resident.
+  2. Live engine only: activating the first file mapping costs one parse,
+  activating a container costs one parse, and nothing else becomes resident.
   3. The warm set is bounded by MaxWarmEngines and switching inside it stays
   O(1) pointer moves (the typing latency contract).
   4. Icon extraction is per-mapping and DOM-free: N mappings must cost a
@@ -144,7 +144,7 @@ begin
   Err := TStringList.Create;
   try
     AnsiMappingDir := MappingDir;
-    AnsiVersion := 'Default';
+    AnsiVersion := '';
     AtStart := GetAvroMemStats;
     Say(AvroMemStatsText('start', AtStart));
 
@@ -158,20 +158,21 @@ begin
     Check('the mapping scan found files', AvroEncoFiles.Count > 1, 'count=' + IntToStr(AvroEncoFiles.Count));
     Check('the scan does not parse or decrypt anything', ScanHeap <= BUDGET_SCAN_HEAP, 'heap delta ' + KB(ScanHeap) + ' > budget ' + KB(BUDGET_SCAN_HEAP));
 
-    EngineList.Add('Default');
     for V in AvroEncoFiles.Keys do
       EngineList.Add(AvroEncoFiles[V].DisplayName);
 
-    // ---- 2. Default only: nothing else may become resident ----------------
+    // ---- 2. first file mapping only: nothing else may become resident -----
     // This is the startup shape of the branch: the persisted version (here
-    // Default) is the ONE engine activated, everything else stays cold.
+    // the first file mapping) is the ONE engine activated, everything else
+    // stays cold.
     Before := GetAvroMemStats;
-    Ok := AnsiEngineManager.SwitchEngine('Default', Err);
-    Check('Default activates', Ok, Err.Text);
-    Check('activating Default parks nothing else', AnsiEngineManager.WarmEngineCount = 0, 'warm=' + IntToStr(AnsiEngineManager.WarmEngineCount));
+    ActiveName := FirstAvailableMappingName;
+    Ok := (ActiveName <> '') and AnsiEngineManager.SwitchEngine(ActiveName, Err);
+    Check('first file mapping activates', Ok, Err.Text);
+    Check('activating it parks nothing else', AnsiEngineManager.WarmEngineCount = 0, 'warm=' + IntToStr(AnsiEngineManager.WarmEngineCount));
     After := GetAvroMemStats;
-    Check('Default is effectively free', After.HeapBytes - Before.HeapBytes <= 256 * 1024, 'heap delta ' + KB(After.HeapBytes - Before.HeapBytes));
-    Check('the live Default engine converts', Converter.Convert(#$0995#$09BF) <> '');
+    Check('the live engine is effectively free', After.HeapBytes - Before.HeapBytes <= 256 * 1024, 'heap delta ' + KB(After.HeapBytes - Before.HeapBytes));
+    Check('the live engine converts', Converter.Convert(#$0995#$09BF) <> '');
 
     // ---- 3. icons: lazy, per mapping, DOM-free ----------------------------
     Before := GetAvroMemStats;
@@ -199,10 +200,9 @@ begin
 
     // ---- 4. cold parse of a real engine -----------------------------------
     EnginesParsed := 0;
-    ActiveName := 'Default';
     ColdName := '';
     for V in EngineList do
-      if (V <> '') and (not SameText(V, 'Default')) then
+      if (V <> '') and (not SameText(V, ActiveName)) then
       begin
         ColdName := V;
         Break;
@@ -231,7 +231,8 @@ begin
         'warm=' + IntToStr(AnsiEngineManager.WarmEngineCount));
 
       // ---- 5. warm switching stays O(1) -----------------------------------
-      WarmName := 'Default';
+      // Warm partner: the first file mapping parked when ColdName went live.
+      WarmName := ActiveName;
       // The switch path used to log through DebugLog, which appended to a file
       // on every line. Measure that floor separately so the budget judges the
       // cache and not the logger - it is ~0 now that the sink writes no file.
@@ -268,8 +269,8 @@ begin
     Check('the whole session parsed engines on demand only', EnginesParsed <= 1, 'parsed=' + IntToStr(EnginesParsed));
 
     // ---- 7. the idle release gives the heap back --------------------------
-    Ok := AnsiEngineManager.SwitchEngine('Default', Err);
-    Check('Default is active before the release', Ok, Err.Text);
+    Ok := AnsiEngineManager.SwitchEngine(ActiveName, Err);
+    Check('first file mapping is active before the release', Ok, Err.Text);
     Refused := AnsiEngineManager.ReleaseIdleEngines(24 * 60);
     Check('the release is time-gated', Refused = 0, 'dropped ' + IntToStr(Refused) + ' while the user was active');
     Before := GetAvroMemStats;

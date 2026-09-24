@@ -341,7 +341,7 @@ begin
   ANSIToggleShortcut := UpperCase(XML.GetValue('ANSIToggleShortcut', 'YES'));
   IgnoreCapsLock := UpperCase(XML.GetValue('IgnoreCapsLock', 'NO'));
 
-  clsUnicodeToBijoy2000.AnsiVersion := XML.GetValue('AnsiVersion', 'Default');
+  clsUnicodeToBijoy2000.AnsiVersion := XML.GetValue('AnsiVersion', '');
 
   // AvroEnco Settings
   CachedEncoPassword := AnsiString(XML.GetValue('CachedEncoPassword', ''));
@@ -528,7 +528,7 @@ begin
     UnicodeToggleShortcut := UpperCase(Reg.ReadStringDef('UnicodeToggleShortcut', 'YES'));
     ANSIToggleShortcut := UpperCase(Reg.ReadStringDef('ANSIToggleShortcut', 'YES'));
     IgnoreCapsLock := UpperCase(Reg.ReadStringDef('IgnoreCapsLock', 'NO'));
-    clsUnicodeToBijoy2000.AnsiVersion := Reg.ReadStringDef('AnsiVersion', 'Default');
+    clsUnicodeToBijoy2000.AnsiVersion := Reg.ReadStringDef('AnsiVersion', '');
 
     // AvroEnco Settings
     CachedEncoPassword := AnsiString(Reg.ReadStringDef('CachedEncoPassword', ''));
@@ -800,9 +800,9 @@ begin
   // duplicate a higher-priority one.
   DeduplicateHotkeys;
 
-  // ANSI Mapping Version
-  if clsUnicodeToBijoy2000.AnsiVersion = '' then
-    clsUnicodeToBijoy2000.AnsiVersion := 'Default';
+  // ANSI Mapping Version: leave '' / 'Default' as-is (unknown). LoadApp
+  // migrates once to FirstAvailableMappingName and persists that name;
+  // never coerce empty back to a compiled-in Default version.
 end;
 
 { =============================================================================== }
