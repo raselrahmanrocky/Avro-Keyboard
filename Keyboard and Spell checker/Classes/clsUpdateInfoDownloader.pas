@@ -47,19 +47,7 @@ var
   Updater: TUpdateCheck;
 
 const
-  {$IFDEF BetaVersion}
-  {$IFDEF PortableOn}
-  UpdateInfo = 'https://www.omicronlab.com/download/liveupdate/portable_avrokeyboard/versioninfo_beta.xml';
-  {$ELSE}
-  UpdateInfo = 'https://www.omicronlab.com/download/liveupdate/avrokeyboard/versioninfo_beta.xml';
-  {$ENDIF}
-  {$ELSE}
-  {$IFDEF PortableOn}
-  UpdateInfo = 'https://www.omicronlab.com/download/liveupdate/portable_avrokeyboard/versioninfo.xml';
-  {$ELSE}
-  UpdateInfo = 'https://www.omicronlab.com/download/liveupdate/avrokeyboard/versioninfo.xml';
-  {$ENDIF}
-  {$ENDIF}
+  UpdateInfo = 'https://github.com/raselrahmanrocky/Avro-Keyboard-Releases/releases/latest/download/versioninfo.xml';
 
 implementation
 
