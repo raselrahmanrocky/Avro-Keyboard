@@ -32,6 +32,33 @@ var
   CachedEncoPassword: AnsiString;
   AvroEncoFiles:      TDictionary<string, TAvroEncoFileInfo>;
 
+{ ============================================================================== }
+{ Per-encoding password memory (key = lowercase full file path) }
+{ ============================================================================== }
+
+{ A protected encoding asks for its password ONCE on this computer; every later
+  load (even after restarting the app or the PC) decrypts silently from here.
+
+  The memory lives with the engine rather than with uRegistrySettings on
+  purpose: this unit is linked by code that must stay clear of the application's
+  settings and UI (the Text Converter and the gate tools reach the engine
+  through clsUnicodeToBijoy2000), while uRegistrySettings pulls in uForm1 and
+  uTopBar. The engine owns the memory; uRegistrySettings only persists the blob
+  it produces with its EncodeEncoCache/DecodeEncoCache helpers. }
+
+const
+  EncoCacheSep = #9; // TAB separates file path from password (never typed in a
+  // single-line edit, and never part of an NTFS file name)
+
+var
+  EncoPasswordCache: TStringList;
+
+procedure InitEncoPasswordCache;
+procedure FreeEncoPasswordCache;
+function GetEncoCachedPassword(const AFilePath: string): AnsiString;
+procedure RememberEncoPassword(const AFilePath: string; const APassword: AnsiString);
+procedure ForgetEncoPassword(const AFilePath: string);
+
 procedure InitializeEncoManager;
 procedure FinalizeEncoManager;
 procedure ScanAvroEncoFiles(const ADirectory: string);
@@ -137,10 +164,80 @@ uses
   uAvroEncoCrypto,
   clsUnicodeToBijoy2000,
   uFileFolderHandling,
-  uRegistrySettings,
   System.Win.Registry,
   System.IOUtils,
   DebugLog;
+
+{ =============================================================================== }
+{ Per-encoding password memory (helpers) }
+{ =============================================================================== }
+
+procedure InitEncoPasswordCache;
+begin
+  if not Assigned(EncoPasswordCache) then
+  begin
+    EncoPasswordCache := TStringList.Create;
+    EncoPasswordCache.NameValueSeparator := EncoCacheSep;
+  end;
+end;
+
+procedure FreeEncoPasswordCache;
+begin
+  FreeAndNil(EncoPasswordCache);
+end;
+
+function GetEncoCachedPassword(const AFilePath: string): AnsiString;
+var
+  Key: string;
+  I:   Integer;
+begin
+  Result := '';
+  Key := LowerCase(Trim(AFilePath));
+  if Key = '' then
+    Exit;
+  InitEncoPasswordCache;
+  for I := 0 to EncoPasswordCache.Count - 1 do
+    if EncoPasswordCache.Names[I] = Key then
+    begin
+      Result := AnsiString(EncoPasswordCache.ValueFromIndex[I]);
+      Exit;
+    end;
+end;
+
+procedure RememberEncoPassword(const AFilePath: string; const APassword: AnsiString);
+var
+  Key:   string;
+  I:     Integer;
+  Found: Boolean;
+begin
+  if (Trim(AFilePath) = '') or (APassword = '') then
+    Exit;
+  InitEncoPasswordCache;
+  Key := LowerCase(Trim(AFilePath));
+  Found := False;
+  for I := 0 to EncoPasswordCache.Count - 1 do
+    if EncoPasswordCache.Names[I] = Key then
+    begin
+      EncoPasswordCache[I] := Key + EncoCacheSep + string(APassword);
+      Found := True;
+      Break;
+    end;
+  if not Found then
+    EncoPasswordCache.Add(Key + EncoCacheSep + string(APassword));
+end;
+
+procedure ForgetEncoPassword(const AFilePath: string);
+var
+  Key: string;
+  I:   Integer;
+begin
+  if not Assigned(EncoPasswordCache) then
+    Exit;
+  Key := LowerCase(Trim(AFilePath));
+  for I := EncoPasswordCache.Count - 1 downto 0 do
+    if EncoPasswordCache.Names[I] = Key then
+      EncoPasswordCache.Delete(I);
+end;
 
 procedure InitializeEncoManager;
 begin
@@ -851,5 +948,6 @@ finalization
 FreeAndNil(MappingIcons);
 FreeAndNil(MappingIconsResolved);
 FreeAndNil(MappingIconsLock);
+FreeEncoPasswordCache; // the memory this unit owns (see the interface section)
 
 end.
