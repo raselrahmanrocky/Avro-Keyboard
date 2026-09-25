@@ -92,15 +92,6 @@ type
     Showactivekeyboardlayout1: TMenuItem;
     Jumptosystemtray1: TMenuItem;
     Exit1: TMenuItem;
-    BeforeYouStart1: TMenuItem;
-    Overview1: TMenuItem;
-    CustomizingAvroKeyboard1: TMenuItem;
-    BanglaTypingwithAvroPhonetic1: TMenuItem;
-    BanglaTypingwithFixedKeyboardLayouts1: TMenuItem;
-    BanglaTypingwithAvroMouse1: TMenuItem;
-    FrequentlyAskedQuestionsFAQ1: TMenuItem;
-    N10: TMenuItem;
-    CreatingEditingFixedKeyboardLayouts1: TMenuItem;
     N11: TMenuItem;
     Aboutcurrentkeyboardlayout1: TMenuItem;
     AboutAvroKeyboard1: TMenuItem;
@@ -139,14 +130,6 @@ type
     SkinDesignerDesignyourownskin2: TMenuItem;
     N48: TMenuItem;
     Helpfiles2: TMenuItem;
-    BeforeYouStart3: TMenuItem;
-    Overview3: TMenuItem;
-    CustomizingAvroKeyboard3: TMenuItem;
-    BanglaTypingwithAvroPhonetic3: TMenuItem;
-    BanglaTypingwithFixedKeyboardLayouts3: TMenuItem;
-    BanglaTypingwithAvroMouse3: TMenuItem;
-    N36: TMenuItem;
-    CreatingEditingFixedKeyboardLayouts3: TMenuItem;
     N39: TMenuItem;
     GetAcrobatReader3: TMenuItem;
     Aboutcurrentkeyboardlayout2: TMenuItem;
@@ -212,14 +195,6 @@ type
     procedure DownloadMoreResourcesClick(Sender: TObject);
     procedure Jumptosystemtray1Click(Sender: TObject);
     procedure Options1Click(Sender: TObject);
-    procedure BeforeYouStart1Click(Sender: TObject);
-    procedure Overview1Click(Sender: TObject);
-    procedure CustomizingAvroKeyboard1Click(Sender: TObject);
-    procedure BanglaTypingwithAvroPhonetic1Click(Sender: TObject);
-    procedure BanglaTypingwithFixedKeyboardLayouts1Click(Sender: TObject);
-    procedure BanglaTypingwithAvroMouse1Click(Sender: TObject);
-    procedure FrequentlyAskedQuestionsFAQ1Click(Sender: TObject);
-    procedure CreatingEditingFixedKeyboardLayouts1Click(Sender: TObject);
     procedure JoinTelegramCommunity(Sender: TObject);
     procedure Aboutcurrentkeyboardlayout1Click(Sender: TObject);
     procedure AboutAvroKeyboard1Click(Sender: TObject);
@@ -369,6 +344,11 @@ type
 
       procedure RestoreFromTray;
       procedure OpenHelpFile(const HelpID: Integer);
+      function ResolveHelpPdf(const AFileName: string): string;
+      procedure CollectHelpPdfs(AList: TStringList);
+      procedure RebuildDynamicHelp(AParent: TMenuItem; AInsertIndex: Integer);
+      procedure DynamicHelpPopup(Sender: TObject);
+      procedure DynamicHelpClick(Sender: TObject);
       procedure ShowOnTray;
       procedure ToggleMode;
       procedure SetBengaliUnicodeMode;
@@ -506,26 +486,6 @@ begin
   KeyLayout.CurrentKeyboardLayout := 'avrophonetic*';
 end;
 
-procedure TAvroMainForm1.BanglaTypingwithAvroMouse1Click(Sender: TObject);
-begin
-  OpenHelpFile(28);
-end;
-
-procedure TAvroMainForm1.BanglaTypingwithAvroPhonetic1Click(Sender: TObject);
-begin
-  OpenHelpFile(26);
-end;
-
-procedure TAvroMainForm1.BanglaTypingwithFixedKeyboardLayouts1Click(Sender: TObject);
-begin
-  OpenHelpFile(27);
-end;
-
-procedure TAvroMainForm1.BeforeYouStart1Click(Sender: TObject);
-begin
-  OpenHelpFile(23);
-end;
-
 procedure TAvroMainForm1.ChangeTypingStyle(const sStyle: string);
 begin
   if Lowercase(sStyle) = Lowercase('ModernStyle') then
@@ -557,16 +517,6 @@ procedure TAvroMainForm1.CreateParams(var Params: TCreateParams);
 begin
   inherited CreateParams(Params);
   Params.ExStyle := Params.ExStyle or WS_EX_TOOLWINDOW and not WS_EX_APPWINDOW;
-end;
-
-procedure TAvroMainForm1.CreatingEditingFixedKeyboardLayouts1Click(Sender: TObject);
-begin
-  OpenHelpFile(35);
-end;
-
-procedure TAvroMainForm1.CustomizingAvroKeyboard1Click(Sender: TObject);
-begin
-  OpenHelpFile(25);
 end;
 
 procedure TAvroMainForm1.Dictionarymodeisdefault1Click(Sender: TObject);
@@ -704,6 +654,8 @@ begin
   // here, so the stored theme has to be applied once more.
   HandleThemes;
   LoadApp;
+  Popup_Help.OnPopup := DynamicHelpPopup;
+  Popup_Tray.OnPopup := DynamicHelpPopup;
 end;
 
 { =============================================================================== }
@@ -717,11 +669,6 @@ end;
 procedure TAvroMainForm1.FreeBanglaFonts1Click(Sender: TObject);
 begin
   Execute_Something('https://www.omicronlab.com/go.php?id=4');
-end;
-
-procedure TAvroMainForm1.FrequentlyAskedQuestionsFAQ1Click(Sender: TObject);
-begin
-  OpenHelpFile(29);
 end;
 
 { =============================================================================== }
@@ -1430,50 +1377,148 @@ end;
 
 { =============================================================================== }
 
+function TAvroMainForm1.ResolveHelpPdf(const AFileName: string): string;
+begin
+  Result := '';
+  if FileExists(ExtractFilePath(Application.ExeName) + AFileName) then
+    Result := ExtractFilePath(Application.ExeName) + AFileName
+  else if FileExists(GetAvroDataDir + 'Docs\' + AFileName) then
+    Result := GetAvroDataDir + 'Docs\' + AFileName;
+end;
+
+procedure TAvroMainForm1.CollectHelpPdfs(AList: TStringList);
+var
+  I, J: Integer;
+  Cur: string;
+
+  function AlreadyListed(const AName: string): Boolean;
+  var
+    K: Integer;
+  begin
+    Result := True;
+    for K := 0 to AList.Count - 1 do
+      if SameText(ExtractFileName(AList[K]), AName) then
+        Exit;
+    Result := False;
+  end;
+
+  procedure ScanDir(const ADir: string);
+  var
+    Sr: TSearchRec;
+  begin
+    if not DirectoryExists(ADir) then
+      Exit;
+    if FindFirst(IncludeTrailingPathDelimiter(ADir) + '*.pdf', faAnyFile, Sr) = 0 then
+    try
+      repeat
+        if ((Sr.Attr and faDirectory) = 0) and (not AlreadyListed(Sr.Name)) then
+          AList.Add(IncludeTrailingPathDelimiter(ADir) + Sr.Name);
+      until FindNext(Sr) <> 0;
+    finally
+      FindClose(Sr);
+    end;
+  end;
+
+begin
+  AList.Clear;
+  ScanDir(ExtractFilePath(Application.ExeName));
+  ScanDir(GetAvroDataDir + 'Docs\');
+  for I := 1 to AList.Count - 1 do
+  begin
+    Cur := AList[I];
+    J := I;
+    while (J > 0) and (CompareText(ExtractFileName(AList[J - 1]), ExtractFileName(Cur)) > 0) do
+    begin
+      AList[J] := AList[J - 1];
+      Dec(J);
+    end;
+    AList[J] := Cur;
+  end;
+end;
+
+procedure TAvroMainForm1.RebuildDynamicHelp(AParent: TMenuItem; AInsertIndex: Integer);
+const
+  DynTag = 9911;
+var
+  I: Integer;
+  Pdfs: TStringList;
+  M: TMenuItem;
+begin
+  for I := AParent.Count - 1 downto 0 do
+    if AParent[I].Tag = DynTag then
+      AParent[I].Free;
+
+  Pdfs := TStringList.Create;
+  try
+    CollectHelpPdfs(Pdfs);
+    if Pdfs.Count = 0 then
+    begin
+      M := TMenuItem.Create(Self);
+      M.Caption := 'No help files found';
+      M.Enabled := False;
+      M.Tag := DynTag;
+      AParent.Insert(AInsertIndex, M);
+    end
+    else
+      for I := 0 to Pdfs.Count - 1 do
+      begin
+        M := TMenuItem.Create(Self);
+        M.Caption := ChangeFileExt(ExtractFileName(Pdfs[I]), '');
+        M.Hint := Pdfs[I];
+        M.ImageIndex := 7;
+        M.Tag := DynTag;
+        M.OnClick := DynamicHelpClick;
+        AParent.Insert(AInsertIndex + I, M);
+      end;
+  finally
+    Pdfs.Free;
+  end;
+end;
+
+procedure TAvroMainForm1.DynamicHelpPopup(Sender: TObject);
+begin
+  if Sender = Popup_Help then
+    RebuildDynamicHelp(Popup_Help.Items, 0)
+  else if Sender = Popup_Tray then
+    RebuildDynamicHelp(Helpfiles2, 0);
+end;
+
+procedure TAvroMainForm1.DynamicHelpClick(Sender: TObject);
+begin
+  if (Sender is TMenuItem) and FileExists(TMenuItem(Sender).Hint) then
+    Execute_Something(TMenuItem(Sender).Hint);
+end;
+
 procedure TAvroMainForm1.OpenHelpFile(const HelpID: Integer);
+var
+  Request: string;
+  Pdf: string;
 begin
   case HelpID of
     23:
-      if FileExists(ExtractFilePath(Application.ExeName) + 'Before You Start.pdf') then
-        Execute_Something(ExtractFilePath(Application.ExeName) + 'Before You Start.pdf')
-      else
-        Execute_Something('https://www.omicronlab.com/go.php?id=' + IntToStr(HelpID));
+      Request := 'Before You Start.pdf';
     24:
-      if FileExists(ExtractFilePath(Application.ExeName) + 'Overview.pdf') then
-        Execute_Something(ExtractFilePath(Application.ExeName) + 'Overview.pdf')
-      else
-        Execute_Something('https://www.omicronlab.com/go.php?id=' + IntToStr(HelpID));
+      Request := 'Overview.pdf';
     25:
-      if FileExists(ExtractFilePath(Application.ExeName) + 'Customizing Avro Keyboard.pdf') then
-        Execute_Something(ExtractFilePath(Application.ExeName) + 'Customizing Avro Keyboard.pdf')
-      else
-        Execute_Something('https://www.omicronlab.com/go.php?id=' + IntToStr(HelpID));
+      Request := 'Customizing Avro Keyboard.pdf';
     26:
-      if FileExists(ExtractFilePath(Application.ExeName) + 'Bangla Typing with Avro Phonetic.pdf') then
-        Execute_Something(ExtractFilePath(Application.ExeName) + 'Bangla Typing with Avro Phonetic.pdf')
-      else
-        Execute_Something('https://www.omicronlab.com/go.php?id=' + IntToStr(HelpID));
+      Request := 'Bangla Typing with Avro Phonetic.pdf';
     27:
-      if FileExists(ExtractFilePath(Application.ExeName) + 'Bangla Typing with Fixed Keyboard Layouts.pdf') then
-        Execute_Something(ExtractFilePath(Application.ExeName) + 'Bangla Typing with Fixed Keyboard Layouts.pdf')
-      else
-        Execute_Something('https://www.omicronlab.com/go.php?id=' + IntToStr(HelpID));
+      Request := 'Bangla Typing with Fixed Keyboard Layouts.pdf';
     28:
-      if FileExists(ExtractFilePath(Application.ExeName) + 'Bangla Typing with Avro Mouse.pdf') then
-        Execute_Something(ExtractFilePath(Application.ExeName) + 'Bangla Typing with Avro Mouse.pdf')
-      else
-        Execute_Something('https://www.omicronlab.com/go.php?id=' + IntToStr(HelpID));
+      Request := 'Bangla Typing with Avro Mouse.pdf';
     29:
-      if FileExists(ExtractFilePath(Application.ExeName) + 'faq.pdf') then
-        Execute_Something(ExtractFilePath(Application.ExeName) + 'faq.pdf')
-      else
-        Execute_Something('https://www.omicronlab.com/go.php?id=' + IntToStr(HelpID));
+      Request := 'faq.pdf';
     35:
-      if FileExists(ExtractFilePath(Application.ExeName) + 'Editing Keyboard Layout.pdf') then
-        Execute_Something(ExtractFilePath(Application.ExeName) + 'Editing Keyboard Layout.pdf')
-      else
-        Execute_Something('https://www.omicronlab.com/go.php?id=' + IntToStr(HelpID));
+      Request := 'Editing Keyboard Layout.pdf';
+  else
+    Exit;
   end;
+  Pdf := ResolveHelpPdf(Request);
+  if Pdf <> '' then
+    Execute_Something(Pdf)
+  else
+    Execute_Something('https://www.omicronlab.com/go.php?id=' + IntToStr(HelpID));
 end;
 
 procedure TAvroMainForm1.Options1Click(Sender: TObject);
@@ -1500,11 +1545,6 @@ begin
   OutputIsBijoy := 'NO';
   OptimizeMemoryUsage;
   RefreshSettings;
-end;
-
-procedure TAvroMainForm1.Overview1Click(Sender: TObject);
-begin
-  OpenHelpFile(24);
 end;
 
 { =============================================================================== }

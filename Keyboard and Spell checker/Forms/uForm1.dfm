@@ -1405,50 +1405,6 @@ object AvroMainForm1: TAvroMainForm1
     Images = ImageList1
     Left = 408
     Top = 72
-    object BeforeYouStart1: TMenuItem
-      Caption = 'Before You Start'
-      ImageIndex = 7
-      OnClick = BeforeYouStart1Click
-    end
-    object Overview1: TMenuItem
-      Caption = 'Overview'
-      ImageIndex = 7
-      OnClick = Overview1Click
-    end
-    object CustomizingAvroKeyboard1: TMenuItem
-      Caption = 'Customizing Avro Keyboard'
-      ImageIndex = 7
-      OnClick = CustomizingAvroKeyboard1Click
-    end
-    object BanglaTypingwithAvroPhonetic1: TMenuItem
-      Caption = 'Bangla Typing with Avro Phonetic'
-      ImageIndex = 7
-      OnClick = BanglaTypingwithAvroPhonetic1Click
-    end
-    object BanglaTypingwithFixedKeyboardLayouts1: TMenuItem
-      Caption = 'Bangla Typing with Fixed Keyboard Layouts'
-      ImageIndex = 7
-      OnClick = BanglaTypingwithFixedKeyboardLayouts1Click
-    end
-    object BanglaTypingwithAvroMouse1: TMenuItem
-      Caption = 'Bangla Typing with Avro Mouse'
-      ImageIndex = 7
-      OnClick = BanglaTypingwithAvroMouse1Click
-    end
-    object FrequentlyAskedQuestionsFAQ1: TMenuItem
-      Caption = 'Frequently Asked Questions (FAQ)'
-      ImageIndex = 7
-      Visible = False
-      OnClick = FrequentlyAskedQuestionsFAQ1Click
-    end
-    object N10: TMenuItem
-      Caption = '-'
-    end
-    object CreatingEditingFixedKeyboardLayouts1: TMenuItem
-      Caption = 'Creating/Editing Fixed Keyboard Layouts'
-      ImageIndex = 7
-      OnClick = CreatingEditingFixedKeyboardLayouts1Click
-    end
     object N11: TMenuItem
       Caption = '-'
     end
@@ -1713,44 +1669,6 @@ object AvroMainForm1: TAvroMainForm1
       object Helpfiles2: TMenuItem
         Caption = 'Help files'
         ImageIndex = 18
-        object BeforeYouStart3: TMenuItem
-          Caption = 'Before You Start'
-          ImageIndex = 7
-          OnClick = BeforeYouStart1Click
-        end
-        object Overview3: TMenuItem
-          Caption = 'Overview'
-          ImageIndex = 7
-          OnClick = Overview1Click
-        end
-        object CustomizingAvroKeyboard3: TMenuItem
-          Caption = 'Customizing Avro Keyboard'
-          ImageIndex = 7
-          OnClick = CustomizingAvroKeyboard1Click
-        end
-        object BanglaTypingwithAvroPhonetic3: TMenuItem
-          Caption = 'Bangla Typing with Avro Phonetic'
-          ImageIndex = 7
-          OnClick = BanglaTypingwithAvroPhonetic1Click
-        end
-        object BanglaTypingwithFixedKeyboardLayouts3: TMenuItem
-          Caption = 'Bangla Typing with Fixed Keyboard Layouts'
-          ImageIndex = 7
-          OnClick = BanglaTypingwithFixedKeyboardLayouts1Click
-        end
-        object BanglaTypingwithAvroMouse3: TMenuItem
-          Caption = 'Bangla Typing with Avro Mouse'
-          ImageIndex = 7
-          OnClick = BanglaTypingwithAvroMouse1Click
-        end
-        object N36: TMenuItem
-          Caption = '-'
-        end
-        object CreatingEditingFixedKeyboardLayouts3: TMenuItem
-          Caption = 'Creating/Editing Fixed Keyboard Layouts'
-          ImageIndex = 7
-          OnClick = CreatingEditingFixedKeyboardLayouts1Click
-        end
         object N39: TMenuItem
           Caption = '-'
         end
