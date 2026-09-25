@@ -12,7 +12,7 @@ rem  Once done the built files can be found in build directory
 
 setlocal
 
-set VER=5.7.0
+set VER=6.0.0
 
 echo Building Avro Keyboard %VER%...
 echo.
