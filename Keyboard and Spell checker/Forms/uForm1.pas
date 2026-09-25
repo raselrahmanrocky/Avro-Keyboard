@@ -84,6 +84,7 @@ type
     CheckupdateforAvroKeyboard1: TMenuItem;
     N6: TMenuItem;
     FreeBanglaFonts1: TMenuItem;
+    DownloadMoreResources1: TMenuItem;
     wwwOmicronLabcom1: TMenuItem;
     UserForum1: TMenuItem;
     AvroPhoneticEnglishtoBangla1: TMenuItem;
@@ -208,6 +209,7 @@ type
     procedure UserForum1Click(Sender: TObject);
     procedure CheckupdateforAvroKeyboard1Click(Sender: TObject);
     procedure FreeBanglaFonts1Click(Sender: TObject);
+    procedure DownloadMoreResourcesClick(Sender: TObject);
     procedure Jumptosystemtray1Click(Sender: TObject);
     procedure Options1Click(Sender: TObject);
     procedure BeforeYouStart1Click(Sender: TObject);
@@ -341,6 +343,7 @@ type
       procedure DeleteAnsiMappingClick(Sender: TObject);
       procedure ImportAnsiMappingClick(Sender: TObject);
       procedure OpenAnsiMappingDirClick(Sender: TObject);
+      procedure NoMappingBalloonClick(Sender: TObject);
       procedure AnsiVersionItemAdvancedDrawItem(Sender: TObject; ACanvas: TCanvas; ARect: TRect; AState: TOwnerDrawState);
       procedure AnsiVersionItemMeasureItem(Sender: TObject; ACanvas: TCanvas; var Width, Height: Integer);
       { The cached HICON for a mapping at the CURRENT small-icon metric, or 0
@@ -435,6 +438,7 @@ uses
   uAvroEncoImporter,
   uAvroEncoIconSection,
   uAvroLayoutUI,
+  ufrmResourceBrowser,
   uAnsiEngineManager;
 
 { =============================================================================== }
@@ -1257,8 +1261,13 @@ begin
     begin
       FNoMappingBalloonShown := True;
       Tray.BalloonTitle := 'Avro Keyboard';
-      Tray.BalloonHint := 'No ANSI mapping files found.' + sLineBreak + 'Unicode output stays active until a mapping is added.';
-      Tray.BalloonTimeout := 5000;
+      // Actionable balloon: clicking it opens the resource downloader, which
+      // is how a user gets the default mappings back after accidentally
+      // deleting them from the mapping folder.
+      Tray.BalloonHint := 'No ANSI mapping files found. Click here to download default mappings.' + sLineBreak +
+        'Unicode output stays active until a mapping is added.';
+      Tray.OnBalloonClick := NoMappingBalloonClick;
+      Tray.BalloonTimeout := 10000;
       Tray.ShowBalloonHint;
     end;
   finally
@@ -3089,6 +3098,22 @@ end;
 
 { =============================================================================== }
 
+procedure TAvroMainForm1.DownloadMoreResourcesClick(Sender: TObject);
+begin
+  ShowResourceBrowser;
+end;
+
+{ Balloon click for the "no ANSI mappings found" case - the balloon text says
+  "Click here to download default mappings", and this is that click. Restores
+  deleted/missing mappings from the resource repository. }
+
+procedure TAvroMainForm1.NoMappingBalloonClick(Sender: TObject);
+begin
+  ShowResourceBrowser;
+end;
+
+{ =============================================================================== }
+
 procedure TAvroMainForm1.DeleteAnsiMappingClick(Sender: TObject);
 var
   MapName: string;
@@ -3293,6 +3318,11 @@ var
     Item := TMenuItem.Create(MoreOptMenu);
     Item.Caption := 'Locate Mapping...';
     Item.OnClick := OpenAnsiMappingDirClick;
+    MoreOptMenu.Add(Item);
+
+    Item := TMenuItem.Create(MoreOptMenu);
+    Item.Caption := 'Download More Resources...';
+    Item.OnClick := DownloadMoreResourcesClick;
     MoreOptMenu.Add(Item);
   end;
 

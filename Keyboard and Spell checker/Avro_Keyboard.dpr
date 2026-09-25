@@ -87,6 +87,9 @@ uses
   uAvroEngineStats in 'Units\uAvroEngineStats.pas',
   uAvroDirectoryWatcher in 'Units\uAvroDirectoryWatcher.pas',
   uAvroLayoutUI in 'Units\uAvroLayoutUI.pas',
+  clsResourceCatalog in 'Classes\clsResourceCatalog.pas',
+  uResourceInstaller in 'Units\uResourceInstaller.pas',
+  ufrmResourceBrowser in 'Forms\ufrmResourceBrowser.pas' {frmResourceBrowser} ,
   uAvroPasswordDlg in 'Forms\uAvroPasswordDlg.pas' {frmAvroPasswordDlg};
 
 var
