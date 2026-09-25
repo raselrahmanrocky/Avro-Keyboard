@@ -17,7 +17,7 @@ param(
   [ValidatePattern('^v\d+\.\d+\.\d+$')]
   [string]$Tag,
 
-  [string]$ExePath = (Join-Path $PSScriptRoot '..\..\build\Avro Keyboard.exe'),
+  [string]$ExePath,
 
   [string]$OutPath = (Join-Path (Get-Location) 'versioninfo.xml'),
 
@@ -25,6 +25,11 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+
+if (-not $ExePath) {
+  $scriptDir = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyInvocation.MyCommand.Path }
+  $ExePath = Join-Path $scriptDir '..\..\build\Avro Keyboard.exe'
+}
 
 if (-not (Test-Path -LiteralPath $ExePath)) {
   throw "Executable not found: $ExePath (build Avro Keyboard first)"
