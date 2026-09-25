@@ -1339,6 +1339,10 @@ object AvroMainForm1: TAvroMainForm1
       ImageIndex = 0
       OnClick = FreeBanglaFonts1Click
     end
+    object DownloadMoreResources1: TMenuItem
+      Caption = 'Download More Resources...'
+      OnClick = DownloadMoreResourcesClick
+    end
     object wwwOmicronLabcom1: TMenuItem
       Caption = 'www.OmicronLab.com'
       ImageIndex = 15
