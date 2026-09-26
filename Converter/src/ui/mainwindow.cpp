@@ -78,13 +78,27 @@ const QColor kDarkBg(0x1F, 0x1F, 0x1F);       // #1f1f1f
 constexpr int kMappingLoadRetries = 4;
 constexpr int kMappingLoadRetryDelayMs = 500;
 
-// Portable settings: store in an INI file next to the executable so the
-// app leaves no trace in the Windows registry.  The INI format is
-// portable across platforms and requires no special permissions.
+// Portable settings: keep the INI next to the executable whenever that folder
+// is writable, so a portable deployment leaves no trace in the Windows
+// registry.  An installation under Program Files is not writable for normal
+// users, so there the settings move to the per-user application config folder
+// (QStandardPaths::AppConfigLocation, i.e. %LOCALAPPDATA%\OmicronLab\
+// Avro Text Converter\) instead.
 QString portableSettingsPath()
 {
-    return QCoreApplication::applicationDirPath()
-           + QStringLiteral("/AvroTextConverter.ini");
+    const QString exeDir = QCoreApplication::applicationDirPath();
+    const QString nextToExe = exeDir + QStringLiteral("/AvroTextConverter.ini");
+    if (QFileInfo(exeDir).isWritable())
+        return nextToExe;
+
+    const QString configDir =
+        QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
+    if (!configDir.isEmpty()) {
+        QDir().mkpath(configDir);
+        return configDir + QStringLiteral("/AvroTextConverter.ini");
+    }
+
+    return nextToExe;   // no usable config location - keep the portable path
 }
 
 QSettings appRegistry()

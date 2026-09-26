@@ -60,7 +60,10 @@ tools/
   **Kalpurush ANSI** are not installed system-wide.
 - **Persistence** - theme, ANSI version and converter font are stored in a
   portable `AvroTextConverter.ini` next to the executable (the same keys the
-  original Delphi app keeps in the registry).
+  original Delphi app keeps in the registry); an installation whose folder is
+  not writable - under `Program Files` - falls back to the per-user
+  `%LOCALAPPDATA%\OmicronLab\Avro Text Converter\AvroTextConverter.ini` (see
+  [Command line](#command-line)).
 - **Settings dialog** - a single sheet behind the gear icon's *Settings...*
   entry: per-box font family and point size, an optional font per ANSI mapping
   picked on the mapping's own row, and OK / Apply / Cancel / Reset to Defaults -
@@ -293,6 +296,29 @@ one entry per remembered family under the `[MappingFonts]` group, and one
 name is the key in both).  A mapping that is *not* listed in
 `[MappingSwitches]` is switched on, so settings files written before that group
 existed keep their exact meaning.
+
+### Command line
+
+```
+AvroTextConverter.exe [--mapping-dir <dir>]
+```
+
+- `--mapping-dir <dir>` - read the ANSI mapping containers from `<dir>` instead
+  of the installed Avro Keyboard (`C:\ProgramData\Avro Keyboard\AnsiMapping`).
+  This is what the portable packaging uses
+  (`--mapping-dir "<exe folder>\AnsiMapping"`); the value is applied before the
+  first window exists, so the mapping picker, the conversion and the live
+  refresh watcher all see the same folder (`AVRO_MAPPING_DIR`).
+- **One instance** - a second launch does not open a second window: it restores
+  and focuses the window of the running copy (including a window hidden in the
+  notification area) and exits with status 0.  A named mutex
+  (`Global\AvroTextConverterSingleInstance`) arbitrates.
+- `--help` and `--version` print and exit.
+- **Settings location** - the INI stays next to the executable whenever that
+  folder is writable (portable setups); an installed build under
+  `Program Files` writes to
+  `%LOCALAPPDATA%\OmicronLab\Avro Text Converter\AvroTextConverter.ini`
+  instead.
 
 ### Dev / test hooks
 
