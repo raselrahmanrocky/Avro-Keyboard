@@ -50,6 +50,9 @@ const
     how much instant switching this session gets to keep. }
   IdleEngineReleaseMinutes = 10;
 
+  { RegisterHotKey id for the global Ctrl+Alt+T that opens the text converter. }
+  HotkeyTextConverter = 1001;
+
 type
   TMenuItemExtended = class(TMenuItem)
     private
@@ -367,8 +370,10 @@ type
       procedure ApplyPendingANSISwitchRevert;
       procedure PendingANSISwitchClear;
       procedure CleanupDuplicateMappings;
+      procedure LaunchAvroTextConverter;
     protected
       procedure CreateParams(var Params: TCreateParams); override;
+      procedure WndProc(var Message: TMessage); override;
   end;
 
 var
@@ -628,6 +633,7 @@ end;
 
 procedure TAvroMainForm1.FormClose(Sender: TObject; var Action: TCloseAction);
 begin
+  UnregisterHotKey(Handle, HotkeyTextConverter);
   Action := caFree;
   AvroMainForm1 := nil;
 end;
@@ -656,6 +662,11 @@ begin
   LoadApp;
   Popup_Help.OnPopup := DynamicHelpPopup;
   Popup_Tray.OnPopup := DynamicHelpPopup;
+
+  // Global Ctrl+Alt+T opens the Qt text converter from anywhere.  Where the
+  // combination is already taken this simply registers nothing - the tray item
+  // keeps working either way.
+  RegisterHotKey(Handle, HotkeyTextConverter, MOD_CONTROL or MOD_ALT, Ord('T'));
 end;
 
 { =============================================================================== }
@@ -2781,7 +2792,42 @@ end;
 
 procedure TAvroMainForm1.UnicodetoBijoytextconverter1Click(Sender: TObject);
 begin
-  Execute_Something(ExtractFilePath(Application.ExeName) + 'Avro Text Converter.exe');
+  LaunchAvroTextConverter;
+end;
+
+{ Starts the Qt text converter that ships in converter\ beside this exe.  A
+  portable edition hands it the portable AnsiMapping folder; an installed one
+  lets the converter read the mappings of the Avro Keyboard installation. }
+procedure TAvroMainForm1.LaunchAvroTextConverter;
+var
+  ExePath, WorkDir, Params: string;
+begin
+  WorkDir := ExtractFilePath(ParamStr(0)) + 'converter\';
+  ExePath := WorkDir + 'AvroTextConverter.exe';
+  if not FileExists(ExePath) then
+  begin
+    MessageDlg('The text converter could not be found:' + sLineBreak + ExePath,
+      mtWarning, [mbOK], 0);
+    Exit;
+  end;
+
+  Params := '';
+{$IFDEF PortableOn}
+  Params := '--mapping-dir "' + ExtractFilePath(ParamStr(0)) + 'AnsiMapping"';
+{$ENDIF}
+
+  ShellExecute(Handle, 'open', PChar(ExePath), PChar(Params), PChar(WorkDir),
+    SW_SHOWNORMAL);
+end;
+
+procedure TAvroMainForm1.WndProc(var Message: TMessage);
+begin
+  if (Message.Msg = WM_HOTKEY) and (Message.WParam = HotkeyTextConverter) then
+  begin
+    LaunchAvroTextConverter;
+    Exit;
+  end;
+  inherited WndProc(Message);
 end;
 
 procedure TAvroMainForm1.UseModernStyleTyping1Click(Sender: TObject);

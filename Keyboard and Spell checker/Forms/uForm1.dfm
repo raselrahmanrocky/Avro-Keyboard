@@ -1628,7 +1628,7 @@ object AvroMainForm1: TAvroMainForm1
       Caption = '-'
     end
     object Spellcheck3: TMenuItem
-      Caption = 'Avro Text Converter'
+      Caption = 'Text Converter...'
       ImageIndex = 25
       OnClick = UnicodetoBijoytextconverter1Click
     end
