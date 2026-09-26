@@ -112,3 +112,11 @@ desktop.ini
 
 # Release artifacts produced by tools/release/build-installers.ps1
 Output/
+
+# Qt converter build output (Converter\MakeDist.bat; see Converter\.gitignore)
+Converter/build/
+Converter/dist/
+Converter/CMakeCache.txt
+Converter/CMakeFiles/
+Converter/*.exe
+Converter/*.obj
