@@ -61,7 +61,7 @@ if not exist "%BDS%\bin\dcc32.exe" goto nodcc
 set "ROOT=..\..\.."
 set "APP=%ROOT%\Keyboard and Spell checker"
 set "UNITS=%APP%\Units"
-set "CONVERTER=%ROOT%\Unicode to ascii converter"
+set "CONVERTER=%ROOT%\legacy-delphi-converter"
 set "RTL=%BDS%\lib\win32\release"
 set "KEYFILE=%ROOT%\keys\avroenco.key"
 set "COMMENTKEY=%ROOT%\keys\avrocomments.key"

@@ -88,7 +88,6 @@ $renameMap = [ordered]@{
     'Avro_Spell_Checker.exe'  = 'Avro Spell Checker.exe'
     'LayoutEditor.exe'        = 'Layout Editor.exe'
     'SkinDesigner.exe'        = 'Skin Designer.exe'
-    'Avro_Text_Converter.exe' = 'Avro Text Converter.exe'
 }
 # AvroSpell.dll is a required output but is never renamed.
 $requiredAfterBuild = @($renameMap.Keys) + 'AvroSpell.dll'

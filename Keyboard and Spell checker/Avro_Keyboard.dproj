@@ -1,4 +1,4 @@
-<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
     <ProjectGuid>{0219940E-5F78-48B1-8960-2C65283492DA}</ProjectGuid>
     <MainSource>Avro_Keyboard.dpr</MainSource>
@@ -110,8 +110,8 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Cfg_1_Win32)'!=''">
     <BT_BuildType>Debug</BT_BuildType>
-    <VerInfo_Build>0</VerInfo_Build>
-    <VerInfo_Keys>CompanyName=OmicronLab;FileDescription=Avro Keyboard - UNICODE compliant Open source Bangla typing software for Windows;FileVersion=6.0.0.0;InternalName=Avro Keyboard;LegalCopyright=© OmicronLab. All rights reserved.;LegalTrademarks=Avro Keyboard;OriginalFilename=Avro Keyboard.exe;ProductName=Avro Keyboard;ProductVersion=6.0.0.0;Comments=Avro Keyboard - UNICODE compliant Open source Bangla typing software for Windows</VerInfo_Keys>
+    <VerInfo_Build>1</VerInfo_Build>
+    <VerInfo_Keys>CompanyName=OmicronLab;FileDescription=Avro Keyboard - UNICODE compliant Open source Bangla typing software for Windows;FileVersion=6.0.0.1;InternalName=Avro Keyboard;LegalCopyright=© OmicronLab. All rights reserved.;LegalTrademarks=Avro Keyboard;OriginalFilename=Avro Keyboard.exe;ProductName=Avro Keyboard;ProductVersion=6.0.0.0;Comments=Avro Keyboard - UNICODE compliant Open source Bangla typing software for Windows</VerInfo_Keys>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Cfg_1_Win64)'!=''">
     <VerInfo_Build>0</VerInfo_Build>
@@ -214,7 +214,7 @@
       <Form>frmSplash</Form>
     </DCCReference>
     <DCCReference Include="Classes\clsAbbreviation.pas" />
-    <DCCReference Include="..\Unicode to ascii converter\clsUnicodeToBijoy2000.pas" />
+    <DCCReference Include="..\legacy-delphi-converter\clsUnicodeToBijoy2000.pas" />
     <DCCReference Include="Forms\ufrmEncodingWarning.pas">
       <Form>frmEncodingWarning</Form>
     </DCCReference>
@@ -224,7 +224,7 @@
     <DCCReference Include="Units\uKeyboardMacro.pas" />
     <DCCReference Include="Units\uPickerSupport.pas" />
     <DCCReference Include="Units\Avro.Types.pas" />
-    <DCCReference Include="..\Unicode to ascii converter\clsAnsiSequenceLookup.pas" />
+    <DCCReference Include="..\legacy-delphi-converter\clsAnsiSequenceLookup.pas" />
     <DCCReference Include="Units\uAvroEncoCrypto.pas" />
     <DCCReference Include="Units\uAvroSecureMem.pas" />
     <DCCReference Include="Units\uAvroShieldSecret.pas" />
