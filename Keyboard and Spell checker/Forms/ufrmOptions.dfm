@@ -1252,7 +1252,7 @@ object frmOptions: TfrmOptions
       TabOrder = 2
       object Label3: TLabel
         Left = 24
-        Top = 294
+        Top = 313
         Width = 388
         Height = 21
         Margins.Left = 5
@@ -1358,7 +1358,7 @@ object frmOptions: TfrmOptions
       end
       object optTopBarXButton_Close: TRadioButton
         Left = 60
-        Top = 350
+        Top = 366
         Width = 386
         Height = 27
         Margins.Left = 5
@@ -1370,7 +1370,7 @@ object frmOptions: TfrmOptions
       end
       object optTopBarXButton_Minimize: TRadioButton
         Left = 60
-        Top = 320
+        Top = 338
         Width = 386
         Height = 27
         Margins.Left = 5
@@ -1382,7 +1382,7 @@ object frmOptions: TfrmOptions
       end
       object optTopBarXButton_ShowMenu: TRadioButton
         Left = 60
-        Top = 381
+        Top = 394
         Width = 386
         Height = 27
         Margins.Left = 5
@@ -1394,7 +1394,7 @@ object frmOptions: TfrmOptions
       end
       object CheckUpdate: TCheckBox
         Left = 44
-        Top = 255
+        Top = 253
         Width = 450
         Height = 26
         Margins.Left = 5
@@ -1406,8 +1406,8 @@ object frmOptions: TfrmOptions
       end
       object CheckBetaUpdate: TCheckBox
         Left = 44
-        Top = 287
-        Width = 450
+        Top = 283
+        Width = 545
         Height = 26
         Margins.Left = 5
         Margins.Top = 5
