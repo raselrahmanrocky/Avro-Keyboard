@@ -50,6 +50,7 @@ var
   // Webbuddy Options
   AvroUpdateCheck:     string;
   AvroUpdateLastCheck: TDateTime;
+  CheckBetaUpdates:    string;
 
   // Hotkey settings
   ModeSwitchKey:                string;
@@ -218,6 +219,7 @@ begin
   // Webbuddy Options
   AvroUpdateCheck := UpperCase(XML.GetValue('AvroUpdateCheck', 'Yes'));
   AvroUpdateLastCheck := XML.GetValue('AvroUpdateLastCheck', Now);
+  CheckBetaUpdates := UpperCase(XML.GetValue('CheckBetaUpdates', 'No'));
 
   // Hotkey settings
   ModeSwitchKey := UpperCase(XML.GetValue('ModeSwitchKey', 'F12'));
@@ -308,6 +310,7 @@ begin
   // Webbuddy Options
   XML.SetValue('AvroUpdateCheck', AvroUpdateCheck);
   XML.SetValue('AvroUpdateLastCheck', AvroUpdateLastCheck);
+  XML.SetValue('CheckBetaUpdates', CheckBetaUpdates);
 
   // Hotkey settings
   XML.SetValue('ModeSwitchKey', ModeSwitchKey);
@@ -398,6 +401,7 @@ begin
     TopBarTransparent := UpperCase(Reg.ReadStringDef('TopBarTransparent', 'Yes'));
     AvroUpdateCheck := UpperCase(Reg.ReadStringDef('AvroUpdateCheck', 'Yes'));
     AvroUpdateLastCheck := Reg.ReadDateDef('AvroUpdateLastCheck', Now);
+    CheckBetaUpdates := UpperCase(Reg.ReadStringDef('CheckBetaUpdates', 'No'));
 
     // Inteface Settings
     InterfaceSkin := Reg.ReadStringDef('InterfaceSkin', 'internalskin*');
@@ -502,6 +506,7 @@ begin
     // Webbuddy Options
     Reg.WriteString('AvroUpdateCheck', AvroUpdateCheck);
     Reg.WriteDateTime('AvroUpdateLastCheck', AvroUpdateLastCheck);
+    Reg.WriteString('CheckBetaUpdates', CheckBetaUpdates);
 
     // Hotkeys settings
     Reg.WriteString('ModeSwitchKey', ModeSwitchKey);

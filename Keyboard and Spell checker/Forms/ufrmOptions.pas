@@ -65,6 +65,7 @@ type
     optTopBarXButton_Minimize: TRadioButton;
     optTopBarXButton_ShowMenu: TRadioButton;
     CheckUpdate: TCheckBox;
+    CheckBetaUpdate: TCheckBox;
     Interface_Panel: TPanel;
     Captionl_Transparency: TLabel;
     Label_Transparency: TLabel;
@@ -691,6 +692,11 @@ begin
   else
     CheckUpdate.Checked := False;
 
+  if CheckBetaUpdates = 'YES' then
+    CheckBetaUpdate.Checked := True
+  else
+    CheckBetaUpdate.Checked := False;
+
   if TopBarXButton = 'MINIMIZE' then
     optTopBarXButton_Minimize.Checked := True
   else if TopBarXButton = 'EXIT' then
@@ -1006,6 +1012,11 @@ begin
     AvroUpdateCheck := 'YES'
   else
     AvroUpdateCheck := 'NO';
+
+  if CheckBetaUpdate.Checked = True then
+    CheckBetaUpdates := 'YES'
+  else
+    CheckBetaUpdates := 'NO';
 
   if optTopBarXButton_Minimize.Checked = True then
     TopBarXButton := 'MINIMIZE'
