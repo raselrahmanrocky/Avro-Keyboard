@@ -1404,6 +1404,18 @@ object frmOptions: TfrmOptions
         Caption = 'Automatically check for update every week (anonymous)'
         TabOrder = 4
       end
+      object CheckBetaUpdate: TCheckBox
+        Left = 44
+        Top = 287
+        Width = 450
+        Height = 26
+        Margins.Left = 5
+        Margins.Top = 5
+        Margins.Right = 5
+        Margins.Bottom = 5
+        Caption = 'Include beta / pre-release versions when checking for updates'
+        TabOrder = 5
+      end
     end
 
   end

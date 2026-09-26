@@ -46,17 +46,29 @@ type
 var
   Updater: TUpdateCheck;
 
-const
-  UpdateInfo = 'https://github.com/raselrahmanrocky/Avro-Keyboard-Releases/releases/latest/download/versioninfo.xml';
-
 implementation
 
 uses
   clsFileVersion,
   ufrmUpdateNotify,
   uWindowHandlers,
+  uRegistrySettings,
   System.Threading,
   DebugLog;
+
+{ Returns the update feed URL for the channel the user selected in Options
+  (CheckBetaUpdates). The files live on the main branch of the
+  Avro-Keyboard-Releases repository; pushing a new XML is enough to publish. }
+function GetUpdateInfoURL: string;
+const
+  URL_STABLE = 'https://raw.githubusercontent.com/raselrahmanrocky/Avro-Keyboard-Releases/main/versioninfo.xml';
+  URL_BETA   = 'https://raw.githubusercontent.com/raselrahmanrocky/Avro-Keyboard-Releases/main/versioninfo_beta.xml';
+begin
+  if CheckBetaUpdates = 'YES' then
+    Result := URL_BETA
+  else
+    Result := URL_STABLE;
+end;
 
 { TUpdateCheck }
 { =============================================================================== }
@@ -74,7 +86,7 @@ begin
       Response: string;
     begin
       try
-        Response := HttpClient.Get(UpdateInfo).ContentAsString();
+        Response := HttpClient.Get(GetUpdateInfoURL).ContentAsString();
         TThread.Queue(nil,
             procedure
           begin
@@ -108,7 +120,7 @@ begin
       Response: string;
     begin
       try
-        Response := HttpClient.Get(UpdateInfo).ContentAsString();
+        Response := HttpClient.Get(GetUpdateInfoURL).ContentAsString();
         TThread.Queue(nil,
             procedure
           begin
@@ -168,6 +180,14 @@ begin
     downloadurl := Xml.DocumentElement.ChildNodes['downloadurl'].NodeValue;
     productpageurl := Xml.DocumentElement.ChildNodes['productpageurl'].NodeValue;
     releasedate := Xml.DocumentElement.ChildNodes['releasedate'].NodeValue;
+
+    // Prefer the installer matching this executable's architecture when the
+    // feed provides per-arch URLs. Feeds without these nodes (legacy) keep
+    // using downloadurl unchanged.
+    if (SizeOf(Pointer) = 8) and Assigned(Xml.DocumentElement.ChildNodes.FindNode('downloadurl64')) then
+      downloadurl := Xml.DocumentElement.ChildNodes['downloadurl64'].NodeValue
+    else if (SizeOf(Pointer) = 4) and Assigned(Xml.DocumentElement.ChildNodes.FindNode('downloadurl32')) then
+      downloadurl := Xml.DocumentElement.ChildNodes['downloadurl32'].NodeValue;
 
     if IsUpdate(Major, Minor, Release, Build) then
     begin
