@@ -34,6 +34,7 @@ type
       Verbose:          Boolean;
 
       function IsUpdate(const Major, Minor, Release, Build: Integer): Boolean;
+      function DownloadUrlAvailable(const Url: string): Boolean;
       procedure ProcessResponse(const Response: string);
     public
       function IsConnected: Boolean;
@@ -159,6 +160,7 @@ procedure TUpdateCheck.ProcessResponse(const Response: string);
 var
   Major, Minor, Release, Build:                           Integer;
   changelogurl, downloadurl, productpageurl, releasedate: string;
+  OfferUpdate:                                            Boolean;
 begin
   StillDownloading := False;
 
@@ -189,7 +191,17 @@ begin
     else if (SizeOf(Pointer) = 4) and Assigned(Xml.DocumentElement.ChildNodes.FindNode('downloadurl32')) then
       downloadurl := Xml.DocumentElement.ChildNodes['downloadurl32'].NodeValue;
 
-    if IsUpdate(Major, Minor, Release, Build) then
+    // Only when the server reports a newer version: confirm the offered
+    // download link actually exists (HEAD request), so a stale manifest can
+    // never send the user to a 404. Dead link = treat as no update.
+    OfferUpdate := IsUpdate(Major, Minor, Release, Build);
+    if OfferUpdate and (not DownloadUrlAvailable(downloadurl)) then
+    begin
+      Log('Update ' + Format('%d.%d.%d.%d', [Major, Minor, Release, Build]) + ' suppressed, download URL unavailable: ' + downloadurl);
+      OfferUpdate := False;
+    end;
+
+    if OfferUpdate then
     begin
       CheckCreateForm(TfrmUpdateNotify, frmUpdateNotify, 'frmUpdateNotify');
       frmUpdateNotify.SetupAndShow(Format('%d.%d.%d.%d', [Major, Minor, Release, Build]), releasedate, changelogurl, downloadurl);
@@ -238,6 +250,24 @@ begin
       ((Major = Version.VerMajor) and (Minor = Version.VerMinor) and (Release = Version.VerRelease) and (Build > Version.VerBuild));
   finally
     Version.Free;
+  end;
+end;
+
+{ =============================================================================== }
+
+{ True when the URL answers a HEAD request with a success status (redirects
+  are followed by TNetHTTPClient). Network errors and 404s count as
+  unavailable, which suppresses the update offer until the next check. }
+function TUpdateCheck.DownloadUrlAvailable(const Url: string): Boolean;
+var
+  Resp: IHTTPResponse;
+begin
+  Result := False;
+  try
+    Resp := HttpClient.Head(Url);
+    Result := (Resp.StatusCode >= 200) and (Resp.StatusCode <= 399);
+  except
+    Result := False;
   end;
 end;
 
