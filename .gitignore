@@ -110,3 +110,5 @@ desktop.ini
 .freebuff
 .kilo
 
+# Release artifacts produced by tools/release/build-installers.ps1
+Output/

@@ -12,6 +12,14 @@
 #define MyAppAssocExt ".exe"
 #define MyAppAssocKey StringChange(MyAppAssocName, " ", "") + MyAppAssocExt
 
+; Installer output name. Overridable from the command line so one script can
+; build per-architecture installers from the same source:
+;   ISCC /DSetupBaseName=AvroKeyboard-6.0.0-win32-setup avro-setup.iss
+; (produces AvroKeyboard-6.0.0-win32-setup.exe)
+#ifndef SetupBaseName
+  #define SetupBaseName "Setup_AvroKeyboard"
+#endif
+
 [Setup]
 ; NOTE: The value of AppId uniquely identifies this application. Do not use the same AppId value in installers for other applications.
 AppId={{E2703872-FEFB-4B04-B89D-0DA64713B943}
@@ -38,7 +46,7 @@ VersionInfoTextVersion={#MyAppVersion}
 ChangesAssociations=yes
 LicenseFile=LICENSE.txt
 OutputDir=Output
-OutputBaseFilename=Setup_AvroKeyboard
+OutputBaseFilename={#SetupBaseName}
 SetupIconFile=assets\icons\Avro.ico
 SolidCompression=yes
 WizardStyle=modern dynamic
@@ -61,7 +69,8 @@ Source: "assets\Database.db3"; DestDir: "{commonappdata}\Avro Keyboard"; Flags: 
 Source: "assets\skins\*"; DestDir: "{commonappdata}\Avro Keyboard\Skin"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "assets\keyboard-layouts\*"; DestDir: "{commonappdata}\Avro Keyboard\Keyboard Layouts"; Flags: ignoreversion recursesubdirs createallsubdirs
 
-Source: "build\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+; dcu\ holds compiled intermediates (DCC_DcuOutput) and must never ship.
+Source: "build\*"; DestDir: "{app}"; Excludes: "dcu\*"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "assets\docs\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 Source: "assets\fonts\Kalpurush.ttf"; DestDir: "{autofonts}"; FontInstall: "Kalpurush"; Flags: onlyifdoesntexist uninsneveruninstall
