@@ -18,9 +18,6 @@
         <Projects Include="Skin Designer\SkinDesigner.dproj">
             <Dependencies/>
         </Projects>
-        <Projects Include="Unicode to ascii converter\Avro_Text_Converter.dproj">
-            <Dependencies/>
-        </Projects>
     </ItemGroup>
     <ProjectExtensions>
         <Borland.Personality>Default.Personality.12</Borland.Personality>
@@ -74,23 +71,14 @@
     <Target Name="SkinDesigner:Make">
         <MSBuild Projects="Skin Designer\SkinDesigner.dproj" Targets="Make"/>
     </Target>
-    <Target Name="Avro_Text_Converter">
-        <MSBuild Projects="Unicode to ascii converter\Avro_Text_Converter.dproj"/>
-    </Target>
-    <Target Name="Avro_Text_Converter:Clean">
-        <MSBuild Projects="Unicode to ascii converter\Avro_Text_Converter.dproj" Targets="Clean"/>
-    </Target>
-    <Target Name="Avro_Text_Converter:Make">
-        <MSBuild Projects="Unicode to ascii converter\Avro_Text_Converter.dproj" Targets="Make"/>
-    </Target>
     <Target Name="Build">
-        <CallTarget Targets="Avro_Keyboard;AvroSpell;Avro_Spell_Checker;LayoutEditor;SkinDesigner;Avro_Text_Converter"/>
+        <CallTarget Targets="Avro_Keyboard;AvroSpell;Avro_Spell_Checker;LayoutEditor;SkinDesigner"/>
     </Target>
     <Target Name="Clean">
-        <CallTarget Targets="Avro_Keyboard:Clean;AvroSpell:Clean;Avro_Spell_Checker:Clean;LayoutEditor:Clean;SkinDesigner:Clean;Avro_Text_Converter:Clean"/>
+        <CallTarget Targets="Avro_Keyboard:Clean;AvroSpell:Clean;Avro_Spell_Checker:Clean;LayoutEditor:Clean;SkinDesigner:Clean"/>
     </Target>
     <Target Name="Make">
-        <CallTarget Targets="Avro_Keyboard:Make;AvroSpell:Make;Avro_Spell_Checker:Make;LayoutEditor:Make;SkinDesigner:Make;Avro_Text_Converter:Make"/>
+        <CallTarget Targets="Avro_Keyboard:Make;AvroSpell:Make;Avro_Spell_Checker:Make;LayoutEditor:Make;SkinDesigner:Make"/>
     </Target>
     <Import Project="$(BDS)\Bin\CodeGear.Group.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Group.Targets')"/>
 </Project>
