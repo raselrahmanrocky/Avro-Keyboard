@@ -21,8 +21,13 @@ type
     thread itself (TThread.Queue), exactly like the rest of the app's tasks. }
   TResourceProgressProc = reference to procedure(const AContentLength, AReadCount: Int64);
 
-{ Folder a resource type installs into ('' for an unknown type).
-  Fonts live in the per-user font store so no admin rights are ever needed. }
+{ Folder a resource type installs into ('' for an unknown type or an
+  unresolvable environment).
+
+  Everything except fonts resolves through GetAvroDataDir, which IS the
+  edition switch: the portable build returns its own folder, the setup build
+  returns %ProgramData%\Avro Keyboard. Fonts split per edition too - see
+  ResourceTargetFolder. }
 function ResourceTargetFolder(const AResourceType: string): string;
 
 { Full destination path a file name would land at. }
@@ -33,8 +38,9 @@ function IsResourceInstalled(const AResourceType, AFileName: string): Boolean;
 { Downloads AUrl to a temp file, verifies it against AExpectedSha256 (SHA-256,
   hex, case-insensitive; empty skips the check), then moves it into the target
   folder for its type and runs the post-install step (fonts register with the
-  per-user font store; everything else is picked up by the existing folder
-  watcher / list refreshes).
+  running session - the setup edition persists them in the per-user store;
+  everything else is picked up by the existing folder watcher / list
+  refreshes).
 
   AFileName is the repo-relative path from index.json - only its final
   component decides the on-disk name. }
@@ -67,6 +73,20 @@ begin
   Result := ExtractFileName(StringReplace(AFileName, '/', '\', [rfReplaceAll]));
 end;
 
+{ The per-user font store (%LOCALAPPDATA%\Microsoft\Windows\Fonts) - the
+  setup edition's download target and, in both editions, the "installed"
+  check for downloads made before targets became edition-aware. '' when the
+  environment does not resolve - never a relative path. }
+function PerUserFontFolder: string;
+var
+  Dir: string;
+begin
+  Result := '';
+  Dir    := GetEnvironmentVariable('LOCALAPPDATA');
+  if Dir <> '' then
+    Result := IncludeTrailingPathDelimiter(Dir) + 'Microsoft\Windows\Fonts\';
+end;
+
 function ResourceTargetFolder(const AResourceType: string): string;
 begin
   if SameText(AResourceType, 'ansimapping') then
@@ -78,10 +98,17 @@ begin
   else if SameText(AResourceType, 'doc') then
     Result := GetAvroDataDir + 'Docs\'
   else if SameText(AResourceType, 'font') then
-    // Per-user font store: installing here needs no elevation, and Windows
-    // picks registered HKCU fonts up for every app on next logon (plus the
-    // WM_FONTCHANGE broadcast below makes them usable right away).
-    Result := GetEnvironmentVariable('LOCALAPPDATA') + '\Microsoft\Windows\Fonts\'
+  {$IFDEF PortableOn}
+    // Portable keeps the whole install self-contained: fonts land in the
+    // exe's fonts\ folder (the same one the zip ships) and uForm1 registers
+    // that folder on every startup, so they survive a reboot and travel
+    // with the folder.
+    Result := GetAvroDataDir + 'fonts\'
+  {$ELSE}
+    // Setup edition: writing to {autofonts} (C:\Windows\Fonts) needs
+    // elevation, so downloads go to the per-user store - no admin, no UAC.
+    Result := PerUserFontFolder
+  {$ENDIF}
   else
     Result := '';
 end;
@@ -99,10 +126,37 @@ end;
 
 function IsResourceInstalled(const AResourceType, AFileName: string): Boolean;
 var
-  Path: string;
+  Path:     string;
+  FileName: string;
+  Windir:   string;
+  Legacy:   string;
 begin
+  Result   := False;
+  FileName := LastComponent(AFileName);
+  if FileName = '' then
+    Exit;
+
+  // The download target of the running edition - correct answer on its own
+  // for ansimapping/layout/skin/doc (GetAvroDataDir is the edition switch).
   Path   := ResourceTargetPath(AResourceType, AFileName);
   Result := (Path <> '') and FileExists(Path);
+  if Result or not SameText(AResourceType, 'font') then
+    Exit;
+
+  // Fonts also count when they sit in a store the running edition (or
+  // Windows) legitimately uses, so a shipped font never reads as missing
+  // and downloads made before targets became edition-aware stay visible:
+  //   setup:    C:\Windows\Fonts (installer) and the per-user store
+  //   portable: exe's fonts\ (zip) and the old per-user store
+  Windir := GetEnvironmentVariable('WINDIR');
+  if (Windir <> '') and FileExists(IncludeTrailingPathDelimiter(Windir) + 'Fonts\' + FileName) then
+    Exit(True);
+
+  Legacy := PerUserFontFolder;
+  if (Legacy <> '') and FileExists(Legacy + FileName) then
+    Exit(True);
+
+  Result := FileExists(GetAvroDataDir + 'fonts\' + FileName);
 end;
 
 function ComputeFileSha256(const APath: string): string;
@@ -151,16 +205,22 @@ begin
     FProc(AContentLength, AReadCount);
 end;
 
-{ Registers a downloaded .ttf in the CURRENT USER's font store - no admin
-  rights, no UAC. Mirrors what the per-user font install does on Windows 10+:
-  file under %LOCALAPPDATA%\Microsoft\Windows\Fonts plus the HKCU
-  ...\CurrentVersion\Fonts value. GetFontName extracts the real typeface name
-  so the font shows up correctly in font pickers. }
+{ Activates a downloaded .ttf right away: AddFontResource + WM_FONTCHANGE.
+  The setup edition additionally persists it in the CURRENT USER's font
+  store (HKCU ...\Fonts) - file under %LOCALAPPDATA%\Microsoft\Windows\Fonts
+  - so it survives logoff without needing admin rights. The portable edition
+  deliberately skips that write: its file lives in the portable folder, a
+  registry pointer would go stale the moment the folder moves, and uForm1
+  re-registers exe's fonts\ on every startup instead. GetFontName extracts
+  the real typeface name so the font shows up correctly in font pickers. }
 procedure InstallDownloadedFont(const AFontPath: string);
+{$IFNDEF PortableOn}
 var
   FontName: string;
   Reg:      TMyRegistry;
+{$ENDIF}
 begin
+  {$IFNDEF PortableOn}
   FontName := GetFontName(AFontPath);
   if FontName = '' then
     FontName := ChangeFileExt(ExtractFileName(AFontPath), '');
@@ -173,6 +233,7 @@ begin
   finally
     Reg.Free;
   end;
+  {$ENDIF}
 
   AddFontResource(PChar(AFontPath));
   // SendNotifyMessage, NOT SendMessage: a synchronous broadcast from this
@@ -213,7 +274,10 @@ begin
   Folder := ResourceTargetFolder(AResourceType);
   if Folder = '' then
   begin
-    AError := 'Unknown resource type: ' + AResourceType;
+    if SameText(AResourceType, 'font') then
+      AError := 'Could not resolve the fonts folder (LOCALAPPDATA is not set).'
+    else
+      AError := 'Unknown resource type: ' + AResourceType;
     Exit;
   end;
 

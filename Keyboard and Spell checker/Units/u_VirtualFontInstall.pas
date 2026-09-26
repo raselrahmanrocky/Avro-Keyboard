@@ -20,6 +20,13 @@ uses
 procedure InstallVirtualFont(FontFilePath: string);
 procedure RemoveVirtualFont(FontFilePath: string);
 
+{ Registers every .ttf in AFolder with GDI for this session and broadcasts
+  WM_FONTCHANGE once. The portable edition calls it on startup for its own
+  fonts\ folder (shipped set plus anything the Download Resources dialog
+  placed there): that folder carries no registry entries, so each session
+  re-activates the fonts without touching the registry. }
+procedure RegisterFontFolder(const AFolder: string);
+
 // Privately used
 function GetTempDirectory: string;
 function GetFontName(TTF_Path: string): string;
@@ -161,6 +168,36 @@ begin
 
   SendMessage(HWND_BROADCAST, WM_FONTCHANGE, 0, 0);
   FreeAndNil(Reg);
+end;
+
+procedure RegisterFontFolder(const AFolder: string);
+var
+  Sr:     TSearchRec;
+  Folder: string;
+  Added:  Boolean;
+begin
+  Folder := IncludeTrailingPathDelimiter(AFolder);
+  if not DirectoryExists(Folder) then
+    Exit;
+
+  Added := False;
+  if FindFirst(Folder + '*.ttf', faAnyFile, Sr) = 0 then
+  try
+    repeat
+      if (Sr.Attr and faDirectory) = 0 then
+      begin
+        AddFontResource(PChar(Folder + Sr.Name));
+        Added := True;
+      end;
+    until FindNext(Sr) <> 0;
+  finally
+    FindClose(Sr);
+  end;
+
+  if Added then
+    // SendNotifyMessage, NOT SendMessage: broadcast must never block the
+    // startup path on some hung top-level window.
+    SendNotifyMessage(HWND_BROADCAST, WM_FONTCHANGE, 0, 0);
 end;
 
 end.

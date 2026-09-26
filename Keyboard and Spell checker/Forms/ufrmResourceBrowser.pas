@@ -40,6 +40,7 @@ type
 
   TfrmResourceBrowser = class(TForm)
     lblHint:         TLabel;
+    lblDestination:  TLabel;
     lstCategories:   TListBox;
     lvItems:         TListView;
     lblItemDesc:     TLabel;
@@ -71,6 +72,7 @@ type
       procedure PopulateItems;
       procedure ShowItemDescription(const AIndex: Integer);
       procedure UpdateItemStatus(const AIndex: Integer; const AInstalled: Boolean);
+      procedure UpdateDestinationLabel;
       function  SelectedItemIndex: Integer;
 
       procedure StartDownload(const AIndexes: TArray<Integer>);
@@ -130,6 +132,7 @@ begin
   TOPMOST(Handle);
   lblStatus.Caption := '';
   lblItemDesc.Caption := '';
+  UpdateDestinationLabel;
 end;
 
 procedure TfrmResourceBrowser.FormShow(Sender: TObject);
@@ -225,6 +228,7 @@ begin
   begin
     lstCategories.ItemIndex := 0;
     PopulateItems;
+    UpdateDestinationLabel;
   end;
 end;
 
@@ -272,6 +276,7 @@ end;
 procedure TfrmResourceBrowser.lstCategoriesClick(Sender: TObject);
 begin
   PopulateItems;
+  UpdateDestinationLabel;
 end;
 
 function TfrmResourceBrowser.SelectedItemIndex: Integer;
@@ -317,6 +322,31 @@ begin
     lvItems.Items[AIndex].SubItems[2] := 'Installed'
   else
     lvItems.Items[AIndex].SubItems[2] := '';
+end;
+
+{ States the running edition and where the selected category will actually
+  install - the folders differ between the portable and the setup build, and
+  the font store differs again (exe's fonts\ vs the per-user store). }
+procedure TfrmResourceBrowser.UpdateDestinationLabel;
+var
+  Folder:  string;
+  Edition: string;
+begin
+{$IFDEF PortableOn}
+  Edition := 'Portable edition';
+{$ELSE}
+  Edition := 'Setup edition';
+{$ENDIF}
+  Folder := '';
+  if (FCatalog <> nil) and FCatalog.Loaded and (lstCategories.ItemIndex >= 0) and
+     (lstCategories.ItemIndex <= High(FCatalog.Categories)) and
+     (Length(FCatalog.Categories[lstCategories.ItemIndex].Items) > 0) then
+    Folder := ResourceTargetFolder(FCatalog.Categories[lstCategories.ItemIndex].Items[0].ResourceType);
+
+  if Folder = '' then
+    lblDestination.Caption := Edition + '.'
+  else
+    lblDestination.Caption := Edition + ' - files are installed into: ' + Folder;
 end;
 
 { ---------------------------------------------------------------------------- }
@@ -532,7 +562,10 @@ begin
   else if Length(FDownloadQueue) > 1 then
     SetBusy(Format('Done - %d file(s) installed.', [Length(FDownloadQueue)]))
   else if FLastTarget <> '' then
-    SetBusy('Installed: ' + ExtractFileName(FLastTarget))
+    // Full path, not just the file name: the folders differ per edition and
+    // per category, this is where the user can confirm exactly where the
+    // file landed.
+    SetBusy('Installed: ' + FLastTarget)
   else
     SetBusy('');
   FFailedCount   := 0;

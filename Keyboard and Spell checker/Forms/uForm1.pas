@@ -1099,6 +1099,10 @@ begin
 
   {$IFDEF PortableOn}
   InstallVirtualFont(ExtractFilePath(Application.ExeName) + 'Virtual Font\Siyamrupali.ttf');
+  // The portable fonts\ folder (shipped set plus downloads) has no
+  // registry entries - re-register it every session so fonts stay usable
+  // after a reboot or a move of the portable folder.
+  RegisterFontFolder(ExtractFilePath(Application.ExeName) + 'fonts\');
   {$ENDIF}
   if AvroUpdateCheck = 'YES' then
     InternetCheck.Enabled := True
