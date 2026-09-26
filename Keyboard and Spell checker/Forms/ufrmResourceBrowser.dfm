@@ -4,7 +4,7 @@ object frmResourceBrowser: TfrmResourceBrowser
   BorderIcons = [biSystemMenu]
   BorderStyle = bsDialog
   Caption = 'Download Resources'
-  ClientHeight = 441
+  ClientHeight = 460
   ClientWidth = 676
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
@@ -26,9 +26,17 @@ object frmResourceBrowser: TfrmResourceBrowser
     Caption =
       'Browse the Avro Keyboard resource library. Downloaded files are ' +
       'installed into the right folder automatically - ANSI mappings a' +
-      'nd skins are picked up immediately, fonts register for the curr' +
-      'ent user.'
+      'nd skins are picked up immediately, fonts register automaticall' +
+      'y.'
     WordWrap = True
+  end
+  object lblDestination: TLabel
+    Left = 8
+    Top = 437
+    Width = 660
+    Height = 13
+    AutoSize = False
+    Caption = ''
   end
   object lblItemDesc: TLabel
     Left = 184
