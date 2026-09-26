@@ -14,7 +14,8 @@ rem
 rem The Qt kit defaults to C:\Qt\6.11.1\mingw_64 (or the newest 6.*\mingw_64
 rem under C:\Qt); MinGW, CMake and Ninja are looked up next to it.  The second
 rem argument is optional and becomes -DAVRO_SHARED_ASSETS=<dir>, the directory
-rem whose fonts\ folder is copied next to the executable.
+rem whose fonts\ folder is copied next to the executable.  Left out, the shared
+rem assets default to ..\assets (the monorepo folder next to Converter\).
 rem
 rem dist\AvroTextConverter.ini is settings, not build output: it is never
 rem touched, so an existing deployment keeps its theme/version/font.
@@ -53,12 +54,27 @@ if defined NINJA_DIR set "PATH=!NINJA_DIR!;!PATH!"
 where cmake >nul 2>nul || (echo ERROR: cmake not found on PATH & goto :fail)
 where ninja >nul 2>nul || (echo ERROR: ninja not found on PATH & goto :fail)
 
-set "ASSETS_OPT="
-if not "%~2"=="" set "ASSETS_OPT=-DAVRO_SHARED_ASSETS=%~2"
-
-echo ==^> configure ^(Release^)
-cmake -S . -B build -G Ninja -DCMAKE_PREFIX_PATH=!QT_PREFIX! ^
-      -DCMAKE_BUILD_TYPE=Release !ASSETS_OPT! || goto :fail
+rem Converter\ is one level below the repository root, so %~dp0..\..\assets is
+rem the shared assets folder: the default when no directory was passed.  CMake
+rem gets it as a normalised absolute path, so it never has to guess what a
+rem relative -DAVRO_SHARED_ASSETS would be relative to.
+set "ASSETS_DIR=%~2"
+if not defined ASSETS_DIR (
+    for %%p in ("%~dp0..\..\assets") do (
+        if exist "%%~fp\fonts" set "ASSETS_DIR=%%~fp"
+    )
+)
+if defined ASSETS_DIR (
+    echo ==^> configure ^(Release, shared assets "!ASSETS_DIR!"^)
+    cmake -S . -B build -G Ninja -DCMAKE_PREFIX_PATH="!QT_PREFIX!" ^
+          -DCMAKE_BUILD_TYPE=Release "-DAVRO_SHARED_ASSETS=!ASSETS_DIR!" || goto :fail
+) else (
+    echo ==^> configure ^(Release^)
+    echo     no shared assets with a fonts folder at %~dp0..\..\assets - the
+    echo     fonts installed on the machine are used instead
+    cmake -S . -B build -G Ninja -DCMAKE_PREFIX_PATH="!QT_PREFIX!" ^
+          -DCMAKE_BUILD_TYPE=Release || goto :fail
+)
 
 echo ==^> build
 cmake --build build || goto :fail
@@ -76,8 +92,8 @@ if exist "build\assets\icon\Converter.ico" (
 
 rem The bundled Bengali fonts travel with the executable too: loadBundledFonts
 rem reads <exe dir>\assets\fonts, so a machine that does not have them installed
-rem still renders correctly.  The build only produces them when the shared
-rem assets directory was passed (see AVRO_SHARED_ASSETS in CMakeLists.txt).
+rem still renders correctly.  The build only produces them when a shared assets
+rem directory was found or passed (see AVRO_SHARED_ASSETS in CMakeLists.txt).
 if exist "build\assets\fonts" (
     if not exist "dist\assets\fonts" mkdir "dist\assets\fonts"
     xcopy /y /q /i "build\assets\fonts\*.*" "dist\assets\fonts\" >nul

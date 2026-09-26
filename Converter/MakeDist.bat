@@ -7,10 +7,10 @@ rem deployment in dist\:
 rem
 rem   1. finds the Qt kit            (C:\Qt\6.11.1\mingw_64, else the newest
 rem                                   C:\Qt\6.*\mingw_64 with a windeployqt)
-rem   2. finds the shared assets     (..\assets, else ..\Avro-Keyboard\assets,
-rem                                   else ..\avro-keyboard\assets) - the folder
-rem                                   whose fonts\ directory carries the bundled
-rem                                   Bengali fonts
+rem   2. finds the shared assets     (..\assets - the monorepo's shared assets
+rem                                   folder next to this directory, whose
+rem                                   fonts\ directory carries the bundled
+rem                                   Bengali fonts)
 rem   3. configures + builds Release into build\   (CMake + Ninja, MinGW from the
 rem                                   Qt installation - nothing else needed)
 rem   4. copies the executable, its .ico and the bundled fonts into dist\
@@ -54,10 +54,13 @@ if not exist "!QT_PREFIX!\bin\windeployqt.exe" (
 echo Qt kit        : !QT_PREFIX!
 
 rem ---- 2. shared assets (bundled Bengali fonts) -----------------------------
+rem Converter\ sits one level below the repository root, so ..\assets is the
+rem shared assets folder.  %~dp0 keeps that true whichever directory this file
+rem was started from.
 set "ASSETS_DIR=%~2"
 if not defined ASSETS_DIR (
-    for %%c in ("..\assets" "..\Avro-Keyboard\assets" "..\avro-keyboard\assets") do (
-        if not defined ASSETS_DIR if exist "%%~fc\fonts" set "ASSETS_DIR=%%~fc"
+    for %%c in ("%~dp0..\assets") do (
+        if exist "%%~fc\fonts" set "ASSETS_DIR=%%~fc"
     )
 )
 if defined ASSETS_DIR (

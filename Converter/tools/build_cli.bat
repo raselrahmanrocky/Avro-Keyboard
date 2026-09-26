@@ -14,6 +14,9 @@ rem   tools\build_cli.bat [g++ path]
 rem
 rem g++ is taken from the argument, then %CXX%, then PATH, then the MinGW that
 rem sits next to a Qt installation (C:\Qt\Tools\mingw*_64).
+rem
+rem No shared assets are involved: the CLI bundles no fonts and no mappings -
+rem the ANSI mapping is a command-line argument (usage is printed below).
 rem ---------------------------------------------------------------------------
 setlocal EnableExtensions EnableDelayedExpansion
 set "CORE=%~dp0..\src\core"

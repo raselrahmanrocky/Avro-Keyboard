@@ -69,20 +69,28 @@ endif()
 set(AVRO_SHARED_ASSETS "${CMAKE_CURRENT_SOURCE_DIR}/../assets" CACHE PATH
     "Directory holding the shared fonts/ assets to bundle")
 set(AVRO_SHARE_DIR "$<TARGET_FILE_DIR:AvroTextConverter>/assets")
-# Only re-copy when the shared assets are actually present: copy_directory
-# hard-fails the build when the source is missing, and the assets live outside
-# this checkout (next to the Avro Keyboard install), so a machine without them
+# Converter\ sits inside the Avro Keyboard monorepo, so ../assets is the
+# shared assets directory at the repository root - the same folder the Delphi
+# projects reach as ..\assets.  A checkout can still be missing it, so:
+# only re-copy when the shared assets are actually present: copy_directory
+# hard-fails the build when the source is missing, so a machine without them
 # must still produce a working binary.  Point -DAVRO_SHARED_ASSETS=<dir> at
 # the real directory to bundle fonts.
-if(EXISTS "${AVRO_SHARED_ASSETS}/fonts")
+#
+# Resolved to an absolute path here, so a relative override (tools\build_release.bat
+# passes ..\assets) always means relative to this directory and never relative
+# to the build directory.
+get_filename_component(AVRO_SHARED_ASSETS_DIR "${AVRO_SHARED_ASSETS}"
+    ABSOLUTE BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
+if(EXISTS "${AVRO_SHARED_ASSETS_DIR}/fonts")
     add_custom_command(TARGET AvroTextConverter POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E make_directory "${AVRO_SHARE_DIR}"
         COMMAND ${CMAKE_COMMAND} -E copy_directory
-                "${AVRO_SHARED_ASSETS}/fonts"
+                "${AVRO_SHARED_ASSETS_DIR}/fonts"
                 "${AVRO_SHARE_DIR}/fonts"
     )
 else()
-    message(STATUS "Shared assets not found at ${AVRO_SHARED_ASSETS} - "
+    message(STATUS "Shared assets not found at ${AVRO_SHARED_ASSETS_DIR} - "
                    "not bundling fonts next to the executable")
 endif()
 
@@ -93,13 +101,18 @@ endif()
 # generic "application" glyph.  We embed the .ico here as well.  Override the
 # choice with -DAVRO_APP_ICON=<path>.ico; otherwise the first candidate that
 # exists on disk wins.
+#
+# The source of truth is the shared assets' assets\icons\Converter.ico - the
+# multi-size icon tools\make_multi_size_ico.py generates for the apps in this
+# monorepo.  It ships next to the executable under the singular runtime name
+# assets\icon\Converter.ico that MainWindow::locateAppIconFile() reads.
 # ---------------------------------------------------------------------------
 set(AVRO_APP_ICON "" CACHE FILEPATH
     "Optional .ico compiled into the executable as its Windows shell icon")
 if(NOT AVRO_APP_ICON)
     foreach(candidate
-            "${CMAKE_CURRENT_SOURCE_DIR}/assets/icon/Converter.ico"
-            "${AVRO_SHARED_ASSETS}/icon/Converter.ico"
+            "${AVRO_SHARED_ASSETS_DIR}/icons/Converter.ico"
+            "${CMAKE_CURRENT_SOURCE_DIR}/assets/icons/Converter.ico"
             "${CMAKE_CURRENT_SOURCE_DIR}/dist/assets/icon/Converter.ico")
         if(EXISTS "${candidate}")
             set(AVRO_APP_ICON "${candidate}")

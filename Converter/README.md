@@ -55,7 +55,7 @@ tools/
   ANSI mapping is decrypted on a worker thread.
 - **Zoom** - `Ctrl+wheel`, `Ctrl++` / `Ctrl+-` / `Ctrl+0` per memo, and a
   rich right-click menu (Cut/Copy/Paste/Select All/Clear + zoom).
-- **Bundled fonts** - the repo's `assets/fonts` (.ttf) are loaded
+- **Bundled fonts** - the shared `../assets/fonts` (.ttf) are loaded
   automatically, so Bengali renders correctly even if **Bornomala** /
   **Kalpurush ANSI** are not installed system-wide.
 - **Persistence** - theme, ANSI version and converter font are stored in a
@@ -65,7 +65,7 @@ tools/
   entry: per-box font family and point size, an optional font per ANSI mapping
   picked on the mapping's own row, and OK / Apply / Cancel / Reset to Defaults -
   see [Settings](#settings).
-- **Logo everywhere** - the bundled `assets/icon/Converter.ico` is embedded in
+- **Logo everywhere** - the shared `../assets/icons/Converter.ico` is embedded in
   the `.exe` (Explorer, taskbar, Alt-Tab), reused for the title bar and for a
   notification-area icon with a *Show / Hide window* + *Exit* menu.  The icon
   carries one bitmap per size (16-128px), so the 16px tray renditions stay
@@ -79,12 +79,12 @@ bundled **MinGW 13.1** + **CMake 3.30** + **Ninja** from the Qt installation
 
 ```bash
 export PATH="/c/Qt/Tools/mingw1310_64/bin:/c/Qt/Tools/CMake_64/bin:/c/Qt/Tools/Ninja:$PATH"
-cd Qt-Avro-Converter
+cd Converter
 cmake -S . -B build -G Ninja -DCMAKE_PREFIX_PATH=C:/Qt/6.11.1/mingw_64 -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 ```
 
-`MakeDist.bat` in the repository root is the double-clickable front door: it
+`MakeDist.bat` in this folder is the double-clickable front door: it
 looks for the Qt kit and for the shared assets folder (the one whose `fonts\`
 directory carries the bundled Bengali fonts), then runs the release script
 below, so one double-click leaves `dist\` ready to run - the
@@ -143,7 +143,7 @@ Explorer, the taskbar and Alt-Tab read a Windows executable's icon from an
 `RT_GROUP_ICON` resource compiled into it - a runtime `QIcon`
 (`MainWindow::makeAppIcon`) is not enough, which is why a build without a
 resource file shows the generic "application" glyph instead of a logo.
-CMake therefore compiles `assets/icon/Converter.ico` into the binary through
+CMake therefore compiles `../assets/icons/Converter.ico` into the binary through
 `src/app_icon.rc.in`.  Point `-DAVRO_APP_ICON=<file>.ico` at a different icon
 to override it (CMake prints the one it picked at configure time).
 
@@ -158,7 +158,7 @@ stdlib-only helper (area-average downscale, premultiplied alpha, one AND mask
 per size):
 
 ```bash
-python tools/make_multi_size_ico.py assets/icon/Converter.ico assets/icon/Converter.ico
+python tools/make_multi_size_ico.py ../assets/icons/Converter.ico ../assets/icons/Converter.ico
 ```
 
 The fonts are only copied next to the executable when the shared assets
