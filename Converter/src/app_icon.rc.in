@@ -1,0 +1,6 @@
+// app_icon.rc.in - configured by CMake into <build>/app_icon.rc and compiled
+// into the executable.  Windows takes the shell icon (Explorer, taskbar,
+// Alt-Tab, pinned shortcuts) from the *first* RT_GROUP_ICON resource in the
+// binary; without one the exe shows the generic "application" glyph.
+// ID 1 is the lowest possible value, which keeps it first.
+1 ICON "@AVRO_APP_ICON_RC_PATH@"

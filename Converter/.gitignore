@@ -1,0 +1,53 @@
+# Build directories
+build/
+build-*/
+cmake-build-*/
+*.o
+*.obj
+*.a
+*.lib
+*.dll
+*.exe
+*.so
+*.dylib
+*.pdb
+*.ilk
+*.exp
+*.map
+
+# Qt Creator / IDE
+*.user
+*.user.*
+*.autosave
+.DS_Store
+Thumbs.db
+
+# Local agent / tool metadata (machine-specific, not part of the project)
+.freebuff/
+
+# Compiled translation / moc artifacts
+moc_*.cpp
+moc_*.h
+qrc_*.cpp
+ui_*.h
+*.moc
+*.moc.*
+*.qm
+
+# Local config / data
+*.ini
+*.log
+
+# CLI test artifacts
+tools/assets/
+tools/test_in.txt
+tools/test_out.txt
+tools/test_round.txt
+tools/*.dcu
+tools/*.dsk
+*.tds
+*.png
+
+# Release output copied in by the build (dist/assets/icon is shipped by the
+# repo itself, the fonts come from the shared assets directory at release time)
+dist/assets/fonts/
