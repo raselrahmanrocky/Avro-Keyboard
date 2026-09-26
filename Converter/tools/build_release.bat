@@ -5,7 +5,7 @@ rem
 rem   tools\build_release.bat [Qt kit dir] [shared assets dir]
 rem
 rem 1. configures build\ with -DCMAKE_BUILD_TYPE=Release and builds it,
-rem 2. copies the fresh AvroTextConverter.exe (and its bundled .ico) into dist\,
+rem 2. copies the fresh AvroTextConverter.exe and its runtime .ico into dist\,
 rem 3. runs windeployqt on it with the trimmed plugin set, then deletes the
 rem    plugins this widgets-only app never loads (Qt6Svg + qsvg/qgif/qjpeg;
 rem    never imageformats\qico.dll - that is what decodes the app logo),
@@ -84,10 +84,17 @@ echo ==^> deploy to dist\
 if not exist "dist"                 mkdir "dist"
 if not exist "dist\assets\icon"     mkdir "dist\assets\icon"
 copy /y "build\AvroTextConverter.exe" "dist\AvroTextConverter.exe" >nul || goto :fail
-if exist "build\assets\icon\Converter.ico" (
-    copy /y "build\assets\icon\Converter.ico" "dist\assets\icon\Converter.ico" >nul || goto :fail
+
+rem The runtime logo (title bar, taskbar, Alt-Tab, tray) is read from
+rem <exe dir>\assets\icon\Converter.ico, so the deployment gets its own copy of
+rem the shared multi-size icon: the single source of truth, never a file under
+rem dist\ (dist is build output) and never the build tree's copy.
+if not defined ASSETS_DIR set "ASSETS_DIR=%~dp0..\..\assets"
+if exist "!ASSETS_DIR!\icons\Converter.ico" (
+    copy /y "!ASSETS_DIR!\icons\Converter.ico" "dist\assets\icon\Converter.ico" >nul || goto :fail
 ) else (
-    echo WARNING: no icon was embedded ^(see AVRO_APP_ICON in CMakeLists.txt^)
+    echo WARNING: no icon at "!ASSETS_DIR!\icons\Converter.ico" - the runtime
+    echo          logo falls back to the drawn accent tile
 )
 
 rem The bundled Bengali fonts travel with the executable too: loadBundledFonts

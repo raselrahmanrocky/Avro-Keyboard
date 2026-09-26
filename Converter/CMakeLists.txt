@@ -99,27 +99,28 @@ endif()
 # .exe from the *first* Win32 RT_GROUP_ICON resource compiled into it, not
 # from any runtime QIcon - that is why a binary without a resource shows the
 # generic "application" glyph.  We embed the .ico here as well.  Override the
-# choice with -DAVRO_APP_ICON=<path>.ico; otherwise the first candidate that
-# exists on disk wins.
+# choice with -DAVRO_APP_ICON=<path>.ico.
 #
-# The source of truth is the shared assets' assets\icons\Converter.ico - the
-# multi-size icon tools\make_multi_size_ico.py generates for the apps in this
-# monorepo.  It ships next to the executable under the singular runtime name
-# assets\icon\Converter.ico that MainWindow::locateAppIconFile() reads.
+# The one canonical source is the shared multi-size icon
+#   ${CMAKE_CURRENT_SOURCE_DIR}/../assets/icons/Converter.ico
+# which is ${AVRO_SHARED_ASSETS_DIR}/icons/Converter.ico - the same directory
+# knob that drives the bundled fonts (AVRO_SHARED_ASSETS defaults to the assets\
+# folder one level above Converter\), and the file tools\make_multi_size_ico.py
+# generates for the apps in this monorepo.  Nothing under dist\ is ever a
+# source: dist is build output.  The icon ships next to the executable under
+# the singular runtime name assets\icon\Converter.ico that
+# MainWindow::locateAppIconFile() reads.
 # ---------------------------------------------------------------------------
-set(AVRO_APP_ICON "" CACHE FILEPATH
+set(AVRO_APP_ICON "${AVRO_SHARED_ASSETS_DIR}/icons/Converter.ico" CACHE FILEPATH
     "Optional .ico compiled into the executable as its Windows shell icon")
 if(NOT AVRO_APP_ICON)
-    foreach(candidate
-            "${AVRO_SHARED_ASSETS_DIR}/icons/Converter.ico"
-            "${CMAKE_CURRENT_SOURCE_DIR}/assets/icons/Converter.ico"
-            "${CMAKE_CURRENT_SOURCE_DIR}/dist/assets/icon/Converter.ico")
-        if(EXISTS "${candidate}")
-            set(AVRO_APP_ICON "${candidate}")
-            break()
-        endif()
-    endforeach()
+    # An earlier configure may have left an empty cache entry behind.
+    set(AVRO_APP_ICON "${AVRO_SHARED_ASSETS_DIR}/icons/Converter.ico")
 endif()
+# Relative -DAVRO_APP_ICON overrides resolve against this directory, never
+# against the build directory; the .rc and the copy below use this absolute path.
+get_filename_component(AVRO_APP_ICON_PATH "${AVRO_APP_ICON}"
+    ABSOLUTE BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
 
 # Windows: GUI subsystem so no console window opens, plus dwmapi for the
 # native window shadow (DwmExtendFrameIntoClientArea) in mainwindow.cpp.
@@ -133,25 +134,29 @@ if(WIN32)
 
     # Compile the .ico into the executable (app_icon.rc.in -> build/app_icon.rc).
     enable_language(RC)
-    if(AVRO_APP_ICON)
-        file(TO_CMAKE_PATH "${AVRO_APP_ICON}" AVRO_APP_ICON_RC_PATH)
+    if(AVRO_APP_ICON AND EXISTS "${AVRO_APP_ICON_PATH}")
+        file(TO_CMAKE_PATH "${AVRO_APP_ICON_PATH}" AVRO_APP_ICON_RC_PATH)
         configure_file("${CMAKE_CURRENT_SOURCE_DIR}/src/app_icon.rc.in"
                        "${CMAKE_CURRENT_BINARY_DIR}/app_icon.rc" @ONLY)
         target_sources(AvroTextConverter PRIVATE
                        "${CMAKE_CURRENT_BINARY_DIR}/app_icon.rc")
         # The runtime icons (title bar, taskbar, Alt-Tab, tray) are read from
-        # assets/icon/Converter.ico next to the executable, so a build without
-        # a same-shaped dist/ folder still has to ship that file.
+        # assets/icon/Converter.ico next to the executable, so the build tree
+        # gets its own copy here and every deployment gets one from
+        # tools\build_release.bat.
         add_custom_command(TARGET AvroTextConverter POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E make_directory
                     "${AVRO_SHARE_DIR}/icon"
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                    "${AVRO_APP_ICON}"
+                    "${AVRO_APP_ICON_PATH}"
                     "${AVRO_SHARE_DIR}/icon/Converter.ico")
-        message(STATUS "Application icon: ${AVRO_APP_ICON}")
+        message(STATUS "Application icon: ${AVRO_APP_ICON_PATH}")
     else()
         message(WARNING
-            "No application icon found - the .exe would show the default "
-            "Windows glyph. Pass -DAVRO_APP_ICON=<file>.ico to embed one.")
+            "No application icon at ${AVRO_APP_ICON_PATH} - the .exe would "
+            "show the default Windows glyph and the runtime logo would fall "
+            "back to the drawn tile.  Pass -DAVRO_APP_ICON=<file>.ico, or "
+            "point -DAVRO_SHARED_ASSETS=<dir> at the shared assets folder "
+            "that holds icons/Converter.ico.")
     endif()
 endif()
