@@ -185,7 +185,17 @@ begin
 
     // Prefer the installer matching this executable's architecture when the
     // feed provides per-arch URLs. Feeds without these nodes (legacy) keep
-    // using downloadurl unchanged.
+    // using downloadurl unchanged. Portable builds additionally prefer the
+    // portable ZIP nodes, so portable users receive a portable ZIP instead
+    // of a setup installer; missing portable nodes fall through to the
+    // regular per-arch (then generic) resolution below.
+    {$IFDEF PortableOn}
+    if (SizeOf(Pointer) = 8) and Assigned(Xml.DocumentElement.ChildNodes.FindNode('downloadurlportable64')) then
+      downloadurl := Xml.DocumentElement.ChildNodes['downloadurlportable64'].NodeValue
+    else if (SizeOf(Pointer) = 4) and Assigned(Xml.DocumentElement.ChildNodes.FindNode('downloadurlportable32')) then
+      downloadurl := Xml.DocumentElement.ChildNodes['downloadurlportable32'].NodeValue
+    else
+    {$ENDIF}
     if (SizeOf(Pointer) = 8) and Assigned(Xml.DocumentElement.ChildNodes.FindNode('downloadurl64')) then
       downloadurl := Xml.DocumentElement.ChildNodes['downloadurl64'].NodeValue
     else if (SizeOf(Pointer) = 4) and Assigned(Xml.DocumentElement.ChildNodes.FindNode('downloadurl32')) then
