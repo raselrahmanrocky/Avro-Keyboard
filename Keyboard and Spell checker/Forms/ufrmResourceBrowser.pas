@@ -65,10 +65,15 @@ type
       FLastTarget:   string;
       FFailedCount:  Integer;
       FLastError:    string;
+      { Category the caller asked for ('' = default). The catalog arrives
+        asynchronously, so the selection is applied after the fetch, not at
+        Show time - see SelectCategoryById. }
+      FPendingCategory: string;
 
       procedure SetBusy(const ACaption: string);
       procedure LoadCatalog;
       procedure PopulateCategories;
+      procedure SelectCategoryById(const AId: string);
       procedure PopulateItems;
       procedure ShowItemDescription(const AIndex: Integer);
       procedure UpdateItemStatus(const AIndex: Integer; const AInstalled: Boolean);
@@ -88,8 +93,13 @@ var
 
 { Creates the dialog on first use, reuses it afterwards. The instance stays
   alive for the whole session (hide on close), so a download task can never
-  race a freed form. }
-procedure ShowResourceBrowser;
+  race a freed form.
+
+  ACategoryId opens the dialog on that catalog category - 'dictionary' from
+  the missing-auto-correct-dictionary balloon and from the auto-correct
+  editor's download button. '' (or an id the catalog does not have) shows
+  the first category. }
+procedure ShowResourceBrowser(const ACategoryId: string = '');
 
 implementation
 
@@ -100,13 +110,16 @@ uses
   uWindowHandlers,
   uFileFolderHandling,
   uResourceInstaller,
+  uAutoCorrect,
+  uForm1,
   DebugLog;
 
-procedure ShowResourceBrowser;
+procedure ShowResourceBrowser(const ACategoryId: string);
 begin
   CheckCreateForm(TfrmResourceBrowser, frmResourceBrowser, 'frmResourceBrowser');
   if frmResourceBrowser = nil then
     Exit;
+  frmResourceBrowser.FPendingCategory := ACategoryId;
   frmResourceBrowser.Show;
   frmResourceBrowser.BringToFront;
 end;
@@ -200,6 +213,8 @@ begin
           else
           begin
             PopulateCategories;
+            SelectCategoryById(FPendingCategory);
+            FPendingCategory := '';
             lblStatus.Caption := IntToStr(Length(Catalog.Categories)) + ' categories loaded.';
           end;
           SetBusy(lblStatus.Caption);
@@ -230,6 +245,32 @@ begin
     PopulateItems;
     UpdateDestinationLabel;
   end;
+end;
+
+{ Applies the category the caller named in ShowResourceBrowser, now that the
+  catalog is in. An id the catalog does not carry (the dictionary category
+  only exists once the resource repository has published it) keeps the
+  default first category instead of leaving the list empty. }
+procedure TfrmResourceBrowser.SelectCategoryById(const AId: string);
+var
+  I: Integer;
+begin
+  if AId = '' then
+    Exit;
+  if (FCatalog = nil) or not FCatalog.Loaded then
+    Exit;
+  for I := 0 to High(FCatalog.Categories) do
+    if SameText(FCatalog.Categories[I].Id, AId) then
+    begin
+      if lstCategories.ItemIndex <> I then
+      begin
+        lstCategories.ItemIndex := I;
+        PopulateItems;
+        UpdateDestinationLabel;
+      end;
+      Exit;
+    end;
+  Log('Resource category not in catalog: ' + AId);
 end;
 
 procedure TfrmResourceBrowser.PopulateItems;
@@ -507,6 +548,19 @@ begin
           begin
             UpdateItemStatus(Job.ItemIndex, True);
             FLastTarget := Target;
+            // The dictionary is read lazily by the typing path, and a load
+            // that already failed is never retried in the same session -
+            // drop that state now so the next keystroke parses the file
+            // just installed instead of waiting for a restart. Database.db3
+            // shares the 'dict' type, so the word database - loaded eagerly
+            // at startup, and silent when the file is gone (uDBase) - is
+            // retried here too: RefreshSettings is the only other caller and
+            // it does not run on an install.
+            if SameText(Job.ResourceType, 'dict') then
+            begin
+              uAutoCorrect.ResetDictLoadState;
+              AvroMainForm1.ReloadWordDatabaseIfUsed;
+            end;
             // A document is meant to be read right away; anything else just
             // appears in its list/folder (ANSI mappings are picked up by the
             // directory watcher automatically).

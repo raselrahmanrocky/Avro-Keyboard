@@ -50,6 +50,10 @@ type
       FAutoCorrect:              boolean;
       CandidateDict:             TDictionary<string, string>;
       ManuallySelectedCandidate: boolean;
+      { Set when a choice is learned, cleared by the write that persists it.
+        The main form's timer does the writing - see
+        SaveCandidateOptionsIfDirty. }
+      FCandidateOptionsDirty:    boolean;
       DetermineZWNJ_ZWJ:         string;
       PhoneticCache:             array [1 .. Max_EnglishLength] of TPhoneticCache;
 
@@ -84,6 +88,14 @@ type
       procedure ProcessVKeyUP(const KeyCode: Integer; var Block: boolean);
       procedure ResetDeadKey;
       procedure SelectCandidate(const Item: string);
+
+      { Writes the learned suggestion choices when any were made since the last
+        write. The main form calls this from its message-loop timer, never from
+        the typing path: that path runs inside the WH_KEYBOARD_LL callback, and
+        a disk write there sits between a keystroke and its output (the hook
+        that takes too long gets removed - see uAutoCorrect). }
+      procedure SaveCandidateOptionsIfDirty;
+
       // Published
       property AutoCorrectEnabled: boolean read GetAutoCorrectEnabled write SetAutoCorrectEnabled;
   end;
@@ -102,6 +114,7 @@ uses
   uFileFolderHandling,
   BanglaChars,
   uDBase,
+  Windows,
   WindowsVersion;
 
 { TE2BCharBased }
@@ -311,8 +324,9 @@ begin
   FreeAndNil(Parser);
   FreeAndNil(RegExBuilder);
   FreeAndNil(Abbreviation);
-  if SaveCandidate = 'YES' then
-    SaveCandidateOptions;
+  // Last chance to keep what this session learned; whatever the timer already
+  // flushed is not written a second time.
+  SaveCandidateOptionsIfDirty;
   FreeAndNil(CandidateDict);
 
   for I := low(PhoneticCache) to high(PhoneticCache) do
@@ -1567,8 +1581,13 @@ end;
 procedure TE2BCharBased.SaveCandidateOptions;
 var
   S:       string;
+  Path:    string;
+  TmpPath: string;
   tmpList: TStringList;
 begin
+  Path    := GetAvroDataDir + 'CandidateOptions.dat';
+  TmpPath := Path + '.tmp';
+  tmpList := nil;
   try
     try
       tmpList := TStringList.Create;
@@ -1577,7 +1596,18 @@ begin
       begin
         tmpList.Add(S + ' ' + CandidateDict.Items[S]);
       end;
-      tmpList.SaveToFile(GetAvroDataDir + 'CandidateOptions.dat', TEncoding.UTF8);
+
+      { Written next to the real file and renamed over it in one step. The
+        preferences are now rewritten while Avro runs (see
+        SaveCandidateOptionsIfDirty), so a plain SaveToFile interrupted by a
+        crash would leave them truncated - the rename leaves either the old
+        contents or the new ones. }
+      tmpList.SaveToFile(TmpPath, TEncoding.UTF8);
+      if not Windows.MoveFileEx(PChar(TmpPath), PChar(Path), MOVEFILE_REPLACE_EXISTING) then
+      begin
+        Windows.DeleteFile(PChar(TmpPath));
+        tmpList.SaveToFile(Path, TEncoding.UTF8);
+      end;
     except
       on E: Exception do
       begin
@@ -1585,9 +1615,21 @@ begin
       end;
     end;
   finally
-    tmpList.Clear;
     FreeAndNil(tmpList);
   end;
+end;
+
+{ The choices used to be written only from the destructor, so a crash or a
+  forced close threw away everything this session had learned. The main form
+  calls this from the same 100 ms timer that polls its resource folders, which
+  keeps the write on the message loop and bounds the loss to the last second or
+  so of learning. }
+procedure TE2BCharBased.SaveCandidateOptionsIfDirty;
+begin
+  if (not FCandidateOptionsDirty) or (SaveCandidate <> 'YES') then
+    Exit;
+  SaveCandidateOptions;
+  FCandidateOptionsDirty := False;
 end;
 
 { =============================================================================== }
@@ -1619,6 +1661,9 @@ begin
     if trim(Middle_Main_T) <> '' then
     begin
       CandidateDict.AddOrSetValue(Middle_Main_T, NewBanglaText);
+      // Only mark it here: persisting it is the timer's job, this runs in the
+      // keyboard hook.
+      FCandidateOptionsDirty := True;
     end;
   end;
 end;

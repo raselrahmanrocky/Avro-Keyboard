@@ -25,7 +25,7 @@ type
   TResourceItem = record
     FileName:      string; // repo-relative path, e.g. 'AnsiMapping/Ansi V1.AvroEnco'
     Name:          string;
-    ResourceType:  string; // ansimapping | layout | font | skin | doc
+    ResourceType:  string; // ansimapping | layout | font | skin | doc | dict
     Version:       string;
     Description:   string;
     DescriptionBn: string;

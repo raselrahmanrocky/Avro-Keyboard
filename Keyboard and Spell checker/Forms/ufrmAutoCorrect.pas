@@ -51,7 +51,13 @@ type
     cmdAdd: TButton;
     cmdImport: TButton;
     OpenDialog1: TOpenDialog;
+    { Extra row, shown only while the dictionary is not usable - it sits
+      below the fixed layout and the form grows for it (see
+      UpdateDictionaryState), so nothing above moves. }
+    btnDownloadDict: TButton;
+    lblDictMissing: TLabel;
     procedure FormCreate(Sender: TObject);
+    procedure FormActivate(Sender: TObject);
     procedure ListSelectItem(Sender: TObject; Item: TListItem; Selected: Boolean);
     procedure ReplaceTChange(Sender: TObject);
     procedure WithTChange(Sender: TObject);
@@ -66,12 +72,15 @@ type
     procedure CheckOnTopClick(Sender: TObject);
     procedure FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
     procedure cmdImportClick(Sender: TObject);
+    procedure btnDownloadDictClick(Sender: TObject);
     private
       { Private declarations }
       Phonetic: TEnglishToBangla;
       function FindListItem(const SearchStr: string): TListItem;
       procedure ButtonState;
       function Save: Boolean;
+      procedure LoadEntries;
+      procedure UpdateDictionaryState;
 
     public
       { Public declarations }
@@ -85,7 +94,8 @@ var
 implementation
 
 uses
-  ufrmConflict;
+  ufrmConflict,
+  ufrmResourceBrowser;
 
 {$R *.dfm}
 
@@ -412,26 +422,80 @@ end;
 { =============================================================================== }
 
 procedure TfrmAutoCorrect.FormCreate(Sender: TObject);
-var
-  S:        string;
-  thisItem: TListItem;
 begin
   Phonetic := TEnglishToBangla.Create;
   Phonetic.AutoCorrectEnabled := False;
 
-  List.Items.BeginUpdate;
-  for S in dict.Keys do
-  begin
-    thisItem := List.Items.Add;
-    thisItem.Caption := S;
-    thisItem.SubItems.Add(dict.Items[S]);
-  end;
-  List.SortType := stText;
-  List.Items.EndUpdate;
-
-  lblTotalEntries.Caption := 'Total entries : ' + IntToStr(List.Items.Count);
+  // The dictionary loads lazily on the first phonetic keystroke, so opening
+  // this dialog before typing anything (or after a failed load) must not
+  // walk a nil Dict - InitDict builds it and reports the failure state.
+  InitDict;
+  LoadEntries;
+  UpdateDictionaryState;
 
   DisableCloseButton(Self.Handle);
+end;
+
+{ =============================================================================== }
+
+{ Refills the list from Dict and the count label. }
+procedure TfrmAutoCorrect.LoadEntries;
+var
+  S:        string;
+  thisItem: TListItem;
+begin
+  List.Items.BeginUpdate;
+  try
+    List.Items.Clear;
+    for S in dict.Keys do
+    begin
+      thisItem := List.Items.Add;
+      thisItem.Caption := S;
+      thisItem.SubItems.Add(dict.Items[S]);
+    end;
+    List.SortType := stText;
+  finally
+    List.Items.EndUpdate;
+  end;
+  lblTotalEntries.Caption := 'Total entries : ' + IntToStr(List.Items.Count);
+end;
+
+{ =============================================================================== }
+
+{ Offers the download only while the dictionary is unusable, growing the
+  form for that one row - the buttons above keep their coordinates.
+  Re-checked on every activate: a dictionary downloaded through the button
+  then shows up without closing and reopening the dialog. }
+procedure TfrmAutoCorrect.UpdateDictionaryState;
+var
+  Missing: Boolean;
+begin
+  InitDict;
+  Missing := not AutoCorrectDictionaryOK;
+  btnDownloadDict.Visible := Missing;
+  lblDictMissing.Visible  := Missing;
+  if Missing then
+    ClientHeight := btnDownloadDict.Top + btnDownloadDict.Height + 12;
+end;
+
+{ =============================================================================== }
+
+procedure TfrmAutoCorrect.FormActivate(Sender: TObject);
+begin
+  UpdateDictionaryState;
+  // The list was empty while the file was missing; fill it now that the
+  // download (or an import elsewhere) put it back.
+  if (List.Items.Count = 0) and AutoCorrectDictionaryOK then
+    LoadEntries;
+end;
+
+{ =============================================================================== }
+
+{ The auto-correct dictionary is a catalog entry, so it is fetched the same
+  way every other resource is - straight into the Dictionary category. }
+procedure TfrmAutoCorrect.btnDownloadDictClick(Sender: TObject);
+begin
+  ShowResourceBrowser('dictionary');
 end;
 
 { =============================================================================== }
@@ -524,10 +588,18 @@ begin
   try
     Path := GetAvroDataDir + 'autodict.dct';
     T.SaveToFile(Path);
-    DestroyDict;
-    InitDict;
-    LoadDict;
-    result := True;
+    // Rebuild from the file just written. ResetDictLoadState clears a
+    // previous load failure too, so a dictionary that was missing and is now
+    // saved (or downloaded) starts working without restarting Avro.
+    ResetDictLoadState;
+    if not InitDict then
+    begin
+      Application.MessageBox(PChar('The dictionary was saved, but could not be reloaded!' + #10 + '' + #10 + 'File: ' + Path + #10 + '' + #10 +
+            'Restarting Avro Keyboard may solve this problem.'), 'Auto correct', MB_OK + MB_ICONHAND + MB_DEFBUTTON1 + MB_APPLMODAL);
+      result := False;
+    end
+    else
+      result := True;
   except
     on E: Exception do
     begin

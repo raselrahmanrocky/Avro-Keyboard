@@ -97,6 +97,12 @@ begin
     Result := GetAvroDataDir + 'Skin\'
   else if SameText(AResourceType, 'doc') then
     Result := GetAvroDataDir + 'Docs\'
+  else if SameText(AResourceType, 'dict') then
+    // No subfolder: the 'dict' files land straight in the data folder -
+    // autodict.dct (what uAutoCorrect reads) and Database.db3 (what uDBase
+    // reads) - so the next keystroke and the post-install reload in
+    // ufrmResourceBrowser pick them up without restarting Avro.
+    Result := GetAvroDataDir
   else if SameText(AResourceType, 'font') then
   {$IFDEF PortableOn}
     // Portable keeps the whole install self-contained: fonts land in the

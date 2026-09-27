@@ -19,12 +19,38 @@ uses
   SysUtils,
   StrUtils,
   Generics.Collections,
-  Forms,
+  DebugLog,
   uFileFolderHandling;
 
-procedure InitDict;
-procedure LoadDict;
+{ Creates the empty dictionary on first use and reads the file into it.
+  Returns True when the dictionary is usable: an existing good one, or a
+  fresh load that succeeded. A load that already failed returns False
+  without touching the disk again. }
+function InitDict: Boolean;
+
+{ Parses autodict.dct into Dict. Returns True when the file was read.
+
+
+  Deliberately silent on failure: the first call comes from inside the
+  WH_KEYBOARD_LL callback (committing a word while typing), and a modal
+  dialog opened there keeps the hook procedure from returning. Past
+  LowLevelHooksTimeout Windows unhooks the process without an error, and
+  Avro then receives no keys at all - in every mode, not just phonetic.
+  Failures are reported through OnDictLoadFailed instead, which the main
+  form raises from the message loop as a one-shot tray balloon. }
+function LoadDict: Boolean;
+
 procedure DestroyDict;
+
+{ Clears the failure state so a dictionary installed while Avro is already
+  running (resource download, editor save) is picked up by the next
+  keystroke instead of waiting for a restart. }
+procedure ResetDictLoadState;
+
+{ True when the dictionary is in memory and did not fail to load - what the
+  auto-correct editor asks after InitDict to decide between the entry list
+  and a "download the dictionary" affordance. }
+function AutoCorrectDictionaryOK: Boolean;
 
 { Lookup used by the typing path. Loads the dictionary on FIRST use instead of
   at application start.
@@ -39,28 +65,64 @@ function TryAutoCorrectWord(const AWord: string; out AReplacement: string): Bool
 var
   Dict: TDictionary<string, string>;
 
+{ Assigned once by the main form at startup. Fired from TThread.ForceQueue,
+  i.e. from the message loop - never from the hook callback itself. }
+var
+  OnDictLoadFailed: TProc;
+
 implementation
+
+var
+  { Set the moment a load attempt fails: InitDict then stops re-reading the
+    file on every keystroke and TryAutoCorrectWord answers "no match" without
+    touching the disk again - one failed read per session, never one per
+    Space/Enter. }
+  DictLoadFailed:   Boolean = False;
+  { The failure is surfaced to the user exactly once per session. }
+  DictLoadNotified: Boolean = False;
 
 { =============================================================================== }
 
-procedure InitDict;
+{ The caller runs inside the WH_KEYBOARD_LL callback, so no UI may happen
+  here. ForceQueue - not Queue, which would run the notify inline when the
+  caller IS the main thread and therefore still inside the hook - defers it
+  to the message loop, after the hook callback has returned. }
+procedure NotifyDictLoadFailed;
+begin
+  if DictLoadNotified then
+    Exit;
+  DictLoadNotified := True;
+  TThread.ForceQueue(nil,
+    procedure
+    begin
+      if Assigned(OnDictLoadFailed) then
+        OnDictLoadFailed();
+    end);
+end;
+
+{ =============================================================================== }
+
+function InitDict: Boolean;
 begin
   // Idempotent: the lookup path calls this on every keystroke until the
   // dictionary exists, and the auto-correct editor calls it after saving.
+  // A load that already failed stops the retries outright - see DictLoadFailed.
+  if DictLoadFailed then
+    Exit(False);
   if Assigned(Dict) then
-    Exit;
-  Dict := TDictionary<string, string>.create;
-  LoadDict;
+    Exit(True);
+  Dict   := TDictionary<string, string>.create;
+  Result := LoadDict;
 end;
 
 function TryAutoCorrectWord(const AWord: string; out AReplacement: string): Boolean;
 begin
   AReplacement := '';
-  if AWord = '' then
+  if (AWord = '') or DictLoadFailed then
     Exit(False);
   if not Assigned(Dict) then
     InitDict;
-  if not Assigned(Dict) then
+  if (not Assigned(Dict)) or DictLoadFailed then
     Exit(False); // dictionary file missing/corrupt: behave as "no match"
   Result := Dict.TryGetValue(AWord, AReplacement);
 end;
@@ -74,17 +136,35 @@ end;
 
 { =============================================================================== }
 
-procedure LoadDict;
+procedure ResetDictLoadState;
+begin
+  DictLoadFailed   := False;
+  DictLoadNotified := False;
+  FreeAndNil(Dict);
+end;
+
+{ =============================================================================== }
+
+function AutoCorrectDictionaryOK: Boolean;
+begin
+  Result := Assigned(Dict) and (not DictLoadFailed);
+end;
+
+{ =============================================================================== }
+
+function LoadDict: Boolean;
 var
   List:                  TStringList;
   I, P:                  Integer;
   Path:                  string;
   FirstPart, SecondPart: string;
 begin
+  Result := False;
+  Path   := GetAvroDataDir + 'autodict.dct';
+  List   := nil;
   try
     try
       List := TStringList.create;
-      Path := GetAvroDataDir + 'autodict.dct';
       List.LoadFromFile(Path);
 
       for I := 0 to List.Count - 1 do
@@ -97,12 +177,17 @@ begin
           Dict.AddOrSetValue(FirstPart, SecondPart);
         end;
       end;
+
+      DictLoadFailed := False;
+      Result         := True;
     except
       on E: Exception do
       begin
-        Application.MessageBox(Pchar('Cannot load auto-correct dictionary!' + #10 + '' + #10 + '-> Make sure ''autodict.dct'' file is present in ' + Path +
-              ' folder, or' + #10 + '-> ''autodict.dct'' file is not corrupt.' + #10 + '' + #10 + 'Reinstalling Avro Keyboard may solve this problem.'),
-          'Avro Keyboard', MB_OK + MB_ICONHAND + MB_DEFBUTTON1 + MB_APPLMODAL);
+        { Never a MessageBox here - see the interface comment. The dictionary
+          stays assigned but empty, so typing goes on without auto-correct. }
+        DictLoadFailed := True;
+        Log('Auto-correct dictionary not loaded: ' + E.Message);
+        NotifyDictLoadFailed;
       end;
     end;
   finally

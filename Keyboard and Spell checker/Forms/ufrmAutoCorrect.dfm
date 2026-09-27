@@ -63,6 +63,7 @@ object frmAutoCorrect: TfrmAutoCorrect
     000000000000000000000000000000000000000000000000000000000000}
   KeyPreview = True
   Position = poScreenCenter
+  OnActivate = FormActivate
   OnClose = FormClose
   OnCreate = FormCreate
   OnKeyDown = FormKeyDown
@@ -314,5 +315,33 @@ object frmAutoCorrect: TfrmAutoCorrect
     Options = [ofPathMustExist, ofFileMustExist, ofNoNetworkButton, ofEnableSizing]
     Left = 104
     Top = 336
+  end
+  object btnDownloadDict: TButton
+    Left = 12
+    Top = 561
+    Width = 235
+    Height = 36
+    Margins.Left = 5
+    Margins.Top = 5
+    Margins.Right = 5
+    Margins.Bottom = 5
+    Caption = '&Download Dictionary...'
+    TabOrder = 11
+    Visible = False
+    OnClick = btnDownloadDictClick
+  end
+  object lblDictMissing: TLabel
+    Left = 255
+    Top = 570
+    Width = 157
+    Height = 21
+    Caption = 'Dictionary missing!'
+    Font.Charset = DEFAULT_CHARSET
+    Font.Color = clRed
+    Font.Height = -17
+    Font.Name = 'Tahoma'
+    Font.Style = [fsBold]
+    ParentFont = False
+    Visible = False
   end
 end

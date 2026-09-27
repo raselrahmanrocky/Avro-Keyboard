@@ -77,6 +77,7 @@ type
       procedure BanglaMode;
       procedure SysMode;
       procedure SelectCandidate(const Item: string); // For Phonetic
+      procedure SaveCandidateOptionsIfDirty;         // Learned phonetic choices
 
       // Published
       // --------------------------------------------------------------
@@ -229,6 +230,15 @@ end;
 procedure TLayout.SelectCandidate(const Item: string);
 begin
   AvroPhonetic.SelectCandidate(Item);
+end;
+
+{ =============================================================================== }
+
+{ Pass-through for the main form's timer: see
+  TE2BCharBased.SaveCandidateOptionsIfDirty. }
+procedure TLayout.SaveCandidateOptionsIfDirty;
+begin
+  AvroPhonetic.SaveCandidateOptionsIfDirty;
 end;
 
 procedure TLayout.SetAutoCorrectEnabled(const Value: Boolean);

@@ -33,6 +33,13 @@ type
 
   IntegerArray = LongIntArray;
 
+{ True while Database.db3 is in the data folder. The startup notice in uForm1
+  asks this before raising its balloon - LoadWordDatabase itself can not: a
+  missing file is not an error it is allowed to report (it runs from the
+  settings refresh, and the keyboard hook must never show UI). }
+
+function WordDatabaseFilePresent: Boolean;
+
 procedure LoadWordDatabase;
 
 procedure UnloadWordDatabase;
@@ -159,6 +166,18 @@ uses
   uFileFolderHandling,
   windows;
 
+var
+  { One-shot guard for the "cannot load Avro database" dialog: RefreshSettings
+    retries the load after any settings change, and a dialog per retry would
+    be noise. The retry itself is what lets a download (see the resource
+    browser) bring the database back without restarting Avro. }
+  FDatabaseLoadErrorShown: Boolean;
+
+function WordDatabaseFilePresent: Boolean;
+begin
+  Result := FileExists(GetAvroDataDir + 'Database.db3');
+end;
+
 procedure LoadSuffix;
 var
   FirstPart, SecondPart: string;
@@ -166,6 +185,14 @@ var
   SelectSQL:             string;
 begin
   SelectSQL := 'SELECT English, Bangla FROM Suffix;';
+
+  // A previous attempt can have left these two behind: the failure branch of
+  // LoadWordDatabase frees the connection but keeps whatever it managed to
+  // read, and the reload after a download runs through here again. Assigning
+  // fresh objects over them would keep the half-built pair alive for the rest
+  // of the session.
+  FreeAndNil(Suffix_Spell);
+  FreeAndNil(Suffix);
 
   Suffix_Spell := TStringList.Create;
   Suffix_Spell.Sorted := True;
@@ -446,15 +473,42 @@ begin
       except
         on E: Exception do
         begin
-          Application.MessageBox(Pchar('Cannot load Avro database!' + #10 + '' + #10 + '-> Make sure ''Database.db3'' file is present in ' + GetAvroDataDir +
-                ' folder, or' + #10 + '-> ''Database.db3'' file is not corrupt.' + #10 + '' + #10 + 'Reinstalling Avro Keyboard may solve this problem.'),
-            'Avro Keyboard', MB_OK + MB_ICONHAND + MB_DEFBUTTON1 + MB_APPLMODAL);
+          { The handle belongs to the connection - drop the reference before
+            the finally below, so nothing is freed twice when the connection
+            is released here. FDatabaseLoaded stays False, so the next settings
+            refresh tries again (and reports this dialog only once). }
+          FDatabase := nil;
+          FreeAndNil(FDConnection1);
+          FreeAndNil(FDPhysSQLiteDriverLink1);
+
+          if not FDatabaseLoadErrorShown then
+          begin
+            FDatabaseLoadErrorShown := True;
+            Application.MessageBox(Pchar('Cannot load Avro database!' + #10 + '' + #10 + '-> Make sure ''Database.db3'' file is present in ' + GetAvroDataDir +
+                  ' folder, or' + #10 + '-> ''Database.db3'' file is not corrupt.' + #10 + '' + #10 + 'Reinstalling Avro Keyboard may solve this problem.'),
+              'Avro Keyboard', MB_OK + MB_ICONHAND + MB_DEFBUTTON1 + MB_APPLMODAL);
+          end;
         end;
       end;
     finally
       FreeAndNil(FDatabase);
     end;
+  end
+  else
+  begin
+    { Missing file: stay silent here - this runs from the settings refresh and
+      the load must be retriable after the user downloads the file (the
+      resource browser reloads it on install). uForm1 raises the one-shot
+      startup notice that points at the downloader. Release what the attempt
+      created so a retry starts clean. }
+    FreeAndNil(FDConnection1);
+    FreeAndNil(FDPhysSQLiteDriverLink1);
   end;
+
+  { Every path that falls through here (loaded, missing, corrupt) must leave
+    the loading flag down - otherwise the first failure disables the database
+    for the whole session. }
+  FDatabaseLoading := False;
 
 end;
 
@@ -465,6 +519,14 @@ var
   i:         Integer;
 begin
   SelectSQL := 'SELECT Words FROM ' + FileName + ';';
+  // The slot can still be occupied by an earlier attempt: the failure branch
+  // of LoadWordDatabase keeps whatever tables were already read, and the
+  // reload that follows a download lands in these very same slots. Both
+  // objects are replaced below without being freed (BuildOneHashTable always
+  // creates a new one), so drop the old pair first - the retry then starts
+  // from the same state as a cold start instead of leaking it.
+  FreeAndNil(Arr);
+  FreeAndNil(Dict);
   // Inititialize Data
   Arr := TStringList.Create;
 

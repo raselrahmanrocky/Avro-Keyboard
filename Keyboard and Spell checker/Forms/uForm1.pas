@@ -252,6 +252,13 @@ type
       FUnhandledReported:           Boolean;
       { One-shot tray balloon when the mapping folder is empty at startup. }
       FNoMappingBalloonShown:       Boolean;
+      { One-shot tray balloon when autodict.dct could not be loaded (the load
+        itself is silent - see uAutoCorrect). }
+      FNoDictBalloonShown:          Boolean;
+      { One-shot tray balloon when Database.db3 is absent at startup - the
+        failure is just as silent (see uDBase), and just as fatal to phonetic
+        candidates. }
+      FNoDatabaseBalloonShown:      Boolean;
 
       { Per-layout icons, decoded from the payload each container carries.
 
@@ -322,6 +329,15 @@ type
       procedure ImportAnsiMappingClick(Sender: TObject);
       procedure OpenAnsiMappingDirClick(Sender: TObject);
       procedure NoMappingBalloonClick(Sender: TObject);
+      procedure NoDictBalloonClick(Sender: TObject);
+      procedure ShowAutoCorrectMissingBalloon;
+      procedure CheckWordDatabasePresence;
+      procedure ShowMissingDatabaseBalloon;
+      procedure MissingDatabaseBalloonClick(Sender: TObject);
+      { Reloads the word database after the resource downloader installed it -
+        the load already failed silently once this session (uDBase), and
+        RefreshSettings is the only other place that retries it. }
+      procedure ReloadWordDatabaseIfUsed;
       procedure AnsiVersionItemAdvancedDrawItem(Sender: TObject; ACanvas: TCanvas; ARect: TRect; AState: TOwnerDrawState);
       procedure AnsiVersionItemMeasureItem(Sender: TObject; ACanvas: TCanvas; var Width, Height: Integer);
       { The cached HICON for a mapping at the CURRENT small-icon metric, or 0
@@ -1052,6 +1068,16 @@ begin
   // loaded by the first phonetic keystroke that needs it (see
   // TryAutoCorrectWord). Nothing else in the process reads it, so parsing it
   // before the hook is even installed only made the idle footprint bigger.
+  //
+  // What IS wired here is the failure notice: the load happens inside the
+  // keyboard hook, which must never show UI, so uAutoCorrect defers it to
+  // this form through OnDictLoadFailed and the balloon is raised from the
+  // message loop instead.
+  OnDictLoadFailed :=
+    procedure
+    begin
+      ShowAutoCorrectMissingBalloon;
+    end;
   LoadKeyboardLayoutNames;
   Initmenu;
   LoadUserHotkeysFromXML;
@@ -1257,6 +1283,13 @@ begin
   // to real changes (files copied/removed while Avro Keyboard is running).
   FMappingListCheckCountdown := 5;
   FAnsiMappingSnapshot := BuildAnsiMappingFolderList;
+
+  // Last of the startup notices, once the tray/top bar exist to carry it: the
+  // phonetic candidates read Database.db3, and a load that failed because the
+  // file is gone reports nothing on its own (uDBase stays silent - see
+  // LoadWordDatabase). Raise it here so the user is told what broke and where
+  // to get the file back.
+  CheckWordDatabasePresence;
 end;
 
 procedure TAvroMainForm1.HandleLayoutDirectoryChanged(Sender: TObject);
@@ -2898,6 +2931,14 @@ begin
   begin
     FMappingListCheckCountdown := 15; // ~1.5 seconds at Interval = 100 ms
     RefreshAnsiMappingList;
+
+    // Learned phonetic suggestion choices (CandidateOptions.dat) are persisted
+    // from here on purpose: the only other write point used to be the engine's
+    // destructor, so a crash or a forced close threw the session away, and
+    // writing straight from the typing path would put disk I/O inside the
+    // keyboard hook.
+    if Assigned(KeyLayout) then
+      KeyLayout.SaveCandidateOptionsIfDirty;
   end;
 
   if Assigned(FDirectoryWatcher) then
@@ -3200,6 +3241,116 @@ end;
 procedure TAvroMainForm1.NoMappingBalloonClick(Sender: TObject);
 begin
   ShowResourceBrowser;
+end;
+
+{ The auto-correct dictionary could not be read. The load itself has to stay
+  silent - it runs inside the WH_KEYBOARD_LL callback, where a dialog would
+  get the hook removed - so this is where the user hears about it: once per
+  session, from the message loop. Clicking the balloon opens the resource
+  downloader, which is where the dictionary comes from. }
+
+procedure TAvroMainForm1.ShowAutoCorrectMissingBalloon;
+const
+  Msg = 'Auto-correct dictionary (autodict.dct) is missing.' + sLineBreak +
+    'Typing works normally - only phonetic auto-correct is off.';
+begin
+  if FNoDictBalloonShown then
+    Exit;
+  FNoDictBalloonShown := True;
+
+  if Assigned(Tray) and Tray.Visible then
+  begin
+    Tray.BalloonTitle   := 'Avro Keyboard';
+    Tray.BalloonHint    := Msg + sLineBreak + 'Click here to download the dictionary.';
+    Tray.OnBalloonClick := NoDictBalloonClick;
+    Tray.BalloonTimeout := 10000;
+    Tray.ShowBalloonHint;
+    Exit;
+  end;
+
+  { Top bar mode has no tray icon, so there is nothing to click. The notice
+    still has to reach the user once - it rides the top bar's own hint
+    balloon, which the menu route (Download More Resources...) completes. }
+  if Assigned(TopBar) and TopBar.Visible then
+  begin
+    TopBar.BalloonHint1.Title := Msg + sLineBreak +
+      'Choose "Download More Resources..." from the Avro menu.';
+    TopBar.BalloonHint1.ShowHint(TopBar.ImgButtonMode);
+  end;
+end;
+
+{ =============================================================================== }
+
+procedure TAvroMainForm1.NoDictBalloonClick(Sender: TObject);
+begin
+  ShowResourceBrowser('dictionary');
+end;
+
+{ =============================================================================== }
+
+{ Database.db3 carries the word database the phonetic candidates are built
+  from. It loads with the settings refresh at startup, and when the file is
+  absent uDBase reports nothing - that load can be reached from the keyboard
+  hook, where UI would get the hook removed - so this is where the user hears
+  about it. The balloon's click takes them to the downloader that restores
+  the file. }
+
+procedure TAvroMainForm1.CheckWordDatabasePresence;
+begin
+  // The same rule RefreshSettings loads by: without the preview window's
+  // candidate lists the database is not read, so there is nothing to report.
+  if (ShowPrevWindow = 'NO') or (PhoneticMode = 'ONLYCHAR') then
+    Exit;
+  if WordDatabaseFilePresent then
+    Exit;
+  ShowMissingDatabaseBalloon;
+end;
+
+procedure TAvroMainForm1.ShowMissingDatabaseBalloon;
+const
+  Msg = 'Word database (Database.db3) is missing.' + sLineBreak +
+    'Phonetic suggestions and Bangla word completion are off - typing falls back to English.';
+begin
+  if FNoDatabaseBalloonShown then
+    Exit;
+  FNoDatabaseBalloonShown := True;
+
+  if Assigned(Tray) and Tray.Visible then
+  begin
+    Tray.BalloonTitle   := 'Avro Keyboard';
+    Tray.BalloonHint    := Msg + sLineBreak + 'Click here to download the database.';
+    Tray.OnBalloonClick := MissingDatabaseBalloonClick;
+    Tray.BalloonTimeout := 10000;
+    Tray.ShowBalloonHint;
+    Exit;
+  end;
+
+  { Top bar mode has no tray icon, so there is nothing to click. The notice
+    still has to reach the user once - it rides the top bar's own hint
+    balloon, which the menu route (Download More Resources...) completes. }
+  if Assigned(TopBar) and TopBar.Visible then
+  begin
+    TopBar.BalloonHint1.Title := Msg + sLineBreak +
+      'Choose "Download More Resources..." from the Avro menu.';
+    TopBar.BalloonHint1.ShowHint(TopBar.ImgButtonMode);
+  end;
+end;
+
+procedure TAvroMainForm1.MissingDatabaseBalloonClick(Sender: TObject);
+begin
+  ShowResourceBrowser('worddatabase');
+end;
+
+{ The downloader installed Database.db3 (the shared "dict" resource type -
+  same folder autodict.dct goes to). The load that failed silently at startup
+  is retried here: RefreshSettings is the only other caller, and it does not
+  run on an install, so without this the fix would need an Avro restart. }
+
+procedure TAvroMainForm1.ReloadWordDatabaseIfUsed;
+begin
+  if (ShowPrevWindow = 'NO') or (PhoneticMode = 'ONLYCHAR') then
+    Exit;
+  LoadWordDatabase;
 end;
 
 { =============================================================================== }
