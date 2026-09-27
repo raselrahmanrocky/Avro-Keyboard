@@ -71,6 +71,46 @@ begin
     Result := URL_STABLE;
 end;
 
+{ The manifest's own <channel> node, normalised. Anything unrecognised (a
+  typo, a node we do not understand) is ucUnknown and is presented as stable. }
+function ChannelFromString(const S: string): TUpdateChannel;
+var
+  L: string;
+begin
+  L := LowerCase(Trim(S));
+  if L = 'beta' then
+    Result := ucBeta
+  else if L = 'stable' then
+    Result := ucStable
+  else
+    Result := ucUnknown;
+end;
+
+{ Channel of a manifest published before <channel> existed.
+
+  namedversion is authoritative whenever it is present: a beta tag always
+  yields a name containing "beta" (v6.0.1-beta, "... 6.0.1 BETA"), and the
+  sync workflow's beta feed falls back to the stable release when no beta is
+  published - that fallback keeps a name without "beta", which is exactly
+  what makes the answer correct there. The feed URL is only a last resort
+  when namedversion is missing entirely. }
+function InferChannel(const NamedVersion, FeedURL: string): TUpdateChannel;
+begin
+  if Trim(NamedVersion) <> '' then
+  begin
+    if Pos('beta', LowerCase(NamedVersion)) > 0 then
+      Result := ucBeta
+    else
+      Result := ucStable;
+    Exit;
+  end;
+
+  if Pos('versioninfo_beta', LowerCase(FeedURL)) > 0 then
+    Result := ucBeta
+  else
+    Result := ucStable;
+end;
+
 { TUpdateCheck }
 { =============================================================================== }
 procedure TUpdateCheck.Check;
@@ -160,6 +200,9 @@ procedure TUpdateCheck.ProcessResponse(const Response: string);
 var
   Major, Minor, Release, Build:                           Integer;
   changelogurl, downloadurl, productpageurl, releasedate: string;
+  NamedVersion:                                          string;
+  Channel:                                                TUpdateChannel;
+  Node:                                                   IXMLNode;
   OfferUpdate:                                            Boolean;
 begin
   StillDownloading := False;
@@ -182,6 +225,22 @@ begin
     downloadurl := Xml.DocumentElement.ChildNodes['downloadurl'].NodeValue;
     productpageurl := Xml.DocumentElement.ChildNodes['productpageurl'].NodeValue;
     releasedate := Xml.DocumentElement.ChildNodes['releasedate'].NodeValue;
+
+    // Marketing name of the offered build ("Avro Keyboard 6.0.2-beta").
+    // Optional: older manifests do not carry it.
+    NamedVersion := '';
+    Node := Xml.DocumentElement.ChildNodes.FindNode('namedversion');
+    if Assigned(Node) then
+      NamedVersion := Node.Text;
+
+    // Which channel this update belongs to. The manifest says it outright;
+    // manifests predating <channel> fall back to a namedversion/feed
+    // heuristic (see InferChannel).
+    Node := Xml.DocumentElement.ChildNodes.FindNode('channel');
+    if Assigned(Node) then
+      Channel := ChannelFromString(Node.Text)
+    else
+      Channel := InferChannel(NamedVersion, GetUpdateInfoURL);
 
     // Prefer the installer matching this executable's architecture when the
     // feed provides per-arch URLs. Feeds without these nodes (legacy) keep
@@ -214,7 +273,8 @@ begin
     if OfferUpdate then
     begin
       CheckCreateForm(TfrmUpdateNotify, frmUpdateNotify, 'frmUpdateNotify');
-      frmUpdateNotify.SetupAndShow(Format('%d.%d.%d.%d', [Major, Minor, Release, Build]), releasedate, changelogurl, downloadurl);
+      frmUpdateNotify.SetupAndShow(Format('%d.%d.%d.%d', [Major, Minor, Release, Build]), releasedate, changelogurl, downloadurl, Channel,
+        NamedVersion);
     end
     else if Verbose then
     begin

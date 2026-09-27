@@ -8,7 +8,7 @@ object frmUpdateNotify: TfrmUpdateNotify
   BorderIcons = [biSystemMenu, biMinimize]
   BorderStyle = bsSingle
   Caption = 'Update available for Avro Keyboard'
-  ClientHeight = 275
+  ClientHeight = 320
   ClientWidth = 555
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
@@ -642,7 +642,7 @@ object frmUpdateNotify: TfrmUpdateNotify
   end
   object Label4: TLabel
     Left = 117
-    Top = 116
+    Top = 145
     Width = 103
     Height = 21
     Margins.Left = 5
@@ -653,7 +653,7 @@ object frmUpdateNotify: TfrmUpdateNotify
   end
   object lblWhatsNew: TLabel
     Left = 252
-    Top = 144
+    Top = 174
     Width = 204
     Height = 21
     Cursor = crHandPoint
@@ -672,7 +672,7 @@ object frmUpdateNotify: TfrmUpdateNotify
   end
   object Label6: TLabel
     Left = 116
-    Top = 144
+    Top = 174
     Width = 132
     Height = 21
     Margins.Left = 5
@@ -693,19 +693,19 @@ object frmUpdateNotify: TfrmUpdateNotify
     Caption = 'lblOldVer'
   end
   object lblNewVer: TLabel
-    Left = 318
-    Top = 87
+    Left = 117
+    Top = 116
     Width = 75
     Height = 21
     Margins.Left = 5
     Margins.Top = 5
     Margins.Right = 5
     Margins.Bottom = 5
-    Caption = 'lblNewVer'
+    Caption = '6.0.0.0'
   end
   object lblDate: TLabel
     Left = 227
-    Top = 116
+    Top = 145
     Width = 53
     Height = 21
     Margins.Left = 5
@@ -716,7 +716,7 @@ object frmUpdateNotify: TfrmUpdateNotify
   end
   object Button1: TButton
     Left = 12
-    Top = 201
+    Top = 246
     Width = 113
     Height = 62
     Margins.Left = 5
@@ -730,7 +730,7 @@ object frmUpdateNotify: TfrmUpdateNotify
   end
   object but_Download: TButton
     Left = 341
-    Top = 201
+    Top = 246
     Width = 202
     Height = 62
     Margins.Left = 5
@@ -747,5 +747,48 @@ object frmUpdateNotify: TfrmUpdateNotify
     ParentFont = False
     TabOrder = 0
     OnClick = but_DownloadClick
+  end
+  object pnlChannel: TPanel
+    Left = 117
+    Top = 206
+    Width = 170
+    Height = 28
+    BevelOuter = bvNone
+    Caption = ''
+    Color = 3960347
+    ParentColor = False
+    TabOrder = 2
+    object lblChannel: TLabel
+      Left = 0
+      Top = 0
+      Width = 170
+      Height = 28
+      Align = alClient
+      Alignment = taCenter
+      AutoSize = False
+      Caption = '  STABLE RELEASE  '
+      Font.Charset = DEFAULT_CHARSET
+      Font.Color = clWhite
+      Font.Height = -17
+      Font.Name = 'Tahoma'
+      Font.Style = [fsBold]
+      Layout = tlCenter
+      ParentFont = False
+      Transparent = True
+      ExplicitLeft = 1
+      ExplicitTop = 1
+      ExplicitWidth = 168
+      ExplicitHeight = 26
+    end
+  end
+  object lblWarning: TLabel
+    Left = 117
+    Top = 240
+    Width = 426
+    Height = 44
+    AutoSize = False
+    Caption = ''
+    Visible = False
+    WordWrap = True
   end
 end
