@@ -20,6 +20,11 @@ https://www.embarcadero.com/products/delphi/starter/free-download
 
 - Debug logs can be viewed using [DebugView](https://learn.microsoft.com/en-us/sysinternals/downloads/debugview) when `{$Define DebugLog}` compiler directive is set in the `ProjectDefines.inc` file from the root of this project.
 
+  `Log()` writes to the debugger only and never to a file: it is called from the
+  keyboard hook, and a hook callback must not touch the disk. Startup diagnostics
+  go to a separate log file instead - see [Startup log](#startup-log) below and
+  `docs/TROUBLESHOOTING.md`.
+
 ## Building Standard and Portable editions
 
 ### Compiler Directives
@@ -39,6 +44,13 @@ or,
 
     //{$Define PortableOn}
 
+The file is checked in with the portable switch **commented out**, and it stays
+that way: the standard (installed) edition is the source default. Portables are
+built only by `tools/release/build-installers.ps1`, which forces the switch on
+for its portable passes and restores `ProjectDefines.inc` byte-for-byte
+before it finishes - so a release does not leave the working tree switched to
+portable.
+
 ### Building Projects
 
 Delphi community edition doesn't come with command line compiler. In order to build projects:
@@ -46,6 +58,41 @@ Delphi community edition doesn't come with command line compiler. In order to bu
 - Run `build-ce.bat`
 - Open `WholeProject.groupproj` in Delphi IDE and run `Build All` from the project group
 - Built and renamed files will be under `build` directory
+
+## Where Avro keeps its data
+
+| Edition | Settings | Data (database, mappings, layouts, skins, logs) |
+| --- | --- | --- |
+| Standard (installed) | `HKEY_CURRENT_USER\Software\OmicronLab\Avro Keyboard` | `%ProgramData%\Avro Keyboard\` |
+| Portable | `Settings.xml` next to `Avro Keyboard.exe` | the folder that holds `Avro Keyboard.exe` |
+
+Both editions touch the registry, so "no registry changes" is not an accurate
+description of the portable edition. What it writes:
+
+- `HKCU\Control Panel\Desktop\LowLevelHooksTimeout` (5000 ms) - keeps Windows
+  from silently dropping the keyboard hook when another application blocks for a
+  while
+- the IE per-script font values under
+  `HKCU\Software\Microsoft\Internet Explorer\International\Scripts\11`
+  (`IEFixedFontName`, `IEPropFontName`, with the previous values preserved in the
+  `_Prev` values) while the portable Siyam Rupali font is registered
+- `AvroStartup.log` beside its data files (see below)
+
+Nothing is installed or registered system-wide, and the portable folder can be
+moved or deleted freely; the three registry entries above are the only trace that
+is left, and the font ones are restored when the font is removed.
+
+### Startup log
+
+`AvroStartup.log` is written beside the data files, rotating to
+`AvroStartup.log.old` once it passes 256 KB, and records the startup phases, the
+edition, the exe and data paths, folder writability, the database file size and
+mtime, the OS build, and the class and message of any exception raised by a
+startup step. When the data folder cannot be written to it falls back to
+`%LOCALAPPDATA%\AvroKeyboard\` and then `%TEMP%\AvroKeyboard\`, and with nothing
+writable it skips silently - startup never depends on the log. It never contains
+keystrokes or typed text; the runtime catch-all records only an exception class.
+`docs/TROUBLESHOOTING.md` explains how to read and send it.
 
 ## Avro Text Converter (Qt)
 
