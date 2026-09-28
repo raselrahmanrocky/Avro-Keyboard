@@ -247,6 +247,8 @@ type
       FMappingCheckCountdown:       Integer; // throttles the ANSI mapping disk check
       FMappingListCheckCountdown:   Integer; // throttles the ANSI mapping folder-list poll
       FAnsiMappingSnapshot:         string;  // last seen file-name list of AnsiMappingDir
+      FLayoutSnapshot:              string;  // last seen file-name list of the layouts folder
+      FLayoutCheckCountdown:        Integer; // throttles the keyboard-layouts folder-list poll
       FDirectoryWatcher:            TAvroDirectoryWatcher;
       { Application.OnException reports once per session, not once per fault. }
       FUnhandledReported:           Boolean;
@@ -301,6 +303,8 @@ type
       procedure HandleLayoutDirectoryChanged(Sender: TObject);
       function BuildAnsiMappingFolderList: string;
       procedure RefreshAnsiMappingList;
+      function BuildLayoutFolderList: string;
+      procedure RefreshLayoutMenuItems;
       procedure RefreshAnsiMappingNames;
       procedure IgnoreCapsLockClick(Sender: TObject);
       procedure PopupToolsPopup(Sender: TObject);
@@ -341,6 +345,13 @@ type
         the load already failed silently once this session (uDBase), and
         RefreshSettings is the only other place that retries it. }
       procedure ReloadWordDatabaseIfUsed;
+
+      { Re-scans the layouts folder and rewrites both menus' dynamic layout items
+        when the folder's contents changed.  Public because the resource
+        downloader calls it after installing a layout: the layouts folder has no
+        directory watcher (only AnsiMappingDir does), so nothing else would put a
+        freshly downloaded layout into the menus before the next restart. }
+      procedure RefreshLayoutList;
       procedure AnsiVersionItemAdvancedDrawItem(Sender: TObject; ACanvas: TCanvas; ARect: TRect; AState: TOwnerDrawState);
       procedure AnsiVersionItemMeasureItem(Sender: TObject; ACanvas: TCanvas; var Width, Height: Integer);
       { The cached HICON for a mapping at the CURRENT small-icon metric, or 0
@@ -862,12 +873,71 @@ end;
 { =============================================================================== }
 
 procedure TAvroMainForm1.Initmenu;
+begin
+  RefreshLayoutMenuItems;
+
+  // Create ANSI Version submenus
+  AnsiVersionSubmenu1 := TMenuItem.Create(Popup_Tools);
+  AnsiVersionSubmenu1.Caption := 'Select ANSI Encoding';
+  Popup_Tools.Items.Insert(OutputasANSIAreyousure1.MenuIndex + 1, AnsiVersionSubmenu1);
+
+  // Create Ignore Caps Lock toggle items
+  IgnoreCapsLock1 := TMenuItem.Create(Popup_Tools);
+  IgnoreCapsLock1.Caption := 'Ignore Caps Lock for Bangla typing';
+  IgnoreCapsLock1.AutoCheck := False;
+  IgnoreCapsLock1.Checked := (IgnoreCapsLock = 'YES');
+  IgnoreCapsLock1.OnClick := IgnoreCapsLockClick;
+  Popup_Tools.Items.Insert(AnsiVersionSubmenu1.MenuIndex + 1, IgnoreCapsLock1);
+
+  IgnoreCapsLock2 := TMenuItem.Create(ools1);
+  IgnoreCapsLock2.Caption := 'Ignore Caps Lock for Bangla typing';
+  IgnoreCapsLock2.AutoCheck := False;
+  IgnoreCapsLock2.Checked := (IgnoreCapsLock = 'YES');
+  IgnoreCapsLock2.OnClick := IgnoreCapsLockClick;
+  ools1.Insert(OutputasANSIAreyousure2.MenuIndex + 1, IgnoreCapsLock2);
+end;
+
+{ Adds an entry for every .avrolayout on disk to the tray's "Select keyboard
+  layout" submenu (Selectkeyboardlayout2) and to the TopBar's layout popup
+  (Popup_LayoutList), and removes the entry of any layout that is gone.
+
+  The removal half is new: these loops were add-only (ItemFound), so a deleted
+  .avrolayout stayed in both menus for the rest of the session - and with
+  RefreshLayoutList polling the folder, pruning is what makes a deletion take
+  effect at all. }
+procedure TAvroMainForm1.RefreshLayoutMenuItems;
 var
   I, J:                            Integer;
-  TempMenu1, TempMenu2, TempMenu3: TMenuItemExtended;
+  TempMenu1, TempMenu3:            TMenuItemExtended;
   sCaption:                        string;
   ItemFound:                       Boolean;
+
+  function LayoutOnDisk(const AName: string): Boolean;
+  var
+    K: Integer;
+  begin
+    Result := False;
+    for K := 0 to KeyboardLayouts.Count - 1 do
+      if SameText(KeyboardLayouts[K], AName) then
+      begin
+        Result := True;
+        Break;
+      end;
+  end;
+
 begin
+  // Prune first: Tag = 9903 marks the dynamic layout items.  A layout removed
+  // from disk must disappear from BOTH menus, not merely stop being added.
+  for I := Selectkeyboardlayout2.Count - 1 downto 0 do
+    if (Selectkeyboardlayout2.Items[I].Tag = 9903) and
+       (not LayoutOnDisk((Selectkeyboardlayout2.Items[I] as TMenuItemExtended).Value)) then
+      Selectkeyboardlayout2.Items[I].Free;
+
+  for I := Popup_LayoutList.Items.Count - 1 downto 0 do
+    if (Popup_LayoutList.Items[I].Tag = 9903) and
+       (not LayoutOnDisk((Popup_LayoutList.Items[I] as TMenuItemExtended).Value)) then
+      Popup_LayoutList.Items[I].Free;
+
   for I := KeyboardLayouts.Count - 1 downto 0 do
   begin
 
@@ -910,26 +980,6 @@ begin
       Popup_LayoutList.Items.Insert(AvroPhoneticEnglishtoBangla1.MenuIndex + 1, TempMenu3);
     end;
   end;
-
-  // Create ANSI Version submenus
-  AnsiVersionSubmenu1 := TMenuItem.Create(Popup_Tools);
-  AnsiVersionSubmenu1.Caption := 'Select ANSI Encoding';
-  Popup_Tools.Items.Insert(OutputasANSIAreyousure1.MenuIndex + 1, AnsiVersionSubmenu1);
-
-  // Create Ignore Caps Lock toggle items
-  IgnoreCapsLock1 := TMenuItem.Create(Popup_Tools);
-  IgnoreCapsLock1.Caption := 'Ignore Caps Lock for Bangla typing';
-  IgnoreCapsLock1.AutoCheck := False;
-  IgnoreCapsLock1.Checked := (IgnoreCapsLock = 'YES');
-  IgnoreCapsLock1.OnClick := IgnoreCapsLockClick;
-  Popup_Tools.Items.Insert(AnsiVersionSubmenu1.MenuIndex + 1, IgnoreCapsLock1);
-
-  IgnoreCapsLock2 := TMenuItem.Create(ools1);
-  IgnoreCapsLock2.Caption := 'Ignore Caps Lock for Bangla typing';
-  IgnoreCapsLock2.AutoCheck := False;
-  IgnoreCapsLock2.Checked := (IgnoreCapsLock = 'YES');
-  IgnoreCapsLock2.OnClick := IgnoreCapsLockClick;
-  ools1.Insert(OutputasANSIAreyousure2.MenuIndex + 1, IgnoreCapsLock2);
 end;
 
 {$HINTS Off}
@@ -1380,6 +1430,11 @@ begin
   FMappingListCheckCountdown := 5;
   FAnsiMappingSnapshot := BuildAnsiMappingFolderList;
 
+  // Same for the layouts folder: nothing watches it, so the throttled poll
+  // below is what keeps both menus in step with the files on disk.
+  FLayoutCheckCountdown := 5;
+  FLayoutSnapshot := BuildLayoutFolderList;
+
   // Last of the startup notices, once the tray/top bar exist to carry it: the
   // phonetic candidates read Database.db3, and a load that failed because the
   // file is gone reports nothing on its own (uDBase stays silent - see
@@ -1505,6 +1560,60 @@ begin
   ScanAvroEncoFiles(AnsiMappingDir);
   BuildAnsiVersionMenus;
   Log('ANSI mapping folder changed - encoding list refreshed');
+end;
+
+{ =============================================================================== }
+{ Keyboard layouts folder: snapshot + fallback poll, mirroring the mapping one.  }
+{ This folder has NO directory watcher (FDirectoryWatcher watches AnsiMappingDir }
+{ only), so the poll below is the only thing that notices a .avrolayout copied   }
+{ in or deleted while Avro Keyboard is running. }
+{ =============================================================================== }
+
+function TAvroMainForm1.BuildLayoutFolderList: string;
+var
+  NameList: TStringList;
+  SR:       TSearchRec;
+  Dir:      string;
+begin
+  Result := '';
+  Dir := GetAvroDataDir + 'Keyboard Layouts\';
+  if not DirectoryExists(Dir) then
+    Exit;
+
+  NameList := TStringList.Create;
+  try
+    if FindFirst(Dir + '*.avrolayout', faAnyFile, SR) = 0 then
+    begin
+      try
+        repeat
+          if (SR.Name <> '.') and (SR.Name <> '..') then
+            NameList.Add(Lowercase(SR.Name));
+        until FindNext(SR) <> 0;
+      finally
+        FindClose(SR);
+      end;
+    end;
+    NameList.Sort;
+    Result := NameList.Text;
+  finally
+    NameList.Free;
+  end;
+end;
+
+{ Rebuilds the dynamic layout items only when the folder's file list actually
+  differs from the snapshot - the same contract RefreshAnsiMappingList keeps. }
+procedure TAvroMainForm1.RefreshLayoutList;
+var
+  Snap: string;
+begin
+  Snap := BuildLayoutFolderList;
+  if Snap = FLayoutSnapshot then
+    Exit; // nothing added / removed since the last refresh
+
+  FLayoutSnapshot := Snap;
+  LoadKeyboardLayoutNames;
+  RefreshLayoutMenuItems;
+  Log('Keyboard layouts folder changed - layout menu refreshed');
 end;
 
 procedure TAvroMainForm1.ManageAutoCorrectentries1Click(Sender: TObject);
@@ -3077,6 +3186,15 @@ begin
     // keyboard hook.
     if Assigned(KeyLayout) then
       KeyLayout.SaveCandidateOptionsIfDirty;
+  end;
+
+  // Layouts folder: same cadence, and no watcher at all.  Adding or deleting a
+  // .avrolayout rewrites the layout menus without a restart.
+  Dec(FLayoutCheckCountdown);
+  if FLayoutCheckCountdown <= 0 then
+  begin
+    FLayoutCheckCountdown := 15; // ~1.5 seconds at Interval = 100 ms
+    RefreshLayoutList;
   end;
 
   if Assigned(FDirectoryWatcher) then

@@ -561,6 +561,15 @@ begin
               uAutoCorrect.ResetDictLoadState;
               AvroMainForm1.ReloadWordDatabaseIfUsed;
             end;
+
+            // The layouts folder is the one resource folder with NO directory
+            // watcher (FDirectoryWatcher covers AnsiMappingDir only), so a
+            // downloaded layout has to be pushed into the menus explicitly -
+            // otherwise it reaches them only after the next restart.
+            // RefreshLayoutList is a no-op when nothing really changed.
+            if SameText(Job.ResourceType, 'layout') then
+              AvroMainForm1.RefreshLayoutList;
+
             // A document is meant to be read right away; anything else just
             // appears in its list/folder (ANSI mappings are picked up by the
             // directory watcher automatically).
