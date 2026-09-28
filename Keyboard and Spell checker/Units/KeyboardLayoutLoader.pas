@@ -702,7 +702,15 @@ begin
       end;
     end;
   finally
-    XML.Active := False;
+    { The body above releases XML (XML.Active := False; XML := nil) as soon as it
+      has read the layout details, so by the time this finally runs XML is nil
+      on BOTH the success and the failure path - and a property setter on a nil
+      interface is an EAccessViolation ("read of address 00000000"). That made
+      installing a layout by double-clicking an .avrolayout file end in an
+      "Application Error" crash AFTER the "installed successfully" message.
+      Guarding keeps the intended behaviour: install, report, exit. }
+    if XML <> nil then
+      XML.Active := False;
     XML := nil;
 
   end;

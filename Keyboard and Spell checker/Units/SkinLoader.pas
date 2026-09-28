@@ -362,8 +362,12 @@ begin
       end;
     end;
   finally
-
-    XML.Active := False;
+    { Nil-guarded: a skin that fails to load leaves XML unassigned (or the body
+      above already released it), and a property setter on a nil interface
+      raises EAccessViolation from this finally - hiding the real error message
+      behind a crash. Same defect as InstallSkin below. }
+    if XML <> nil then
+      XML.Active := False;
     XML := nil;
 
   end;
@@ -421,7 +425,11 @@ begin
       end;
     end;
   finally
-    XML.Active := False;
+    { XML is released as soon as the skin/layout details are read, so this
+      finally used to run a property setter on a nil interface - an
+      EAccessViolation on both the success and the failure path. }
+    if XML <> nil then
+      XML.Active := False;
     XML := nil;
 
   end;
@@ -491,7 +499,11 @@ begin
       end;
     end;
   finally
-    XML.Active := False;
+    { XML is released as soon as the skin/layout details are read, so this
+      finally used to run a property setter on a nil interface - an
+      EAccessViolation on both the success and the failure path. }
+    if XML <> nil then
+      XML.Active := False;
     XML := nil;
 
   end;
@@ -569,7 +581,11 @@ begin
       end;
     end;
   finally
-    XML.Active := False;
+    { XML is released as soon as the skin/layout details are read, so this
+      finally used to run a property setter on a nil interface - an
+      EAccessViolation on both the success and the failure path. }
+    if XML <> nil then
+      XML.Active := False;
     XML := nil;
 
   end;

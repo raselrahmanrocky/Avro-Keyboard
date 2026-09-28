@@ -98,9 +98,15 @@ begin
       end;
     end;
   finally
-    OldXML.Active := False;
+    { The body nils OldXML after a conversion, so these two used to dereference
+      a nil interface (EAccessViolation) whenever an old-format layout was
+      actually converted - the crash happened on the file the user just
+      installed. }
+    if OldXML <> nil then
+      OldXML.Active := False;
     OldXML := nil;
-    NewXML.Active := False;
+    if NewXML <> nil then
+      NewXML.Active := False;
     NewXML := nil;
     Application.ProcessMessages;
   end;
