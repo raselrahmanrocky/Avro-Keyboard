@@ -108,8 +108,16 @@ begin
 
   /// ///////////////////////////////////////////////////////////////////////////
   { DONE : check for previous instance }
+  { CreateMutex reports a pre-existing instance through ERROR_ALREADY_EXISTS
+    specifically - and it does not promise to clear the last-error code when it
+    creates a fresh mutex. Testing GetLastError <> 0 therefore inherited
+    whatever the command-line handling above had left behind and could tell a
+    perfectly normal first launch that "Avro Keyboard is already running".
+    Clear the code first so the check reads a defined value even on Windows
+    versions that leave it untouched when the mutex is newly created. }
+  SetLastError(0);
   Mutex := CreateMutex(nil, True, 'Avro_Keyboard');
-  if (Mutex = 0) or (GetLastError <> 0) then
+  if (Mutex = 0) or (GetLastError = ERROR_ALREADY_EXISTS) then
   begin
 
     uCommandLineFunctions.SendCommand('restore');
