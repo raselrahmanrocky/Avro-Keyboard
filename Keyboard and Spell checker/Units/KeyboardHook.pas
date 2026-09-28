@@ -21,6 +21,17 @@ uses
 function Sethook(): Integer;
 procedure Removehook();
 
+{ True while this thread is inside the WH_KEYBOARD_LL callback.
+
+  A low-level hook is always called on the thread that installed it, so a plain
+  depth counter is exact. Anything that could raise a modal dialog - or simply
+  take longer than LowLevelHooksTimeout (5000 ms, which this app sets) - must
+  check this and defer itself with PostMessage: a hook callback that overruns
+  is removed by Windows silently, and typing Bangla stops working with no error
+  anywhere. See TAvroMainForm1.RefreshSettings, the one caller that can reach a
+  dialog (the corrupt-database notice) from in here. }
+function InHookContext: Boolean;
+
 { The one hook procedure Windows ever calls. It is a thin, total wrapper around
   LLHookBody below: nothing may escape a WH_KEYBOARD_LL callback, and the real
   body keeps its own goto-based structure untouched. }
@@ -43,6 +54,11 @@ var
     anything, and every Removehook/Sethook pair (a layout switch, every window
     z-order change) would stack another live copy of this hook. }
   HookRetVal: HHOOK;
+
+  { Nesting depth of LowLevelKeyboardProc on the hook's thread: >0 means "called
+    from inside the hook callback". Not threadvar: the callback always runs on
+    the thread that installed the hook. }
+  HookContextDepth: Integer = 0;
 
 const
   LLKHF_INJECTED = $10;
@@ -636,20 +652,33 @@ end;
   popups' own prompts - which on some Windows builds ends the process with no
   dialog and no tray icon. So: swallow it, note the class and message (never the
   key that was pressed), and let the key through untouched. }
+function InHookContext: Boolean;
+begin
+  Result := HookContextDepth > 0;
+end;
+
 function LowLevelKeyboardProc(nCode: Integer; wParam: WPARAM; lParam: LPARAM): LRESULT; stdcall;
 begin
+  { Published before the body runs and cleared after it, so a callee can ask
+    "am I inside the hook?" and defer its UI work to the main loop instead of
+    blocking this callback on a modal dialog (see InHookContext above). }
+  Inc(HookContextDepth);
   try
-    Result := LLHookBody(nCode, wParam, lParam);
-  except
-    on E: Exception do
-    begin
-      Log('KeyboardHook: ' + E.ClassName + ': ' + E.Message);
-      try
-        Result := CallNextHookEx(HookRetVal, nCode, wParam, lParam);
-      except
-        Result := 0;
+    try
+      Result := LLHookBody(nCode, wParam, lParam);
+    except
+      on E: Exception do
+      begin
+        Log('KeyboardHook: ' + E.ClassName + ': ' + E.Message);
+        try
+          Result := CallNextHookEx(HookRetVal, nCode, wParam, lParam);
+        except
+          Result := 0;
+        end;
       end;
     end;
+  finally
+    Dec(HookContextDepth);
   end;
 end;
 

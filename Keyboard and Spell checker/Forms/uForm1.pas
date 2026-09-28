@@ -309,6 +309,9 @@ type
       procedure WMCopyData(var Msg: TWMCopyData); message WM_COPYDATA;
       procedure WMShowAnsiPicker(var Msg: TMessage); message WM_APP + 1;
       procedure WMShowLayoutPicker(var Msg: TMessage); message WM_APP + 3;
+      { RefreshSettings asked for from inside the keyboard hook (see its own
+        comment): the work runs here, on the main loop, instead. }
+      procedure WMDeferredRefresh(var Msg: TMessage); message WM_APP + 11;
 
     public
       { Public declarations }
@@ -441,6 +444,36 @@ uses
   uAvroLayoutUI,
   ufrmResourceBrowser,
   uAnsiEngineManager;
+
+var
+  { At most one visible startup-failure report per session - see
+    ReportStartupFailure. }
+  FStartupFailureReported: Boolean;
+
+{ =============================================================================== }
+
+{ One visible report per session for a startup step that raised, plus the
+  startup-log line that makes the failure debuggable from a bug report. A tray
+  balloon cannot be used here: the tray is created inside LoadApp, so it may not
+  exist yet, and in top-bar mode a balloon is invisible anyway - which is
+  exactly how this class of failure used to stay silent. }
+procedure ReportStartupFailure(const AStep: string; E: Exception);
+var
+  Msg: string;
+begin
+  StartupLogException('startup step failed: ' + AStep, E);
+  if FStartupFailureReported then
+    Exit;
+  FStartupFailureReported := True;
+
+  Msg := 'Avro Keyboard could not complete the startup step "' + AStep + '".' + sLineBreak + sLineBreak;
+  if Assigned(E) then
+    Msg := Msg + E.ClassName + ': ' + E.Message + sLineBreak + sLineBreak;
+  Msg := Msg + 'Avro keeps running with the parts that did load.' + sLineBreak +
+    StartupLogHint;
+
+  MessageBox(0, PChar(Msg), 'Avro Keyboard', MB_OK or MB_ICONWARNING or MB_SETFOREGROUND);
+end;
 
 { =============================================================================== }
 
@@ -661,7 +694,18 @@ begin
 end;
 
 procedure TAvroMainForm1.FormCreate(Sender: TObject);
+var
+  HotkeyOK: Boolean;
 begin
+  { From here until the keyboard hook is live this form is the only thing
+    running, and an exception that escapes FormCreate never reaches the message
+    loop: the user gets a process they cannot see - no top bar, no tray, no
+    hook - while the app still shows up in Task Manager. Every step that can
+    plausibly fail is therefore contained and reported (see
+    ReportStartupFailure) and the ones that matter are logged. }
+  StartupLogSection('FormCreate enter');
+  StartupLogEnvironment;
+
   HandleThemes;
 
   // Hide the form
@@ -671,18 +715,44 @@ begin
 
   AnsiMappingNames := TStringList.Create;
   AnsiIconHandles := TDictionary<string, HICON>.Create;
-  LoadSettings;
+
+  { Settings: a corrupted value used to raise out of ValidateSettings here,
+    before any window existed. LoadSettings now repairs what it can
+    (FillSafeDefaults) and this guard keeps the rest of startup alive. }
+  try
+    LoadSettings;
+  except
+    on E: Exception do
+      ReportStartupFailure('LoadSettings', E);
+  end;
+
   // The call above only covered the built-in default - AppThemeMode is read
   // here, so the stored theme has to be applied once more.
-  HandleThemes;
-  LoadApp;
+  try
+    HandleThemes;
+  except
+    on E: Exception do
+      ReportStartupFailure('HandleThemes', E);
+  end;
+
+  StartupLog('FormCreate: LoadApp starting');
+  try
+    LoadApp;
+    StartupLog('FormCreate: LoadApp returned');
+  except
+    on E: Exception do
+      ReportStartupFailure('LoadApp', E);
+  end;
+
   Popup_Help.OnPopup := DynamicHelpPopup;
   Popup_Tray.OnPopup := DynamicHelpPopup;
 
   // Global Ctrl+Alt+T opens the Qt text converter from anywhere.  Where the
   // combination is already taken this simply registers nothing - the tray item
   // keeps working either way.
-  RegisterHotKey(Handle, HotkeyTextConverter, MOD_CONTROL or MOD_ALT, Ord('T'));
+  HotkeyOK := RegisterHotKey(Handle, HotkeyTextConverter, MOD_CONTROL or MOD_ALT, Ord('T'));
+  StartupLog('FormCreate: Ctrl+Alt+T hotkey registered=' + BoolToStr(HotkeyOK, True) + ' lastError=' + IntToStr(GetLastError));
+  StartupLogSection('FormCreate end');
 end;
 
 { =============================================================================== }
@@ -1057,6 +1127,7 @@ var
   MappingPath:    string;
   DesiredVersion: string;
 begin
+  StartupLog('LoadApp: begin');
   Set_Process_Priority(HIGH_PRIORITY_CLASS);
   // The user is here: keep normal memory priority until the idle timer decides
   // otherwise (it flips to LOW only when nothing has been touched for a while).
@@ -1135,11 +1206,18 @@ begin
   end;
 
   {$IFDEF PortableOn}
-  InstallVirtualFont(ExtractFilePath(Application.ExeName) + 'Virtual Font\Siyamrupali.ttf');
-  // The portable fonts\ folder (shipped set plus downloads) has no
-  // registry entries - re-register it every session so fonts stay usable
-  // after a reboot or a move of the portable folder.
-  RegisterFontFolder(ExtractFilePath(Application.ExeName) + 'fonts\');
+  { Contained: a font that will not load (or a locked-down HKCU) must
+    degrade to "no Siyam Rupali this session", never take startup down. }
+  try
+    InstallVirtualFont(ExtractFilePath(Application.ExeName) + 'Virtual Font\Siyamrupali.ttf');
+    // The portable fonts\ folder (shipped set plus downloads) has no
+    // registry entries - re-register it every session so fonts stay usable
+    // after a reboot or a move of the portable folder.
+    RegisterFontFolder(ExtractFilePath(Application.ExeName) + 'fonts\');
+  except
+    on E: Exception do
+      StartupLogException('LoadApp/portable fonts', E);
+  end;
   {$ENDIF}
   if AvroUpdateCheck = 'YES' then
     InternetCheck.Enabled := True
@@ -1185,7 +1263,16 @@ begin
   if AnsiMappingDir = '' then
   begin
     AnsiMappingDir := GetAvroDataDir + 'AnsiMapping\';
-    ForceDirectories(AnsiMappingDir);
+    { A read-only data folder (a portable folder extracted into Program Files,
+      a network share, a CD) must not abort startup here: the mapping folder is
+      simply unavailable and Unicode typing carries on. The path is kept as-is
+      so it still matches the persisted setting. }
+    try
+      ForceDirectories(AnsiMappingDir);
+    except
+      on E: Exception do
+        ReportStartupFailure('LoadApp/AnsiMapping folder', E);
+    end;
   end;
   InitializeEncoManager;
   ScanAvroEncoFiles(AnsiMappingDir);
@@ -1217,46 +1304,55 @@ begin
   // resets and rebuilds them, and typing must never read a half-built engine.
   WindowCheck.Enabled := False; // never re-install the hook mid-parse
   RemoveHook;
+  { The hook must come back on whatever happens (the finally below), but a broken
+    mapping file should not take the rest of startup - tray icon, word database,
+    missing-database notice - with it. Delphi has no try/except/finally in one
+    statement, so the except is nested inside the finally. }
   try
-    // DesiredVersion: migrate once when settings say Default / empty, or when
-    // the stored name no longer resolves to a file on disk.
-    DesiredVersion := AnsiVersion;
-    if (DesiredVersion = '') or SameText(DesiredVersion, 'Default') or (GetActiveEncoFilePath(DesiredVersion, AnsiMappingDir) = '') then
-      DesiredVersion := FirstAvailableMappingName;
+    try
+      // DesiredVersion: migrate once when settings say Default / empty, or when
+      // the stored name no longer resolves to a file on disk.
+      DesiredVersion := AnsiVersion;
+      if (DesiredVersion = '') or SameText(DesiredVersion, 'Default') or (GetActiveEncoFilePath(DesiredVersion, AnsiMappingDir) = '') then
+        DesiredVersion := FirstAvailableMappingName;
 
-    if DesiredVersion <> '' then
-    begin
-      if not Application.Terminated then
-        if (not AnsiEngineManager.SwitchEngine(DesiredVersion)) and (not AnsiEngineManager.SwitchEngine(DesiredVersion)) then
-        begin
-          // Two attempts cover the first-run race (cache directory missing,
-          // container just installed and still being written). No compiled-in
-          // Default fallback - if both fail, stay on Unicode and log.
-          Log('Startup: could not activate "' + DesiredVersion + '"');
-          DesiredVersion := '';
-        end;
-    end
-    else
-      Log('Startup: no ANSI mapping files - Unicode only');
+      if DesiredVersion <> '' then
+      begin
+        if not Application.Terminated then
+          if (not AnsiEngineManager.SwitchEngine(DesiredVersion)) and (not AnsiEngineManager.SwitchEngine(DesiredVersion)) then
+          begin
+            // Two attempts cover the first-run race (cache directory missing,
+            // container just installed and still being written). No compiled-in
+            // Default fallback - if both fail, stay on Unicode and log.
+            Log('Startup: could not activate "' + DesiredVersion + '"');
+            DesiredVersion := '';
+          end;
+      end
+      else
+        Log('Startup: no ANSI mapping files - Unicode only');
 
-    if AnsiVersion <> DesiredVersion then
-    begin
-      AnsiVersion := DesiredVersion;
-      SaveAnsiVersionOnly;
-    end;
-    SyncActiveMappingTimestamp(AnsiVersion);
-    if (AnsiVersion = '') and (not FNoMappingBalloonShown) and Assigned(Tray) and Tray.Visible then
-    begin
-      FNoMappingBalloonShown := True;
-      Tray.BalloonTitle := 'Avro Keyboard';
-      // Actionable balloon: clicking it opens the resource downloader, which
-      // is how a user gets the default mappings back after accidentally
-      // deleting them from the mapping folder.
-      Tray.BalloonHint := 'No ANSI mapping files found. Click here to download default mappings.' + sLineBreak +
-        'Unicode output stays active until a mapping is added.';
-      Tray.OnBalloonClick := NoMappingBalloonClick;
-      Tray.BalloonTimeout := 10000;
-      Tray.ShowBalloonHint;
+      if AnsiVersion <> DesiredVersion then
+      begin
+        AnsiVersion := DesiredVersion;
+        SaveAnsiVersionOnly;
+      end;
+      SyncActiveMappingTimestamp(AnsiVersion);
+      if (AnsiVersion = '') and (not FNoMappingBalloonShown) and Assigned(Tray) and Tray.Visible then
+      begin
+        FNoMappingBalloonShown := True;
+        Tray.BalloonTitle := 'Avro Keyboard';
+        // Actionable balloon: clicking it opens the resource downloader, which
+        // is how a user gets the default mappings back after accidentally
+        // deleting them from the mapping folder.
+        Tray.BalloonHint := 'No ANSI mapping files found. Click here to download default mappings.' + sLineBreak +
+          'Unicode output stays active until a mapping is added.';
+        Tray.OnBalloonClick := NoMappingBalloonClick;
+        Tray.BalloonTimeout := 10000;
+        Tray.ShowBalloonHint;
+      end;
+    except
+      on E: Exception do
+        ReportStartupFailure('LoadApp/ANSI mapping', E);
     end;
   finally
     Sethook;
@@ -1289,7 +1385,13 @@ begin
   // file is gone reports nothing on its own (uDBase stays silent - see
   // LoadWordDatabase). Raise it here so the user is told what broke and where
   // to get the file back.
-  CheckWordDatabasePresence;
+  try
+    CheckWordDatabasePresence;
+  except
+    on E: Exception do
+      StartupLogException('LoadApp/CheckWordDatabasePresence', E);
+  end;
+  StartupLog('LoadApp: complete');
 end;
 
 procedure TAvroMainForm1.HandleLayoutDirectoryChanged(Sender: TObject);
@@ -1603,6 +1705,21 @@ procedure TAvroMainForm1.RefreshSettings;
 var
   DesiredVersion: string;
 begin
+  { Entered from the WH_KEYBOARD_LL callback: the mode/output hotkeys in
+    KeyboardHook call us directly from the hook body, which must return within
+    LowLevelHooksTimeout (5000 ms - a limit Avro itself sets) or Windows removes
+    the hook silently. Everything below is too heavy for that, and
+    LoadWordDatabase can even raise a MODAL dialog for a corrupt Database.db3,
+    which would block the hook until the user clicks OK.
+
+    The setting itself has already been applied by the caller, so typing stays
+    correct; only the re-application (menus, theme, engine, tray, database) is
+    posted back to the main loop. }
+  if InHookContext then
+  begin
+    PostMessage(Handle, WM_APP + 11, 0, 0);
+    Exit;
+  end;
 
   // Update Spell Checker Shortcut in Menu
   Spellcheck2.ShortCut := TextToShortcut(SpellerLauncherKey);
@@ -2766,8 +2883,16 @@ end;
   balloon per session. Nothing here touches a file and no keystroke is ever
   recorded (DebugLog writes to the debugger only). }
 procedure TAvroMainForm1.ReportUnhandledException(E: Exception);
+var
+  Msg: string;
 begin
   try
+    { In the startup log too: this handler is the last stop before an exception
+      disappears, and the tray alone cannot show it (see below). Class only:
+      unlike a startup step, this one can fire while the user is typing, and an
+      exception message may quote the text being handled. }
+    StartupLogExceptionClass('Application.OnException', E);
+
     if Assigned(E) then
       Log('Unhandled ' + E.ClassName + ': ' + E.Message);
 
@@ -2781,6 +2906,19 @@ begin
       Tray.BalloonHint := 'An internal error was handled and Avro is still running.' + sLineBreak + 'Restart Avro if typing misbehaves.';
       Tray.BalloonTimeout := 5000;
       Tray.ShowBalloonHint;
+    end
+    else
+    begin
+      { No tray yet (a failure during FormCreate/LoadApp) or top-bar mode,
+        where a balloon has no visible surface: without this the exception
+        simply vanished, which is how a half-started Avro looked like "it
+        just does not open". }
+      Msg := 'Avro Keyboard hit an internal error and handled it.' + sLineBreak + sLineBreak;
+      if Assigned(E) then
+        Msg := Msg + E.ClassName + ': ' + E.Message + sLineBreak + sLineBreak;
+      Msg := Msg + 'Restart Avro if typing misbehaves.' + sLineBreak +
+        StartupLogHint;
+      MessageBox(0, PChar(Msg), 'Avro Keyboard', MB_OK or MB_ICONWARNING or MB_SETFOREGROUND);
     end;
   except
     { A crash reporter that raises is worse than the fault it reports. }
@@ -2984,6 +3122,14 @@ end;
 procedure TAvroMainForm1.WMShowAnsiPicker(var Msg: TMessage);
 begin
   ToggleAnsiVersionPicker;
+end;
+
+procedure TAvroMainForm1.WMDeferredRefresh(var Msg: TMessage);
+begin
+  { Deferred half of RefreshSettings: see the note there. Arriving here means we
+    are on the message loop, where modal dialogs (the corrupt-database notice)
+    and the engine reload are safe. }
+  RefreshSettings;
 end;
 
 procedure TAvroMainForm1.WMCopyData(var Msg: TWMCopyData);
