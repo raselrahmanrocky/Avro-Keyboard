@@ -3,7 +3,7 @@
 All notable user-visible changes to Avro Keyboard. Entries describe what a user
 would notice, not the implementation.
 
-## Unreleased
+## 6.0.1-beta - 28 September 2026
 
 ### Fixed
 
