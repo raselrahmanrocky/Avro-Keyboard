@@ -249,12 +249,13 @@ type
       FAnsiMappingSnapshot:         string;  // last seen file-name list of AnsiMappingDir
       FLayoutSnapshot:              string;  // last seen file-name list of the layouts folder
       FLayoutCheckCountdown:        Integer; // throttles the keyboard-layouts folder-list poll
-      { >0 while one of the two menus that carry the dynamic layout items
-        (Popup_Tray's "Select keyboard layout" submenu and Popup_LayoutList) is
-        being tracked by Windows.  TMenuItem.Free calls RebuildHandle
-        (Vcl.Menus), which destroys and rebuilds the HMENU that menu's own track
-        loop is still displaying, so the rebuild has to wait for it to close. }
-      FLayoutMenusOpen:             Integer;
+      { >0 while a menu that carries dynamic items is being tracked by Windows:
+        Popup_Tray's "Select keyboard layout" / "Select ANSI Encoding" submenus,
+        Popup_LayoutList, and Popup_Tools' AnsiVersionSubmenu1.  Freeing or
+        clearing a TMenuItem calls RebuildHandle (Vcl.Menus), which destroys and
+        rebuilds the HMENU that menu's own track loop is still displaying, so a
+        timer-driven rebuild has to wait for it to close. }
+      FTrackedMenusOpen:            Integer;
       FDirectoryWatcher:            TAvroDirectoryWatcher;
       { Application.OnException reports once per session, not once per fault. }
       FUnhandledReported:           Boolean;
@@ -315,8 +316,8 @@ type
       procedure IgnoreCapsLockClick(Sender: TObject);
       procedure PopupToolsPopup(Sender: TObject);
       procedure PopupTrayPopup(Sender: TObject);
-      procedure LayoutMenusPopup(Sender: TObject);
-      procedure LayoutMenusClose(Sender: TObject);
+      procedure TrackedMenusPopup(Sender: TObject);
+      procedure TrackedMenusClose(Sender: TObject);
 
       procedure WMCopyData(var Msg: TWMCopyData); message WM_COPYDATA;
       procedure WMShowAnsiPicker(var Msg: TMessage); message WM_APP + 1;
@@ -769,19 +770,20 @@ begin
     RefreshSettings later overwrote it, so until the first settings refresh the
     tray popup ran the help handler.  Wire it once, correctly, right now. }
   Popup_Tray.OnPopup := PopupTrayPopup;
-  { Layout rebuilds are held off while either of the two menus carrying the
-    dynamic Tag = 9903 items is tracked: freeing a TMenuItem calls RebuildHandle
-    (Vcl.Menus), which destroys and rebuilds the HMENU Windows is still
-    displaying.  TPopupMenu.Popup fires OnPopup (DoPopup) and OnClose (DoClose,
-    right after TrackPopupMenu returns), so the pair is balanced for every route
-    into these menus - including the tray icon, whose TTrayIcon calls
-    FPopupMenu.Popup directly.  Popup_Tray's submenus are tracked inside the
-    same Popup call and need no hook of their own.  RefreshSettings re-assigns
-    Popup_Tray.OnPopup, so the open half of the count lives inside
-    PopupTrayPopup; OnClose is assigned here once and never overwritten. }
-  Popup_Tray.OnClose := LayoutMenusClose;
-  Popup_LayoutList.OnPopup := LayoutMenusPopup;
-  Popup_LayoutList.OnClose := LayoutMenusClose;
+  { Timer-driven menu rebuilds are held off while a menu carrying dynamic items
+    is tracked: freeing or clearing a TMenuItem calls RebuildHandle (Vcl.Menus),
+    which destroys and rebuilds the HMENU Windows is still displaying.
+    TPopupMenu.Popup fires OnPopup (DoPopup) and OnClose (DoClose, right after
+    TrackPopupMenu returns), so the pair is balanced for every route into these
+    menus - including the tray icon, whose TTrayIcon calls FPopupMenu.Popup
+    directly.  Submenus are tracked inside the same Popup call and need no hooks
+    of their own.  RefreshSettings re-assigns Popup_Tray/Popup_Tools.OnPopup, so
+    the open half of the count lives inside PopupTrayPopup/PopupToolsPopup;
+    every OnClose is assigned here once and never overwritten. }
+  Popup_Tray.OnClose := TrackedMenusClose;
+  Popup_LayoutList.OnPopup := TrackedMenusPopup;
+  Popup_LayoutList.OnClose := TrackedMenusClose;
+  Popup_Tools.OnClose := TrackedMenusClose;
 
   // Global Ctrl+Alt+T opens the Qt text converter from anywhere.  Where the
   // combination is already taken this simply registers nothing - the tray item
@@ -1538,6 +1540,16 @@ begin
     // New/changed/removed engines are reconciled with the cache as well.
     AnsiEngineManager.RefreshFromDisk;
 
+    { Only the rebuild waits for a tracked menu: the scan, the active-engine
+      invalidation and RefreshFromDisk above are menu-independent and have
+      already run.  The popup menus hold the dynamic version items built by
+      BuildAnsiVersionMenus, and clearing or rebuilding those under a tracked
+      menu destroys the HMENU Windows is still displaying.  The snapshot stays
+      unadvanced, so the 1.5 s poll re-detects the change and rebuilds once the
+      menu is closed. }
+    if FTrackedMenusOpen > 0 then
+      Exit;
+
     // Rebuild ONLY when the folder's file list really changed.  The scan ran
     // above, so the snapshot is refreshed BEFORE the rebuild - BuildAnsiVersionMenus
     // skips its own re-scan when nothing changed since this snapshot.  An event
@@ -1616,6 +1628,14 @@ begin
   GetSortedMappingDisplayNames(AnsiMappingNames);
 end;
 
+{ Poll half of the mapping watcher/poll pair (the watcher handler is
+  HandleLayoutDirectoryChanged): both feed FAnsiMappingSnapshot, so a change the
+  watcher missed - or one deferred below - is still picked up here.
+
+  Contained, because its caller is the 100 ms UI timer: an exception escaping
+  here would be swallowed by Application.OnException (one balloon per session)
+  and the rest of that tick - the watcher check, the window tracking, the hook
+  re-arm - would never run. }
 procedure TAvroMainForm1.RefreshAnsiMappingList;
 var
   Snap: string;
@@ -1623,14 +1643,27 @@ begin
   if (AnsiMappingDir = '') or (not DirectoryExists(AnsiMappingDir)) then
     Exit;
 
-  Snap := BuildAnsiMappingFolderList;
-  if Snap = FAnsiMappingSnapshot then
-    Exit; // nothing new added / removed since the last refresh
+  { Deferred while a menu carrying these items is tracked (Popup_Tools'
+    "Select ANSI Encoding" submenu or the tray's): rebuilding them would destroy
+    and rebuild the HMENU Windows is still displaying.  The snapshot is
+    deliberately NOT advanced, so the change lands on the first tick after the
+    menu closes - the same contract RefreshLayoutList keeps. }
+  if FTrackedMenusOpen > 0 then
+    Exit;
 
-  FAnsiMappingSnapshot := Snap;
-  ScanAvroEncoFiles(AnsiMappingDir);
-  BuildAnsiVersionMenus;
-  Log('ANSI mapping folder changed - encoding list refreshed');
+  try
+    Snap := BuildAnsiMappingFolderList;
+    if Snap = FAnsiMappingSnapshot then
+      Exit; // nothing new added / removed since the last refresh
+
+    FAnsiMappingSnapshot := Snap;
+    ScanAvroEncoFiles(AnsiMappingDir);
+    BuildAnsiVersionMenus;
+    Log('ANSI mapping folder changed - encoding list refreshed');
+  except
+    on E: Exception do
+      Log('RefreshAnsiMappingList failed: ' + E.ClassName + ' - ' + E.Message);
+  end;
 end;
 
 { =============================================================================== }
@@ -1682,12 +1715,12 @@ procedure TAvroMainForm1.RefreshLayoutList;
 var
   Snap: string;
 begin
-  { Rebuilding while one of the two menus carrying these items is tracked would
-    destroy and rebuild the HMENU Windows is still displaying (TMenuItem.Free
-    -> RebuildHandle), which is how a folder change landing on an open menu
-    became a crash.  The snapshot is deliberately NOT advanced here: the change
-    is picked up by the first tick after the menu closes, not dropped. }
-  if FLayoutMenusOpen > 0 then
+  { Rebuilding while a menu carrying these items is tracked would destroy and
+    rebuild the HMENU Windows is still displaying (TMenuItem.Free ->
+    RebuildHandle), which is how a folder change landing on an open menu became
+    a crash.  The snapshot is deliberately NOT advanced here: the change is
+    picked up by the first tick after the menu closes, not dropped. }
+  if FTrackedMenusOpen > 0 then
     Exit;
 
   try
@@ -2340,6 +2373,12 @@ end;
 
 procedure TAvroMainForm1.PopupToolsPopup(Sender: TObject);
 begin
+  // Open half of that guard too: this menu holds AnsiVersionSubmenu1, which
+  // BuildAnsiVersionMenus rebuilds from the timer and the folder watcher, so
+  // those rebuilds have to wait while it is up (PopupToolsPopup IS
+  // Popup_Tools.OnPopup - RefreshSettings re-wires it).
+  TrackedMenusPopup(Sender);
+
   // The badges this menu is about to draw come from the mapping payloads.
   // They are resolved on the FIRST popup rather than at startup, and again
   // after an idle release dropped them (IdleTimerTimer) - the menu just opened
@@ -2358,27 +2397,28 @@ begin
   ReplaceAnsiMenuParentIcon;
 end;
 
-{ The open/close halves of the layout-menu guard: RefreshLayoutList skips its
-  rebuild while FLayoutMenusOpen > 0, because freeing a TMenuItem calls
-  RebuildHandle (Vcl.Menus) and destroys/rebuilds the HMENU Windows is still
-  displaying.  See the wiring note in FormCreate for why the pair is balanced. }
+{ The open/close halves of the tracked-menu guard: RefreshLayoutList and the
+  ANSI mapping rebuilds skip while FTrackedMenusOpen > 0, because freeing or
+  clearing a TMenuItem calls RebuildHandle (Vcl.Menus) and destroys/rebuilds the
+  HMENU Windows is still displaying.  See the wiring note in FormCreate for why
+  the pair is balanced. }
 
-procedure TAvroMainForm1.LayoutMenusPopup(Sender: TObject);
+procedure TAvroMainForm1.TrackedMenusPopup(Sender: TObject);
 begin
-  Inc(FLayoutMenusOpen);
+  Inc(FTrackedMenusOpen);
 end;
 
-procedure TAvroMainForm1.LayoutMenusClose(Sender: TObject);
+procedure TAvroMainForm1.TrackedMenusClose(Sender: TObject);
 begin
-  if FLayoutMenusOpen > 0 then
-    Dec(FLayoutMenusOpen);
+  if FTrackedMenusOpen > 0 then
+    Dec(FTrackedMenusOpen);
 end;
 
 procedure TAvroMainForm1.PopupTrayPopup(Sender: TObject);
 begin
   // Open half of that guard: PopupTrayPopup IS Popup_Tray.OnPopup (RefreshSettings
   // re-wires it), so the count belongs here rather than in a second assignment.
-  LayoutMenusPopup(Sender);
+  TrackedMenusPopup(Sender);
 
   // See PopupToolsPopup: the icon bytes are resolved lazily, when a menu that
   // draws badges is actually opened.
