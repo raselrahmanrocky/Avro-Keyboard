@@ -106,6 +106,10 @@ var
 procedure SaveUISettings;
 procedure LoadSettings;
 procedure ValidateSettings;
+{ Fills every setting LoadApp depends on that came back empty (a failed or
+  partial load) with its documented default. Only empties/invalid values are
+  touched - a good value is never clobbered. Called at the end of LoadSettings. }
+procedure FillSafeDefaults;
 procedure SaveSettings;
 procedure SaveAnsiVersionOnly;
 
@@ -124,7 +128,8 @@ uses
   clsUnicodeToBijoy2000,
   uKeyboardMacro,
   uAvroEncoManager,
-  uThemeManager;
+  uThemeManager,
+  DebugLog;
 
 { =============================================================================== }
 { Per-encoding password memory - persistence }
@@ -184,14 +189,20 @@ var
   XML: TXMLSetting;
 begin
   Reg := TMyRegistry.Create;
-  Reg.RootKey := HKEY_CURRENT_USER;
-
-  if Reg.OpenKey('Control Panel\Desktop', True) = True then
-  begin
-    Reg.WriteInteger('LowLevelHooksTimeout', 5000);
+  try
+    { Raised hooks timeout keeps a slow app from dropping its keyboard hook.
+      It is a nice-to-have: a policy-locked or roaming HKCU must not be      able to abort startup, so this runs contained. }
+    try
+      Reg.RootKey := HKEY_CURRENT_USER;
+      if Reg.OpenKey('Control Panel\Desktop', True) = True then
+        Reg.WriteInteger('LowLevelHooksTimeout', 5000);
+    except
+      on E: Exception do
+        StartupLog('LoadSettingsFromFile: LowLevelHooksTimeout not applied', E.Message);
+    end;
+  finally
+    Reg.Free;
   end;
-
-  Reg.Free;
 
   XML := TXMLSetting.Create;
   XML.LoadXMLData;
@@ -377,17 +388,23 @@ var
   Reg: TMyRegistry;
 begin
   Reg := TMyRegistry.Create;
-  Reg.RootKey := HKEY_CURRENT_USER;
+  try
+    try
+      Reg.RootKey := HKEY_CURRENT_USER;
+      if Reg.OpenKey('Control Panel\Desktop', True) = True then
+      begin
+        Reg.WriteInteger('LowLevelHooksTimeout', 5000);
+        Reg.CloseKey;
+      end;
+    except
+      on E: Exception do
+        StartupLog('LoadSettingsFromRegistry: LowLevelHooksTimeout not applied', E.Message);
+    end;
 
-  if Reg.OpenKey('Control Panel\Desktop', True) = True then
-  begin
-    Reg.WriteInteger('LowLevelHooksTimeout', 5000);
-  end;
-  Reg.CloseKey;
-
-  Reg.RootKey := HKEY_CURRENT_USER;
-  if Reg.OpenKey('Software\OmicronLab\Avro Keyboard', True) = True then
-  begin
+    Reg.RootKey := HKEY_CURRENT_USER;
+    try
+    if Reg.OpenKey('Software\OmicronLab\Avro Keyboard', True) = True then
+    begin
     DontShowComplexLNotification := UpperCase(Reg.ReadStringDef('DontShowComplexLNotification', 'NO'));
     DontShowStartupWizard := UpperCase(Reg.ReadStringDef('DontShowStartupWizard', 'NO'));
 
@@ -463,9 +480,14 @@ begin
     CachedEncoPassword := AnsiString(Reg.ReadStringDef('CachedEncoPassword', ''));
     DecodeEncoCache(Reg.ReadStringDef('EncoPasswordCache', ''));
 
+    end;
+    except
+      on E: Exception do
+        StartupLogException('LoadSettingsFromRegistry', E);
+    end;
+  finally
+    Reg.Free;
   end;
-
-  Reg.Free;
 
 end;
 
@@ -607,6 +629,78 @@ begin
 
   {$ENDIF}
   ValidateSettings;
+  // Last line of defence: whatever the source handed back, nothing critical is
+  // left empty. LoadApp builds the top bar, tray and hook out of these values.
+  FillSafeDefaults;
+end;
+
+{ =============================================================================== }
+
+procedure FillSafeDefaults;
+
+  procedure Need(var S: string; const Default: string);
+  begin
+    if Trim(S) = '' then
+      S := Default;
+  end;
+
+begin
+  Need(StartWithWindows, 'YES');
+  Need(ShowSplash, 'YES');
+  Need(DefaultUIMode, 'LASTUI');
+  Need(LastUIMode, 'TOP BAR');
+  Need(TopBarPosX, '1000000');
+  Need(TopBarXButton, 'SHOW MENU');
+  Need(TopBarTransparent, 'YES');
+  Need(InterfaceSkin, 'internalskin*');
+  Need(TopBarTransparencyLevel, '80');
+  Need(TrayHintShowTimes, '0');
+  Need(TopHintShowTimes, '0');
+  Need(AppThemeMode, APP_THEME_SETTING_SYSTEM);
+  Need(AvroUpdateCheck, 'YES');
+  Need(CheckBetaUpdates, 'NO');
+  Need(PhoneticAutoCorrect, 'YES');
+  Need(ShowPrevWindow, 'YES');
+  Need(FollowCaretByDefault, 'YES');
+  Need(PhoneticMode, 'CHAR');
+  Need(SaveCandidate, 'YES');
+  Need(AddToPhoneticDict, 'YES');
+  Need(TabBrowsing, 'YES');
+  Need(PipeToDot, 'YES');
+  Need(EnableJoNukta, 'NO');
+  Need(DefaultLayout, 'avrophonetic*');
+  Need(OldStyleReph, 'YES');
+  Need(VowelFormating, 'YES');
+  Need(NumPadBangla, 'YES');
+  Need(FullOldStyleTyping, 'NO');
+  Need(AutomaticallyFixChandra, 'YES');
+  Need(EnableCaretSniffer, 'YES');
+  Need(ShowLayoutOnTop, 'YES');
+  Need(SavePosLayoutViewer, 'YES');
+  Need(LayoutViewerPosX, '0');
+  Need(LayoutViewerPosY, '0');
+  Need(LayoutViewerSize, '60%');
+  Need(OutputIsBijoy, 'NO');
+  Need(ShowOutputwarning, 'YES');
+  Need(UnicodeToggleShortcut, 'YES');
+  Need(ANSIToggleShortcut, 'YES');
+  Need(IgnoreCapsLock, 'NO');
+  Need(DontShowComplexLNotification, 'NO');
+  Need(DontShowStartupWizard, 'NO');
+  Need(ShowLayoutSwitchNotification, 'YES');
+  Need(ShowAnsiSwitchNotification, 'YES');
+  Need(ModeSwitchKey, 'F12');
+  Need(ToggleOutputModeKey, 'F12');
+  Need(SpellerLauncherKey, 'F7');
+  Need(LayoutSwitchKey, 'CTRL+SHIFT+F11');
+  Need(AnsiVersionSwitchKey, 'F12');
+
+  try
+    ValidateSettings;
+  except
+    on E: Exception do
+      StartupLogException('FillSafeDefaults/ValidateSettings', E);
+  end;
 end;
 
 { =============================================================================== }
@@ -648,7 +742,10 @@ begin
     DefaultUIMode := 'LASTUI';
   if not((LastUIMode = 'ICON') or (LastUIMode = 'TOP BAR')) then
     LastUIMode := 'TOP BAR';
-  if not(StrToInt(TopBarPosX) > 0) then
+  // StrToIntDef, NOT StrToInt: a corrupted or hand-edited value raised
+  // EConvertError from here, and this runs inside FormCreate before any window
+  // exists - the user got an invisible process instead of an error.
+  if StrToIntDef(TopBarPosX, 0) <= 0 then
     TopBarPosX := '1000000';
   if not((TopBarXButton = 'MINIMIZE') or (TopBarXButton = 'EXIT') or (TopBarXButton = 'SHOW MENU')) then
     TopBarXButton := 'SHOW MENU';
@@ -670,9 +767,9 @@ begin
     ShowAnsiSwitchNotification := 'YES';
 
   // Avro Mouse Settings
-  if not(StrToInt(AvroMousePosX) > 0) then
+  if StrToIntDef(AvroMousePosX, 0) <= 0 then
     AvroMousePosX := '0';
-  if not(StrToInt(AvroMousePosY) > 0) then
+  if StrToIntDef(AvroMousePosY, 0) <= 0 then
     AvroMousePosY := '0';
 
   // Avro Phonetic Settings
@@ -708,10 +805,10 @@ begin
     ShowLayoutOnTop := 'YES';
   if not((SavePosLayoutViewer = 'YES') or (SavePosLayoutViewer = 'NO')) then
     SavePosLayoutViewer := 'YES';
-  if not(StrToInt(LayoutViewerPosX) > 0) then
+  if StrToIntDef(LayoutViewerPosX, 0) <= 0 then
     LayoutViewerPosX := '0';
-  if not(StrToInt(LayoutViewerPosY) > 0) then
-    LayoutViewerPosX := '0';
+  if StrToIntDef(LayoutViewerPosY, 0) <= 0 then
+    LayoutViewerPosY := '0'; // was resetting PosX - copy/paste slip
   // If Not ((StrToInt(LayoutViewerSize) > 50) And (RightStr(LayoutViewerSize, 1) = '%')) Then LayoutViewerSize := '60%';
 
   // Global Output settings
