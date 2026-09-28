@@ -756,7 +756,11 @@ begin
   end;
 
   Popup_Help.OnPopup := DynamicHelpPopup;
-  Popup_Tray.OnPopup := DynamicHelpPopup;
+  { Popup_Tray's real handler is PopupTrayPopup (icon badges + checkmarks).  It
+    was wired to DynamicHelpPopup here - a copy of the line above - and
+    RefreshSettings later overwrote it, so until the first settings refresh the
+    tray popup ran the help handler.  Wire it once, correctly, right now. }
+  Popup_Tray.OnPopup := PopupTrayPopup;
 
   // Global Ctrl+Alt+T opens the Qt text converter from anywhere.  Where the
   // combination is already taken this simply registers nothing - the tray item
@@ -1452,37 +1456,54 @@ end;
 procedure TAvroMainForm1.HandleLayoutDirectoryChanged(Sender: TObject);
 var
   TargetPath: string;
+  Snap:       string;
 begin
-  ScanAvroEncoFiles(AnsiMappingDir);
+  // The watcher only ever fires from CheckForChanges on the UI timer, but it
+  // fires for whatever happens to the folder: a locked file, a vanished
+  // directory, an engine that refuses to re-parse.  Nothing here may take the
+  // app down, so the body is contained and reported instead of escaping into
+  // the timer's caller.
+  try
+    ScanAvroEncoFiles(AnsiMappingDir);
 
-  if (AnsiMappingDir <> '') and (AnsiVersion <> '') and (GetActiveEncoFilePath(AnsiVersion, AnsiMappingDir) <> '') then
-  begin
-    TargetPath := GetActiveEncoFilePath(AnsiVersion, AnsiMappingDir);
-    if TargetPath <> '' then
+    if (AnsiMappingDir <> '') and (AnsiVersion <> '') and (GetActiveEncoFilePath(AnsiVersion, AnsiMappingDir) <> '') then
     begin
-      // Default-key files (flag $00) reload transparently; password
-      // protected files reload only when a usable password is cached. The
-      // engine cache re-parses the changed file in place, so the active
-      // engine stays fresh AND later switches keep using the cached copy.
-      if IsEncoFile(TargetPath) then
+      TargetPath := GetActiveEncoFilePath(AnsiVersion, AnsiMappingDir);
+      if TargetPath <> '' then
       begin
-        if (GetAvroEncoProtectionFlag(TargetPath) = AVROENCO_FLAG_DEFAULT_KEY) or (GetEncoCachedPassword(TargetPath) <> '') then
+        // Default-key files (flag $00) reload transparently; password
+        // protected files reload only when a usable password is cached. The
+        // engine cache re-parses the changed file in place, so the active
+        // engine stays fresh AND later switches keep using the cached copy.
+        if IsEncoFile(TargetPath) then
+        begin
+          if (GetAvroEncoProtectionFlag(TargetPath) = AVROENCO_FLAG_DEFAULT_KEY) or (GetEncoCachedPassword(TargetPath) <> '') then
+            AnsiEngineManager.InvalidateEngine(AnsiVersion);
+        end
+        else
           AnsiEngineManager.InvalidateEngine(AnsiVersion);
-      end
-      else
-        AnsiEngineManager.InvalidateEngine(AnsiVersion);
+      end;
     end;
+
+    // New/changed/removed engines are reconciled with the cache as well.
+    AnsiEngineManager.RefreshFromDisk;
+
+    // Rebuild ONLY when the folder's file list really changed.  The scan ran
+    // above, so the snapshot is refreshed BEFORE the rebuild - BuildAnsiVersionMenus
+    // skips its own re-scan when nothing changed since this snapshot.  An event
+    // for a file that was merely touched used to rebuild both encoding menus and
+    // toast "ANSI mappings refreshed" anyway.
+    Snap := BuildAnsiMappingFolderList;
+    if Snap <> FAnsiMappingSnapshot then
+    begin
+      FAnsiMappingSnapshot := Snap;
+      BuildAnsiVersionMenus;
+      ShowAnsiToastNotification('ANSI mappings refreshed');
+    end;
+  except
+    on E: Exception do
+      Log('Layout directory handler failed: ' + E.ClassName + ' - ' + E.Message);
   end;
-
-  // New/changed/removed engines are reconciled with the cache as well.
-  AnsiEngineManager.RefreshFromDisk;
-
-  // Folders were scanned above, so refresh the snapshot BEFORE the menu
-  // rebuild - BuildAnsiVersionMenus skips its own re-scan when nothing
-  // changed since this snapshot.
-  FAnsiMappingSnapshot := BuildAnsiMappingFolderList;
-  BuildAnsiVersionMenus;
-  ShowAnsiToastNotification('ANSI mappings refreshed');
 end;
 
 { =============================================================================== }
@@ -2253,7 +2274,11 @@ begin
   // They are resolved on the FIRST popup rather than at startup, and again
   // after an idle release dropped them (IdleTimerTimer) - the menu just opened
   // is exactly the moment the work is wanted, so it is paid here.
-  EnsureMappingIcons;
+  // Each row resolves its OWN badge while it draws (see
+  // AnsiVersionItemAdvancedDrawItem), so opening this menu no longer pays for
+  // EnsureMappingIcons - the sweep that decodes every mapping's payload.  Only
+  // the active layout's badge is needed up front: it is what the parent item's
+  // gutter icon reads.
   EnsureMappingIcon(AnsiVersion);
   // Only update checkmarks on existing items -- do NOT Clear/rebuild during popup
   SyncAnsiVersionChecks(AnsiVersionSubmenu1);
@@ -2267,7 +2292,8 @@ procedure TAvroMainForm1.PopupTrayPopup(Sender: TObject);
 begin
   // See PopupToolsPopup: the icon bytes are resolved lazily, when a menu that
   // draws badges is actually opened.
-  EnsureMappingIcons;
+  // See PopupToolsPopup: rows resolve their own badges while they draw, so only
+  // the active layout's badge has to be ready here.
   EnsureMappingIcon(AnsiVersion);
   SyncAnsiVersionChecks(mnuTraySelectAnsiEncoding);
   ReplaceAnsiMenuParentIcon;
@@ -2601,10 +2627,17 @@ begin
   DrawText(ACanvas.Handle, PChar(CapStr), -1, TextRect,
     DT_LEFT or DT_VCENTER or DT_SINGLELINE);
 
-  { Right-side icon badge }
+  { Right-side icon badge.  Resolve THIS row's own badge on demand: the icon
+    bytes are dropped whenever the mapping folder is re-scanned
+    (BuildAnsiVersionMenus -> ReleaseAnsiIconCache), so a row must be able to
+    restore its own artwork while it draws instead of relying on a full sweep of
+    every mapping when the menu opens. }
   IconHandle := 0;
   if Item.Hint <> '' then
+  begin
+    EnsureMappingIcon(Item.Hint);
     IconHandle := GetAnsiTrayIcon(Item.Hint);
+  end;
   if IconHandle <> 0 then
   begin
     X := ARect.Right - ICON_SZ - ICON_PAD;
