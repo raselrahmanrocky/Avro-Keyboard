@@ -249,6 +249,12 @@ type
       FAnsiMappingSnapshot:         string;  // last seen file-name list of AnsiMappingDir
       FLayoutSnapshot:              string;  // last seen file-name list of the layouts folder
       FLayoutCheckCountdown:        Integer; // throttles the keyboard-layouts folder-list poll
+      { >0 while one of the two menus that carry the dynamic layout items
+        (Popup_Tray's "Select keyboard layout" submenu and Popup_LayoutList) is
+        being tracked by Windows.  TMenuItem.Free calls RebuildHandle
+        (Vcl.Menus), which destroys and rebuilds the HMENU that menu's own track
+        loop is still displaying, so the rebuild has to wait for it to close. }
+      FLayoutMenusOpen:             Integer;
       FDirectoryWatcher:            TAvroDirectoryWatcher;
       { Application.OnException reports once per session, not once per fault. }
       FUnhandledReported:           Boolean;
@@ -309,6 +315,8 @@ type
       procedure IgnoreCapsLockClick(Sender: TObject);
       procedure PopupToolsPopup(Sender: TObject);
       procedure PopupTrayPopup(Sender: TObject);
+      procedure LayoutMenusPopup(Sender: TObject);
+      procedure LayoutMenusClose(Sender: TObject);
 
       procedure WMCopyData(var Msg: TWMCopyData); message WM_COPYDATA;
       procedure WMShowAnsiPicker(var Msg: TMessage); message WM_APP + 1;
@@ -761,6 +769,19 @@ begin
     RefreshSettings later overwrote it, so until the first settings refresh the
     tray popup ran the help handler.  Wire it once, correctly, right now. }
   Popup_Tray.OnPopup := PopupTrayPopup;
+  { Layout rebuilds are held off while either of the two menus carrying the
+    dynamic Tag = 9903 items is tracked: freeing a TMenuItem calls RebuildHandle
+    (Vcl.Menus), which destroys and rebuilds the HMENU Windows is still
+    displaying.  TPopupMenu.Popup fires OnPopup (DoPopup) and OnClose (DoClose,
+    right after TrackPopupMenu returns), so the pair is balanced for every route
+    into these menus - including the tray icon, whose TTrayIcon calls
+    FPopupMenu.Popup directly.  Popup_Tray's submenus are tracked inside the
+    same Popup call and need no hook of their own.  RefreshSettings re-assigns
+    Popup_Tray.OnPopup, so the open half of the count lives inside
+    PopupTrayPopup; OnClose is assigned here once and never overwritten. }
+  Popup_Tray.OnClose := LayoutMenusClose;
+  Popup_LayoutList.OnPopup := LayoutMenusPopup;
+  Popup_LayoutList.OnClose := LayoutMenusClose;
 
   // Global Ctrl+Alt+T opens the Qt text converter from anywhere.  Where the
   // combination is already taken this simply registers nothing - the tray item
@@ -908,81 +929,110 @@ end;
   The removal half is new: these loops were add-only (ItemFound), so a deleted
   .avrolayout stayed in both menus for the rest of the session - and with
   RefreshLayoutList polling the folder, pruning is what makes a deletion take
-  effect at all. }
+  effect at all.
+
+  Membership is a dictionary lookup on both sides.  The older code asked the
+  disk list a linear question per menu item (LayoutOnDisk) and re-scanned the
+  whole menu for every layout, i.e. O(n*m) on each folder change; the loop
+  shapes, the ordering, the anchors and what is created are unchanged. }
 procedure TAvroMainForm1.RefreshLayoutMenuItems;
 var
-  I, J:                            Integer;
-  TempMenu1, TempMenu3:            TMenuItemExtended;
-  sCaption:                        string;
-  ItemFound:                       Boolean;
+  I:             Integer;
+  sCaption, Key: string;
+  OnDisk:        TDictionary<string, Boolean>;
+  PresentTray:   TDictionary<string, Boolean>;
+  PresentTopBar: TDictionary<string, Boolean>;
 
-  function LayoutOnDisk(const AName: string): Boolean;
+  { The dynamic (Tag = 9903) captions of one menu, keyed lowercase. }
+  procedure CollectItems(AMenu: TMenuItem; const AInto: TDictionary<string, Boolean>);
   var
-    K: Integer;
+    J: Integer;
   begin
-    Result := False;
-    for K := 0 to KeyboardLayouts.Count - 1 do
-      if SameText(KeyboardLayouts[K], AName) then
-      begin
-        Result := True;
-        Break;
-      end;
+    for J := 0 to AMenu.Count - 1 do
+      if AMenu.Items[J].Tag = 9903 then
+        AInto.AddOrSetValue(Lowercase((AMenu.Items[J] as TMenuItemExtended).Value), True);
+  end;
+
+  { One dynamic item, inserted right below AAfter - the placement both menus
+    use.  AOwner stays the popup that owns the item, exactly as before. }
+  procedure AddLayoutItem(const AOwner: TComponent; const AInto, AAfter: TMenuItem; const ACaption: string);
+  var
+    M: TMenuItemExtended;
+  begin
+    M := TMenuItemExtended.Create(AOwner);
+    M.Caption := ACaption;
+    M.Value := ACaption;
+    M.RadioItem := True;
+    M.Tag := 9903;
+    M.OnClick := MenuFixedLayoutClick;
+    AInto.Insert(AAfter.MenuIndex + 1, M);
   end;
 
 begin
-  // Prune first: Tag = 9903 marks the dynamic layout items.  A layout removed
-  // from disk must disappear from BOTH menus, not merely stop being added.
-  for I := Selectkeyboardlayout2.Count - 1 downto 0 do
-    if (Selectkeyboardlayout2.Items[I].Tag = 9903) and
-       (not LayoutOnDisk((Selectkeyboardlayout2.Items[I] as TMenuItemExtended).Value)) then
-      Selectkeyboardlayout2.Items[I].Free;
+  { A folder read that failed leaves this nil (LoadKeyboardLayoutNames frees it
+    first); there is nothing to reconcile then. }
+  if KeyboardLayouts = nil then
+    Exit;
 
-  for I := Popup_LayoutList.Items.Count - 1 downto 0 do
-    if (Popup_LayoutList.Items[I].Tag = 9903) and
-       (not LayoutOnDisk((Popup_LayoutList.Items[I] as TMenuItemExtended).Value)) then
-      Popup_LayoutList.Items[I].Free;
+  OnDisk := TDictionary<string, Boolean>.Create;
+  PresentTray := TDictionary<string, Boolean>.Create;
+  PresentTopBar := TDictionary<string, Boolean>.Create;
+  try
+    { RemoveExtension keeps these keys comparable with the item values whatever
+      the loader hands over; LoadKeyboardLayoutNames already strips it. }
+    for I := 0 to KeyboardLayouts.Count - 1 do
+      OnDisk.AddOrSetValue(Lowercase(RemoveExtension(KeyboardLayouts[I])), True);
 
-  for I := KeyboardLayouts.Count - 1 downto 0 do
-  begin
+    CollectItems(Selectkeyboardlayout2, PresentTray);
+    CollectItems(Popup_LayoutList.Items, PresentTopBar);
 
-    sCaption := RemoveExtension(KeyboardLayouts[I]);
+    // Prune first: Tag = 9903 marks the dynamic layout items.  A layout removed
+    // from disk must disappear from BOTH menus, not merely stop being added.
+    for I := Selectkeyboardlayout2.Count - 1 downto 0 do
+      if Selectkeyboardlayout2.Items[I].Tag = 9903 then
+      begin
+        Key := Lowercase((Selectkeyboardlayout2.Items[I] as TMenuItemExtended).Value);
+        if not OnDisk.ContainsKey(Key) then
+        begin
+          PresentTray.Remove(Key);
+          Selectkeyboardlayout2.Items[I].Free;
+        end;
+      end;
 
-    ItemFound := False;
-    for J := 0 to Selectkeyboardlayout2.Count - 1 do
+    for I := Popup_LayoutList.Items.Count - 1 downto 0 do
+      if Popup_LayoutList.Items[I].Tag = 9903 then
+      begin
+        Key := Lowercase((Popup_LayoutList.Items[I] as TMenuItemExtended).Value);
+        if not OnDisk.ContainsKey(Key) then
+        begin
+          PresentTopBar.Remove(Key);
+          Popup_LayoutList.Items[I].Free;
+        end;
+      end;
+
+    // Add every layout neither menu carries yet.  Counting DOWN matters: each
+    // item goes in at the same index, so the last one inserted ends up on top.
+    for I := KeyboardLayouts.Count - 1 downto 0 do
     begin
-      if Selectkeyboardlayout2.Items[J].Tag = 9903 then
-        if Lowercase((Selectkeyboardlayout2.Items[J] as TMenuItemExtended).Value) = Lowercase(sCaption) then
-          ItemFound := True;
-    end;
-    if not(ItemFound) then
-    begin
-      TempMenu1 := TMenuItemExtended.Create(Popup_Tray);
-      TempMenu1.Caption := sCaption;
-      TempMenu1.Value := sCaption;
-      TempMenu1.RadioItem := True;
-      TempMenu1.Tag := 9903;
-      TempMenu1.OnClick := MenuFixedLayoutClick;
-      Selectkeyboardlayout2.Insert(AvroPhoneticEnglishtoBangla3.MenuIndex + 1, TempMenu1);
-    end;
+      sCaption := RemoveExtension(KeyboardLayouts[I]);
+      Key := Lowercase(sCaption);
 
-    /// ////
-    ItemFound := False;
-    for J := 0 to Popup_LayoutList.Items.Count - 1 do
-    begin
-      if Popup_LayoutList.Items.Items[J].Tag = 9903 then
-        if Lowercase((Popup_LayoutList.Items.Items[J] as TMenuItemExtended).Value) = Lowercase(sCaption) then
-          ItemFound := True;
+      if not PresentTray.ContainsKey(Key) then
+      begin
+        AddLayoutItem(Popup_Tray, Selectkeyboardlayout2, AvroPhoneticEnglishtoBangla3, sCaption);
+        PresentTray.AddOrSetValue(Key, True);
+      end;
+
+      if not PresentTopBar.ContainsKey(Key) then
+      begin
+        AddLayoutItem(Popup_LayoutList, Popup_LayoutList.Items, AvroPhoneticEnglishtoBangla1, sCaption);
+        PresentTopBar.AddOrSetValue(Key, True);
+      end;
     end;
-    if not(ItemFound) then
-    begin
-      TempMenu3 := TMenuItemExtended.Create(Popup_LayoutList);
-      TempMenu3.Caption := sCaption;
-      TempMenu3.Value := sCaption;
-      TempMenu3.RadioItem := True;
-      TempMenu3.Tag := 9903;
-      TempMenu3.OnClick := MenuFixedLayoutClick;
-      Popup_LayoutList.Items.Insert(AvroPhoneticEnglishtoBangla1.MenuIndex + 1, TempMenu3);
-    end;
+  finally
+    OnDisk.Free;
+    PresentTray.Free;
+    PresentTopBar.Free;
   end;
 end;
 
@@ -1622,19 +1672,39 @@ begin
 end;
 
 { Rebuilds the dynamic layout items only when the folder's file list actually
-  differs from the snapshot - the same contract RefreshAnsiMappingList keeps. }
+  differs from the snapshot - the same contract RefreshAnsiMappingList keeps.
+
+  Contained, because the caller is the 100 ms UI timer: an exception escaping
+  here would be swallowed by Application.OnException (one balloon per session)
+  and the rest of that tick - the directory-watcher check, the window tracking,
+  the hook re-arm - would never run. }
 procedure TAvroMainForm1.RefreshLayoutList;
 var
   Snap: string;
 begin
-  Snap := BuildLayoutFolderList;
-  if Snap = FLayoutSnapshot then
-    Exit; // nothing added / removed since the last refresh
+  { Rebuilding while one of the two menus carrying these items is tracked would
+    destroy and rebuild the HMENU Windows is still displaying (TMenuItem.Free
+    -> RebuildHandle), which is how a folder change landing on an open menu
+    became a crash.  The snapshot is deliberately NOT advanced here: the change
+    is picked up by the first tick after the menu closes, not dropped. }
+  if FLayoutMenusOpen > 0 then
+    Exit;
 
-  FLayoutSnapshot := Snap;
-  LoadKeyboardLayoutNames;
-  RefreshLayoutMenuItems;
-  Log('Keyboard layouts folder changed - layout menu refreshed');
+  try
+    Snap := BuildLayoutFolderList;
+    if Snap = FLayoutSnapshot then
+      Exit; // nothing added / removed since the last refresh
+
+    LoadKeyboardLayoutNames;
+    RefreshLayoutMenuItems;
+    { Last, so a failure above leaves the snapshot unadvanced and the next tick
+      retries instead of swallowing the change for the whole session. }
+    FLayoutSnapshot := Snap;
+    Log('Keyboard layouts folder changed - layout menu refreshed');
+  except
+    on E: Exception do
+      Log('RefreshLayoutList failed: ' + E.ClassName + ' - ' + E.Message);
+  end;
 end;
 
 procedure TAvroMainForm1.ManageAutoCorrectentries1Click(Sender: TObject);
@@ -2288,8 +2358,28 @@ begin
   ReplaceAnsiMenuParentIcon;
 end;
 
+{ The open/close halves of the layout-menu guard: RefreshLayoutList skips its
+  rebuild while FLayoutMenusOpen > 0, because freeing a TMenuItem calls
+  RebuildHandle (Vcl.Menus) and destroys/rebuilds the HMENU Windows is still
+  displaying.  See the wiring note in FormCreate for why the pair is balanced. }
+
+procedure TAvroMainForm1.LayoutMenusPopup(Sender: TObject);
+begin
+  Inc(FLayoutMenusOpen);
+end;
+
+procedure TAvroMainForm1.LayoutMenusClose(Sender: TObject);
+begin
+  if FLayoutMenusOpen > 0 then
+    Dec(FLayoutMenusOpen);
+end;
+
 procedure TAvroMainForm1.PopupTrayPopup(Sender: TObject);
 begin
+  // Open half of that guard: PopupTrayPopup IS Popup_Tray.OnPopup (RefreshSettings
+  // re-wires it), so the count belongs here rather than in a second assignment.
+  LayoutMenusPopup(Sender);
+
   // See PopupToolsPopup: the icon bytes are resolved lazily, when a menu that
   // draws badges is actually opened.
   // See PopupToolsPopup: rows resolve their own badges while they draw, so only

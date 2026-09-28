@@ -723,6 +723,13 @@ procedure LoadKeyboardLayoutNames;
 var
   I, Count: Integer;
 begin
+  { Every call gets a fresh list.  The old code assigned a new TStringList over
+    the previous one, so each call after the first leaked the whole list and its
+    strings - and this runs on every detected layouts-folder change, on every
+    resource-browser layout install and on every drop-install.  Reusing the list
+    with Clear is not an option: GetFileList only appends, so a reused list would
+    fill up with duplicates. }
+  FreeAndNil(KeyboardLayouts);
   KeyboardLayouts := TStringList.create;
   Count := GetFileList(GetAvroDataDir + 'Keyboard Layouts\*.avrolayout', KeyboardLayouts);
 
@@ -736,5 +743,18 @@ begin
 end;
 
 {$WARN IMPLICIT_STRING_CAST ON}
+
+initialization
+  { Nothing to set up - KeyboardLayoutNames creates KeyboardLayouts the first
+    time it runs.  The empty section is not optional: dcc32 rejects a
+    finalization section that has no initialization before it (E2029, verified
+    against this project's compiler), and every other unit here that needs
+    finalization carries the pair. }
+
+finalization
+  { The list outlives every form.  The normal quit path (TAvroMainForm1.ExitApp)
+    frees it itself and then calls ExitProcess(0), so unit finalization never
+    runs there; this covers the paths that end the process any other way. }
+  FreeAndNil(KeyboardLayouts);
 
 end.
