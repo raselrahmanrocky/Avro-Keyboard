@@ -133,13 +133,33 @@ begin
 end;
 
 function GetAnsiCacheDirectory: string;
+var
+  Base: string;
 begin
   // Per-user Roaming AppData: always writable without elevated rights, so
   // the cache actually persists across runs (ProgramData required
   // installer-created ACLs and could silently fall back to decrypting
   // every startup). Format stays <SHA-256>.cache.
-  Result := IncludeTrailingPathDelimiter(GetEnvironmentVariable('APPDATA')) + 'AvroKeyboard\Cache\';
-  ForceDirectories(Result);
+  //
+  // A profile without %APPDATA% (service accounts, some locked-down or roaming
+  // setups) used to leave the path relative - "AvroKeyboard\Cache\" resolved
+  // against whatever the current directory happened to be. Fall back through
+  // LocalAppData, TEMP and finally the Avro data folder.
+  Base := IncludeTrailingPathDelimiter(GetEnvironmentVariable('APPDATA'));
+  if Base = '\' then
+    Base := IncludeTrailingPathDelimiter(GetEnvironmentVariable('LOCALAPPDATA'));
+  if Base = '\' then
+    Base := IncludeTrailingPathDelimiter(GetEnvironmentVariable('TEMP'));
+  if Base = '\' then
+    Base := IncludeTrailingPathDelimiter(GetAvroDataDir);
+
+  Result := Base + 'AvroKeyboard\Cache\';
+  try
+    ForceDirectories(Result);
+  except
+    // An unusable cache directory only means every run decrypts from scratch:
+    // reads treat it as a miss and writes are individually guarded.
+  end;
 end;
 
 function GetLegacyAnsiCacheDirectory: string;
