@@ -406,10 +406,14 @@ begin
     FDConnection1.Params.Values['Database'] := GetAvroDataDir + 'Database.db3';
 
     try
-      FDConnection1.Open;
-      FDatabase := TSQLiteDatabase(FDConnection1.CliObj);
-
       try
+        { Open belongs INSIDE the guarded region: a corrupt Database.db3 makes
+          the driver raise right here ("file is not a database"), and an
+          exception escaping this procedure is swallowed by Application.OnException
+          with no dialog - startup would abort mid-way and FDatabaseLoading would
+          stay True, disabling the database for the whole session. }
+        FDConnection1.Open;
+        FDatabase := TSQLiteDatabase(FDConnection1.CliObj);
 
         LoadOneDatabase('A', W_A, W_Hash_A);
         LoadOneDatabase('AA', W_AA, W_Hash_AA);
