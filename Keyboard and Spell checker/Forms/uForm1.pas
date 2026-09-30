@@ -3612,7 +3612,7 @@ var
 begin
   OpenDialog := TOpenDialog.Create(nil);
   try
-    OpenDialog.Filter := 'ANSI Mapping|*.AvroEnco';
+    OpenDialog.Filter := 'ANSI Mapping|*.json;*.AvroEnco';
     OpenDialog.DefaultExt := 'AvroEnco';
     OpenDialog.Title := 'Import ANSI Mapping';
     OpenDialog.Options := OpenDialog.Options + [ofAllowMultiSelect, ofFileMustExist];
@@ -3635,6 +3635,15 @@ begin
           // for password-protected imports (default-key imports stay silent).
           if not ImportEncoFile(OpenDialog.Files[I], ErrMsg) and (ErrMsg <> '') then
             AddError(OpenDialog.Files[I], ErrMsg);
+        end
+        else if SameText(ExtractFileExt(OpenDialog.Files[I]), '.json') then
+        begin
+          // Structural validation, copy, scan, activation and toast
+          // (uAvroEncoImporter.ImportJsonMappingFile - also used by drag &
+          // drop). Plain JSON mappings are unprotected, so import activates
+          // them.
+          if not ImportJsonMappingFile(OpenDialog.Files[I], ErrMsg) and (ErrMsg <> '') then
+            AddError(OpenDialog.Files[I], 'ANSI mapping import failed:'#13#10#13#10 + ErrMsg);
         end;
       end;
 

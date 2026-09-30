@@ -920,8 +920,11 @@ begin
   // been freed.
   BeginClose;
   try
-    SourcePath := AnsiMappingDir + MapName + '.AvroEnco';
-    if not FileExists(SourcePath) then
+    // Resolve through the shared lookup: .AvroEnco first, .json fallback -
+    // the same priority the engine uses, so export always copies the file
+    // that is actually active.
+    SourcePath := GetActiveEncoFilePath(MapName, AnsiMappingDir);
+    if (SourcePath = '') or (not FileExists(SourcePath)) then
     begin
       MessageDlg('Mapping file not found: ' + MapName, mtError, [mbOK], 0);
       Exit;
@@ -929,10 +932,20 @@ begin
 
     SaveDlg := TSaveDialog.Create(nil);
     try
-      SaveDlg.Filter := 'Avro Encoded Mapping|*.AvroEnco';
-      SaveDlg.DefaultExt := 'AvroEnco';
+      // Export mirrors the source format: .AvroEnco stays .AvroEnco, a plain
+      // JSON mapping is saved as .json.
+      if IsEncoFile(SourcePath) then
+      begin
+        SaveDlg.Filter := 'Avro Encoded Mapping|*.AvroEnco';
+        SaveDlg.DefaultExt := 'AvroEnco';
+      end
+      else
+      begin
+        SaveDlg.Filter := 'ANSI Mapping JSON|*.json';
+        SaveDlg.DefaultExt := 'json';
+      end;
       SaveDlg.Title := 'Export ' + MapName + ' Mapping';
-      SaveDlg.FileName := MapName + '.AvroEnco';
+      SaveDlg.FileName := MapName + ExtractFileExt(SourcePath);
       if SaveDlg.Execute then
       begin
         if Windows.CopyFile(PChar(SourcePath), PChar(SaveDlg.FileName), False) then

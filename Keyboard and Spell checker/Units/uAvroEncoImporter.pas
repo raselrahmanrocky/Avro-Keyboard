@@ -10,7 +10,8 @@
 unit uAvroEncoImporter;
 
 { =============================================================================
-  uAvroEncoImporter - smart conditional import of ".AvroEnco" mapping files.
+  uAvroEncoImporter - smart conditional import of ".AvroEnco" mapping files,
+  plus plain ".json" mapping import (ImportJsonMappingFile).
 
   Imports branch on the protection flag of the cryptographic container header.
   The flag is read through the canonical uAvroEncoCrypto.GetAvroEncoProtectionFlag
@@ -60,6 +61,12 @@ uses
 // password-protected imports also get activated). AErrorMessage is empty
 // when the user cancelled a password prompt (not an error condition).
 function ImportEncoFile(const ASourcePath: string; out AErrorMessage: string): Boolean;
+
+// Imports a plain ".json" ANSI mapping: structural validation, copy into
+// AnsiMappingDir, then activation. Plain JSON mappings carry no protection
+// flag, so - unlike default-key containers - an import always activates them
+// (the pre-container behaviour). Shared by the import dialog and drag & drop.
+function ImportJsonMappingFile(const ASourcePath: string; out AErrorMessage: string): Boolean;
 
 // File-dialog import: iterates every selected file independently.
 function ImportEncoFromDialog: Boolean;
@@ -318,6 +325,106 @@ begin
       Result := False;
       AErrorMessage := 'Unexpected error while importing the file.';
       Log('ImportEncoFile exception: ' + E.ClassName + ': ' + E.Message + ' - ' + ASourcePath);
+    end;
+  end;
+end;
+
+{ ============================================================================= }
+function ImportJsonMappingFile(const ASourcePath: string; out AErrorMessage: string): Boolean;
+var
+  TargetPath, ImportedName, ErrMsg: string;
+  ErrorLog:                         TStringList;
+begin
+  Result := False;
+  AErrorMessage := '';
+  try
+    // --- 1. Basic checks ------------------------------------------------------
+    if not FileExists(ASourcePath) then
+    begin
+      AErrorMessage := 'Source file does not exist.';
+      Exit;
+    end;
+
+    if not SameText(ExtractFileExt(ASourcePath), '.json') then
+    begin
+      AErrorMessage := 'Invalid file extension. Expected .json.';
+      Exit;
+    end;
+
+    // --- 2. Structural validation (nothing is copied or created yet) ----------
+    if not ValidateAnsiMappingFile(ASourcePath, ErrMsg) then
+    begin
+      AErrorMessage := ErrMsg;
+      Exit;
+    end;
+
+    // --- 3. Destination folder ------------------------------------------------
+    ForceDirectories(AnsiMappingDir);
+
+    if SameText(ExtractFilePath(ASourcePath), AnsiMappingDir) then
+    begin
+      AErrorMessage := 'File is already in the target directory.';
+      Exit;
+    end;
+
+    // --- 4. Duplicate-name handling -------------------------------------------
+    TargetPath := AnsiMappingDir + ExtractFileName(ASourcePath);
+
+    if FileExists(TargetPath) then
+    begin
+      if Application.MessageBox(PChar('A mapping named "' + ChangeFileExt(ExtractFileName(ASourcePath), '') + '" already exists.' + sLineBreak + 'Overwrite the existing file?'),
+        'Confirm Overwrite', MB_ICONQUESTION or MB_YESNO or MB_DEFBUTTON2) <> ID_YES then
+      begin
+        TargetPath := GenerateUniqueFileName(AnsiMappingDir, ExtractFileName(ASourcePath));
+        if TargetPath = '' then
+        begin
+          AErrorMessage := 'Could not generate unique file name.';
+          Exit;
+        end;
+      end;
+    end;
+
+    // --- 5. Copy ---------------------------------------------------------------
+    if not Windows.CopyFile(PChar(ASourcePath), PChar(TargetPath), False) then
+    begin
+      AErrorMessage := 'Failed to copy file to target directory. Error: ' + SysErrorMessage(GetLastError);
+      Exit;
+    end;
+
+    ImportedName := ChangeFileExt(ExtractFileName(TargetPath), '');
+    Result       := True;
+
+    // --- 6. Scan / refresh -----------------------------------------------------
+    ScanAvroEncoFiles(AnsiMappingDir);
+
+    // --- 7. Activate the new mapping ------------------------------------------
+    // Plain JSON mappings are unprotected: import activates them, exactly like
+    // the pre-container behaviour. InvalidateEngine first - when the name was
+    // already cached, the freshly copied file must replace the stale parked
+    // engine. A failed activation leaves the previous mapping live and is only
+    // logged: the file itself imported fine.
+    AnsiEngineManager.InvalidateEngine(ImportedName);
+    ErrorLog := TStringList.Create;
+    try
+      if AnsiEngineManager.SwitchEngine(ImportedName, ErrorLog) then
+      begin
+        SaveSettings; // persist the active AnsiVersion
+        Log('Imported and activated json mapping: ' + ImportedName);
+      end
+      else
+        Log('Imported but could not activate ' + ImportedName + ': ' + ErrorLog.Text);
+    finally
+      ErrorLog.Free;
+    end;
+
+    Log('Imported json mapping file: ' + ImportedName);
+    ShowAnsiToastNotification('Mapping imported: ' + ImportedName);
+  except
+    on E: Exception do
+    begin
+      Result := False;
+      AErrorMessage := 'Unexpected error while importing the file.';
+      Log('ImportJsonMappingFile exception: ' + E.ClassName + ': ' + E.Message + ' - ' + ASourcePath);
     end;
   end;
 end;

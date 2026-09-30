@@ -863,6 +863,15 @@ procedure TTopBar.WMDROPFILES(var msg: TWMDropFiles);
       if not result and (ErrMsg <> '') then
         Application.MessageBox(PChar(ErrMsg), 'Import Error', MB_ICONERROR or MB_OK);
       AvroMainForm1.BuildAnsiVersionMenus;
+    end
+    else if uppercase(ExtractFileExt(FileName)) = '.JSON' then
+    begin
+      // Plain JSON mappings import through the shared helper - validation,
+      // copy into AnsiMappingDir, activation and toast.
+      result := ImportJsonMappingFile(FileName, ErrMsg);
+      if not result and (ErrMsg <> '') then
+        Application.MessageBox(PChar(ErrMsg), 'Import Error', MB_ICONERROR or MB_OK);
+      AvroMainForm1.BuildAnsiVersionMenus;
     end;
   end;
 

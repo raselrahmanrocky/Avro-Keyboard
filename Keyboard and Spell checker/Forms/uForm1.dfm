@@ -1674,6 +1674,7 @@ object AvroMainForm1: TAvroMainForm1
         end
         object GetAcrobatReader3: TMenuItem
           Caption = 'Avro on Telegram'
+          ImageIndex = 33
           OnClick = JoinTelegramCommunity
         end
       end
