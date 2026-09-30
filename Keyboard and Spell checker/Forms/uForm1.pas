@@ -305,6 +305,7 @@ type
 
       procedure HandleThemes;
       procedure HandleLayoutDirectoryChanged(Sender: TObject);
+      procedure HandleRemoteEncoRefresh;
       function BuildAnsiMappingFolderList: string;
       procedure RefreshAnsiMappingList;
       function BuildLayoutFolderList: string;
@@ -1559,6 +1560,69 @@ begin
   except
     on E: Exception do
       Log('Layout directory handler failed: ' + E.ClassName + ' - ' + E.Message);
+  end;
+end;
+
+{ refresh_enco: a second process (a double-clicked .AvroEnco import) just
+  imported - and possibly activated - a mapping. The directory watcher already
+  sees the file on disk; what it cannot see is the AnsiVersion value the other
+  process persisted. Re-read that value here and run the normal switch path
+  when it moved, then reconcile menus and the engine cache exactly like a
+  local folder change. }
+procedure TAvroMainForm1.HandleRemoteEncoRefresh;
+var
+  Persisted: string;
+  ErrorLog:  TStringList;
+begin
+  try
+    // Pick the freshly imported file into the shared list before anything
+    // resolves paths against it.
+    ScanAvroEncoFiles(AnsiMappingDir);
+
+    Persisted := ReadActiveAnsiVersion;
+    if (Persisted <> '') and (not SameText(Persisted, AnsiVersion)) then
+    begin
+      // Same two-step switch as the encoding menu click: instant path first,
+      // blocking on-demand repair parse as the fallback.
+      if AnsiEngineManager.TrySwitchCached(Persisted) then
+      begin
+        AnsiVersion := Persisted;
+        SyncActiveMappingTimestamp(Persisted);
+        UpdateAnsiVersionMenuChecks(Persisted);
+        ReplaceAnsiMenuParentIcon;
+        UpdateTrayIcon;
+        if ShowAnsiSwitchNotification = 'YES' then
+          ShowAnsiToastNotification('ANSI Encoding: ' + Persisted);
+      end
+      else
+      begin
+        Screen.Cursor := crHourGlass;
+        ErrorLog := TStringList.Create;
+        try
+          if AnsiEngineManager.SwitchEngine(Persisted, ErrorLog) then
+          begin
+            AnsiVersion := Persisted;
+            SyncActiveMappingTimestamp(Persisted);
+            UpdateAnsiVersionMenuChecks(Persisted);
+            ReplaceAnsiMenuParentIcon;
+            UpdateTrayIcon;
+            if ShowAnsiSwitchNotification = 'YES' then
+              ShowAnsiToastNotification('ANSI Encoding: ' + Persisted);
+          end
+          else
+            ShowAnsiToastNotification('ANSI encoding failed to load - try again');
+        finally
+          ErrorLog.Free;
+          Screen.Cursor := crDefault;
+        end;
+      end;
+    end;
+
+    // Reconcile menus, engine cache and snapshot like any other folder change.
+    HandleLayoutDirectoryChanged(nil);
+  except
+    on E: Exception do
+      Log('refresh_enco handler failed: ' + E.ClassName + ' - ' + E.Message);
   end;
 end;
 
@@ -3432,6 +3496,14 @@ begin
     Msg.Result := 21;
   end;
 
+  if cmd = 'refresh_enco' then
+  begin
+    HandleRemoteEncoRefresh;
+
+    // Send something back
+    Msg.Result := 21;
+  end;
+
   if cmd = 'toggle' then
   begin
     KeyLayout.ToggleMode;
@@ -3708,11 +3780,11 @@ begin
 
   { Top bar mode has no tray icon, so there is nothing to click. The notice
     still has to reach the user once - it rides the top bar's own hint
-    balloon, which the menu route (Download More Resources...) completes. }
+    balloon, which the menu route (Resources Management) completes. }
   if Assigned(TopBar) and TopBar.Visible then
   begin
     TopBar.BalloonHint1.Title := Msg + sLineBreak +
-      'Choose "Download More Resources..." from the Avro menu.';
+      'Choose "Resources Management" from the Avro menu.';
     TopBar.BalloonHint1.ShowHint(TopBar.ImgButtonMode);
   end;
 end;
@@ -3765,11 +3837,11 @@ begin
 
   { Top bar mode has no tray icon, so there is nothing to click. The notice
     still has to reach the user once - it rides the top bar's own hint
-    balloon, which the menu route (Download More Resources...) completes. }
+    balloon, which the menu route (Resources Management) completes. }
   if Assigned(TopBar) and TopBar.Visible then
   begin
     TopBar.BalloonHint1.Title := Msg + sLineBreak +
-      'Choose "Download More Resources..." from the Avro menu.';
+      'Choose "Resources Management" from the Avro menu.';
     TopBar.BalloonHint1.ShowHint(TopBar.ImgButtonMode);
   end;
 end;
@@ -4000,7 +4072,7 @@ var
     MoreOptMenu.Add(Item);
 
     Item := TMenuItem.Create(MoreOptMenu);
-    Item.Caption := 'Download More Resources...';
+    Item.Caption := 'Resources Management';
     Item.OnClick := DownloadMoreResourcesClick;
     MoreOptMenu.Add(Item);
   end;

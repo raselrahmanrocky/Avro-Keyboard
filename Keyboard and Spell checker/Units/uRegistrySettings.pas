@@ -114,6 +114,14 @@ procedure FillSafeDefaults;
 procedure SaveSettings;
 procedure SaveAnsiVersionOnly;
 
+{ Cross-process re-read of the persisted active ANSI mapping name. The
+  refresh_enco WM_COPYDATA command uses it: a second process (a double-clicked
+  .AvroEnco import) may have activated a different mapping through
+  SaveAnsiVersionOnly/SaveSettings, and the running instance must pick that up
+  without reloading every other setting. Returns '' when nothing is persisted
+  or the read fails. }
+function ReadActiveAnsiVersion: string;
+
 procedure LoadSettingsFromFile;
 procedure SaveSettingsInXML;
 
@@ -876,6 +884,44 @@ begin
     Reg.Free;
   end;
   {$ENDIF}
+end;
+
+{ =============================================================================== }
+
+function ReadActiveAnsiVersion: string;
+{$IFDEF PortableOn}
+var
+  XML: TXMLSetting;
+{$ELSE}
+var
+  Reg: TMyRegistry;
+{$ENDIF}
+begin
+  Result := '';
+  try
+    {$IFDEF PortableOn}
+    XML := TXMLSetting.Create;
+    try
+      XML.LoadXMLData;
+      Result := XML.GetValue('AnsiVersion', '');
+    finally
+      XML.Free;
+    end;
+    {$ELSE}
+    Reg := TMyRegistry.Create;
+    try
+      Reg.RootKey := HKEY_CURRENT_USER;
+      if Reg.OpenKey('Software\OmicronLab\Avro Keyboard', False) then
+        Result := Reg.ReadStringDef('AnsiVersion', '');
+    finally
+      Reg.Free;
+    end;
+    {$ENDIF}
+  except
+    // A locked/removed settings store must never break the caller: '' simply
+    // means "cannot tell", and the caller keeps its current mapping.
+    Result := '';
+  end;
 end;
 
 initialization

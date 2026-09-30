@@ -149,7 +149,7 @@ procedure RebuildAnviVersionMenus;
     MoreOptMenu.Add(Item);
 
     Item := TMenuItem.Create(MoreOptMenu);
-    Item.Caption := 'Download More Resources...';
+    Item.Caption := 'Resources Management';
     Item.OnClick := AvroMainForm1.DownloadMoreResourcesClick;
     MoreOptMenu.Add(Item);
   end;

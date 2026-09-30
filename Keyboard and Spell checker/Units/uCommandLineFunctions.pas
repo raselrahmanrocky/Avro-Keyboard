@@ -21,6 +21,7 @@ uses
 function HandleAllCommandLine: Boolean;
 function CheckSkinInstallParam: Boolean;
 function CheckLayoutInstallParam: Boolean;
+function CheckEncoInstallParam: Boolean;
 function CheckSendCommandParam: Boolean;
 
 function SendCommand(cmd: string): Boolean;
@@ -34,7 +35,8 @@ uses
   WindowsVersion,
   uFileFolderHandling,
   SkinLoader,
-  KeyboardLayoutLoader;
+  KeyboardLayoutLoader,
+  uAvroEncoImporter;
 
 { =============================================================================== }
 
@@ -78,6 +80,28 @@ end;
 
 { =============================================================================== }
 
+{ FindWindow('TAvroMainForm1') demonstrably misses the main window on some
+  systems (Win10 22H2: the window is a visible top-level owned window and
+  EnumWindows reports it, yet FindWindow/FindWindowEx return NULL for the exact
+  class name - from any process, the Delphi CLI included). Every command sent
+  through SendCommand (toggle, minimize/restore, refresh_layout, refresh_enco)
+  therefore died silently. EnumWindows finds it reliably, so it is the
+  authoritative lookup; FindWindow stays only as the fast path. }
+var
+  GEnumFoundMainWnd: THandle;
+
+function EnumFindMainWndProc(Wnd: HWND; Param: LPARAM): BOOL; stdcall;
+var
+  ClassName: array [0 .. 255] of Char;
+begin
+  Result := True;
+  if (GetClassName(Wnd, ClassName, Length(ClassName)) > 0) and (StrComp(ClassName, 'TAvroMainForm1') = 0) then
+  begin
+    GEnumFoundMainWnd := Wnd;
+    Result := False;
+  end;
+end;
+
 function SendCommand(cmd: string): Boolean;
 var
   copyDataStruct: TCopyDataStruct;
@@ -85,10 +109,21 @@ var
 begin
   result := False;
   copyDataStruct.dwData := 0; // 0=string
-  copyDataStruct.cbData := 1 + Length(cmd);
+  // cbData is the marshaled byte count of the payload. PChar is UTF-16 since
+  // Delphi 2009, so the ANSI-era "1 + Length" (chars incl. terminator) sent
+  // only half the buffer; the OS copies exactly cbData bytes across processes
+  // and the receiver read a truncated, non-terminated garbage string - the
+  // command silently did nothing. Count bytes, not characters.
+  copyDataStruct.cbData := (1 + Length(cmd)) * SizeOf(Char);
   copyDataStruct.lpData := PChar(cmd);
 
   receiverHandle := FindWindow(PChar('TAvroMainForm1'), nil);
+  if receiverHandle = 0 then
+  begin
+    GEnumFoundMainWnd := 0;
+    EnumWindows(@EnumFindMainWndProc, 0);
+    receiverHandle := GEnumFoundMainWnd;
+  end;
   if receiverHandle = 0 then
     exit;
 
@@ -101,7 +136,7 @@ end;
 function HandleAllCommandLine: Boolean;
 begin
   result := False;
-  if CheckSkinInstallParam or CheckLayoutInstallParam or CheckSendCommandParam then
+  if CheckSkinInstallParam or CheckLayoutInstallParam or CheckEncoInstallParam or CheckSendCommandParam then
     result := True;
 end;
 
@@ -174,6 +209,43 @@ begin
       end;
     end;
   end;
+
+end;
+
+{ =============================================================================== }
+
+function CheckEncoInstallParam: Boolean;
+var
+  i:      Integer;
+  ErrMsg: string;
+begin
+  result := False;
+  if uCmdLineHelper.GetParamCount <= 0 then
+    exit;
+
+  for i := 1 to uCmdLineHelper.GetParamCount do
+  begin
+    if FileExists(uCmdLineHelper.GetParamStr(i)) then
+    begin
+      if uppercase(ExtractFileExt(uCmdLineHelper.GetParamStr(i))) = '.AVROENCO' then
+      begin
+        result := True;
+
+        // ImportEncoFile: default-key containers import silently, password
+        // protected ones prompt (ErrMsg stays empty when the user cancels).
+        ErrMsg := '';
+        ImportEncoFile(uCmdLineHelper.GetParamStr(i), ErrMsg);
+        if ErrMsg <> '' then
+          Application.MessageBox(PChar(ErrMsg), 'Avro Keyboard', MB_ICONERROR or MB_OK);
+      end;
+    end;
+  end;
+
+  // A running first instance must reload its active mapping; when no instance
+  // is listening SendCommand silently does nothing and the next app start
+  // picks the imported file up from disk anyway.
+  if result then
+    SendCommand('refresh_enco');
 
 end;
 
