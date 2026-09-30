@@ -9,7 +9,7 @@ object FrameImageAdd: TFrameImageAdd
   Margins.Bottom = 5
   HorzScrollBar.Visible = False
   VertScrollBar.Visible = False
-  Color = clWhite
+  Color = clWindow
   ParentBackground = False
   ParentColor = False
   TabOrder = 0
@@ -37,7 +37,7 @@ object FrameImageAdd: TFrameImageAdd
       Margins.Right = 5
       Margins.Bottom = 5
       Caption = 'Top Bar Background:'
-      Color = clWhite
+      Color = clWindow
       Font.Charset = DEFAULT_CHARSET
       Font.Color = clWindowText
       Font.Height = -17
@@ -57,7 +57,7 @@ object FrameImageAdd: TFrameImageAdd
       Margins.Right = 5
       Margins.Bottom = 5
       Caption = 'Image:'
-      Color = clWhite
+      Color = clWindow
       Font.Charset = DEFAULT_CHARSET
       Font.Color = clWindowText
       Font.Height = -17
@@ -117,7 +117,7 @@ object FrameImageAdd: TFrameImageAdd
       Margins.Right = 5
       Margins.Bottom = 5
       Caption = 'Avro Icon Button:'
-      Color = clWhite
+      Color = clWindow
       Font.Charset = DEFAULT_CHARSET
       Font.Color = clWindowText
       Font.Height = -17
@@ -137,7 +137,7 @@ object FrameImageAdd: TFrameImageAdd
       Margins.Right = 5
       Margins.Bottom = 5
       Caption = 'Normal Image:'
-      Color = clWhite
+      Color = clWindow
       Font.Charset = DEFAULT_CHARSET
       Font.Color = clWindowText
       Font.Height = -17
@@ -157,7 +157,7 @@ object FrameImageAdd: TFrameImageAdd
       Margins.Right = 5
       Margins.Bottom = 5
       Caption = 'Mouse Over Image:'
-      Color = clWhite
+      Color = clWindow
       Font.Charset = DEFAULT_CHARSET
       Font.Color = clWindowText
       Font.Height = -17
@@ -177,7 +177,7 @@ object FrameImageAdd: TFrameImageAdd
       Margins.Right = 5
       Margins.Bottom = 5
       Caption = 'Mouse Down Image:'
-      Color = clWhite
+      Color = clWindow
       Font.Charset = DEFAULT_CHARSET
       Font.Color = clWindowText
       Font.Height = -17
@@ -289,7 +289,7 @@ object FrameImageAdd: TFrameImageAdd
       Margins.Right = 5
       Margins.Bottom = 5
       Caption = 'Keyboard Mode Button (English Keyboard Mode):'
-      Color = clWhite
+      Color = clWindow
       Font.Charset = DEFAULT_CHARSET
       Font.Color = clWindowText
       Font.Height = -17
@@ -309,7 +309,7 @@ object FrameImageAdd: TFrameImageAdd
       Margins.Right = 5
       Margins.Bottom = 5
       Caption = 'Normal Image:'
-      Color = clWhite
+      Color = clWindow
       Font.Charset = DEFAULT_CHARSET
       Font.Color = clWindowText
       Font.Height = -17
@@ -329,7 +329,7 @@ object FrameImageAdd: TFrameImageAdd
       Margins.Right = 5
       Margins.Bottom = 5
       Caption = 'Mouse Over Image:'
-      Color = clWhite
+      Color = clWindow
       Font.Charset = DEFAULT_CHARSET
       Font.Color = clWindowText
       Font.Height = -17
@@ -349,7 +349,7 @@ object FrameImageAdd: TFrameImageAdd
       Margins.Right = 5
       Margins.Bottom = 5
       Caption = 'Mouse Down Image:'
-      Color = clWhite
+      Color = clWindow
       Font.Charset = DEFAULT_CHARSET
       Font.Color = clWindowText
       Font.Height = -17
@@ -461,7 +461,7 @@ object FrameImageAdd: TFrameImageAdd
       Margins.Right = 5
       Margins.Bottom = 5
       Caption = 'Keyboard Mode Button (Bangla Keyboard Mode):'
-      Color = clWhite
+      Color = clWindow
       Font.Charset = DEFAULT_CHARSET
       Font.Color = clWindowText
       Font.Height = -17
@@ -481,7 +481,7 @@ object FrameImageAdd: TFrameImageAdd
       Margins.Right = 5
       Margins.Bottom = 5
       Caption = 'Normal Image:'
-      Color = clWhite
+      Color = clWindow
       Font.Charset = DEFAULT_CHARSET
       Font.Color = clWindowText
       Font.Height = -17
@@ -501,7 +501,7 @@ object FrameImageAdd: TFrameImageAdd
       Margins.Right = 5
       Margins.Bottom = 5
       Caption = 'Mouse Over Image:'
-      Color = clWhite
+      Color = clWindow
       Font.Charset = DEFAULT_CHARSET
       Font.Color = clWindowText
       Font.Height = -17
@@ -521,7 +521,7 @@ object FrameImageAdd: TFrameImageAdd
       Margins.Right = 5
       Margins.Bottom = 5
       Caption = 'Mouse Down Image:'
-      Color = clWhite
+      Color = clWindow
       Font.Charset = DEFAULT_CHARSET
       Font.Color = clWindowText
       Font.Height = -17
@@ -633,7 +633,7 @@ object FrameImageAdd: TFrameImageAdd
       Margins.Right = 5
       Margins.Bottom = 5
       Caption = 'Keyboard Layout Button:'
-      Color = clWhite
+      Color = clWindow
       Font.Charset = DEFAULT_CHARSET
       Font.Color = clWindowText
       Font.Height = -17
@@ -653,7 +653,7 @@ object FrameImageAdd: TFrameImageAdd
       Margins.Right = 5
       Margins.Bottom = 5
       Caption = 'Normal Image:'
-      Color = clWhite
+      Color = clWindow
       Font.Charset = DEFAULT_CHARSET
       Font.Color = clWindowText
       Font.Height = -17
@@ -673,7 +673,7 @@ object FrameImageAdd: TFrameImageAdd
       Margins.Right = 5
       Margins.Bottom = 5
       Caption = 'Mouse Over Image:'
-      Color = clWhite
+      Color = clWindow
       Font.Charset = DEFAULT_CHARSET
       Font.Color = clWindowText
       Font.Height = -17
@@ -693,7 +693,7 @@ object FrameImageAdd: TFrameImageAdd
       Margins.Right = 5
       Margins.Bottom = 5
       Caption = 'Mouse Down Image:'
-      Color = clWhite
+      Color = clWindow
       Font.Charset = DEFAULT_CHARSET
       Font.Color = clWindowText
       Font.Height = -17
@@ -805,7 +805,7 @@ object FrameImageAdd: TFrameImageAdd
       Margins.Right = 5
       Margins.Bottom = 5
       Caption = 'Layout Viewer Button:'
-      Color = clWhite
+      Color = clWindow
       Font.Charset = DEFAULT_CHARSET
       Font.Color = clWindowText
       Font.Height = -17
@@ -825,7 +825,7 @@ object FrameImageAdd: TFrameImageAdd
       Margins.Right = 5
       Margins.Bottom = 5
       Caption = 'Normal Image:'
-      Color = clWhite
+      Color = clWindow
       Font.Charset = DEFAULT_CHARSET
       Font.Color = clWindowText
       Font.Height = -17
@@ -845,7 +845,7 @@ object FrameImageAdd: TFrameImageAdd
       Margins.Right = 5
       Margins.Bottom = 5
       Caption = 'Mouse Over Image:'
-      Color = clWhite
+      Color = clWindow
       Font.Charset = DEFAULT_CHARSET
       Font.Color = clWindowText
       Font.Height = -17
@@ -865,7 +865,7 @@ object FrameImageAdd: TFrameImageAdd
       Margins.Right = 5
       Margins.Bottom = 5
       Caption = 'Mouse Down Image:'
-      Color = clWhite
+      Color = clWindow
       Font.Charset = DEFAULT_CHARSET
       Font.Color = clWindowText
       Font.Height = -17
@@ -977,7 +977,7 @@ object FrameImageAdd: TFrameImageAdd
       Margins.Right = 5
       Margins.Bottom = 5
       Caption = 'Avro Mouse Button:'
-      Color = clWhite
+      Color = clWindow
       Font.Charset = DEFAULT_CHARSET
       Font.Color = clWindowText
       Font.Height = -17
@@ -997,7 +997,7 @@ object FrameImageAdd: TFrameImageAdd
       Margins.Right = 5
       Margins.Bottom = 5
       Caption = 'Normal Image:'
-      Color = clWhite
+      Color = clWindow
       Font.Charset = DEFAULT_CHARSET
       Font.Color = clWindowText
       Font.Height = -17
@@ -1017,7 +1017,7 @@ object FrameImageAdd: TFrameImageAdd
       Margins.Right = 5
       Margins.Bottom = 5
       Caption = 'Mouse Over Image:'
-      Color = clWhite
+      Color = clWindow
       Font.Charset = DEFAULT_CHARSET
       Font.Color = clWindowText
       Font.Height = -17
@@ -1037,7 +1037,7 @@ object FrameImageAdd: TFrameImageAdd
       Margins.Right = 5
       Margins.Bottom = 5
       Caption = 'Mouse Down Image:'
-      Color = clWhite
+      Color = clWindow
       Font.Charset = DEFAULT_CHARSET
       Font.Color = clWindowText
       Font.Height = -17
@@ -1149,7 +1149,7 @@ object FrameImageAdd: TFrameImageAdd
       Margins.Right = 5
       Margins.Bottom = 5
       Caption = 'Tools Button:'
-      Color = clWhite
+      Color = clWindow
       Font.Charset = DEFAULT_CHARSET
       Font.Color = clWindowText
       Font.Height = -17
@@ -1169,7 +1169,7 @@ object FrameImageAdd: TFrameImageAdd
       Margins.Right = 5
       Margins.Bottom = 5
       Caption = 'Normal Image:'
-      Color = clWhite
+      Color = clWindow
       Font.Charset = DEFAULT_CHARSET
       Font.Color = clWindowText
       Font.Height = -17
@@ -1189,7 +1189,7 @@ object FrameImageAdd: TFrameImageAdd
       Margins.Right = 5
       Margins.Bottom = 5
       Caption = 'Mouse Over Image:'
-      Color = clWhite
+      Color = clWindow
       Font.Charset = DEFAULT_CHARSET
       Font.Color = clWindowText
       Font.Height = -17
@@ -1209,7 +1209,7 @@ object FrameImageAdd: TFrameImageAdd
       Margins.Right = 5
       Margins.Bottom = 5
       Caption = 'Mouse Down Image:'
-      Color = clWhite
+      Color = clWindow
       Font.Charset = DEFAULT_CHARSET
       Font.Color = clWindowText
       Font.Height = -17
@@ -1321,7 +1321,7 @@ object FrameImageAdd: TFrameImageAdd
       Margins.Right = 5
       Margins.Bottom = 5
       Caption = 'Help Button:'
-      Color = clWhite
+      Color = clWindow
       Font.Charset = DEFAULT_CHARSET
       Font.Color = clWindowText
       Font.Height = -17
@@ -1341,7 +1341,7 @@ object FrameImageAdd: TFrameImageAdd
       Margins.Right = 5
       Margins.Bottom = 5
       Caption = 'Normal Image:'
-      Color = clWhite
+      Color = clWindow
       Font.Charset = DEFAULT_CHARSET
       Font.Color = clWindowText
       Font.Height = -17
@@ -1361,7 +1361,7 @@ object FrameImageAdd: TFrameImageAdd
       Margins.Right = 5
       Margins.Bottom = 5
       Caption = 'Mouse Over Image:'
-      Color = clWhite
+      Color = clWindow
       Font.Charset = DEFAULT_CHARSET
       Font.Color = clWindowText
       Font.Height = -17
@@ -1381,7 +1381,7 @@ object FrameImageAdd: TFrameImageAdd
       Margins.Right = 5
       Margins.Bottom = 5
       Caption = 'Mouse Down Image:'
-      Color = clWhite
+      Color = clWindow
       Font.Charset = DEFAULT_CHARSET
       Font.Color = clWindowText
       Font.Height = -17
@@ -1493,7 +1493,7 @@ object FrameImageAdd: TFrameImageAdd
       Margins.Right = 5
       Margins.Bottom = 5
       Caption = 'Web Options Button:'
-      Color = clWhite
+      Color = clWindow
       Font.Charset = DEFAULT_CHARSET
       Font.Color = clWindowText
       Font.Height = -17
@@ -1513,7 +1513,7 @@ object FrameImageAdd: TFrameImageAdd
       Margins.Right = 5
       Margins.Bottom = 5
       Caption = 'Normal Image:'
-      Color = clWhite
+      Color = clWindow
       Font.Charset = DEFAULT_CHARSET
       Font.Color = clWindowText
       Font.Height = -17
@@ -1533,7 +1533,7 @@ object FrameImageAdd: TFrameImageAdd
       Margins.Right = 5
       Margins.Bottom = 5
       Caption = 'Mouse Over Image:'
-      Color = clWhite
+      Color = clWindow
       Font.Charset = DEFAULT_CHARSET
       Font.Color = clWindowText
       Font.Height = -17
@@ -1553,7 +1553,7 @@ object FrameImageAdd: TFrameImageAdd
       Margins.Right = 5
       Margins.Bottom = 5
       Caption = 'Mouse Down Image:'
-      Color = clWhite
+      Color = clWindow
       Font.Charset = DEFAULT_CHARSET
       Font.Color = clWindowText
       Font.Height = -17
@@ -1665,7 +1665,7 @@ object FrameImageAdd: TFrameImageAdd
       Margins.Right = 5
       Margins.Bottom = 5
       Caption = 'Exit Button:'
-      Color = clWhite
+      Color = clWindow
       Font.Charset = DEFAULT_CHARSET
       Font.Color = clWindowText
       Font.Height = -17
@@ -1685,7 +1685,7 @@ object FrameImageAdd: TFrameImageAdd
       Margins.Right = 5
       Margins.Bottom = 5
       Caption = 'Normal Image:'
-      Color = clWhite
+      Color = clWindow
       Font.Charset = DEFAULT_CHARSET
       Font.Color = clWindowText
       Font.Height = -17
@@ -1705,7 +1705,7 @@ object FrameImageAdd: TFrameImageAdd
       Margins.Right = 5
       Margins.Bottom = 5
       Caption = 'Mouse Over Image:'
-      Color = clWhite
+      Color = clWindow
       Font.Charset = DEFAULT_CHARSET
       Font.Color = clWindowText
       Font.Height = -17
@@ -1725,7 +1725,7 @@ object FrameImageAdd: TFrameImageAdd
       Margins.Right = 5
       Margins.Bottom = 5
       Caption = 'Mouse Down Image:'
-      Color = clWhite
+      Color = clWindow
       Font.Charset = DEFAULT_CHARSET
       Font.Color = clWindowText
       Font.Height = -17
@@ -1837,7 +1837,7 @@ object FrameImageAdd: TFrameImageAdd
       Margins.Right = 5
       Margins.Bottom = 5
       Caption = 'Preview Image for this skin:'
-      Color = clWhite
+      Color = clWindow
       Font.Charset = DEFAULT_CHARSET
       Font.Color = clWindowText
       Font.Height = -17

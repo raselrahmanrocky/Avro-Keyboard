@@ -162,7 +162,7 @@ uses
   strutils,
   uRegistrySettings,
   uWindowHandlers,
-  WindowsDarkMode;
+  uThemeManager;
 
 const
   Show_Window_in_Taskbar = True;
@@ -785,7 +785,8 @@ end;
 
 procedure TfrmSpell.AppEventsSettingChange(Sender: TObject; Flag: Integer; const Section: string; var Result: LongInt);
 begin
-  if SameText('ImmersiveColorSet', string(Section)) then
+  if SameText('ImmersiveColorSet', string(Section))
+     or SameText(APP_THEME_BROADCAST_SECTION, string(Section)) then
     HandleThemes;
 end;
 
@@ -877,7 +878,7 @@ end;
 
 procedure TfrmSpell.HandleThemes;
 begin
-  SetAppropriateThemeMode('Windows10 Dark', 'Windows10');
+  ApplyStoredAppTheme;
 end;
 
 procedure TfrmSpell.SaveToStream_BOM_Specify(Stream: TStream; WithBOM, BOM_Unicode, BOM_UnicodeBE, BOM_UTF8: Boolean);

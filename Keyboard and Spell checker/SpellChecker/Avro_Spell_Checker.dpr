@@ -23,6 +23,7 @@ uses
   clsRegistry_XMLSetting in 'clsRegistry_XMLSetting.pas',
   WindowsVersion in '..\Units\WindowsVersion.pas',
   WindowsDarkMode in '..\Units\WindowsDarkMode.pas',
+  uThemeManager in '..\Units\uThemeManager.pas',
   Vcl.Themes,
   Vcl.Styles,
   DebugLog in '..\Units\DebugLog.pas';

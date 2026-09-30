@@ -60,6 +60,12 @@ const
   APP_THEME_SETTING_LIGHT  = 'LIGHT';
   APP_THEME_SETTING_DARK   = 'DARK';
 
+  { Section name of the WM_SETTINGCHANGE broadcast sent after the stored
+    AppThemeMode changes. Satellite tools listen for it in their
+    TApplicationEvents.OnSettingChange and re-read the store, so an open
+    Layout Editor / Skin Designer / Avro Pad restyles live. }
+  APP_THEME_BROADCAST_SECTION = 'AvroThemeMode';
+
   { True when Windows itself uses light application mode. Reads
     HKCU\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize\
     AppsUseLightTheme (0 = dark); a missing value means light, which is also
@@ -93,6 +99,19 @@ function CurrentPalette: TAppThemePalette;
   result. This is the single entry point for the application. }
 procedure ApplyAppTheme(const AMode: TAppThemeMode);
 
+{ Persisted AppThemeMode ('SYSTEM'/'LIGHT'/'DARK') from the same store the
+  main app uses: HKCU\Software\OmicronLab\Avro Keyboard (installed) or
+  Settings.xml beside the exe (portable). Missing/garbage => atmSystemDefault.
+  Satellite tools (Layout Editor, Skin Designer, Avro Pad) use this so every
+  Avro window agrees with the Customize dialog, whatever Windows is doing. }
+function StoredAppThemeMode: TAppThemeMode;
+procedure ApplyStoredAppTheme;
+
+{ Tells every running Avro process (this one included) that the stored
+  AppThemeMode changed. Signal only - receivers re-read the store, so the
+  broadcast is identical for installed (registry) and portable (XML) builds. }
+procedure BroadcastAppThemeChanged;
+
 { DWMWA_USE_IMMERSIVE_DARK_MODE on one window; True when the attribute was
   accepted. It is a no-op for a borderless window (the flyouts are WS_POPUP
   with no frame) and while a VCL style draws the non-client area - it is the
@@ -103,10 +122,14 @@ implementation
 
 uses
   System.SysUtils,
+  System.Variants, // VarToStr on an XML node value
   System.Win.Registry,
+  Xml.XMLDoc, // TXMLDocument: the portable store, read-only
+  Xml.XMLIntf, // IXMLNode
   Vcl.Themes,
   Vcl.Forms,
-  Winapi.DwmApi;
+  Winapi.DwmApi,
+  Winapi.Messages; // WM_SETTINGCHANGE lives here, not in Winapi.Windows
 
 const
   { Windows 10 17763..18999 shipped the attribute with this pre-release id. }
@@ -114,6 +137,13 @@ const
 
   THEME_KEY   = 'Software\Microsoft\Windows\CurrentVersion\Themes\Personalize';
   THEME_VALUE = 'AppsUseLightTheme';
+
+  { The store the Customize dialog writes: the Avro Keyboard registry key when
+    installed, Settings.xml beside the exe when portable. Every satellite reads
+    THIS one - never its own settings file - so one setting drives them all. }
+  AVRO_SETTING_KEY   = 'Software\OmicronLab\Avro Keyboard';
+  AVRO_SETTING_VALUE = 'AppThemeMode';
+  AVRO_SETTING_FILE  = 'Settings.xml';
 
 var
   // The resolved theme in force; light until ApplyAppTheme says otherwise.
@@ -307,6 +337,101 @@ begin
     ApplyImmersiveDarkMode(Screen.ActiveForm.Handle, Dark);
   if Assigned(Application.MainForm) then
     ApplyImmersiveDarkMode(Application.MainForm.Handle, Dark);
+end;
+
+{ =============================================================================== }
+{ Stored setting (what the Customize dialog last wrote) }
+{ =============================================================================== }
+
+{$IFDEF PortableOn}
+{ Settings.xml beside the exe, in the exact layout TXMLSetting writes: a root
+  element holding one child element per setting, each with a single CDATA
+  payload. Read here instead of through clsRegistry_XMLSetting on purpose:
+  every satellite ships its OWN copy of that class pointed at its OWN file
+  ('Layout Editor Settings.xml', 'Spell Settings.xml'), so going through the
+  class would silently read the wrong document in those projects. This reader
+  always opens the main Avro Keyboard settings, whichever project links this
+  unit. An absent or malformed file simply yields '' (= SYSTEM). }
+function PortableAppThemeSetting: string;
+var
+  Doc:  TXMLDocument;
+  Node: IXMLNode;
+begin
+  Result := '';
+  if not FileExists(ExtractFilePath(Application.ExeName) + AVRO_SETTING_FILE) then
+    Exit;
+  { Owner must be Application, not nil. With a nil owner FOwnerIsComponent is
+    False, and TXMLDocument._Release (Xml.XMLDoc.pas) DESTROYS the document the
+    moment the document-element node's transient second reference is released
+    (FRefCount 1 -> 0). That happens while DocumentElement/FindNode is still
+    being evaluated: the freed shell then answers Active with a stale False and
+    the next interface release into the dangling node raises "Invalid pointer
+    operation" - the crash all three portable satellites hit at startup. A
+    component owner suppresses that self-destruct; Doc.Free below frees it. }
+  Doc := TXMLDocument.Create(Application);
+  try
+    try
+      Doc.Active := True;
+      Doc.LoadFromFile(ExtractFilePath(Application.ExeName) + AVRO_SETTING_FILE);
+      Node := Doc.DocumentElement.ChildNodes.FindNode(AVRO_SETTING_VALUE);
+      if Assigned(Node) and (Node.ChildNodes.Count > 0) then
+        Result := Trim(VarToStr(Node.ChildNodes.Nodes[0].NodeValue));
+    except
+      Result := '';
+    end;
+    // The node interface must be released BEFORE the document: Node is
+    // finalized in the function epilogue, after Doc.Free, and touching the
+    // already-destroyed DOM there raises "Invalid pointer operation".
+    Node := nil;
+  finally
+    Doc.Free;
+  end;
+end;
+{$ENDIF}
+
+function StoredAppThemeMode: TAppThemeMode;
+{$IFDEF PortableOn}
+begin
+  Result := AppThemeModeFromSetting(PortableAppThemeSetting);
+end;
+{$ELSE}
+var
+  Reg: TRegistry;
+begin
+  Result := atmSystemDefault;
+  Reg := nil;
+  try
+    Reg := TRegistry.Create(KEY_READ);
+    Reg.RootKey := HKEY_CURRENT_USER;
+    if Reg.OpenKey(AVRO_SETTING_KEY, False) then
+      try
+        if Reg.ValueExists(AVRO_SETTING_VALUE) then
+          Result := AppThemeModeFromSetting(Reg.ReadString(AVRO_SETTING_VALUE));
+      finally
+        Reg.CloseKey;
+      end;
+  except
+    // Wrong value type or a locked-down hive must never break theming:
+    // fall back to SYSTEM.
+    Result := atmSystemDefault;
+  end;
+  Reg.Free;
+end;
+{$ENDIF}
+
+procedure ApplyStoredAppTheme;
+begin
+  ApplyAppTheme(StoredAppThemeMode);
+end;
+
+procedure BroadcastAppThemeChanged;
+var
+  Res: DWORD_PTR;
+begin
+  { SMTO_ABORTIFHUNG + short timeout: a hung top-level window anywhere in the
+    session must not block the Customize dialog. Result intentionally ignored. }
+  SendMessageTimeout(HWND_BROADCAST, WM_SETTINGCHANGE, 0,
+    LPARAM(PChar(APP_THEME_BROADCAST_SECTION)), SMTO_ABORTIFHUNG, 500, @Res);
 end;
 
 end.

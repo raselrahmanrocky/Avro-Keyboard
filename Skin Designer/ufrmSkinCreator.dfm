@@ -430,7 +430,7 @@ object frmSkinCreator: TfrmSkinCreator
         Margins.Bottom = 5
         HorzScrollBar.Visible = False
         VertScrollBar.Visible = False
-        Color = clWhite
+        Color = clWindow
         Font.Charset = DEFAULT_CHARSET
         Font.Color = clWindowText
         Font.Height = -18
@@ -735,7 +735,7 @@ object frmSkinCreator: TfrmSkinCreator
     Margins.Top = 5
     Margins.Right = 5
     Margins.Bottom = 5
-    Color = clWhite
+    Color = clWindow
     ParentBackground = False
     TabOrder = 0
     object Label1: TLabel

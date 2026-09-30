@@ -101,7 +101,7 @@ object frmAbout: TfrmAbout
     Top = 0
     Width = 529
     Height = 73
-    Color = clWhite
+    Color = clWindow
     ParentBackground = False
     TabOrder = 2
     object Image1: TImage

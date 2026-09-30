@@ -123,7 +123,7 @@ object frmAbout: TfrmAbout
     Margins.Top = 5
     Margins.Right = 5
     Margins.Bottom = 5
-    Color = clWhite
+    Color = clWindow
     ParentBackground = False
     TabOrder = 0
     object Image1: TImage

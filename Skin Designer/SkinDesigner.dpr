@@ -17,6 +17,7 @@ uses
   uFrameDrag in 'uFrameDrag.pas' {FrameDrag: TFrame} ,
   uFrameImageAdd in 'uFrameImageAdd.pas' {FrameImageAdd: TFrame} ,
   WindowsDarkMode in '..\Keyboard and Spell checker\Units\WindowsDarkMode.pas',
+  uThemeManager in '..\Keyboard and Spell checker\Units\uThemeManager.pas',
   Vcl.Themes,
   Vcl.Styles;
 

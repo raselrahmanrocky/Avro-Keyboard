@@ -19,6 +19,7 @@ uses
   clsFileVersion in '..\Keyboard and Spell checker\Classes\clsFileVersion.pas',
   uFileFolderHandling in '..\Keyboard and Spell checker\Units\uFileFolderHandling.pas',
   WindowsDarkMode in '..\Keyboard and Spell checker\Units\WindowsDarkMode.pas',
+  uThemeManager in '..\Keyboard and Spell checker\Units\uThemeManager.pas',
   Vcl.Themes,
   Vcl.Styles;
 

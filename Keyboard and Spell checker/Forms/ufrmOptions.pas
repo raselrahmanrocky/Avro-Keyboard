@@ -213,6 +213,7 @@ begin
   RecordingTargetEdit := nil;
   Self.SaveSettings;
   AvroMainForm1.RefreshSettings;
+  BroadcastAppThemeChanged;
 
   { Surface the "Settings saved!" status, auto-hidden after 2s
     by LabelHideTimer. Reset the timer in case the user clicks
@@ -253,6 +254,7 @@ begin
   RecordingTargetEdit := nil;
   Self.SaveSettings;
   AvroMainForm1.RefreshSettings;
+  BroadcastAppThemeChanged;
   Self.Close;
 end;
 
