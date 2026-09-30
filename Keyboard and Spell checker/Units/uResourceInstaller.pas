@@ -217,8 +217,10 @@ end;
   - so it survives logoff without needing admin rights. The portable edition
   deliberately skips that write: its file lives in the portable folder, a
   registry pointer would go stale the moment the folder moves, and uForm1
-  re-registers exe's fonts\ on every startup instead. GetFontName extracts
-  the real typeface name so the font shows up correctly in font pickers. }
+  re-registers exe's fonts\ on every startup instead (ExitApp's
+  UnregisterFontFolder balances this session's add, keeping the portable
+  folder deletable after use). GetFontName extracts the real typeface name so
+  the font shows up correctly in font pickers. }
 procedure InstallDownloadedFont(const AFontPath: string);
 {$IFNDEF PortableOn}
 var

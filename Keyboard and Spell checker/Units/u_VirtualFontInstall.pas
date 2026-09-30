@@ -27,6 +27,13 @@ procedure RemoveVirtualFont(FontFilePath: string);
   re-activates the fonts without touching the registry. }
 procedure RegisterFontFolder(const AFolder: string);
 
+{ Releases every .ttf RegisterFontFolder added from AFolder and broadcasts
+  WM_FONTCHANGE once. The portable edition calls it in ExitApp so the fonts\
+  folder can be deleted after use: an AddFontResource that is never balanced
+  keeps the file mapped by the font driver - the OS shows it as "open in
+  System" and every delete/rename fails - until sign-out. }
+procedure UnregisterFontFolder(const AFolder: string);
+
 // Privately used
 function GetTempDirectory: string;
 function GetFontName(TTF_Path: string): string;
@@ -133,6 +140,10 @@ begin
   try
     try
       Reg := TMyRegistry.Create;
+      { Reconcile first: a crashed previous run of this same folder can leave
+        the file registered (mapping it undeletable), and RemoveFontResource
+        at count 0 is a harmless no-op. }
+      RemoveFontResource(PChar(FontFilePath));
       AddFontResource(pchar(FontFilePath));
       VirtualFontName := GetFontName(FontFilePath);
 
@@ -226,6 +237,9 @@ begin
     repeat
       if (Sr.Attr and faDirectory) = 0 then
       begin
+        // Reconcile first (see InstallVirtualFont): clear a stale session
+        // count from a crashed previous run before registering for this one.
+        RemoveFontResource(PChar(Folder + Sr.Name));
         AddFontResource(PChar(Folder + Sr.Name));
         Added := True;
       end;
@@ -237,6 +251,38 @@ begin
   if Added then
     // SendNotifyMessage, NOT SendMessage: broadcast must never block the
     // startup path on some hung top-level window.
+    SendNotifyMessage(HWND_BROADCAST, WM_FONTCHANGE, 0, 0);
+end;
+
+{ =============================================================================== }
+
+procedure UnregisterFontFolder(const AFolder: string);
+var
+  Sr:      TSearchRec;
+  Folder:  string;
+  Removed: Boolean;
+begin
+  Folder := IncludeTrailingPathDelimiter(AFolder);
+  if not DirectoryExists(Folder) then
+    Exit;
+
+  Removed := False;
+  if FindFirst(Folder + '*.ttf', faAnyFile, Sr) = 0 then
+  try
+    repeat
+      if (Sr.Attr and faDirectory) = 0 then
+      begin
+        RemoveFontResource(PChar(Folder + Sr.Name));
+        Removed := True;
+      end;
+    until FindNext(Sr) <> 0;
+  finally
+    FindClose(Sr);
+  end;
+
+  if Removed then
+    // SendNotifyMessage, NOT SendMessage: never block the exit path on some
+    // hung top-level window - same rule as RegisterFontFolder.
     SendNotifyMessage(HWND_BROADCAST, WM_FONTCHANGE, 0, 0);
 end;
 

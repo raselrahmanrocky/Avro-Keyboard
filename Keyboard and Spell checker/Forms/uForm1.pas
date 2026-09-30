@@ -631,6 +631,8 @@ begin
   {$IFDEF PortableOn}
   RemoveVirtualFont(ExtractFilePath(Application.ExeName) + 'Virtual Font\Siyamrupali.ttf');
   Log('Portable: RemoveVirtualFont');
+  UnregisterFontFolder(ExtractFilePath(Application.ExeName) + 'fonts\');
+  Log('Portable: UnregisterFontFolder');
   {$ENDIF}
   SaveSettings;
   Log('SaveSettings');
