@@ -68,8 +68,7 @@ type
       procedure LayoutForWarning(AWarningVisible: Boolean);
     public
       { Public declarations }
-      procedure SetupAndShow(const mNewVer, mDate, mWhatsNew, mDownload: string;
-        AChannel: TUpdateChannel = ucUnknown; const ANamedVersion: string = '');
+      procedure SetupAndShow(const mNewVer, mDate, mWhatsNew, mDownload: string; AChannel: TUpdateChannel = ucUnknown; const ANamedVersion: string = '');
     protected
       procedure CreateParams(var Params: TCreateParams); override;
   end;
@@ -159,7 +158,7 @@ end;
 
 function TfrmUpdateNotify.WarningHeightFor(const AText: string): Integer;
 var
-  R:   TRect;
+  R: TRect;
   { Winapi.Windows also declares a TBitmap record; the class we need is the
     VCL one. }
   Bmp: Graphics.TBitmap;
@@ -204,8 +203,7 @@ end;
 
 { =============================================================================== }
 
-procedure TfrmUpdateNotify.SetupAndShow(const mNewVer, mDate, mWhatsNew, mDownload: string;
-  AChannel: TUpdateChannel; const ANamedVersion: string);
+procedure TfrmUpdateNotify.SetupAndShow(const mNewVer, mDate, mWhatsNew, mDownload: string; AChannel: TUpdateChannel; const ANamedVersion: string);
 var
   Version: TFileVersion;
   mOldVer: string;
@@ -241,21 +239,21 @@ begin
         lblWarning.Visible := True;
         but_Download.Caption := 'Download beta now!';
       end;
-  else
-    begin
-      Caption := 'Update available for Avro Keyboard';
-      pnlChannel.Color := RGB(27, 110, 60);
-      lblChannel.Caption := '  STABLE RELEASE  ';
-      lblWarning.Visible := False;
-      but_Download.Caption := 'Download now!';
+    else
+      begin
+        Caption := 'Update available for Avro Keyboard';
+        pnlChannel.Color := RGB(27, 110, 60);
+        lblChannel.Caption := '  STABLE RELEASE  ';
+        lblWarning.Visible := False;
+        but_Download.Caption := 'Download now!';
 
-      {$IFDEF BetaVersion}
-      { Offered a stable (or unknown-channel) update while running a beta
-        build: say so, because the download replaces the beta the user is on. }
-      lblWarning.Caption := 'This stable release will replace your current beta build.';
-      lblWarning.Visible := True;
-      {$ENDIF}
-    end;
+        {$IFDEF BetaVersion}
+        { Offered a stable (or unknown-channel) update while running a beta
+          build: say so, because the download replaces the beta the user is on. }
+        lblWarning.Caption := 'This stable release will replace your current beta build.';
+        lblWarning.Visible := True;
+        {$ENDIF}
+      end;
   end;
 
   if lblWarning.Visible then

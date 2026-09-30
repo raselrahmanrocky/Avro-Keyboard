@@ -53,9 +53,9 @@ type
       { Set when a choice is learned, cleared by the write that persists it.
         The main form's timer does the writing - see
         SaveCandidateOptionsIfDirty. }
-      FCandidateOptionsDirty:    boolean;
-      DetermineZWNJ_ZWJ:         string;
-      PhoneticCache:             array [1 .. Max_EnglishLength] of TPhoneticCache;
+      FCandidateOptionsDirty: boolean;
+      DetermineZWNJ_ZWJ:      string;
+      PhoneticCache:          array [1 .. Max_EnglishLength] of TPhoneticCache;
 
       procedure Fix_ZWNJ_ZWJ(var rList: TStringList);
       procedure ProcessSpace(var Block: boolean);
@@ -1585,7 +1585,7 @@ var
   TmpPath: string;
   tmpList: TStringList;
 begin
-  Path    := GetAvroDataDir + 'CandidateOptions.dat';
+  Path := GetAvroDataDir + 'CandidateOptions.dat';
   TmpPath := Path + '.tmp';
   tmpList := nil;
   try

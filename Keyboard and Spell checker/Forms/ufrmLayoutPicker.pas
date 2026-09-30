@@ -55,15 +55,15 @@ type
         once (its own keys, its own mouse, the hotkey that opened it, clicking
         outside) and its apply path can raise a modal message box, so all of
         them go through BeginClose/FinishClose and the state is explicit. }
-      FClosing:      Boolean; // no longer accepts input; unregistered; hidden
-      FFinished:     Boolean; // destruction has been asked for
-      FApplying:     Boolean; // a selection is being applied on this stack
+      FClosing:  Boolean; // no longer accepts input; unregistered; hidden
+      FFinished: Boolean; // destruction has been asked for
+      FApplying: Boolean; // a selection is being applied on this stack
 
       { Focus is best effort only - the keyboard hook delivers the navigation
         keys whether or not this popup ever owns the foreground. }
-      FShownAt:      DWORD;
+      FShownAt:       DWORD;
       FWasForeground: Boolean;
-      FFocusTries:   Integer;
+      FFocusTries:    Integer;
 
       procedure AutoSizeForm;
       procedure FormPaint(Sender: TObject);
@@ -290,8 +290,7 @@ begin
   // Same predicate as the timer: ignoring the first activation flicker is the
   // whole point, because closing on it is what made the popup vanish the
   // instant it appeared.
-  if (not FClosing) and FWasForeground and (Application.ModalLevel = 0) and
-    (GetTickCount - FShownAt > PICKER_ACTIVATION_GRACE_MS) then
+  if (not FClosing) and FWasForeground and (Application.ModalLevel = 0) and (GetTickCount - FShownAt > PICKER_ACTIVATION_GRACE_MS) then
     RequestDismiss;
 end;
 
@@ -518,7 +517,7 @@ var
 begin
   // Both lists are addressed by the same index, so a row that exists in only
   // one of them must not be painted from the other one.
-  if (Index < 0) or (Index >= ListBox.Items.Count) or (Index >= FLayoutValues.Count) then
+  if (index < 0) or (index >= ListBox.Items.Count) or (index >= FLayoutValues.Count) then
   begin
     ListBox.Canvas.Brush.Color := FTheme.Background;
     ListBox.Canvas.FillRect(Rect);
@@ -528,8 +527,8 @@ begin
   CurrentLayout := '';
   if Assigned(AvroMainForm1) then
     CurrentLayout := AvroMainForm1.GetMyCurrentLayout;
-  IsActive := LowerCase(FLayoutValues[Index]) = LowerCase(CurrentLayout);
-  IsHovered := (Index = FHoverIndex) or (odSelected in State);
+  IsActive := LowerCase(FLayoutValues[index]) = LowerCase(CurrentLayout);
+  IsHovered := (index = FHoverIndex) or (odSelected in State);
 
   ListBox.Canvas.Brush.Color := FTheme.Background;
   ListBox.Canvas.FillRect(Rect);
@@ -555,10 +554,10 @@ begin
 
   ListBox.Canvas.Brush.Style := bsClear;
   ListBox.Canvas.Font.Color := FTheme.Text;
-  if Index < 9 then
-    DisplayText := IntToStr(Index + 1) + '. ' + ListBox.Items[Index]
+  if index < 9 then
+    DisplayText := IntToStr(index + 1) + '. ' + ListBox.Items[index]
   else
-    DisplayText := ListBox.Items[Index];
+    DisplayText := ListBox.Items[index];
   ListBox.Canvas.TextOut(Rect.Left + 35, Rect.Top + 3, DisplayText);
   ListBox.Canvas.Brush.Style := bsSolid;
 end;

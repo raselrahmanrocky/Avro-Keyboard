@@ -372,8 +372,8 @@ begin
 
     if FileExists(TargetPath) then
     begin
-      if Application.MessageBox(PChar('A mapping named "' + ChangeFileExt(ExtractFileName(ASourcePath), '') + '" already exists.' + sLineBreak + 'Overwrite the existing file?'),
-        'Confirm Overwrite', MB_ICONQUESTION or MB_YESNO or MB_DEFBUTTON2) <> ID_YES then
+      if Application.MessageBox(PChar('A mapping named "' + ChangeFileExt(ExtractFileName(ASourcePath), '') + '" already exists.' + sLineBreak +
+            'Overwrite the existing file?'), 'Confirm Overwrite', MB_ICONQUESTION or MB_YESNO or MB_DEFBUTTON2) <> ID_YES then
       begin
         TargetPath := GenerateUniqueFileName(AnsiMappingDir, ExtractFileName(ASourcePath));
         if TargetPath = '' then
@@ -392,7 +392,7 @@ begin
     end;
 
     ImportedName := ChangeFileExt(ExtractFileName(TargetPath), '');
-    Result       := True;
+    Result := True;
 
     // --- 6. Scan / refresh -----------------------------------------------------
     ScanAvroEncoFiles(AnsiMappingDir);

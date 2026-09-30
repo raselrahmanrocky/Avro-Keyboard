@@ -745,16 +745,18 @@ end;
 {$WARN IMPLICIT_STRING_CAST ON}
 
 initialization
-  { Nothing to set up - KeyboardLayoutNames creates KeyboardLayouts the first
-    time it runs.  The empty section is not optional: dcc32 rejects a
-    finalization section that has no initialization before it (E2029, verified
-    against this project's compiler), and every other unit here that needs
-    finalization carries the pair. }
+
+{ Nothing to set up - KeyboardLayoutNames creates KeyboardLayouts the first
+  time it runs.  The empty section is not optional: dcc32 rejects a
+  finalization section that has no initialization before it (E2029, verified
+  against this project's compiler), and every other unit here that needs
+  finalization carries the pair. }
 
 finalization
-  { The list outlives every form.  The normal quit path (TAvroMainForm1.ExitApp)
-    frees it itself and then calls ExitProcess(0), so unit finalization never
-    runs there; this covers the paths that end the process any other way. }
-  FreeAndNil(KeyboardLayouts);
+
+{ The list outlives every form.  The normal quit path (TAvroMainForm1.ExitApp)
+  frees it itself and then calls ExitProcess(0), so unit finalization never
+  runs there; this covers the paths that end the process any other way. }
+FreeAndNil(KeyboardLayouts);
 
 end.

@@ -100,9 +100,9 @@ var
   ANSIToggleShortcut:    string;
   IgnoreCapsLock:        string;
 
-{ The per-encoding password memory now lives in uAvroEncoManager - the mapping
-  engine needs it and must stay clear of this unit's UI dependencies (uForm1,
-  uTopBar, ...); only the persistence of it stays here. }
+  { The per-encoding password memory now lives in uAvroEncoManager - the mapping
+    engine needs it and must stay clear of this unit's UI dependencies (uForm1,
+    uTopBar, ...); only the persistence of it stays here. }
 
 procedure SaveUISettings;
 procedure LoadSettings;
@@ -414,85 +414,85 @@ begin
 
     Reg.RootKey := HKEY_CURRENT_USER;
     try
-    if Reg.OpenKey('Software\OmicronLab\Avro Keyboard', True) = True then
-    begin
-    DontShowComplexLNotification := UpperCase(Reg.ReadStringDef('DontShowComplexLNotification', 'NO'));
-    DontShowStartupWizard := UpperCase(Reg.ReadStringDef('DontShowStartupWizard', 'NO'));
+      if Reg.OpenKey('Software\OmicronLab\Avro Keyboard', True) = True then
+      begin
+        DontShowComplexLNotification := UpperCase(Reg.ReadStringDef('DontShowComplexLNotification', 'NO'));
+        DontShowStartupWizard := UpperCase(Reg.ReadStringDef('DontShowStartupWizard', 'NO'));
 
-    // General settings
-    StartWithWindows := UpperCase(Reg.ReadStringDef('StartWithWindows', 'Yes'));
-    ShowSplash := UpperCase(Reg.ReadStringDef('ShowSplash', 'Yes'));
-    DefaultUIMode := UpperCase(Reg.ReadStringDef('DefaultUIMode', 'LastUI'));
-    LastUIMode := UpperCase(Reg.ReadStringDef('LastUIMode', 'Top Bar'));
-    TopBarPosX := UpperCase(Reg.ReadStringDef('TopBarPosX', '1000000'));
-    TopBarXButton := UpperCase(Reg.ReadStringDef('TopBarXButton', 'Show Menu'));
-    TopBarTransparent := UpperCase(Reg.ReadStringDef('TopBarTransparent', 'Yes'));
-    AvroUpdateCheck := UpperCase(Reg.ReadStringDef('AvroUpdateCheck', 'Yes'));
-    AvroUpdateLastCheck := Reg.ReadDateDef('AvroUpdateLastCheck', Now);
-    CheckBetaUpdates := UpperCase(Reg.ReadStringDef('CheckBetaUpdates', 'No'));
+        // General settings
+        StartWithWindows := UpperCase(Reg.ReadStringDef('StartWithWindows', 'Yes'));
+        ShowSplash := UpperCase(Reg.ReadStringDef('ShowSplash', 'Yes'));
+        DefaultUIMode := UpperCase(Reg.ReadStringDef('DefaultUIMode', 'LastUI'));
+        LastUIMode := UpperCase(Reg.ReadStringDef('LastUIMode', 'Top Bar'));
+        TopBarPosX := UpperCase(Reg.ReadStringDef('TopBarPosX', '1000000'));
+        TopBarXButton := UpperCase(Reg.ReadStringDef('TopBarXButton', 'Show Menu'));
+        TopBarTransparent := UpperCase(Reg.ReadStringDef('TopBarTransparent', 'Yes'));
+        AvroUpdateCheck := UpperCase(Reg.ReadStringDef('AvroUpdateCheck', 'Yes'));
+        AvroUpdateLastCheck := Reg.ReadDateDef('AvroUpdateLastCheck', Now);
+        CheckBetaUpdates := UpperCase(Reg.ReadStringDef('CheckBetaUpdates', 'No'));
 
-    // Inteface Settings
-    InterfaceSkin := Reg.ReadStringDef('InterfaceSkin', 'internalskin*');
-    TopBarTransparencyLevel := Reg.ReadStringDef('TopBarTransparencyLevel', '80');
-    TopBarTransparent := Reg.ReadStringDef('TopBarTransparent', 'YES');
-    TrayHintShowTimes := Reg.ReadStringDef('TrayHintShowTimes', '0');
-    TopHintShowTimes := Reg.ReadStringDef('TopHintShowTimes', '0');
-    AppThemeMode := UpperCase(Reg.ReadStringDef('AppThemeMode', APP_THEME_SETTING_SYSTEM));
+        // Inteface Settings
+        InterfaceSkin := Reg.ReadStringDef('InterfaceSkin', 'internalskin*');
+        TopBarTransparencyLevel := Reg.ReadStringDef('TopBarTransparencyLevel', '80');
+        TopBarTransparent := Reg.ReadStringDef('TopBarTransparent', 'YES');
+        TrayHintShowTimes := Reg.ReadStringDef('TrayHintShowTimes', '0');
+        TopHintShowTimes := Reg.ReadStringDef('TopHintShowTimes', '0');
+        AppThemeMode := UpperCase(Reg.ReadStringDef('AppThemeMode', APP_THEME_SETTING_SYSTEM));
 
-    // Hotkey settings
-    ModeSwitchKey := UpperCase(Reg.ReadStringDef('ModeSwitchKey', 'F12'));
-    ToggleOutputModeKey := UpperCase(Reg.ReadStringDef('ToggleOutputModeKey', 'F12'));
-    SpellerLauncherKey := UpperCase(Reg.ReadStringDef('SpellerLauncherKey', 'F7'));
-    ConverterLauncherKey := UpperCase(Reg.ReadStringDef('ConverterLauncherKey', 'CTRL+ALT+T'));
-    LayoutSwitchKey := UpperCase(Reg.ReadStringDef('LayoutSwitchKey', 'CTRL+SHIFT+F11'));
-    ShowLayoutSwitchNotification := UpperCase(Reg.ReadStringDef('ShowLayoutSwitchNotification', 'YES'));
-    AnsiVersionSwitchKey := UpperCase(Reg.ReadStringDef('AnsiVersionSwitchKey', 'F12'));
-    ShowAnsiSwitchNotification := UpperCase(Reg.ReadStringDef('ShowAnsiSwitchNotification', 'YES'));
+        // Hotkey settings
+        ModeSwitchKey := UpperCase(Reg.ReadStringDef('ModeSwitchKey', 'F12'));
+        ToggleOutputModeKey := UpperCase(Reg.ReadStringDef('ToggleOutputModeKey', 'F12'));
+        SpellerLauncherKey := UpperCase(Reg.ReadStringDef('SpellerLauncherKey', 'F7'));
+        ConverterLauncherKey := UpperCase(Reg.ReadStringDef('ConverterLauncherKey', 'CTRL+ALT+T'));
+        LayoutSwitchKey := UpperCase(Reg.ReadStringDef('LayoutSwitchKey', 'CTRL+SHIFT+F11'));
+        ShowLayoutSwitchNotification := UpperCase(Reg.ReadStringDef('ShowLayoutSwitchNotification', 'YES'));
+        AnsiVersionSwitchKey := UpperCase(Reg.ReadStringDef('AnsiVersionSwitchKey', 'F12'));
+        ShowAnsiSwitchNotification := UpperCase(Reg.ReadStringDef('ShowAnsiSwitchNotification', 'YES'));
 
-    // Avro Mouse Settings
-    AvroMousePosX := UpperCase(Reg.ReadStringDef('AvroMousePosX', '0'));
-    AvroMousePosY := UpperCase(Reg.ReadStringDef('AvroMousePosY', '0'));
+        // Avro Mouse Settings
+        AvroMousePosX := UpperCase(Reg.ReadStringDef('AvroMousePosX', '0'));
+        AvroMousePosY := UpperCase(Reg.ReadStringDef('AvroMousePosY', '0'));
 
-    // Avro Phonetic Settings
-    PhoneticAutoCorrect := UpperCase(Reg.ReadStringDef('PhoneticAutoCorrect', 'Yes'));
-    ShowPrevWindow := UpperCase(Reg.ReadStringDef('ShowPrevWindow', 'Yes'));
-    FollowCaretByDefault := UpperCase(Reg.ReadStringDef('FollowCaretByDefault', 'Yes'));
-    PhoneticMode := UpperCase(Reg.ReadStringDef('PhoneticMode', 'CHAR'));
-    SaveCandidate := UpperCase(Reg.ReadStringDef('SaveCandidate', 'YES'));
-    AddToPhoneticDict := UpperCase(Reg.ReadStringDef('AddToPhoneticDict', 'YES'));
-    TabBrowsing := UpperCase(Reg.ReadStringDef('TabBrowsing', 'YES'));
-    PipeToDot := UpperCase(Reg.ReadStringDef('PipeToDot', 'YES'));
-    EnableJoNukta := UpperCase(Reg.ReadStringDef('EnableJoNukta', 'NO'));
+        // Avro Phonetic Settings
+        PhoneticAutoCorrect := UpperCase(Reg.ReadStringDef('PhoneticAutoCorrect', 'Yes'));
+        ShowPrevWindow := UpperCase(Reg.ReadStringDef('ShowPrevWindow', 'Yes'));
+        FollowCaretByDefault := UpperCase(Reg.ReadStringDef('FollowCaretByDefault', 'Yes'));
+        PhoneticMode := UpperCase(Reg.ReadStringDef('PhoneticMode', 'CHAR'));
+        SaveCandidate := UpperCase(Reg.ReadStringDef('SaveCandidate', 'YES'));
+        AddToPhoneticDict := UpperCase(Reg.ReadStringDef('AddToPhoneticDict', 'YES'));
+        TabBrowsing := UpperCase(Reg.ReadStringDef('TabBrowsing', 'YES'));
+        PipeToDot := UpperCase(Reg.ReadStringDef('PipeToDot', 'YES'));
+        EnableJoNukta := UpperCase(Reg.ReadStringDef('EnableJoNukta', 'NO'));
 
-    // Tools Settings
-    OldStyleReph := UpperCase(Reg.ReadStringDef('OldStyleReph', 'Yes'));
-    VowelFormating := UpperCase(Reg.ReadStringDef('VowelFormating', 'Yes'));
-    NumPadBangla := UpperCase(Reg.ReadStringDef('NumPadBangla', 'Yes'));
-    FullOldStyleTyping := UpperCase(Reg.ReadStringDef('FullOldStyleTyping', 'No'));
-    AutomaticallyFixChandra := UpperCase(Reg.ReadStringDef('AutomaticallyFixChandra', 'Yes'));
-    EnableCaretSniffer := UpperCase(Reg.ReadStringDef('EnableCaretSniffer', 'Yes'));
+        // Tools Settings
+        OldStyleReph := UpperCase(Reg.ReadStringDef('OldStyleReph', 'Yes'));
+        VowelFormating := UpperCase(Reg.ReadStringDef('VowelFormating', 'Yes'));
+        NumPadBangla := UpperCase(Reg.ReadStringDef('NumPadBangla', 'Yes'));
+        FullOldStyleTyping := UpperCase(Reg.ReadStringDef('FullOldStyleTyping', 'No'));
+        AutomaticallyFixChandra := UpperCase(Reg.ReadStringDef('AutomaticallyFixChandra', 'Yes'));
+        EnableCaretSniffer := UpperCase(Reg.ReadStringDef('EnableCaretSniffer', 'Yes'));
 
-    // Keyboard Layout Viewer Settings
-    DefaultLayout := Reg.ReadStringDef('DefaultLayout', 'avrophonetic*');
-    ShowLayoutOnTop := UpperCase(Reg.ReadStringDef('ShowLayoutOnTop', 'Yes'));
-    SavePosLayoutViewer := UpperCase(Reg.ReadStringDef('SavePosLayoutViewer', 'Yes'));
-    LayoutViewerPosX := UpperCase(Reg.ReadStringDef('LayoutViewerPosX', '0'));
-    LayoutViewerPosY := UpperCase(Reg.ReadStringDef('LayoutViewerPosY', '0'));
-    LayoutViewerSize := UpperCase(Reg.ReadStringDef('LayoutViewerSize', '60%'));
+        // Keyboard Layout Viewer Settings
+        DefaultLayout := Reg.ReadStringDef('DefaultLayout', 'avrophonetic*');
+        ShowLayoutOnTop := UpperCase(Reg.ReadStringDef('ShowLayoutOnTop', 'Yes'));
+        SavePosLayoutViewer := UpperCase(Reg.ReadStringDef('SavePosLayoutViewer', 'Yes'));
+        LayoutViewerPosX := UpperCase(Reg.ReadStringDef('LayoutViewerPosX', '0'));
+        LayoutViewerPosY := UpperCase(Reg.ReadStringDef('LayoutViewerPosY', '0'));
+        LayoutViewerSize := UpperCase(Reg.ReadStringDef('LayoutViewerSize', '60%'));
 
-    // Global Output settings
-    OutputIsBijoy := UpperCase(Reg.ReadStringDef('OutputIsBijoy', 'No'));
-    ShowOutputwarning := UpperCase(Reg.ReadStringDef('ShowOutputwarning', 'Yes'));
-    UnicodeToggleShortcut := UpperCase(Reg.ReadStringDef('UnicodeToggleShortcut', 'YES'));
-    ANSIToggleShortcut := UpperCase(Reg.ReadStringDef('ANSIToggleShortcut', 'YES'));
-    IgnoreCapsLock := UpperCase(Reg.ReadStringDef('IgnoreCapsLock', 'NO'));
-    clsUnicodeToBijoy2000.AnsiVersion := Reg.ReadStringDef('AnsiVersion', '');
+        // Global Output settings
+        OutputIsBijoy := UpperCase(Reg.ReadStringDef('OutputIsBijoy', 'No'));
+        ShowOutputwarning := UpperCase(Reg.ReadStringDef('ShowOutputwarning', 'Yes'));
+        UnicodeToggleShortcut := UpperCase(Reg.ReadStringDef('UnicodeToggleShortcut', 'YES'));
+        ANSIToggleShortcut := UpperCase(Reg.ReadStringDef('ANSIToggleShortcut', 'YES'));
+        IgnoreCapsLock := UpperCase(Reg.ReadStringDef('IgnoreCapsLock', 'NO'));
+        clsUnicodeToBijoy2000.AnsiVersion := Reg.ReadStringDef('AnsiVersion', '');
 
-    // AvroEnco Settings
-    CachedEncoPassword := AnsiString(Reg.ReadStringDef('CachedEncoPassword', ''));
-    DecodeEncoCache(Reg.ReadStringDef('EncoPasswordCache', ''));
+        // AvroEnco Settings
+        CachedEncoPassword := AnsiString(Reg.ReadStringDef('CachedEncoPassword', ''));
+        DecodeEncoCache(Reg.ReadStringDef('EncoPasswordCache', ''));
 
-    end;
+      end;
     except
       on E: Exception do
         StartupLogException('LoadSettingsFromRegistry', E);
@@ -654,7 +654,7 @@ procedure FillSafeDefaults;
   procedure Need(var S: string; const Default: string);
   begin
     if Trim(S) = '' then
-      S := Default;
+      S := default;
   end;
 
 begin
@@ -895,7 +895,7 @@ var
 {$ELSE}
 var
   Reg: TMyRegistry;
-{$ENDIF}
+  {$ENDIF}
 begin
   Result := '';
   try

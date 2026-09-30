@@ -2797,11 +2797,11 @@ end;
 
 procedure TForm1.cbAnsiVersionDrawItem(Control: TWinControl; Index: Integer; Rect: TRect; State: TOwnerDrawState);
 var
-  Combo:                         TComboBox;
-  Text:                          string;
-  GlyphR, TextR:                 TRect;
-  Bg:                            TColor;
-  IsHover, IsChecked:            Boolean;
+  Combo:              TComboBox;
+  Text:               string;
+  GlyphR, TextR:      TRect;
+  Bg:                 TColor;
+  IsHover, IsChecked: Boolean;
 begin
   Combo := TComboBox(Control);
   Text := Combo.Items[index];

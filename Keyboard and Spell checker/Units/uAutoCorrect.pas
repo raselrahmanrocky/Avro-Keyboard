@@ -65,8 +65,8 @@ function TryAutoCorrectWord(const AWord: string; out AReplacement: string): Bool
 var
   Dict: TDictionary<string, string>;
 
-{ Assigned once by the main form at startup. Fired from TThread.ForceQueue,
-  i.e. from the message loop - never from the hook callback itself. }
+  { Assigned once by the main form at startup. Fired from TThread.ForceQueue,
+    i.e. from the message loop - never from the hook callback itself. }
 var
   OnDictLoadFailed: TProc;
 
@@ -77,23 +77,23 @@ var
     file on every keystroke and TryAutoCorrectWord answers "no match" without
     touching the disk again - one failed read per session, never one per
     Space/Enter. }
-  DictLoadFailed:   Boolean = False;
+  DictLoadFailed: Boolean = False;
   { The failure is surfaced to the user exactly once per session. }
   DictLoadNotified: Boolean = False;
 
-{ =============================================================================== }
+  { =============================================================================== }
 
-{ The caller runs inside the WH_KEYBOARD_LL callback, so no UI may happen
-  here. ForceQueue - not Queue, which would run the notify inline when the
-  caller IS the main thread and therefore still inside the hook - defers it
-  to the message loop, after the hook callback has returned. }
+  { The caller runs inside the WH_KEYBOARD_LL callback, so no UI may happen
+    here. ForceQueue - not Queue, which would run the notify inline when the
+    caller IS the main thread and therefore still inside the hook - defers it
+    to the message loop, after the hook callback has returned. }
 procedure NotifyDictLoadFailed;
 begin
   if DictLoadNotified then
     Exit;
   DictLoadNotified := True;
   TThread.ForceQueue(nil,
-    procedure
+      procedure
     begin
       if Assigned(OnDictLoadFailed) then
         OnDictLoadFailed();
@@ -111,7 +111,7 @@ begin
     Exit(False);
   if Assigned(Dict) then
     Exit(True);
-  Dict   := TDictionary<string, string>.create;
+  Dict := TDictionary<string, string>.create;
   Result := LoadDict;
 end;
 
@@ -138,7 +138,7 @@ end;
 
 procedure ResetDictLoadState;
 begin
-  DictLoadFailed   := False;
+  DictLoadFailed := False;
   DictLoadNotified := False;
   FreeAndNil(Dict);
 end;
@@ -160,8 +160,8 @@ var
   FirstPart, SecondPart: string;
 begin
   Result := False;
-  Path   := GetAvroDataDir + 'autodict.dct';
-  List   := nil;
+  Path := GetAvroDataDir + 'autodict.dct';
+  List := nil;
   try
     try
       List := TStringList.create;
@@ -179,7 +179,7 @@ begin
       end;
 
       DictLoadFailed := False;
-      Result         := True;
+      Result := True;
     except
       on E: Exception do
       begin

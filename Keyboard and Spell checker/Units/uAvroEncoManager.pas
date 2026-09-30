@@ -32,19 +32,19 @@ var
   CachedEncoPassword: AnsiString;
   AvroEncoFiles:      TDictionary<string, TAvroEncoFileInfo>;
 
-{ ============================================================================== }
-{ Per-encoding password memory (key = lowercase full file path) }
-{ ============================================================================== }
+  { ============================================================================== }
+  { Per-encoding password memory (key = lowercase full file path) }
+  { ============================================================================== }
 
-{ A protected encoding asks for its password ONCE on this computer; every later
-  load (even after restarting the app or the PC) decrypts silently from here.
+  { A protected encoding asks for its password ONCE on this computer; every later
+    load (even after restarting the app or the PC) decrypts silently from here.
 
-  The memory lives with the engine rather than with uRegistrySettings on
-  purpose: this unit is linked by code that must stay clear of the application's
-  settings and UI (the Text Converter and the gate tools reach the engine
-  through clsUnicodeToBijoy2000), while uRegistrySettings pulls in uForm1 and
-  uTopBar. The engine owns the memory; uRegistrySettings only persists the blob
-  it produces with its EncodeEncoCache/DecodeEncoCache helpers. }
+    The memory lives with the engine rather than with uRegistrySettings on
+    purpose: this unit is linked by code that must stay clear of the application's
+    settings and UI (the Text Converter and the gate tools reach the engine
+    through clsUnicodeToBijoy2000), while uRegistrySettings pulls in uForm1 and
+    uTopBar. The engine owns the memory; uRegistrySettings only persists the blob
+    it produces with its EncodeEncoCache/DecodeEncoCache helpers. }
 
 const
   EncoCacheSep = #9; // TAB separates file path from password (never typed in a
@@ -273,9 +273,9 @@ begin
   MappingIconsLock.Enter;
   try
     if Length(AIconBytes) = 0 then
-      MappingIcons.Remove(Lowercase(ADisplayName))
+      MappingIcons.Remove(LowerCase(ADisplayName))
     else
-      MappingIcons.AddOrSetValue(Lowercase(ADisplayName), AIconBytes);
+      MappingIcons.AddOrSetValue(LowerCase(ADisplayName), AIconBytes);
   finally
     MappingIconsLock.Leave;
   end;
@@ -288,7 +288,7 @@ begin
     Exit;
   MappingIconsLock.Enter;
   try
-    MappingIcons.TryGetValue(Lowercase(ADisplayName), Result);
+    MappingIcons.TryGetValue(LowerCase(ADisplayName), Result);
   finally
     MappingIconsLock.Leave;
   end;
@@ -303,7 +303,7 @@ begin
     Exit;
   MappingIconsLock.Enter;
   try
-    Result := MappingIconsResolved.TryGetValue(Lowercase(ADisplayName), Dummy);
+    Result := MappingIconsResolved.TryGetValue(LowerCase(ADisplayName), Dummy);
   finally
     MappingIconsLock.Leave;
   end;
@@ -351,7 +351,7 @@ begin
           Info.DisplayName := DisplayName;
           Info.IsEncoFile := True;
           Info.LastWriteTime := SR.TimeStamp;
-          AvroEncoFiles.AddOrSetValue(Lowercase(DisplayName), Info);
+          AvroEncoFiles.AddOrSetValue(LowerCase(DisplayName), Info);
         end;
       until FindNext(SR) <> 0;
     finally
@@ -367,14 +367,14 @@ begin
         if (SR.Name <> '.') and (SR.Name <> '..') then
         begin
           DisplayName := ChangeFileExt(SR.Name, '');
-          if not AvroEncoFiles.ContainsKey(Lowercase(DisplayName)) then
+          if not AvroEncoFiles.ContainsKey(LowerCase(DisplayName)) then
           begin
             FoundPath := ADir + SR.Name;
             Info.FilePath := FoundPath;
             Info.DisplayName := DisplayName;
             Info.IsEncoFile := False;
             Info.LastWriteTime := SR.TimeStamp;
-            AvroEncoFiles.AddOrSetValue(Lowercase(DisplayName), Info);
+            AvroEncoFiles.AddOrSetValue(LowerCase(DisplayName), Info);
           end;
         end;
       until FindNext(SR) <> 0;
@@ -445,7 +445,7 @@ var
   JSONContent: string;
   Key:         string;
 begin
-  Key := Lowercase(AInfo.DisplayName);
+  Key := LowerCase(AInfo.DisplayName);
 
   // Mark the name resolved up front: converging through every exit below
   // (read error, corrupted container, no icon member) is what keeps a failing
@@ -510,7 +510,7 @@ begin
     Exit;
   if MappingIconResolved(ADisplayName) then
     Exit;
-  if not AvroEncoFiles.TryGetValue(Lowercase(ADisplayName), Info) then
+  if not AvroEncoFiles.TryGetValue(LowerCase(ADisplayName), Info) then
     Exit;
   ExtractOneFileIcon(Info);
 end;
@@ -675,7 +675,7 @@ begin
   begin
     C := S[I];
     if CharInSet(C, ['A' .. 'Z', 'a' .. 'z', '0' .. '9']) then
-      Result := Result + Lowercase(C);
+      Result := Result + LowerCase(C);
   end;
 end;
 
@@ -757,7 +757,7 @@ var
 begin
   Result := '';
   // 1. Check dictionary cache first
-  if Assigned(AvroEncoFiles) and AvroEncoFiles.TryGetValue(Lowercase(ADisplayName), Info) then
+  if Assigned(AvroEncoFiles) and AvroEncoFiles.TryGetValue(LowerCase(ADisplayName), Info) then
   begin
     if FileExists(Info.FilePath) then
       Exit(Info.FilePath);

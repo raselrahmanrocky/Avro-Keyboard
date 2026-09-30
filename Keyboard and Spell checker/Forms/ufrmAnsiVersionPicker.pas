@@ -71,11 +71,11 @@ type
         own mouse, the hotkey, a context-menu command), and the apply path can
         raise a modal password prompt or message box - so every one of them goes
         through BeginClose/FinishClose and the state is explicit. }
-      FClosing:      Boolean; // no longer accepts input; unregistered; hidden
-      FFinished:     Boolean; // destruction has been asked for
-      FApplying:     Boolean; // a selection is being applied on this stack
-      FInMenuLoop:   Boolean; // our own popup menu owns the stack right now
-      FPendingFree:  Boolean; // FinishClose was requested while the menu was up
+      FClosing:     Boolean; // no longer accepts input; unregistered; hidden
+      FFinished:    Boolean; // destruction has been asked for
+      FApplying:    Boolean; // a selection is being applied on this stack
+      FInMenuLoop:  Boolean; // our own popup menu owns the stack right now
+      FPendingFree: Boolean; // FinishClose was requested while the menu was up
 
       { Focus is best effort only - the keyboard hook delivers the navigation
         keys whether or not this popup ever owns the foreground. }
@@ -335,8 +335,7 @@ begin
   // Same predicate as the timer: ignoring the first activation flicker is the
   // whole point, because closing on it is what made the popup vanish the
   // instant it appeared.
-  if (not FClosing) and FWasForeground and (Application.ModalLevel = 0) and
-    (GetTickCount - FShownAt > PICKER_ACTIVATION_GRACE_MS) then
+  if (not FClosing) and FWasForeground and (Application.ModalLevel = 0) and (GetTickCount - FShownAt > PICKER_ACTIVATION_GRACE_MS) then
     RequestDismiss;
 end;
 
@@ -567,14 +566,14 @@ var
   DisplayText:         string;
   IconHandle:          HICON;
 begin
-  if (Index < 0) or (Index >= ListBox.Items.Count) then
+  if (index < 0) or (index >= ListBox.Items.Count) then
   begin
     ListBox.Canvas.Brush.Color := FTheme.Background;
     ListBox.Canvas.FillRect(Rect);
     Exit;
   end;
-  IsActive := SameText(AnsiVersion, ListBox.Items[Index]);
-  IsHovered := (Index = FHoverIndex) or (odSelected in State);
+  IsActive := SameText(AnsiVersion, ListBox.Items[index]);
+  IsHovered := (index = FHoverIndex) or (odSelected in State);
 
   // 1. Base background
   ListBox.Canvas.Brush.Color := FTheme.Background;
@@ -606,10 +605,10 @@ begin
   // 5. Draw item text
   ListBox.Canvas.Brush.Style := bsClear;
   ListBox.Canvas.Font.Color := FTheme.Text;
-  if Index < 9 then
-    DisplayText := IntToStr(Index + 1) + '. ' + ListBox.Items[Index]
+  if index < 9 then
+    DisplayText := IntToStr(index + 1) + '. ' + ListBox.Items[index]
   else
-    DisplayText := ListBox.Items[Index];
+    DisplayText := ListBox.Items[index];
   ListBox.Canvas.TextOut(Rect.Left + 34, Rect.Top + 4, DisplayText);
 
   ListBox.Canvas.Brush.Style := bsSolid;
@@ -618,7 +617,7 @@ begin
   // Encoding" submenu shows, so the picker and the menu agree about which
   // encoding carries which icon. Rows without an icon (empty name, or a
   // container whose icon section is missing) stay badge-free.
-  IconHandle := RowIconHandle(ListBox.Items[Index]);
+  IconHandle := RowIconHandle(ListBox.Items[index]);
   if IconHandle <> 0 then
     DrawIconEx(ListBox.Canvas.Handle, Rect.Right - BADGE_RIGHT_GAP - BADGE_SIZE, Rect.Top + ((Rect.Bottom - Rect.Top - BADGE_SIZE) div 2), IconHandle,
       BADGE_SIZE, BADGE_SIZE, 0, 0, DI_NORMAL);

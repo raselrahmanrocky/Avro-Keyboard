@@ -200,7 +200,7 @@ procedure TUpdateCheck.ProcessResponse(const Response: string);
 var
   Major, Minor, Release, Build:                           Integer;
   changelogurl, downloadurl, productpageurl, releasedate: string;
-  NamedVersion:                                          string;
+  NamedVersion:                                           string;
   Channel:                                                TUpdateChannel;
   Node:                                                   IXMLNode;
   OfferUpdate:                                            Boolean;
@@ -254,11 +254,11 @@ begin
     else if (SizeOf(Pointer) = 4) and Assigned(Xml.DocumentElement.ChildNodes.FindNode('downloadurlportable32')) then
       downloadurl := Xml.DocumentElement.ChildNodes['downloadurlportable32'].NodeValue
     else
-    {$ENDIF}
-    if (SizeOf(Pointer) = 8) and Assigned(Xml.DocumentElement.ChildNodes.FindNode('downloadurl64')) then
-      downloadurl := Xml.DocumentElement.ChildNodes['downloadurl64'].NodeValue
-    else if (SizeOf(Pointer) = 4) and Assigned(Xml.DocumentElement.ChildNodes.FindNode('downloadurl32')) then
-      downloadurl := Xml.DocumentElement.ChildNodes['downloadurl32'].NodeValue;
+      {$ENDIF}
+      if (SizeOf(Pointer) = 8) and Assigned(Xml.DocumentElement.ChildNodes.FindNode('downloadurl64')) then
+        downloadurl := Xml.DocumentElement.ChildNodes['downloadurl64'].NodeValue
+      else if (SizeOf(Pointer) = 4) and Assigned(Xml.DocumentElement.ChildNodes.FindNode('downloadurl32')) then
+        downloadurl := Xml.DocumentElement.ChildNodes['downloadurl32'].NodeValue;
 
     // Only when the server reports a newer version: confirm the offered
     // download link actually exists (HEAD request), so a stale manifest can
@@ -273,8 +273,7 @@ begin
     if OfferUpdate then
     begin
       CheckCreateForm(TfrmUpdateNotify, frmUpdateNotify, 'frmUpdateNotify');
-      frmUpdateNotify.SetupAndShow(Format('%d.%d.%d.%d', [Major, Minor, Release, Build]), releasedate, changelogurl, downloadurl, Channel,
-        NamedVersion);
+      frmUpdateNotify.SetupAndShow(Format('%d.%d.%d.%d', [Major, Minor, Release, Build]), releasedate, changelogurl, downloadurl, Channel, NamedVersion);
     end
     else if Verbose then
     begin

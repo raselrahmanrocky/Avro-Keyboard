@@ -83,7 +83,7 @@ begin
     ignored that result and then opened the file it had just failed to create,
     raising an exception - and in the portable edition this runs on every
     launch, so the failure landed in the middle of the startup sequence. }
-  if not FileExists(TTF_Path) then
+  if not fileexists(TTF_Path) then
     Exit;
   if not CreateScalableFontResource(0, PChar(TempName), PChar(TTF_Path), nil) then
   begin
@@ -103,7 +103,7 @@ begin
         APos := Pos('FONTRES:', AInfo);
         // This is followed by the font typeface name (null terminated)
         if APos > 0 then
-          FontName := pchar(@AInfo[APos + 8]);
+          FontName := PChar(@AInfo[APos + 8]);
       end;
     except
       on E: Exception do
@@ -130,7 +130,7 @@ begin
     registry part is contained and the WM_FONTCHANGE broadcast is asynchronous
     (SendMessage to HWND_BROADCAST blocks this thread on every top-level window
     - including a hung one; RegisterFontFolder below was fixed the same way). }
-  if not FileExists(FontFilePath) then
+  if not fileexists(FontFilePath) then
   begin
     StartupLog('InstallVirtualFont: font not found, skipped: ' + FontFilePath);
     Exit;
@@ -144,7 +144,7 @@ begin
         the file registered (mapping it undeletable), and RemoveFontResource
         at count 0 is a harmless no-op. }
       RemoveFontResource(PChar(FontFilePath));
-      AddFontResource(pchar(FontFilePath));
+      AddFontResource(PChar(FontFilePath));
       VirtualFontName := GetFontName(FontFilePath);
 
       Reg.RootKey := HKEY_CURRENT_USER;
@@ -190,7 +190,7 @@ begin
   try
     try
       Reg := TMyRegistry.Create;
-      RemoveFontResource(pchar(FontFilePath));
+      RemoveFontResource(PChar(FontFilePath));
 
       Reg.RootKey := HKEY_CURRENT_USER;
       if Reg.OpenKey('Software\Microsoft\Internet Explorer\International\Scripts\11', True) = True then
@@ -233,20 +233,20 @@ begin
 
   Added := False;
   if FindFirst(Folder + '*.ttf', faAnyFile, Sr) = 0 then
-  try
-    repeat
-      if (Sr.Attr and faDirectory) = 0 then
-      begin
-        // Reconcile first (see InstallVirtualFont): clear a stale session
-        // count from a crashed previous run before registering for this one.
-        RemoveFontResource(PChar(Folder + Sr.Name));
-        AddFontResource(PChar(Folder + Sr.Name));
-        Added := True;
-      end;
-    until FindNext(Sr) <> 0;
-  finally
-    FindClose(Sr);
-  end;
+    try
+      repeat
+        if (Sr.Attr and faDirectory) = 0 then
+        begin
+          // Reconcile first (see InstallVirtualFont): clear a stale session
+          // count from a crashed previous run before registering for this one.
+          RemoveFontResource(PChar(Folder + Sr.Name));
+          AddFontResource(PChar(Folder + Sr.Name));
+          Added := True;
+        end;
+      until FindNext(Sr) <> 0;
+    finally
+      FindClose(Sr);
+    end;
 
   if Added then
     // SendNotifyMessage, NOT SendMessage: broadcast must never block the
@@ -268,17 +268,17 @@ begin
 
   Removed := False;
   if FindFirst(Folder + '*.ttf', faAnyFile, Sr) = 0 then
-  try
-    repeat
-      if (Sr.Attr and faDirectory) = 0 then
-      begin
-        RemoveFontResource(PChar(Folder + Sr.Name));
-        Removed := True;
-      end;
-    until FindNext(Sr) <> 0;
-  finally
-    FindClose(Sr);
-  end;
+    try
+      repeat
+        if (Sr.Attr and faDirectory) = 0 then
+        begin
+          RemoveFontResource(PChar(Folder + Sr.Name));
+          Removed := True;
+        end;
+      until FindNext(Sr) <> 0;
+    finally
+      FindClose(Sr);
+    end;
 
   if Removed then
     // SendNotifyMessage, NOT SendMessage: never block the exit path on some

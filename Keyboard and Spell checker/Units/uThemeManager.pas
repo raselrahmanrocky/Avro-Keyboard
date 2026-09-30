@@ -124,7 +124,7 @@ uses
   System.SysUtils,
   System.Variants, // VarToStr on an XML node value
   System.Win.Registry,
-  Xml.XMLDoc, // TXMLDocument: the portable store, read-only
+  Xml.XMLDoc,  // TXMLDocument: the portable store, read-only
   Xml.XMLIntf, // IXMLNode
   Vcl.Themes,
   Vcl.Forms,
@@ -344,6 +344,7 @@ end;
 { =============================================================================== }
 
 {$IFDEF PortableOn}
+
 { Settings.xml beside the exe, in the exact layout TXMLSetting writes: a root
   element holding one child element per setting, each with a single CDATA
   payload. Read here instead of through clsRegistry_XMLSetting on purpose:
@@ -395,6 +396,7 @@ begin
   Result := AppThemeModeFromSetting(PortableAppThemeSetting);
 end;
 {$ELSE}
+
 var
   Reg: TRegistry;
 begin
@@ -430,8 +432,7 @@ var
 begin
   { SMTO_ABORTIFHUNG + short timeout: a hung top-level window anywhere in the
     session must not block the Customize dialog. Result intentionally ignored. }
-  SendMessageTimeout(HWND_BROADCAST, WM_SETTINGCHANGE, 0,
-    LPARAM(PChar(APP_THEME_BROADCAST_SECTION)), SMTO_ABORTIFHUNG, 500, @Res);
+  SendMessageTimeout(HWND_BROADCAST, WM_SETTINGCHANGE, 0, LPARAM(PChar(APP_THEME_BROADCAST_SECTION)), SMTO_ABORTIFHUNG, 500, @Res);
 end;
 
 end.

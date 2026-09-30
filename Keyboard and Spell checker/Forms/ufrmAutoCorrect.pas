@@ -473,7 +473,7 @@ begin
   InitDict;
   Missing := not AutoCorrectDictionaryOK;
   btnDownloadDict.Visible := Missing;
-  lblDictMissing.Visible  := Missing;
+  lblDictMissing.Visible := Missing;
   if Missing then
     ClientHeight := btnDownloadDict.Top + btnDownloadDict.Height + 12;
 end;

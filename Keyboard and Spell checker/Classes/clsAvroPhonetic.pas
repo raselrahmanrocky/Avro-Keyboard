@@ -35,7 +35,7 @@ type
       procedure ProcessVKeyUP(const KeyCode: Integer; var Block: Boolean);
       procedure ResetDeadKey;
       procedure SelectCandidate(const Item: string); // For Avro Phonetic
-      procedure SaveCandidateOptionsIfDirty; // Learned choices -> disk
+      procedure SaveCandidateOptionsIfDirty;         // Learned choices -> disk
       // Published
       property AutoCorrectEnabled: Boolean read GetAutoCorrectEnabled write SetAutoCorrectEnabled;
   end;

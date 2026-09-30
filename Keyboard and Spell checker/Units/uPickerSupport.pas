@@ -60,14 +60,14 @@ const
     timer. Giving up is fine: the hook drives the keys either way. }
   PICKER_FOCUS_ATTEMPTS = 5;
 
-{ True for the keys a visible popup navigates with: the number row, the numpad
-  (with NumLock on - the numpad keys report VK_HOME/VK_END/... with it off and
-  are then indistinguishable from the real cursor keys), latin letters, and
-  Up/Down/Enter/Escape.
+  { True for the keys a visible popup navigates with: the number row, the numpad
+    (with NumLock on - the numpad keys report VK_HOME/VK_END/... with it off and
+    are then indistinguishable from the real cursor keys), latin letters, and
+    Up/Down/Enter/Escape.
 
-  Letters are matched by VK code, not by the character produced: VK_A..VK_Z are
-  layout independent, so the first-letter shortcut means "the A key" even while
-  a Bangla or Dvorak layout is active. }
+    Letters are matched by VK code, not by the character produced: VK_A..VK_Z are
+    layout independent, so the first-letter shortcut means "the A key" even while
+    a Bangla or Dvorak layout is active. }
 function IsPickerNavigableKey(AVk: Integer): Boolean;
 
 { The row a key activates, or -1 when that key is not a row shortcut.
@@ -89,8 +89,7 @@ function PickerIndexForKey(const ANames: TStrings; AKey: Word): Integer;
   AActivateIndex: >= 0 apply that row, -1 nothing, -2 cancel (Escape).
   Up/Down move the highlight only; nothing is applied until Enter or a
   number/letter shortcut. }
-procedure HandlePickerNavigation(AListBox: TListBox; AKey: Word;
-  out AConsumed: Boolean; out AActivateIndex: Integer);
+procedure HandlePickerNavigation(AListBox: TListBox; AKey: Word; out AConsumed: Boolean; out AActivateIndex: Integer);
 
 { Best-effort activation. Never a precondition for anything: the hook delivers
   the navigation keys whether or not this succeeds.
@@ -134,17 +133,15 @@ uses
 function IsHungAppWindow(AWnd: HWND): BOOL; stdcall; external 'user32.dll' name 'IsHungAppWindow';
 
 var
-  MouseHook:          HHOOK = 0;
-  MouseHookOwner:     HWND = 0;
+  MouseHook:          HHOOK   = 0;
+  MouseHookOwner:     HWND    = 0;
   MouseHookSuspended: Boolean = False;
 
-{ =============================================================================== }
+  { =============================================================================== }
 
 function IsPickerNavigableKey(AVk: Integer): Boolean;
 begin
-  Result := ((AVk >= Ord('0')) and (AVk <= Ord('9'))) or
-    ((AVk >= VK_NUMPAD0) and (AVk <= VK_NUMPAD9)) or
-    ((AVk >= Ord('A')) and (AVk <= Ord('Z'))) or
+  Result := ((AVk >= Ord('0')) and (AVk <= Ord('9'))) or ((AVk >= VK_NUMPAD0) and (AVk <= VK_NUMPAD9)) or ((AVk >= Ord('A')) and (AVk <= Ord('Z'))) or
     (AVk = VK_UP) or (AVk = VK_DOWN) or (AVk = VK_RETURN) or (AVk = VK_ESCAPE);
 end;
 
@@ -184,8 +181,7 @@ end;
 
 { =============================================================================== }
 
-procedure HandlePickerNavigation(AListBox: TListBox; AKey: Word;
-  out AConsumed: Boolean; out AActivateIndex: Integer);
+procedure HandlePickerNavigation(AListBox: TListBox; AKey: Word; out AConsumed: Boolean; out AActivateIndex: Integer);
 var
   Idx: Integer;
 begin
@@ -295,7 +291,7 @@ begin
   Result := (StrComp(ClsName, '#32768') = 0) or (StrComp(ClsName, 'ComboLBox') = 0);
 end;
 
-function LowLevelMouseProc(nCode: Integer; wParam: WPARAM; lParam: LPARAM): LRESULT; stdcall;
+function LowLevelMouseProc(nCode: Integer; wParam: wParam; lParam: lParam): LRESULT; stdcall;
 var
   Info:   PMouseHookStruct;
   Target: HWND;
@@ -364,13 +360,13 @@ initialization
 
 finalization
 
-  { A hook left installed past the lifetime of the window it reports to would
-    outlive the message loop that pumps it. }
-  if MouseHook <> 0 then
-  begin
-    UnhookWindowsHookEx(MouseHook);
-    MouseHook := 0;
-    MouseHookOwner := 0;
-  end;
+{ A hook left installed past the lifetime of the window it reports to would
+  outlive the message loop that pumps it. }
+if MouseHook <> 0 then
+begin
+  UnhookWindowsHookEx(MouseHook);
+  MouseHook := 0;
+  MouseHookOwner := 0;
+end;
 
 end.

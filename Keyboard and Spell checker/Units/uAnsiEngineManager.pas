@@ -516,9 +516,9 @@ end;
 procedure TAnsiEngineManager.EnsureLiveEngine;
 var
   PrevKey, BestKey, FallbackName, Path: string;
-  BestStamp: Cardinal;
-  Key: string;
-  Slot: TEngineSlot;
+  BestStamp:                            Cardinal;
+  Key:                                  string;
+  Slot:                                 TEngineSlot;
 begin
   if GlobalsHoldEngine then
     Exit;

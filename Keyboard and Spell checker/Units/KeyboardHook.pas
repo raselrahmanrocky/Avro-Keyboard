@@ -35,7 +35,7 @@ function InHookContext: Boolean;
 { The one hook procedure Windows ever calls. It is a thin, total wrapper around
   LLHookBody below: nothing may escape a WH_KEYBOARD_LL callback, and the real
   body keeps its own goto-based structure untouched. }
-function LowLevelKeyboardProc(nCode: Integer; wParam: WPARAM; lParam: LPARAM): LRESULT; stdcall;
+function LowLevelKeyboardProc(nCode: Integer; wParam: wParam; lParam: lParam): LRESULT; stdcall;
 
 type
   pKBDLLHOOKSTRUCT = ^TKBDLLHOOKSTRUCT;
@@ -200,7 +200,7 @@ end;
 
 { =============================================================================== }
 
-function LLHookBody(nCode: Integer; wParam: WPARAM; lParam: LPARAM): LRESULT; stdcall;
+function LLHookBody(nCode: Integer; wParam: wParam; lParam: lParam): LRESULT; stdcall;
 var
   kbdllhs:         pKBDLLHOOKSTRUCT;
   ShouldBlock:     Boolean;
@@ -678,7 +678,7 @@ begin
   Result := HookContextDepth > 0;
 end;
 
-function LowLevelKeyboardProc(nCode: Integer; wParam: WPARAM; lParam: LPARAM): LRESULT; stdcall;
+function LowLevelKeyboardProc(nCode: Integer; wParam: wParam; lParam: lParam): LRESULT; stdcall;
 begin
   { Published before the body runs and cleared after it, so a callee can ask
     "am I inside the hook?" and defer its UI work to the main loop instead of
@@ -688,9 +688,9 @@ begin
     try
       Result := LLHookBody(nCode, wParam, lParam);
     except
-      on E: Exception do
+      on e: exception do
       begin
-        Log('KeyboardHook: ' + E.ClassName + ': ' + E.Message);
+        Log('KeyboardHook: ' + e.ClassName + ': ' + e.Message);
         try
           Result := CallNextHookEx(HookRetVal, nCode, wParam, lParam);
         except

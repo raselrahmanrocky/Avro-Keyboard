@@ -33,10 +33,10 @@ type
 
   IntegerArray = LongIntArray;
 
-{ True while Database.db3 is in the data folder. The startup notice in uForm1
-  asks this before raising its balloon - LoadWordDatabase itself can not: a
-  missing file is not an error it is allowed to report (it runs from the
-  settings refresh, and the keyboard hook must never show UI). }
+  { True while Database.db3 is in the data folder. The startup notice in uForm1
+    asks this before raising its balloon - LoadWordDatabase itself can not: a
+    missing file is not an error it is allowed to report (it runs from the
+    settings refresh, and the keyboard hook must never show UI). }
 
 function WordDatabaseFilePresent: Boolean;
 

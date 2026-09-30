@@ -23,21 +23,21 @@ uses
 type
   { One downloadable file listed in the resource repository's index.json. }
   TResourceItem = record
-    FileName:      string; // repo-relative path, e.g. 'AnsiMapping/Ansi V1.AvroEnco'
-    Name:          string;
-    ResourceType:  string; // ansimapping | layout | font | skin | doc | dict
-    Version:       string;
-    Description:   string;
+    FileName: string; // repo-relative path, e.g. 'AnsiMapping/Ansi V1.AvroEnco'
+    Name: string;
+    ResourceType: string; // ansimapping | layout | font | skin | doc | dict
+    Version: string;
+    Description: string;
     DescriptionBn: string;
-    Size:          Int64;
-    Sha256:        string;
+    Size: Int64;
+    Sha256: string;
   end;
 
   TResourceCategory = record
-    Id:      string;
-    Title:   string;
+    Id: string;
+    Title: string;
     TitleBn: string;
-    Items:   TArray<TResourceItem>;
+    Items: TArray<TResourceItem>;
   end;
 
   { Fetches and parses index.json from the Avro-Keyboard-Resource repository.
@@ -73,9 +73,9 @@ const
   RESOURCE_INDEX_URL = 'https://raw.githubusercontent.com/raselrahmanrocky/Avro-Keyboard-Resource/main/index.json';
   RESOURCE_RAW_ROOT  = 'https://raw.githubusercontent.com/';
 
-{ ---------------------------------------------------------------------------- }
-{ Helpers                                                                      }
-{ ---------------------------------------------------------------------------- }
+  { ---------------------------------------------------------------------------- }
+  { Helpers }
+  { ---------------------------------------------------------------------------- }
 
 class function TResourceCatalog.DefaultIndexUrl: string;
 begin
@@ -94,7 +94,7 @@ begin
     Exit;
   if V is TJSONString then
     Result := TJSONString(V).Value
-  else if not (V is TJSONNull) then
+  else if not(V is TJSONNull) then
     Result := V.Value;
 end;
 
@@ -106,31 +106,31 @@ begin
 end;
 
 { ---------------------------------------------------------------------------- }
-{ TResourceCatalog                                                             }
+{ TResourceCatalog }
 { ---------------------------------------------------------------------------- }
 
 procedure TResourceCatalog.Clear;
 begin
   FCategories := nil;
-  FBaseUrl    := '';
-  FGenerated  := '';
-  FLoaded     := False;
+  FBaseUrl := '';
+  FGenerated := '';
+  FLoaded := False;
 end;
 
 function TResourceCatalog.Fetch(out AError: string): Boolean;
 var
-  Http:      TNetHTTPClient;
-  Response:  IHTTPResponse;
+  Http:     TNetHTTPClient;
+  Response: IHTTPResponse;
 begin
-  Result  := False;
-  AError  := '';
+  Result := False;
+  AError := '';
 
   Http := TNetHTTPClient.Create(nil);
   try
-    Http.UserAgent          := 'Avro Keyboard';
-    Http.AllowCookies       := False;
-    Http.ConnectionTimeout  := 8000;
-    Http.ResponseTimeout    := 15000;
+    Http.UserAgent := 'Avro Keyboard';
+    Http.AllowCookies := False;
+    Http.ConnectionTimeout := 8000;
+    Http.ResponseTimeout := 15000;
     try
       Response := Http.Get(RESOURCE_INDEX_URL);
     except
@@ -173,8 +173,8 @@ var
   SizeValue: TJSONValue;
   I, J:      Integer;
 begin
-  Result  := False;
-  AError  := '';
+  Result := False;
+  AError := '';
   Clear;
 
   Text := AJson;
@@ -194,7 +194,7 @@ begin
     Exit;
   end;
   try
-    if not (Root is TJSONObject) then
+    if not(Root is TJSONObject) then
     begin
       AError := 'The resource catalog has an unexpected shape.';
       Exit;
@@ -209,8 +209,8 @@ begin
 
     // File URLs: explicit baseUrl wins, otherwise raw.githubusercontent.com
     // is assembled from repo + branch so a renamed/branded fork just works.
-    Base   := JsonStr(RootObj, 'baseUrl');
-    Repo   := JsonStr(RootObj, 'repo');
+    Base := JsonStr(RootObj, 'baseUrl');
+    Repo := JsonStr(RootObj, 'repo');
     Branch := JsonStr(RootObj, 'branch');
     if Base = '' then
     begin
@@ -221,11 +221,11 @@ begin
       end;
       Base := RESOURCE_RAW_ROOT + Repo + '/' + Branch + '/';
     end;
-    FBaseUrl   := Base;
+    FBaseUrl := Base;
     FGenerated := JsonStr(RootObj, 'generated');
 
     Cats := RootObj.Values['categories'];
-    if not (Cats is TJSONArray) then
+    if not(Cats is TJSONArray) then
     begin
       AError := 'The resource catalog has no categories.';
       Exit;
@@ -236,12 +236,12 @@ begin
     try
       for I := 0 to CatArray.Count - 1 do
       begin
-        if not (CatArray.Items[I] is TJSONObject) then
+        if not(CatArray.Items[I] is TJSONObject) then
           Continue;
         CatObj := TJSONObject(CatArray.Items[I]);
 
-        Cat.Id      := JsonStr(CatObj, 'id');
-        Cat.Title   := JsonStr(CatObj, 'title');
+        Cat.Id := JsonStr(CatObj, 'id');
+        Cat.Title := JsonStr(CatObj, 'title');
         Cat.TitleBn := JsonStr(CatObj, 'titleBn');
         if Cat.Id = '' then
           Continue;
@@ -253,17 +253,17 @@ begin
             ItemArray := TJSONArray(CatObj.Values['items']);
             for J := 0 to ItemArray.Count - 1 do
             begin
-              if not (ItemArray.Items[J] is TJSONObject) then
+              if not(ItemArray.Items[J] is TJSONObject) then
                 Continue;
               ItemObj := TJSONObject(ItemArray.Items[J]);
 
-              Item.FileName      := JsonStr(ItemObj, 'file');
-              Item.Name          := JsonStr(ItemObj, 'name');
-              Item.ResourceType  := JsonStr(ItemObj, 'type');
-              Item.Version       := JsonStr(ItemObj, 'version');
-              Item.Description   := JsonStr(ItemObj, 'description');
+              Item.FileName := JsonStr(ItemObj, 'file');
+              Item.Name := JsonStr(ItemObj, 'name');
+              Item.ResourceType := JsonStr(ItemObj, 'type');
+              Item.Version := JsonStr(ItemObj, 'version');
+              Item.Description := JsonStr(ItemObj, 'description');
               Item.DescriptionBn := JsonStr(ItemObj, 'descriptionBn');
-              Item.Sha256        := JsonStr(ItemObj, 'sha256');
+              Item.Sha256 := JsonStr(ItemObj, 'sha256');
 
               Item.Size := 0;
               SizeValue := ItemObj.Values['size'];
@@ -297,7 +297,7 @@ begin
     end;
 
     FLoaded := True;
-    Result  := True;
+    Result := True;
   finally
     Root.Free;
   end;

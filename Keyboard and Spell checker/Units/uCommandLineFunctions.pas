@@ -94,11 +94,11 @@ function EnumFindMainWndProc(Wnd: HWND; Param: LPARAM): BOOL; stdcall;
 var
   ClassName: array [0 .. 255] of Char;
 begin
-  Result := True;
+  result := True;
   if (GetClassName(Wnd, ClassName, Length(ClassName)) > 0) and (StrComp(ClassName, 'TAvroMainForm1') = 0) then
   begin
     GEnumFoundMainWnd := Wnd;
-    Result := False;
+    result := False;
   end;
 end;
 

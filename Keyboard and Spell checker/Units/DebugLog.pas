@@ -55,7 +55,7 @@ procedure Log(const Msg: string; i: LongInt); overload;
 }
 const
   StartupLogFileName: string = 'AvroStartup.log';
-  StartupLogMaxBytes: Int64 = 256 * 1024;
+  StartupLogMaxBytes: Int64  = 256 * 1024;
 
 procedure StartupLog(const Msg: string); overload;
 procedure StartupLog(const Section, Msg: string); overload;
@@ -101,7 +101,7 @@ begin
 end;
 
 { =============================================================================== }
-{ STARTUP LOG                                                                    }
+{ STARTUP LOG }
 { =============================================================================== }
 
 const
@@ -112,22 +112,23 @@ var
   { Resolved once per process: the first candidate this process can actually
     write to. Empty until resolved, and cleared again when a write to it fails
     so the next call walks the chain afresh. }
-  CachedStartupLogPath: string;
+  CachedStartupLogPath:   string;
   StartupLogPathResolved: Boolean;
 
-{ The candidates, in order: beside the data files, then - for a data folder the
-  user cannot write to (a portable copy in Program Files, a network share, a
-  locked-down profile) - LOCALAPPDATA and finally TEMP. A candidate whose base
-  folder is unset is skipped; nothing is ever resolved relative to the current
-  directory. }
+  { The candidates, in order: beside the data files, then - for a data folder the
+    user cannot write to (a portable copy in Program Files, a network share, a
+    locked-down profile) - LOCALAPPDATA and finally TEMP. A candidate whose base
+    folder is unset is skipped; nothing is ever resolved relative to the current
+    directory. }
 function StartupLogCandidate(Index: Integer): string;
 var
   Base: string;
 begin
   Result := '';
   try
-    case Index of
-      0: Result := GetAvroDataDir + StartupLogFileName;
+    case index of
+      0:
+        Result := GetAvroDataDir + StartupLogFileName;
       1:
         begin
           Base := GetEnvironmentVariable('LOCALAPPDATA');
@@ -178,16 +179,16 @@ end;
 
 function ResolveStartupLogPath: string;
 var
-  I:         Integer;
+  i:         Integer;
   Candidate: string;
 begin
   if StartupLogPathResolved then
     Exit(CachedStartupLogPath);
 
   Result := '';
-  for I := 0 to 2 do
+  for i := 0 to 2 do
   begin
-    Candidate := StartupLogCandidate(I);
+    Candidate := StartupLogCandidate(i);
     if CanWriteStartupLog(Candidate) then
     begin
       Result := Candidate;

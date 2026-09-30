@@ -785,8 +785,7 @@ end;
 
 procedure TfrmSpell.AppEventsSettingChange(Sender: TObject; Flag: Integer; const Section: string; var Result: LongInt);
 begin
-  if SameText('ImmersiveColorSet', string(Section))
-     or SameText(APP_THEME_BROADCAST_SECTION, string(Section)) then
+  if SameText('ImmersiveColorSet', string(Section)) or SameText(APP_THEME_BROADCAST_SECTION, string(Section)) then
     HandleThemes;
 end;
 

@@ -29,26 +29,26 @@ type
   { One entry of the download queue. Jobs run sequentially in a single TTask;
     the record is captured by the per-run closure, so each run owns its copy. }
   TResourceDownloadJob = record
-    Url:          string;
-    FileName:     string;
+    Url: string;
+    FileName: string;
     ResourceType: string;
-    Sha256:       string;
-    Name:         string;
-    ItemIndex:    Integer;
-    IsOnlyJob:    Boolean;
+    Sha256: string;
+    Name: string;
+    ItemIndex: Integer;
+    IsOnlyJob: Boolean;
   end;
 
   TfrmResourceBrowser = class(TForm)
-    lblHint:         TLabel;
-    lblDestination:  TLabel;
-    lstCategories:   TListBox;
-    lvItems:         TListView;
-    lblItemDesc:     TLabel;
-    lblStatus:       TLabel;
-    pbProgress:      TProgressBar;
-    btnDownload:     TButton;
-    btnDownloadAll:  TButton;
-    btnClose:        TButton;
+    lblHint: TLabel;
+    lblDestination: TLabel;
+    lstCategories: TListBox;
+    lvItems: TListView;
+    lblItemDesc: TLabel;
+    lblStatus: TLabel;
+    pbProgress: TProgressBar;
+    btnDownload: TButton;
+    btnDownloadAll: TButton;
+    btnClose: TButton;
     procedure FormCreate(Sender: TObject);
     procedure FormShow(Sender: TObject);
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
@@ -58,13 +58,13 @@ type
     procedure btnDownloadAllClick(Sender: TObject);
     procedure btnCloseClick(Sender: TObject);
     private
-      FCatalog:      TResourceCatalog;
-      FBusy:         Boolean;
+      FCatalog:       TResourceCatalog;
+      FBusy:          Boolean;
       FDownloadQueue: TArray<TResourceDownloadJob>;
-      FQueuePos:     Integer;
-      FLastTarget:   string;
-      FFailedCount:  Integer;
-      FLastError:    string;
+      FQueuePos:      Integer;
+      FLastTarget:    string;
+      FFailedCount:   Integer;
+      FLastError:     string;
       { Category the caller asked for ('' = default). The catalog arrives
         asynchronously, so the selection is applied after the fetch, not at
         Show time - see SelectCategoryById. }
@@ -78,7 +78,7 @@ type
       procedure ShowItemDescription(const AIndex: Integer);
       procedure UpdateItemStatus(const AIndex: Integer; const AInstalled: Boolean);
       procedure UpdateDestinationLabel;
-      function  SelectedItemIndex: Integer;
+      function SelectedItemIndex: Integer;
 
       procedure StartDownload(const AIndexes: TArray<Integer>);
       procedure RunNextJob;
@@ -91,14 +91,14 @@ type
 var
   frmResourceBrowser: TfrmResourceBrowser;
 
-{ Creates the dialog on first use, reuses it afterwards. The instance stays
-  alive for the whole session (hide on close), so a download task can never
-  race a freed form.
+  { Creates the dialog on first use, reuses it afterwards. The instance stays
+    alive for the whole session (hide on close), so a download task can never
+    race a freed form.
 
-  ACategoryId opens the dialog on that catalog category - 'dictionary' from
-  the missing-auto-correct-dictionary balloon and from the auto-correct
-  editor's download button. '' (or an id the catalog does not have) shows
-  the first category. }
+    ACategoryId opens the dialog on that catalog category - 'dictionary' from
+    the missing-auto-correct-dictionary balloon and from the auto-correct
+    editor's download button. '' (or an id the catalog does not have) shows
+    the first category. }
 procedure ShowResourceBrowser(const ACategoryId: string = '');
 
 implementation
@@ -125,7 +125,7 @@ begin
 end;
 
 { ---------------------------------------------------------------------------- }
-{ Lifecycle                                                                    }
+{ Lifecycle }
 { ---------------------------------------------------------------------------- }
 
 constructor TfrmResourceBrowser.Create(AOwner: TComponent);
@@ -169,7 +169,7 @@ begin
 end;
 
 { ---------------------------------------------------------------------------- }
-{ Catalog                                                                      }
+{ Catalog }
 { ---------------------------------------------------------------------------- }
 
 procedure TfrmResourceBrowser.LoadCatalog;
@@ -180,12 +180,12 @@ begin
   SetBusy('Loading resource catalog...');
   Catalog := FCatalog;
   TTask.Run(
-    procedure
+      procedure
     var
       Err: string;
-      Ok:  Boolean;
+      Ok: Boolean;
     begin
-      Ok  := False;
+      Ok := False;
       Err := '';
       try
         Ok := Catalog.Fetch(Err);
@@ -194,12 +194,12 @@ begin
         // otherwise FBusy stays True and the form is dead for the session.
         on E: Exception do
         begin
-          Ok  := False;
+          Ok := False;
           Err := 'Catalog error: ' + E.Message;
         end;
       end;
       TThread.Queue(nil,
-        procedure
+          procedure
         begin
           FBusy := False;
           if not Ok then
@@ -224,10 +224,10 @@ end;
 
 procedure TfrmResourceBrowser.SetBusy(const ACaption: string);
 begin
-  lblStatus.Caption      := ACaption;
-  btnDownload.Enabled    := not FBusy;
+  lblStatus.Caption := ACaption;
+  btnDownload.Enabled := not FBusy;
   btnDownloadAll.Enabled := not FBusy;
-  lstCategories.Enabled  := not FBusy;
+  lstCategories.Enabled := not FBusy;
 end;
 
 procedure TfrmResourceBrowser.PopulateCategories;
@@ -237,7 +237,7 @@ begin
   lstCategories.Items.Clear;
   lvItems.Items.Clear;
   lblItemDesc.Caption := '';
-  for I := 0 to High(FCatalog.Categories) do
+  for I := 0 to high(FCatalog.Categories) do
     lstCategories.Items.Add(FCatalog.Categories[I].Title);
   if lstCategories.Items.Count > 0 then
   begin
@@ -259,7 +259,7 @@ begin
     Exit;
   if (FCatalog = nil) or not FCatalog.Loaded then
     Exit;
-  for I := 0 to High(FCatalog.Categories) do
+  for I := 0 to high(FCatalog.Categories) do
     if SameText(FCatalog.Categories[I].Id, AId) then
     begin
       if lstCategories.ItemIndex <> I then
@@ -275,10 +275,10 @@ end;
 
 procedure TfrmResourceBrowser.PopulateItems;
 var
-  Cat:     TResourceCategory;
-  Item:    TResourceItem;
-  Row:     TListItem;
-  I:       Integer;
+  Cat:      TResourceCategory;
+  Item:     TResourceItem;
+  Row:      TListItem;
+  I:        Integer;
   SizeText: string;
 begin
   lvItems.Items.BeginUpdate;
@@ -287,14 +287,14 @@ begin
     lblItemDesc.Caption := '';
     if (FCatalog = nil) or not FCatalog.Loaded then
       Exit;
-    if (lstCategories.ItemIndex < 0) or (lstCategories.ItemIndex > High(FCatalog.Categories)) then
+    if (lstCategories.ItemIndex < 0) or (lstCategories.ItemIndex > high(FCatalog.Categories)) then
       Exit;
 
     Cat := FCatalog.Categories[lstCategories.ItemIndex];
-    for I := 0 to High(Cat.Items) do
+    for I := 0 to high(Cat.Items) do
     begin
       Item := Cat.Items[I];
-      Row  := lvItems.Items.Add;
+      Row := lvItems.Items.Add;
       Row.Caption := Item.Name;
       Row.SubItems.Add(Item.Version);
       if Item.Size >= 1024 * 1024 then
@@ -341,10 +341,10 @@ begin
   lblItemDesc.Caption := '';
   if (FCatalog = nil) or not FCatalog.Loaded then
     Exit;
-  if (lstCategories.ItemIndex < 0) or (lstCategories.ItemIndex > High(FCatalog.Categories)) then
+  if (lstCategories.ItemIndex < 0) or (lstCategories.ItemIndex > high(FCatalog.Categories)) then
     Exit;
   Cat := FCatalog.Categories[lstCategories.ItemIndex];
-  if (AIndex < 0) or (AIndex > High(Cat.Items)) then
+  if (AIndex < 0) or (AIndex > high(Cat.Items)) then
     Exit;
 
   Item := Cat.Items[AIndex];
@@ -373,15 +373,14 @@ var
   Folder:  string;
   Edition: string;
 begin
-{$IFDEF PortableOn}
+  {$IFDEF PortableOn}
   Edition := 'Portable edition';
-{$ELSE}
+  {$ELSE}
   Edition := 'Setup edition';
-{$ENDIF}
+  {$ENDIF}
   Folder := '';
-  if (FCatalog <> nil) and FCatalog.Loaded and (lstCategories.ItemIndex >= 0) and
-     (lstCategories.ItemIndex <= High(FCatalog.Categories)) and
-     (Length(FCatalog.Categories[lstCategories.ItemIndex].Items) > 0) then
+  if (FCatalog <> nil) and FCatalog.Loaded and (lstCategories.ItemIndex >= 0) and (lstCategories.ItemIndex <= high(FCatalog.Categories)) and
+    (Length(FCatalog.Categories[lstCategories.ItemIndex].Items) > 0) then
     Folder := ResourceTargetFolder(FCatalog.Categories[lstCategories.ItemIndex].Items[0].ResourceType);
 
   if Folder = '' then
@@ -391,37 +390,37 @@ begin
 end;
 
 { ---------------------------------------------------------------------------- }
-{ Download                                                                     }
+{ Download }
 { ---------------------------------------------------------------------------- }
 
 procedure TfrmResourceBrowser.btnDownloadClick(Sender: TObject);
 var
   Index: Integer;
 begin
-  Index := SelectedItemIndex;
-  if Index < 0 then
+  index := SelectedItemIndex;
+  if index < 0 then
   begin
     lblStatus.Caption := 'Select a file first.';
     Exit;
   end;
-  StartDownload([Index]);
+  StartDownload([index]);
 end;
 
 procedure TfrmResourceBrowser.btnDownloadAllClick(Sender: TObject);
 var
-  Cat:   TResourceCategory;
+  Cat:     TResourceCategory;
   Indexes: TArray<Integer>;
-  I:     Integer;
+  I:       Integer;
 begin
   if (FCatalog = nil) or not FCatalog.Loaded then
     Exit;
-  if (lstCategories.ItemIndex < 0) or (lstCategories.ItemIndex > High(FCatalog.Categories)) then
+  if (lstCategories.ItemIndex < 0) or (lstCategories.ItemIndex > high(FCatalog.Categories)) then
     Exit;
   Cat := FCatalog.Categories[lstCategories.ItemIndex];
   if Length(Cat.Items) = 0 then
     Exit;
   SetLength(Indexes, Length(Cat.Items));
-  for I := 0 to High(Cat.Items) do
+  for I := 0 to high(Cat.Items) do
     Indexes[I] := I;
   StartDownload(Indexes);
 end;
@@ -440,7 +439,7 @@ begin
     lblStatus.Caption := 'The resource catalog is not loaded yet - try again in a moment.';
     Exit;
   end;
-  if (lstCategories.ItemIndex < 0) or (lstCategories.ItemIndex > High(FCatalog.Categories)) then
+  if (lstCategories.ItemIndex < 0) or (lstCategories.ItemIndex > high(FCatalog.Categories)) then
   begin
     lblStatus.Caption := 'Select a category first.';
     Exit;
@@ -453,38 +452,38 @@ begin
 
   Cat := FCatalog.Categories[lstCategories.ItemIndex];
   SetLength(FDownloadQueue, Length(AIndexes));
-  for I := 0 to High(AIndexes) do
+  for I := 0 to high(AIndexes) do
   begin
-    if (AIndexes[I] < 0) or (AIndexes[I] > High(Cat.Items)) then
+    if (AIndexes[I] < 0) or (AIndexes[I] > high(Cat.Items)) then
     begin
       FDownloadQueue := nil;
       lblStatus.Caption := 'Invalid selection.';
       Exit;
     end;
     Item := Cat.Items[AIndexes[I]];
-    Job.Url          := FCatalog.FileUrl(Item);
-    Job.FileName     := Item.FileName;
+    Job.Url := FCatalog.FileUrl(Item);
+    Job.FileName := Item.FileName;
     Job.ResourceType := Item.ResourceType;
-    Job.Sha256       := Item.Sha256;
-    Job.Name         := Item.Name;
-    Job.ItemIndex    := AIndexes[I];
-    Job.IsOnlyJob    := Length(AIndexes) = 1;
+    Job.Sha256 := Item.Sha256;
+    Job.Name := Item.Name;
+    Job.ItemIndex := AIndexes[I];
+    Job.IsOnlyJob := Length(AIndexes) = 1;
     FDownloadQueue[I] := Job;
   end;
 
-  FQueuePos  := 0;
+  FQueuePos := 0;
   FLastTarget := '';
   FFailedCount := 0;
-  FLastError   := '';
+  FLastError := '';
   RunNextJob;
 end;
 
 procedure TfrmResourceBrowser.RunNextJob;
 var
-  Job:        TResourceDownloadJob;
+  Job:         TResourceDownloadJob;
   LastPercent: Integer;
 begin
-  if FQueuePos > High(FDownloadQueue) then
+  if FQueuePos > high(FDownloadQueue) then
   begin
     FinishQueue;
     Exit;
@@ -499,16 +498,16 @@ begin
   TTask.Run(
     procedure
     var
-      Err:    string;
+      Err: string;
       Target: string;
-      Ok:     Boolean;
+      Ok: Boolean;
     begin
-      Ok     := False;
-      Err    := '';
+      Ok := False;
+      Err := '';
       Target := '';
       try
         Ok := DownloadAndInstallResource(Job.Url, Job.FileName, Job.ResourceType, Job.Sha256,
-          procedure(const AContentLength, AReadCount: Int64)
+            procedure(const AContentLength, AReadCount: Int64)
           var
             Percent: Integer;
           begin
@@ -523,20 +522,19 @@ begin
               Exit;
             LastPercent := Percent;
             TThread.Queue(nil,
-              procedure
+                procedure
               begin
-                pbProgress.Max      := 100;
+                pbProgress.Max := 100;
                 pbProgress.Position := Percent;
               end);
-          end,
-          Err, Target);
+          end, Err, Target);
       except
         // The completion below must run no matter what - otherwise FBusy
         // stays True and every later click silently does nothing.
         on E: Exception do
         begin
-          Ok     := False;
-          Err    := 'Unexpected error: ' + E.Message;
+          Ok := False;
+          Err := 'Unexpected error: ' + E.Message;
           Target := '';
         end;
       end;
@@ -618,8 +616,7 @@ begin
       if InstalledCount = 0 then
         SetBusy(Format('All %d download(s) failed. Last: %s', [FFailedCount, FLastError]))
       else
-        SetBusy(Format('Done - %d installed, %d failed. Last: %s',
-          [InstalledCount, FFailedCount, FLastError]));
+        SetBusy(Format('Done - %d installed, %d failed. Last: %s', [InstalledCount, FFailedCount, FLastError]));
     end;
   end
   else if Length(FDownloadQueue) > 1 then
@@ -631,10 +628,10 @@ begin
     SetBusy('Installed: ' + FLastTarget)
   else
     SetBusy('');
-  FFailedCount   := 0;
-  FLastError     := '';
+  FFailedCount := 0;
+  FLastError := '';
   FDownloadQueue := nil;
-  FQueuePos      := 0;
+  FQueuePos := 0;
   // The catalog is unchanged by an install - refresh the installed markers.
   PopulateItems;
 end;

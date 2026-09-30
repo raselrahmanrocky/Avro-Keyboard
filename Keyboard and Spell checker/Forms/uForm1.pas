@@ -252,19 +252,19 @@ type
         clearing a TMenuItem calls RebuildHandle (Vcl.Menus), which destroys and
         rebuilds the HMENU that menu's own track loop is still displaying, so a
         timer-driven rebuild has to wait for it to close. }
-      FTrackedMenusOpen:            Integer;
-      FDirectoryWatcher:            TAvroDirectoryWatcher;
+      FTrackedMenusOpen: Integer;
+      FDirectoryWatcher: TAvroDirectoryWatcher;
       { Application.OnException reports once per session, not once per fault. }
-      FUnhandledReported:           Boolean;
+      FUnhandledReported: Boolean;
       { One-shot tray balloon when the mapping folder is empty at startup. }
-      FNoMappingBalloonShown:       Boolean;
+      FNoMappingBalloonShown: Boolean;
       { One-shot tray balloon when autodict.dct could not be loaded (the load
         itself is silent - see uAutoCorrect). }
-      FNoDictBalloonShown:          Boolean;
+      FNoDictBalloonShown: Boolean;
       { One-shot tray balloon when Database.db3 is absent at startup - the
         failure is just as silent (see uDBase), and just as fatal to phonetic
         candidates. }
-      FNoDatabaseBalloonShown:      Boolean;
+      FNoDatabaseBalloonShown: Boolean;
 
       { Per-layout icons, decoded from the payload each container carries.
 
@@ -471,13 +471,13 @@ var
     ReportStartupFailure. }
   FStartupFailureReported: Boolean;
 
-{ =============================================================================== }
+  { =============================================================================== }
 
-{ One visible report per session for a startup step that raised, plus the
-  startup-log line that makes the failure debuggable from a bug report. A tray
-  balloon cannot be used here: the tray is created inside LoadApp, so it may not
-  exist yet, and in top-bar mode a balloon is invisible anyway - which is
-  exactly how this class of failure used to stay silent. }
+  { One visible report per session for a startup step that raised, plus the
+    startup-log line that makes the failure debuggable from a bug report. A tray
+    balloon cannot be used here: the tray is created inside LoadApp, so it may not
+    exist yet, and in top-bar mode a balloon is invisible anyway - which is
+    exactly how this class of failure used to stay silent. }
 procedure ReportStartupFailure(const AStep: string; E: Exception);
 var
   Msg: string;
@@ -490,8 +490,7 @@ begin
   Msg := 'Avro Keyboard could not complete the startup step "' + AStep + '".' + sLineBreak + sLineBreak;
   if Assigned(E) then
     Msg := Msg + E.ClassName + ': ' + E.Message + sLineBreak + sLineBreak;
-  Msg := Msg + 'Avro keeps running with the parts that did load.' + sLineBreak +
-    StartupLogHint;
+  Msg := Msg + 'Avro keeps running with the parts that did load.' + sLineBreak + StartupLogHint;
 
   MessageBox(0, PChar(Msg), 'Avro Keyboard', MB_OK or MB_ICONWARNING or MB_SETFOREGROUND);
 end;
@@ -950,8 +949,8 @@ var
         AInto.AddOrSetValue(Lowercase((AMenu.Items[J] as TMenuItemExtended).Value), True);
   end;
 
-  { One dynamic item, inserted right below AAfter - the placement both menus
-    use.  AOwner stays the popup that owns the item, exactly as before. }
+{ One dynamic item, inserted right below AAfter - the placement both menus
+  use.  AOwner stays the popup that owns the item, exactly as before. }
   procedure AddLayoutItem(const AOwner: TComponent; const AInto, AAfter: TMenuItem; const ACaption: string);
   var
     M: TMenuItemExtended;
@@ -1725,9 +1724,9 @@ begin
 end;
 
 { =============================================================================== }
-{ Keyboard layouts folder: snapshot + fallback poll, mirroring the mapping one.  }
+{ Keyboard layouts folder: snapshot + fallback poll, mirroring the mapping one. }
 { This folder has NO directory watcher (FDirectoryWatcher watches AnsiMappingDir }
-{ only), so the poll below is the only thing that notices a .avrolayout copied   }
+{ only), so the poll below is the only thing that notices a .avrolayout copied }
 { in or deleted while Avro Keyboard is running. }
 { =============================================================================== }
 
@@ -1830,7 +1829,7 @@ end;
 procedure TAvroMainForm1.CollectHelpPdfs(AList: TStringList);
 var
   I, J: Integer;
-  Cur: string;
+  Cur:  string;
 
   function AlreadyListed(const AName: string): Boolean;
   var
@@ -1845,19 +1844,19 @@ var
 
   procedure ScanDir(const ADir: string);
   var
-    Sr: TSearchRec;
+    SR: TSearchRec;
   begin
     if not DirectoryExists(ADir) then
       Exit;
-    if FindFirst(IncludeTrailingPathDelimiter(ADir) + '*.pdf', faAnyFile, Sr) = 0 then
-    try
-      repeat
-        if ((Sr.Attr and faDirectory) = 0) and (not AlreadyListed(Sr.Name)) then
-          AList.Add(IncludeTrailingPathDelimiter(ADir) + Sr.Name);
-      until FindNext(Sr) <> 0;
-    finally
-      FindClose(Sr);
-    end;
+    if FindFirst(IncludeTrailingPathDelimiter(ADir) + '*.pdf', faAnyFile, SR) = 0 then
+      try
+        repeat
+          if ((SR.Attr and faDirectory) = 0) and (not AlreadyListed(SR.Name)) then
+            AList.Add(IncludeTrailingPathDelimiter(ADir) + SR.Name);
+        until FindNext(SR) <> 0;
+      finally
+        FindClose(SR);
+      end;
   end;
 
 begin
@@ -1881,9 +1880,9 @@ procedure TAvroMainForm1.RebuildDynamicHelp(AParent: TMenuItem; AInsertIndex: In
 const
   DynTag = 9911;
 var
-  I: Integer;
+  I:    Integer;
   Pdfs: TStringList;
-  M: TMenuItem;
+  M:    TMenuItem;
 begin
   for I := AParent.Count - 1 downto 0 do
     if AParent[I].Tag = DynTag then
@@ -1933,7 +1932,7 @@ end;
 procedure TAvroMainForm1.OpenHelpFile(const HelpID: Integer);
 var
   Request: string;
-  Pdf: string;
+  Pdf:     string;
 begin
   case HelpID of
     23:
@@ -1952,8 +1951,8 @@ begin
       Request := 'faq.pdf';
     35:
       Request := 'Editing Keyboard Layout.pdf';
-  else
-    Exit;
+    else
+      Exit;
   end;
   Pdf := ResolveHelpPdf(Request);
   if Pdf <> '' then
@@ -2722,13 +2721,13 @@ end;
   on the right side. }
 procedure TAvroMainForm1.AnsiVersionItemAdvancedDrawItem(Sender: TObject; ACanvas: TCanvas; ARect: TRect; AState: TOwnerDrawState);
 var
-  Item:            TMenuItem;
-  IconHandle:      HICON;
-  X, Y:            Integer;
-  CapStr:          string;
-  TextRect:        TRect;
-  GutterRect:      TRect;
-  IsHovered:       Boolean;
+  Item:                                           TMenuItem;
+  IconHandle:                                     HICON;
+  X, Y:                                           Integer;
+  CapStr:                                         string;
+  TextRect:                                       TRect;
+  GutterRect:                                     TRect;
+  IsHovered:                                      Boolean;
   CMenuBg, CMenuText, CHighlight, CHighlightText: TColor;
 const
   GUTTER_W = 26;
@@ -2742,9 +2741,9 @@ begin
   { Fetch VCL-theme-aware system colours so the rendering automatically
     matches the active style (Windows10, Windows10 Dark, or any future
     custom style). }
-  CMenuBg        := StyleServices.GetSystemColor(clMenu);
-  CMenuText      := StyleServices.GetSystemColor(clMenuText);
-  CHighlight     := StyleServices.GetSystemColor(clHighlight);
+  CMenuBg := StyleServices.GetSystemColor(clMenu);
+  CMenuText := StyleServices.GetSystemColor(clMenuText);
+  CHighlight := StyleServices.GetSystemColor(clHighlight);
   CHighlightText := StyleServices.GetSystemColor(clHighlightText);
 
   if IsDarkAppTheme then
@@ -2825,8 +2824,7 @@ begin
     ACanvas.Font.Color := CMenuText;
   SetBkMode(ACanvas.Handle, TRANSPARENT);
   TextRect := Rect(ARect.Left + GUTTER_W + 4, ARect.Top, ARect.Right, ARect.Bottom);
-  DrawText(ACanvas.Handle, PChar(CapStr), -1, TextRect,
-    DT_LEFT or DT_VCENTER or DT_SINGLELINE);
+  DrawText(ACanvas.Handle, PChar(CapStr), -1, TextRect, DT_LEFT or DT_VCENTER or DT_SINGLELINE);
 
   { Right-side icon badge.  Resolve THIS row's own badge on demand: the icon
     bytes are dropped whenever the mapping folder is re-scanned
@@ -3212,8 +3210,8 @@ begin
   Result := False;
   if (CurrentPicker <> nil) and (not CurrentPicker.Closing) and CurrentPicker.HandleAllocated and IsWindow(CurrentPicker.Handle) then
     Result := PostMessage(CurrentPicker.Handle, WM_PICKER_KEY, AVkCode, 0) <> False
-  else if (CurrentLayoutPicker <> nil) and (not CurrentLayoutPicker.Closing) and CurrentLayoutPicker.HandleAllocated and
-    IsWindow(CurrentLayoutPicker.Handle) then
+  else if (CurrentLayoutPicker <> nil) and (not CurrentLayoutPicker.Closing) and CurrentLayoutPicker.HandleAllocated and IsWindow(CurrentLayoutPicker.Handle)
+  then
     Result := PostMessage(CurrentLayoutPicker.Handle, WM_PICKER_KEY, AVkCode, 0) <> False;
 end;
 
@@ -3259,8 +3257,7 @@ begin
       Msg := 'Avro Keyboard hit an internal error and handled it.' + sLineBreak + sLineBreak;
       if Assigned(E) then
         Msg := Msg + E.ClassName + ': ' + E.Message + sLineBreak + sLineBreak;
-      Msg := Msg + 'Restart Avro if typing misbehaves.' + sLineBreak +
-        StartupLogHint;
+      Msg := Msg + 'Restart Avro if typing misbehaves.' + sLineBreak + StartupLogHint;
       MessageBox(0, PChar(Msg), 'Avro Keyboard', MB_OK or MB_ICONWARNING or MB_SETFOREGROUND);
     end;
   except
@@ -3320,18 +3317,15 @@ begin
   ExePath := WorkDir + 'AvroTextConverter.exe';
   if not FileExists(ExePath) then
   begin
-    MessageDlg('The text converter could not be found:' + sLineBreak + ExePath,
-      mtWarning, [mbOK], 0);
+    MessageDlg('The text converter could not be found:' + sLineBreak + ExePath, mtWarning, [mbOK], 0);
     Exit;
   end;
 
   Params := '';
-{$IFDEF PortableOn}
+  {$IFDEF PortableOn}
   Params := '--mapping-dir "' + ExtractFilePath(ParamStr(0)) + 'AnsiMapping"';
-{$ENDIF}
-
-  ShellExecute(Handle, 'open', PChar(ExePath), PChar(Params), PChar(WorkDir),
-    SW_SHOWNORMAL);
+  {$ENDIF}
+  ShellExecute(Handle, 'open', PChar(ExePath), PChar(Params), PChar(WorkDir), SW_SHOWNORMAL);
 end;
 
 procedure TAvroMainForm1.WMLaunchTextConverter(var Msg: TMessage);
@@ -3761,8 +3755,7 @@ end;
 
 procedure TAvroMainForm1.ShowAutoCorrectMissingBalloon;
 const
-  Msg = 'Auto-correct dictionary (autodict.dct) is missing.' + sLineBreak +
-    'Typing works normally - only phonetic auto-correct is off.';
+  Msg = 'Auto-correct dictionary (autodict.dct) is missing.' + sLineBreak + 'Typing works normally - only phonetic auto-correct is off.';
 begin
   if FNoDictBalloonShown then
     Exit;
@@ -3770,8 +3763,8 @@ begin
 
   if Assigned(Tray) and Tray.Visible then
   begin
-    Tray.BalloonTitle   := 'Avro Keyboard';
-    Tray.BalloonHint    := Msg + sLineBreak + 'Click here to download the dictionary.';
+    Tray.BalloonTitle := 'Avro Keyboard';
+    Tray.BalloonHint := Msg + sLineBreak + 'Click here to download the dictionary.';
     Tray.OnBalloonClick := NoDictBalloonClick;
     Tray.BalloonTimeout := 10000;
     Tray.ShowBalloonHint;
@@ -3781,11 +3774,10 @@ begin
   { Top bar mode has no tray icon, so there is nothing to click. The notice
     still has to reach the user once - it rides the top bar's own hint
     balloon, which the menu route (Resources Management) completes. }
-  if Assigned(TopBar) and TopBar.Visible then
+  if Assigned(Topbar) and Topbar.Visible then
   begin
-    TopBar.BalloonHint1.Title := Msg + sLineBreak +
-      'Choose "Resources Management" from the Avro menu.';
-    TopBar.BalloonHint1.ShowHint(TopBar.ImgButtonMode);
+    Topbar.BalloonHint1.Title := Msg + sLineBreak + 'Choose "Resources Management" from the Avro menu.';
+    Topbar.BalloonHint1.ShowHint(Topbar.ImgButtonMode);
   end;
 end;
 
@@ -3818,8 +3810,7 @@ end;
 
 procedure TAvroMainForm1.ShowMissingDatabaseBalloon;
 const
-  Msg = 'Word database (Database.db3) is missing.' + sLineBreak +
-    'Phonetic suggestions and Bangla word completion are off - typing falls back to English.';
+  Msg = 'Word database (Database.db3) is missing.' + sLineBreak + 'Phonetic suggestions and Bangla word completion are off - typing falls back to English.';
 begin
   if FNoDatabaseBalloonShown then
     Exit;
@@ -3827,8 +3818,8 @@ begin
 
   if Assigned(Tray) and Tray.Visible then
   begin
-    Tray.BalloonTitle   := 'Avro Keyboard';
-    Tray.BalloonHint    := Msg + sLineBreak + 'Click here to download the database.';
+    Tray.BalloonTitle := 'Avro Keyboard';
+    Tray.BalloonHint := Msg + sLineBreak + 'Click here to download the database.';
     Tray.OnBalloonClick := MissingDatabaseBalloonClick;
     Tray.BalloonTimeout := 10000;
     Tray.ShowBalloonHint;
@@ -3838,11 +3829,10 @@ begin
   { Top bar mode has no tray icon, so there is nothing to click. The notice
     still has to reach the user once - it rides the top bar's own hint
     balloon, which the menu route (Resources Management) completes. }
-  if Assigned(TopBar) and TopBar.Visible then
+  if Assigned(Topbar) and Topbar.Visible then
   begin
-    TopBar.BalloonHint1.Title := Msg + sLineBreak +
-      'Choose "Resources Management" from the Avro menu.';
-    TopBar.BalloonHint1.ShowHint(TopBar.ImgButtonMode);
+    Topbar.BalloonHint1.Title := Msg + sLineBreak + 'Choose "Resources Management" from the Avro menu.';
+    Topbar.BalloonHint1.ShowHint(Topbar.ImgButtonMode);
   end;
 end;
 
