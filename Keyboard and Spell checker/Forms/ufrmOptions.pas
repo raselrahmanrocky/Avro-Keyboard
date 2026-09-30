@@ -123,10 +123,12 @@ type
     CheckShowAnsiSwitchNotification: TCheckBox;
     GroupBox11: TGroupBox;
     CheckShowLayoutSwitchNotification: TCheckBox;
+    GroupBox12: TGroupBox;
 
     edtModeSwitch: TEdit;
     edtOutputMode: TEdit;
     edtSpellerLauncher: TEdit;
+    edtConverterLauncher: TEdit;
     edtLayoutSwitch: TEdit;
     edtAnsiVersion: TEdit;
     procedure FormCreate(Sender: TObject);
@@ -531,12 +533,33 @@ begin
   edtSpellerLauncher.OnClick := ShortcutEditClick;
 
   // =======================================================
+  // Text Converter Launcher Hotkey UI (runtime-created)
+  GroupBox12 := TGroupBox.Create(KeyboardMode_Panel);
+  GroupBox12.Parent := KeyboardMode_Panel;
+  GroupBox12.Left := GroupBox4.Left;
+  GroupBox12.Width := GroupBox4.Width;
+  GroupBox12.Top := GroupBox9.Top + GroupBox9.Height + GROUP_SPACING;
+  GroupBox12.Height := GROUP_HEIGHT;
+  GroupBox12.Caption := 'Text Converter Launcher';
+
+  // Create TEdit for Text Converter Launcher (in GroupBox12)
+  edtConverterLauncher := TEdit.Create(GroupBox12);
+  edtConverterLauncher.Parent := GroupBox12;
+  edtConverterLauncher.Left := LEFT_MARGIN;
+  edtConverterLauncher.Top := 35;
+  edtConverterLauncher.Width := EDIT_WIDTH;
+  edtConverterLauncher.ReadOnly := True;
+  edtConverterLauncher.Text := 'Set Shortcut';
+  edtConverterLauncher.Color := clWindow;
+  edtConverterLauncher.OnClick := ShortcutEditClick;
+
+  // =======================================================
   // Layout Switcher Hotkey UI (runtime-created)
   GroupBox11 := TGroupBox.Create(KeyboardMode_Panel);
   GroupBox11.Parent := KeyboardMode_Panel;
   GroupBox11.Left := GroupBox4.Left;
   GroupBox11.Width := GroupBox4.Width;
-  GroupBox11.Top := GroupBox9.Top + GroupBox9.Height + GROUP_SPACING;
+  GroupBox11.Top := GroupBox12.Top + GroupBox12.Height + GROUP_SPACING;
   GroupBox11.Height := GROUP_HEIGHT;
   GroupBox11.Caption := 'Layout Switcher';
 
@@ -603,6 +626,7 @@ begin
   RegisterHotkeyFeature(@ModeSwitchKey, 'Keyboard Mode Switch', edtModeSwitch);
   RegisterHotkeyFeature(@ToggleOutputModeKey, 'Output Mode Toggle', edtOutputMode);
   RegisterHotkeyFeature(@SpellerLauncherKey, 'Spell Checker Launcher', edtSpellerLauncher);
+  RegisterHotkeyFeature(@ConverterLauncherKey, 'Text Converter Launcher', edtConverterLauncher);
   RegisterHotkeyFeature(@LayoutSwitchKey, 'Layout Switch', edtLayoutSwitch);
   RegisterHotkeyFeature(@AnsiVersionSwitchKey, 'ANSI Version Switch', edtAnsiVersion);
 end;
@@ -786,6 +810,11 @@ begin
     edtSpellerLauncher.Text := SpellerLauncherKey
   else
     edtSpellerLauncher.Text := 'None';
+
+  if ConverterLauncherKey <> '' then
+    edtConverterLauncher.Text := ConverterLauncherKey
+  else
+    edtConverterLauncher.Text := 'None';
 
   if LayoutSwitchKey <> '' then
     edtLayoutSwitch.Text := LayoutSwitchKey
@@ -1060,6 +1089,11 @@ begin
     SpellerLauncherKey := ''
   else
     SpellerLauncherKey := edtSpellerLauncher.Text;
+
+  if IsHotkeyNone(edtConverterLauncher.Text) then
+    ConverterLauncherKey := ''
+  else
+    ConverterLauncherKey := UpperCase(edtConverterLauncher.Text);
 
   if IsHotkeyNone(edtLayoutSwitch.Text) then
     LayoutSwitchKey := ''

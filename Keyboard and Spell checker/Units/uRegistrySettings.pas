@@ -56,6 +56,7 @@ var
   ModeSwitchKey:                string;
   ToggleOutputModeKey:          string;
   SpellerLauncherKey:           string;
+  ConverterLauncherKey:         string;
   LayoutSwitchKey:              string;
   ShowLayoutSwitchNotification: string;
   AnsiVersionSwitchKey:         string;
@@ -236,6 +237,7 @@ begin
   ModeSwitchKey := UpperCase(XML.GetValue('ModeSwitchKey', 'F12'));
   ToggleOutputModeKey := UpperCase(XML.GetValue('ToggleOutputModeKey', 'F12'));
   SpellerLauncherKey := UpperCase(XML.GetValue('SpellerLauncherKey', 'F7'));
+  ConverterLauncherKey := UpperCase(XML.GetValue('ConverterLauncherKey', 'CTRL+ALT+T'));
   LayoutSwitchKey := UpperCase(XML.GetValue('LayoutSwitchKey', 'CTRL+SHIFT+F11'));
   ShowLayoutSwitchNotification := UpperCase(XML.GetValue('ShowLayoutSwitchNotification', 'YES'));
   AnsiVersionSwitchKey := UpperCase(XML.GetValue('AnsiVersionSwitchKey', 'F12'));
@@ -327,6 +329,7 @@ begin
   XML.SetValue('ModeSwitchKey', ModeSwitchKey);
   XML.SetValue('ToggleOutputModeKey', ToggleOutputModeKey);
   XML.SetValue('SpellerLauncherKey', SpellerLauncherKey);
+  XML.SetValue('ConverterLauncherKey', ConverterLauncherKey);
   XML.SetValue('LayoutSwitchKey', LayoutSwitchKey);
   XML.SetValue('ShowLayoutSwitchNotification', ShowLayoutSwitchNotification);
   XML.SetValue('AnsiVersionSwitchKey', AnsiVersionSwitchKey);
@@ -432,6 +435,7 @@ begin
     ModeSwitchKey := UpperCase(Reg.ReadStringDef('ModeSwitchKey', 'F12'));
     ToggleOutputModeKey := UpperCase(Reg.ReadStringDef('ToggleOutputModeKey', 'F12'));
     SpellerLauncherKey := UpperCase(Reg.ReadStringDef('SpellerLauncherKey', 'F7'));
+    ConverterLauncherKey := UpperCase(Reg.ReadStringDef('ConverterLauncherKey', 'CTRL+ALT+T'));
     LayoutSwitchKey := UpperCase(Reg.ReadStringDef('LayoutSwitchKey', 'CTRL+SHIFT+F11'));
     ShowLayoutSwitchNotification := UpperCase(Reg.ReadStringDef('ShowLayoutSwitchNotification', 'YES'));
     AnsiVersionSwitchKey := UpperCase(Reg.ReadStringDef('AnsiVersionSwitchKey', 'F12'));
@@ -534,6 +538,7 @@ begin
     Reg.WriteString('ModeSwitchKey', ModeSwitchKey);
     Reg.WriteString('ToggleOutputModeKey', ToggleOutputModeKey);
     Reg.WriteString('SpellerLauncherKey', SpellerLauncherKey);
+    Reg.WriteString('ConverterLauncherKey', ConverterLauncherKey);
     Reg.WriteString('LayoutSwitchKey', LayoutSwitchKey);
     Reg.WriteString('ShowLayoutSwitchNotification', ShowLayoutSwitchNotification);
     Reg.WriteString('AnsiVersionSwitchKey', AnsiVersionSwitchKey);
@@ -692,6 +697,7 @@ begin
   Need(ModeSwitchKey, 'F12');
   Need(ToggleOutputModeKey, 'F12');
   Need(SpellerLauncherKey, 'F7');
+  Need(ConverterLauncherKey, 'CTRL+ALT+T');
   Need(LayoutSwitchKey, 'CTRL+SHIFT+F11');
   Need(AnsiVersionSwitchKey, 'F12');
 
@@ -707,22 +713,23 @@ end;
 
 procedure DeduplicateHotkeys;
 var
-  Keys: array [0 .. 4] of ^string;
+  Keys: array [0 .. 5] of ^string;
   I, J: Integer;
 begin
-  // Priority: ModeSwitch > ToggleOutput > SpellerLauncher > LayoutSwitch > AnsiVersion
+  // Priority: ModeSwitch > ToggleOutput > SpellerLauncher > Converter > LayoutSwitch > AnsiVersion
   Keys[0] := @ModeSwitchKey;
   Keys[1] := @ToggleOutputModeKey;
   Keys[2] := @SpellerLauncherKey;
-  Keys[3] := @LayoutSwitchKey;
-  Keys[4] := @AnsiVersionSwitchKey;
+  Keys[3] := @ConverterLauncherKey;
+  Keys[4] := @LayoutSwitchKey;
+  Keys[5] := @AnsiVersionSwitchKey;
 
   // For each higher-priority key, clear any lower-priority key with the same value
-  for I := 0 to 3 do
+  for I := 0 to 4 do
   begin
     if (Keys[I]^ = '') or (Keys[I]^ = 'NONE') then
       Continue;
-    for J := I + 1 to 4 do
+    for J := I + 1 to 5 do
     begin
       if (Keys[J]^ <> '') and (Keys[J]^ <> 'NONE') and (HotkeyStringToModifiers(Keys[I]^) = HotkeyStringToModifiers(Keys[J]^)) and
         (HotkeyStringToKey(Keys[I]^) = HotkeyStringToKey(Keys[J]^)) then

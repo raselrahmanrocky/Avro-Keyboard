@@ -298,7 +298,8 @@ begin
     if (kbdllhs.vkCode = VK_F10) and ((wParam = 260) or (wParam = 261)) then
     begin
       if MatchesHotkeySettingTracked(ModeSwitchKey, kbdllhs.vkCode) or MatchesHotkeySettingTracked(ToggleOutputModeKey, kbdllhs.vkCode) or
-        MatchesHotkeySettingTracked(SpellerLauncherKey, kbdllhs.vkCode) or MatchesHotkeySettingTracked(AnsiVersionSwitchKey, kbdllhs.vkCode) then
+        MatchesHotkeySettingTracked(SpellerLauncherKey, kbdllhs.vkCode) or MatchesHotkeySettingTracked(ConverterLauncherKey, kbdllhs.vkCode) or
+        MatchesHotkeySettingTracked(AnsiVersionSwitchKey, kbdllhs.vkCode) then
       begin
         Result := 1;
         Exit;
@@ -519,6 +520,21 @@ begin
         ShouldBlock := True;
         goto ExitHere;
       end;
+      // Text Converter Launcher
+      if MatchesHotkeySettingTracked(ConverterLauncherKey, kbdllhs.vkCode) then
+      begin
+        // Posted, not called: LaunchAvroTextConverter answers a missing exe
+        // with a modal MessageDlg, and a modal loop inside the hook callback
+        // would blow LowLevelHooksTimeout and get the hook removed silently.
+        PostMessage(AvroMainForm1.Handle, WM_APP + 7, 0, 0);
+        if SettingUsesWinModifier(ConverterLauncherKey) then
+        begin
+          SendInput_Down(VK_MENU_MASK);
+          SendInput_UP(VK_MENU_MASK);
+        end;
+        ShouldBlock := True;
+        goto ExitHere;
+      end;
       // ANSI Version Switch
       if MatchesHotkeySettingTracked(AnsiVersionSwitchKey, kbdllhs.vkCode) then
       begin
@@ -590,6 +606,11 @@ begin
         goto ExitHere;
       end;
       if MatchesHotkeySettingTracked(SpellerLauncherKey, kbdllhs.vkCode) then
+      begin
+        ShouldBlock := True;
+        goto ExitHere;
+      end;
+      if MatchesHotkeySettingTracked(ConverterLauncherKey, kbdllhs.vkCode) then
       begin
         ShouldBlock := True;
         goto ExitHere;

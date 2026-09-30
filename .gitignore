@@ -106,6 +106,10 @@ keys/
 # runtime), it is read by nothing in the code and nothing in the build.
 desktop.ini
 
+# Local config / data
+*.ini
+*.log
+
 # Ai agent
 .freebuff
 .kilo

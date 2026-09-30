@@ -6,6 +6,7 @@ interface
 uses
   Classes,
   Graphics,
+  Menus,
   StdCtrls; // For TEdit
 
 const
@@ -63,6 +64,7 @@ function HotkeyStringToModifiers(const S: string): Byte;
 function HotkeyStringToKey(const S: string): Integer;
 function KeyToHotkeyString(Mods: Byte; VK: Integer): string;
 function MatchesHotkeySetting(const Setting: string; vkCode: Integer): Boolean;
+function HotkeyStringToShortCut(const Setting: string): TShortCut;
 function VirtualKeyToStr(VK: Byte): string;
 
 implementation
@@ -489,6 +491,46 @@ begin
   finally
     Parts.Free;
   end;
+end;
+
+{ =============================================================================== }
+
+// Parse a hotkey setting string ("SHIFT + F5", "CTRL+ALT+T", "F7") into a VCL
+// menu TShortCut so RefreshSettings can show it next to the matching menu
+// item.  Vcl.Menus.TextToShortCut cannot read what the recorder and the
+// registry actually store (uppercase, " + " spacing) and answers 0, leaving
+// the menu blank - so this reuses the same two parsers the low-level hook
+// fires with, which are Trim/UpperCase tolerant by construction.  A Win
+// modifier has no bit in a TShortCut (VCL knows only Ctrl/Shift/Alt), so
+// those settings return 0: a menu must not advertise a shortcut it cannot
+// render.
+function HotkeyStringToShortCut(const Setting: string): TShortCut;
+var
+  Mods:  Byte;
+  Key:   Integer;
+  Shift: TShiftState;
+begin
+  Result := 0;
+  if (Setting = '') or (UpperCase(Setting) = 'NONE') then
+    Exit;
+
+  Mods := HotkeyStringToModifiers(Setting);
+  if (Mods and MOD_WIN) <> 0 then
+    Exit;
+
+  Key := HotkeyStringToKey(Setting);
+  if Key = 0 then
+    Exit;
+
+  Shift := [];
+  if (Mods and MOD_CTRL) <> 0 then
+    Include(Shift, ssCtrl);
+  if (Mods and MOD_SHIFT) <> 0 then
+    Include(Shift, ssShift);
+  if (Mods and MOD_ALT) <> 0 then
+    Include(Shift, ssAlt);
+
+  Result := ShortCut(Key, Shift);
 end;
 
 { =============================================================================== }

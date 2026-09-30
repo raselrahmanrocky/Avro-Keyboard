@@ -50,9 +50,6 @@ const
     how much instant switching this session gets to keep. }
   IdleEngineReleaseMinutes = 10;
 
-  { RegisterHotKey id for the global Ctrl+Alt+T that opens the text converter. }
-  HotkeyTextConverter = 1001;
-
 type
   TMenuItemExtended = class(TMenuItem)
     private
@@ -322,6 +319,10 @@ type
       procedure WMCopyData(var Msg: TWMCopyData); message WM_COPYDATA;
       procedure WMShowAnsiPicker(var Msg: TMessage); message WM_APP + 1;
       procedure WMShowLayoutPicker(var Msg: TMessage); message WM_APP + 3;
+      { The Text Converter Launcher hotkey (KeyboardHook) lands here. Posted
+        rather than called so LaunchAvroTextConverter's missing-exe MessageDlg
+        never runs inside the hook callback (see its note there). }
+      procedure WMLaunchTextConverter(var Msg: TMessage); message WM_APP + 7;
       { RefreshSettings asked for from inside the keyboard hook (see its own
         comment): the work runs here, on the main loop, instead. }
       procedure WMDeferredRefresh(var Msg: TMessage); message WM_APP + 11;
@@ -412,7 +413,6 @@ type
       procedure LaunchAvroTextConverter;
     protected
       procedure CreateParams(var Params: TCreateParams); override;
-      procedure WndProc(var Message: TMessage); override;
   end;
 
 var
@@ -704,7 +704,6 @@ end;
 
 procedure TAvroMainForm1.FormClose(Sender: TObject; var Action: TCloseAction);
 begin
-  UnregisterHotKey(Handle, HotkeyTextConverter);
   Action := caFree;
   AvroMainForm1 := nil;
 end;
@@ -716,8 +715,6 @@ begin
 end;
 
 procedure TAvroMainForm1.FormCreate(Sender: TObject);
-var
-  HotkeyOK: Boolean;
 begin
   { From here until the keyboard hook is live this form is the only thing
     running, and an exception that escapes FormCreate never reaches the message
@@ -787,11 +784,6 @@ begin
   Popup_LayoutList.OnClose := TrackedMenusClose;
   Popup_Tools.OnClose := TrackedMenusClose;
 
-  // Global Ctrl+Alt+T opens the Qt text converter from anywhere.  Where the
-  // combination is already taken this simply registers nothing - the tray item
-  // keeps working either way.
-  HotkeyOK := RegisterHotKey(Handle, HotkeyTextConverter, MOD_CONTROL or MOD_ALT, Ord('T'));
-  StartupLog('FormCreate: Ctrl+Alt+T hotkey registered=' + BoolToStr(HotkeyOK, True) + ' lastError=' + IntToStr(GetLastError));
   StartupLogSection('FormCreate end');
 end;
 
@@ -1956,9 +1948,22 @@ begin
     Exit;
   end;
 
-  // Update Spell Checker Shortcut in Menu
-  Spellcheck2.ShortCut := TextToShortcut(SpellerLauncherKey);
-  Spellcheck4.ShortCut := TextToShortcut(SpellerLauncherKey);
+  // Mirror the Global Hotkeys settings onto every menu item that performs the
+  // same action.  HotkeyStringToShortCut (not Vcl.Menus.TextToShortCut) reads
+  // the stored uppercase / " + " spacing format, so modifier combos show up
+  // too; an empty or "None" setting clears the display (ShortCut = 0).
+  Spellcheck2.ShortCut := HotkeyStringToShortCut(SpellerLauncherKey);
+  Spellcheck4.ShortCut := HotkeyStringToShortCut(SpellerLauncherKey);
+
+  UnicodetoBijoytextconverter1.ShortCut := HotkeyStringToShortCut(ConverterLauncherKey);
+  Spellcheck3.ShortCut := HotkeyStringToShortCut(ConverterLauncherKey);
+
+  ogglekeyboardmode1.ShortCut := HotkeyStringToShortCut(ModeSwitchKey);
+  ogglekeyboardmode2.ShortCut := HotkeyStringToShortCut(ModeSwitchKey);
+
+  mnuTraySelectAnsiEncoding.ShortCut := HotkeyStringToShortCut(AnsiVersionSwitchKey);
+  if AnsiVersionSubmenu1 <> nil then
+    AnsiVersionSubmenu1.ShortCut := HotkeyStringToShortCut(AnsiVersionSwitchKey);
 
   if VowelFormating = 'NO' then
   begin
@@ -3265,14 +3270,9 @@ begin
     SW_SHOWNORMAL);
 end;
 
-procedure TAvroMainForm1.WndProc(var Message: TMessage);
+procedure TAvroMainForm1.WMLaunchTextConverter(var Msg: TMessage);
 begin
-  if (Message.Msg = WM_HOTKEY) and (Message.WParam = HotkeyTextConverter) then
-  begin
-    LaunchAvroTextConverter;
-    Exit;
-  end;
-  inherited WndProc(Message);
+  LaunchAvroTextConverter;
 end;
 
 procedure TAvroMainForm1.UseModernStyleTyping1Click(Sender: TObject);
