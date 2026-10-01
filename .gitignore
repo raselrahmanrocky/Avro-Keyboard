@@ -124,3 +124,7 @@ Converter/CMakeCache.txt
 Converter/CMakeFiles/
 Converter/*.exe
 Converter/*.obj
+
+# Delphi keyboard build output (rebuilt by tools\release\build-installers.ps1
+# on every pass; build\ is cleaned before each build)
+/build/

@@ -2015,18 +2015,39 @@ begin
   // same action.  HotkeyStringToShortCut (not Vcl.Menus.TextToShortCut) reads
   // the stored uppercase / " + " spacing format, so modifier combos show up
   // too; an empty or "None" setting clears the display (ShortCut = 0).
-  Spellcheck2.ShortCut := HotkeyStringToShortCut(SpellerLauncherKey);
-  Spellcheck4.ShortCut := HotkeyStringToShortCut(SpellerLauncherKey);
+  // ShowShortcutKeysOnMenu = 'NO' clears the display on both tray and topbar
+  // menus - the real hotkeys keep working, they are handled by KeyboardHook
+  // and never read these menu items.
+  if ShowShortcutKeysOnMenu = 'NO' then
+  begin
+    Spellcheck2.ShortCut := 0;
+    Spellcheck4.ShortCut := 0;
 
-  UnicodetoBijoytextconverter1.ShortCut := HotkeyStringToShortCut(ConverterLauncherKey);
-  Spellcheck3.ShortCut := HotkeyStringToShortCut(ConverterLauncherKey);
+    UnicodetoBijoytextconverter1.ShortCut := 0;
+    Spellcheck3.ShortCut := 0;
 
-  ogglekeyboardmode1.ShortCut := HotkeyStringToShortCut(ModeSwitchKey);
-  ogglekeyboardmode2.ShortCut := HotkeyStringToShortCut(ModeSwitchKey);
+    ogglekeyboardmode1.ShortCut := 0;
+    ogglekeyboardmode2.ShortCut := 0;
 
-  mnuTraySelectAnsiEncoding.ShortCut := HotkeyStringToShortCut(AnsiVersionSwitchKey);
-  if AnsiVersionSubmenu1 <> nil then
-    AnsiVersionSubmenu1.ShortCut := HotkeyStringToShortCut(AnsiVersionSwitchKey);
+    mnuTraySelectAnsiEncoding.ShortCut := 0;
+    if AnsiVersionSubmenu1 <> nil then
+      AnsiVersionSubmenu1.ShortCut := 0;
+  end
+  else
+  begin
+    Spellcheck2.ShortCut := HotkeyStringToShortCut(SpellerLauncherKey);
+    Spellcheck4.ShortCut := HotkeyStringToShortCut(SpellerLauncherKey);
+
+    UnicodetoBijoytextconverter1.ShortCut := HotkeyStringToShortCut(ConverterLauncherKey);
+    Spellcheck3.ShortCut := HotkeyStringToShortCut(ConverterLauncherKey);
+
+    ogglekeyboardmode1.ShortCut := HotkeyStringToShortCut(ModeSwitchKey);
+    ogglekeyboardmode2.ShortCut := HotkeyStringToShortCut(ModeSwitchKey);
+
+    mnuTraySelectAnsiEncoding.ShortCut := HotkeyStringToShortCut(AnsiVersionSwitchKey);
+    if AnsiVersionSubmenu1 <> nil then
+      AnsiVersionSubmenu1.ShortCut := HotkeyStringToShortCut(AnsiVersionSwitchKey);
+  end;
 
   if VowelFormating = 'NO' then
   begin
@@ -3776,7 +3797,7 @@ begin
     balloon, which the menu route (Resources Management) completes. }
   if Assigned(Topbar) and Topbar.Visible then
   begin
-    Topbar.BalloonHint1.Title := Msg + sLineBreak + 'Choose "Resources Management" from the Avro menu.';
+    Topbar.BalloonHint1.Title := Msg + sLineBreak + 'Choose "Tools" - "Resources Management" from the Avro menu.';
     Topbar.BalloonHint1.ShowHint(Topbar.ImgButtonMode);
   end;
 end;
@@ -3831,7 +3852,7 @@ begin
     balloon, which the menu route (Resources Management) completes. }
   if Assigned(Topbar) and Topbar.Visible then
   begin
-    Topbar.BalloonHint1.Title := Msg + sLineBreak + 'Choose "Resources Management" from the Avro menu.';
+    Topbar.BalloonHint1.Title := Msg + sLineBreak + 'Choose "Tools" - "Resources Management" from the Avro menu.';
     Topbar.BalloonHint1.ShowHint(Topbar.ImgButtonMode);
   end;
 end;
@@ -4059,11 +4080,6 @@ var
     Item := TMenuItem.Create(MoreOptMenu);
     Item.Caption := 'Locate Mapping...';
     Item.OnClick := OpenAnsiMappingDirClick;
-    MoreOptMenu.Add(Item);
-
-    Item := TMenuItem.Create(MoreOptMenu);
-    Item.Caption := 'Resources Management';
-    Item.OnClick := DownloadMoreResourcesClick;
     MoreOptMenu.Add(Item);
   end;
 

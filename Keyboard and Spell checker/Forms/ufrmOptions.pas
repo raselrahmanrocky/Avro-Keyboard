@@ -1,4 +1,4 @@
-{
+﻿{
   =============================================================================
   This Source Code Form is subject to the terms of the Mozilla Public
   License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -110,6 +110,7 @@ type
     CheckUnicodeToggleShortcut: TCheckBox;
     CheckANSIToggleShortcut: TCheckBox;
     CheckIgnoreCapsLockShortcut: TCheckBox;
+    CheckShowMenuShortcuts: TCheckBox;
     LabelHideTimer: TTimer;
     GroupBox8: TGroupBox;
     Label16: TLabel;
@@ -969,6 +970,11 @@ begin
   else
     CheckIgnoreCapsLockShortcut.Checked := False;
 
+  if ShowShortcutKeysOnMenu = 'YES' then
+    CheckShowMenuShortcuts.Checked := True
+  else
+    CheckShowMenuShortcuts.Checked := False;
+
 end;
 
 { =============================================================================== }
@@ -1213,6 +1219,11 @@ begin
     IgnoreCapsLock := 'YES'
   else
     IgnoreCapsLock := 'NO';
+
+  if CheckShowMenuShortcuts.Checked = True then
+    ShowShortcutKeysOnMenu := 'YES'
+  else
+    ShowShortcutKeysOnMenu := 'NO';
 
   // Application theme (Interface Settings). The combo items are in
   // TAppThemeMode order; a missing selection means "follow Windows".

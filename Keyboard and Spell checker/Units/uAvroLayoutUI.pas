@@ -147,11 +147,6 @@ procedure RebuildAnviVersionMenus;
     Item.Caption := 'Locate Mapping...';
     Item.OnClick := AvroMainForm1.OpenAnsiMappingDirClick;
     MoreOptMenu.Add(Item);
-
-    Item := TMenuItem.Create(MoreOptMenu);
-    Item.Caption := 'Resources Management';
-    Item.OnClick := AvroMainForm1.DownloadMoreResourcesClick;
-    MoreOptMenu.Add(Item);
   end;
 
 var

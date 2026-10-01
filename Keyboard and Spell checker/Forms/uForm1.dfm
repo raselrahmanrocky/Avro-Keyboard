@@ -1667,6 +1667,11 @@ object AvroMainForm1: TAvroMainForm1
         ImageIndex = 4
         OnClick = SkinDesignerDesignyourownskin1Click
       end
+      object DownloadMoreResources2: TMenuItem
+        Caption = 'Resources Management'
+        ImageIndex = 34
+        OnClick = DownloadMoreResourcesClick
+      end
       object Helpfiles2: TMenuItem
         Caption = 'Help files'
         ImageIndex = 18

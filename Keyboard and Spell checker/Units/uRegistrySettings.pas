@@ -1,4 +1,4 @@
-{
+﻿{
   =============================================================================
   This Source Code Form is subject to the terms of the Mozilla Public
   License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -94,11 +94,12 @@ var
   LayoutViewerSize:    string;
 
   // Global Output settings
-  OutputIsBijoy:         string;
-  ShowOutputwarning:     string;
-  UnicodeToggleShortcut: string;
-  ANSIToggleShortcut:    string;
-  IgnoreCapsLock:        string;
+  OutputIsBijoy:          string;
+  ShowOutputwarning:      string;
+  UnicodeToggleShortcut:  string;
+  ANSIToggleShortcut:     string;
+  IgnoreCapsLock:         string;
+  ShowShortcutKeysOnMenu: string;
 
   { The per-encoding password memory now lives in uAvroEncoManager - the mapping
     engine needs it and must stay clear of this unit's UI dependencies (uForm1,
@@ -288,6 +289,7 @@ begin
   UnicodeToggleShortcut := UpperCase(XML.GetValue('UnicodeToggleShortcut', 'YES'));
   ANSIToggleShortcut := UpperCase(XML.GetValue('ANSIToggleShortcut', 'YES'));
   IgnoreCapsLock := UpperCase(XML.GetValue('IgnoreCapsLock', 'NO'));
+  ShowShortcutKeysOnMenu := UpperCase(XML.GetValue('ShowShortcutKeysOnMenu', 'YES'));
 
   clsUnicodeToBijoy2000.AnsiVersion := XML.GetValue('AnsiVersion', '');
 
@@ -381,6 +383,7 @@ begin
   XML.SetValue('UnicodeToggleShortcut', UnicodeToggleShortcut);
   XML.SetValue('ANSIToggleShortcut', ANSIToggleShortcut);
   XML.SetValue('IgnoreCapsLock', IgnoreCapsLock);
+  XML.SetValue('ShowShortcutKeysOnMenu', ShowShortcutKeysOnMenu);
   XML.SetValue('AnsiVersion', clsUnicodeToBijoy2000.AnsiVersion);
 
   // AvroEnco Settings
@@ -486,6 +489,7 @@ begin
         UnicodeToggleShortcut := UpperCase(Reg.ReadStringDef('UnicodeToggleShortcut', 'YES'));
         ANSIToggleShortcut := UpperCase(Reg.ReadStringDef('ANSIToggleShortcut', 'YES'));
         IgnoreCapsLock := UpperCase(Reg.ReadStringDef('IgnoreCapsLock', 'NO'));
+        ShowShortcutKeysOnMenu := UpperCase(Reg.ReadStringDef('ShowShortcutKeysOnMenu', 'YES'));
         clsUnicodeToBijoy2000.AnsiVersion := Reg.ReadStringDef('AnsiVersion', '');
 
         // AvroEnco Settings
@@ -589,6 +593,7 @@ begin
     Reg.WriteString('UnicodeToggleShortcut', UnicodeToggleShortcut);
     Reg.WriteString('ANSIToggleShortcut', ANSIToggleShortcut);
     Reg.WriteString('IgnoreCapsLock', IgnoreCapsLock);
+    Reg.WriteString('ShowShortcutKeysOnMenu', ShowShortcutKeysOnMenu);
     Reg.WriteString('AnsiVersion', clsUnicodeToBijoy2000.AnsiVersion);
 
     // AvroEnco Settings
@@ -698,6 +703,7 @@ begin
   Need(UnicodeToggleShortcut, 'YES');
   Need(ANSIToggleShortcut, 'YES');
   Need(IgnoreCapsLock, 'NO');
+  Need(ShowShortcutKeysOnMenu, 'YES');
   Need(DontShowComplexLNotification, 'NO');
   Need(DontShowStartupWizard, 'NO');
   Need(ShowLayoutSwitchNotification, 'YES');
@@ -837,6 +843,8 @@ begin
     ANSIToggleShortcut := 'YES';
   if not((IgnoreCapsLock = 'YES') or (IgnoreCapsLock = 'NO')) then
     IgnoreCapsLock := 'NO';
+  if not((ShowShortcutKeysOnMenu = 'YES') or (ShowShortcutKeysOnMenu = 'NO')) then
+    ShowShortcutKeysOnMenu := 'YES';
 
   // Hotkey deduplication: reset lower-priority hotkeys that
   // duplicate a higher-priority one.

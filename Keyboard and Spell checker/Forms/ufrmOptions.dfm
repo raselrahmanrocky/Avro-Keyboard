@@ -425,9 +425,21 @@ object frmOptions: TfrmOptions
         TabOrder = 1
         OnMouseUp = optOutputANSIMouseUp
       end
+      object CheckShowMenuShortcuts: TCheckBox
+        Left = 35
+        Top = 140
+        Width = 420
+        Height = 25
+        Margins.Left = 5
+        Margins.Top = 5
+        Margins.Right = 5
+        Margins.Bottom = 5
+        Caption = 'Show shortcut keys on menu'
+        TabOrder = 2
+      end
       object CheckWarningAnsi: TCheckBox
         Left = 35
-        Top = 191
+        Top = 176
         Width = 342
         Height = 25
         Margins.Left = 5
@@ -435,11 +447,11 @@ object frmOptions: TfrmOptions
         Margins.Right = 5
         Margins.Bottom = 5
         Caption = 'Show warning in ANSI mode.'
-        TabOrder = 2
+        TabOrder = 3
       end
       object CheckUnicodeToggleShortcut: TCheckBox
         Left = 35
-        Top = 230
+        Top = 212
         Width = 420
         Height = 25
         Margins.Left = 5
@@ -447,11 +459,11 @@ object frmOptions: TfrmOptions
         Margins.Right = 5
         Margins.Bottom = 5
         Caption = 'Enable Ctrl+Alt+V for Bengali (Unicode) mode'
-        TabOrder = 3
+        TabOrder = 4
       end
       object CheckANSIToggleShortcut: TCheckBox
         Left = 35
-        Top = 260
+        Top = 248
         Width = 420
         Height = 25
         Margins.Left = 5
@@ -459,11 +471,11 @@ object frmOptions: TfrmOptions
         Margins.Right = 5
         Margins.Bottom = 5
         Caption = 'Enable Ctrl+Alt+B for Bengali (ANSI) mode'
-        TabOrder = 4
+        TabOrder = 5
       end
       object CheckIgnoreCapsLockShortcut: TCheckBox
         Left = 35
-        Top = 290
+        Top = 284
         Width = 420
         Height = 25
         Margins.Left = 5
@@ -471,7 +483,7 @@ object frmOptions: TfrmOptions
         Margins.Right = 5
         Margins.Bottom = 5
         Caption = 'Ignore Caps Lock for Bangla typing'
-        TabOrder = 5
+        TabOrder = 6
       end
     end
     object KeyboardMode_Panel: TPanel
