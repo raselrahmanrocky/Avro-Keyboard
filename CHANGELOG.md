@@ -33,6 +33,15 @@ would notice, not the implementation.
   keyboard hook.** A modal dialog (or a slow reload) inside the low-level keyboard
   callback makes Windows drop the hook after `LowLevelHooksTimeout`; the refresh
   now defers itself to the main loop when it is entered from the hook.
+- **The installed Avro Text Converter never remembered its settings.** Switching
+  the theme (or a font, or the ANSI version) and restarting always came back to
+  the same values: the settings location was picked with a writability check
+  that ignores Windows permissions and called `Program Files` writable, so every
+  save failed silently. The converter now probes for real, keeps its settings in
+  `%LOCALAPPDATA%\OmicronLab\Avro Text Converter\` when the folder beside the
+  exe is not writable (carrying an existing INI over once so an upgrade keeps
+  it), and reports a failed write instead of swallowing it. The installer also
+  stopped shipping the developer's local `AvroTextConverter.ini`.
 
 ### Added
 
