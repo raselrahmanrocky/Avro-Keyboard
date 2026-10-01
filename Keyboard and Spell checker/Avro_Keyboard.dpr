@@ -70,6 +70,7 @@ uses
   Vcl.Styles,
   WindowsDarkMode in 'Units\WindowsDarkMode.pas',
   uThemeManager in 'Units\uThemeManager.pas',
+  uStyledMenuBorder in 'Units\uStyledMenuBorder.pas',
   uKeyboardMacro in 'Units\uKeyboardMacro.pas',
   uPickerSupport in 'Units\uPickerSupport.pas',
   Avro.Types in 'Units\Avro.Types.pas',
