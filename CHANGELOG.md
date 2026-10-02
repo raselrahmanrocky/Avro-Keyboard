@@ -3,6 +3,19 @@
 All notable user-visible changes to Avro Keyboard. Entries describe what a user
 would notice, not the implementation.
 
+## Unreleased
+
+### Changed
+
+- **The 64-bit installer now installs to `C:\Program Files\Avro Keyboard`**
+  instead of `C:\Program Files (x86)\Avro Keyboard`, as Windows expects for a
+  64-bit application. The 32-bit installer keeps
+  `C:\Program Files (x86)\Avro Keyboard` (or `C:\Program Files` on 32-bit
+  Windows). Each edition is its own application identity with its own uninstall
+  entry, so both can be installed side by side without touching each other, and
+  the 64-bit installer no longer starts on 32-bit Windows, where its files could
+  never run.
+
 ## 6.0.1-beta - 28 September 2026
 
 ### Fixed
