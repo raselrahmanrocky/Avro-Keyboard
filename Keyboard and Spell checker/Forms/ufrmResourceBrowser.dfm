@@ -4,7 +4,7 @@ object frmResourceBrowser: TfrmResourceBrowser
   BorderIcons = [biSystemMenu]
   BorderStyle = bsDialog
   Caption = 'Resources Management'
-  ClientHeight = 460
+  ClientHeight = 432
   ClientWidth = 676
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
@@ -32,7 +32,7 @@ object frmResourceBrowser: TfrmResourceBrowser
   end
   object lblDestination: TLabel
     Left = 8
-    Top = 437
+    Top = 409
     Width = 660
     Height = 13
     AutoSize = False
@@ -70,10 +70,15 @@ object frmResourceBrowser: TfrmResourceBrowser
     Top = 44
     Width = 484
     Height = 276
+    Checkboxes = True
     Columns = <
       item
+        Caption = ''
+        Width = 26
+      end
+      item
         Caption = 'Name'
-        Width = 165
+        Width = 150
       end
       item
         Caption = 'Version'
@@ -81,52 +86,51 @@ object frmResourceBrowser: TfrmResourceBrowser
       end
       item
         Caption = 'Size'
-        Width = 75
+        Width = 70
       end
       item
         Caption = 'Status'
         Width = 85
+      end
+      item
+        Caption = 'Delete'
+        Width = 60
       end>
     ReadOnly = True
     RowSelect = True
     TabOrder = 1
     ViewStyle = vsReport
+    OnColumnClick = lvItemsColumnClick
+    OnItemChecked = lvItemsItemChecked
+    OnMouseUp = lvItemsMouseUp
     OnSelectItem = lvItemsSelectItem
   end
   object pbProgress: TProgressBar
-    Left = 184
-    Top = 384
-    Width = 300
+    Left = 282
+    Top = 385
+    Width = 306
     Height = 15
     Max = 100
     TabOrder = 2
+    Visible = False
   end
   object btnDownload: TButton
     Left = 184
-    Top = 408
+    Top = 380
     Width = 90
     Height = 25
     Caption = '&Download'
     TabOrder = 3
     OnClick = btnDownloadClick
   end
-  object btnDownloadAll: TButton
-    Left = 282
-    Top = 408
-    Width = 100
-    Height = 25
-    Caption = 'Download &All'
-    TabOrder = 4
-    OnClick = btnDownloadAllClick
-  end
   object btnClose: TButton
     Left = 596
-    Top = 408
+    Top = 380
     Width = 72
     Height = 25
     Cancel = True
     Caption = 'Close'
-    TabOrder = 5
+    TabOrder = 4
     OnClick = btnCloseClick
   end
 end

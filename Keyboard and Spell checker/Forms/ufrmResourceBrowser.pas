@@ -47,15 +47,16 @@ type
     lblStatus: TLabel;
     pbProgress: TProgressBar;
     btnDownload: TButton;
-    btnDownloadAll: TButton;
     btnClose: TButton;
     procedure FormCreate(Sender: TObject);
     procedure FormShow(Sender: TObject);
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
     procedure lstCategoriesClick(Sender: TObject);
     procedure lvItemsSelectItem(Sender: TObject; Item: TListItem; Selected: Boolean);
+    procedure lvItemsMouseUp(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+    procedure lvItemsColumnClick(Sender: TObject; Column: TListColumn);
+    procedure lvItemsItemChecked(Sender: TObject; Item: TListItem);
     procedure btnDownloadClick(Sender: TObject);
-    procedure btnDownloadAllClick(Sender: TObject);
     procedure btnCloseClick(Sender: TObject);
     private
       FCatalog:       TResourceCatalog;
@@ -66,13 +67,23 @@ type
       FFailedCount:   Integer;
       FLastError:     string;
       { How many requested items were left out of the queue because they are
-        already installed - reported by FinishQueue so a Download All on a
-        fully installed category never claims it re-downloaded anything. }
+        already installed - reported by FinishQueue so a bulk download of a
+        fully installed selection never claims it re-downloaded anything. }
       FSkipCount:     Integer;
       { Category the caller asked for ('' = default). The catalog arrives
         asynchronously, so the selection is applied after the fetch, not at
         Show time - see SelectCategoryById. }
       FPendingCategory: string;
+      { The select-all box floated over the header's first cell is a real
+        TCheckBox (created in EnsureSelAllCheckBox) - no code in this unit
+        paints it. It is a CHILD OF THE FORM, not of the list: the native
+        header lives inside the list's window tree, so anything parented
+        inside the list can be buried when Windows re-creates that header,
+        while a form-level sibling always paints above the whole list. The
+        flag breaks the SetChecked -> Click -> toggle -> SetChecked cycle
+        while the box and the rows mirror each other. }
+      FSelAll: TCheckBox;
+      FUpdatingSelAll: Boolean;
 
       procedure SetBusy(const ACaption: string);
       procedure LoadCatalog;
@@ -83,8 +94,16 @@ type
       procedure UpdateItemStatus(const AIndex: Integer; const AInstalled: Boolean);
       procedure UpdateDestinationLabel;
       function SelectedItemIndex: Integer;
+      function CheckedItemIndexes: TArray<Integer>;
+      function ColumnAtX(X: Integer): Integer;
+      function AllItemsChecked: Boolean;
+      procedure ToggleAllChecked;
+      procedure EnsureSelAllCheckBox;
+      procedure SyncSelAllCheckBox;
+      procedure SelAllClick(Sender: TObject);
 
       procedure StartDownload(const AIndexes: TArray<Integer>);
+      procedure StartDelete(const AIndexes: TArray<Integer>);
       procedure RunNextJob;
       procedure FinishQueue;
     public
@@ -154,6 +173,10 @@ end;
 
 procedure TfrmResourceBrowser.FormShow(Sender: TObject);
 begin
+  // The select-all box is a real TCheckBox floated over the header's first
+  // cell, parented to the form so the native header can never cover it -
+  // Ensure creates it on first show and re-raises/heals it on every show.
+  EnsureSelAllCheckBox;
   // Every show refreshes the catalog (it is one small HTTPS GET); a running
   // download keeps priority - reopening during a transfer must not restart it.
   if not FBusy then
@@ -230,7 +253,6 @@ procedure TfrmResourceBrowser.SetBusy(const ACaption: string);
 begin
   lblStatus.Caption := ACaption;
   btnDownload.Enabled := not FBusy;
-  btnDownloadAll.Enabled := not FBusy;
   lstCategories.Enabled := not FBusy;
 end;
 
@@ -279,11 +301,12 @@ end;
 
 procedure TfrmResourceBrowser.PopulateItems;
 var
-  Cat:      TResourceCategory;
-  Item:     TResourceItem;
-  Row:      TListItem;
-  I:        Integer;
-  SizeText: string;
+  Cat:        TResourceCategory;
+  Item:       TResourceItem;
+  Row:        TListItem;
+  I:          Integer;
+  SizeText:   string;
+  IsInstalled: Boolean;
 begin
   lvItems.Items.BeginUpdate;
   try
@@ -299,7 +322,10 @@ begin
     begin
       Item := Cat.Items[I];
       Row := lvItems.Items.Add;
-      Row.Caption := Item.Name;
+      // Column 0 is the dedicated checkbox column and stays caption-less; the
+      // name starts at SubItems[0], one slot per column to its right.
+      Row.Caption := '';
+      Row.SubItems.Add(Item.Name);
       Row.SubItems.Add(Item.Version);
       if Item.Size >= 1024 * 1024 then
         SizeText := Format('%.1f MB', [Item.Size / (1024 * 1024)])
@@ -308,14 +334,26 @@ begin
       else
         SizeText := IntToStr(Item.Size) + ' B';
       Row.SubItems.Add(SizeText);
-      if IsResourceInstalled(Item.ResourceType, Item.FileName) then
+      IsInstalled := IsResourceInstalled(Item.ResourceType, Item.FileName);
+      if IsInstalled then
         Row.SubItems.Add('Installed')
       else
         Row.SubItems.Add('');
+      // The Delete cell carries its label only while the row is installed -
+      // lvItemsMouseUp keys its hit test off this same text.
+      if IsInstalled then
+        Row.SubItems.Add('Delete')
+      else
+        Row.SubItems.Add('');
     end;
-  finally
-    lvItems.Items.EndUpdate;
-  end;
+    finally
+      lvItems.Items.EndUpdate;
+      // Covers every exit above: a rebuilt or emptied list leaves the header's
+      // select-all box in step with the rows (unchecked by default). Calling
+      // Ensure - not just Sync - also rebuilds the box if it was ever lost to
+      // a list-window recycle, and re-raises it above the header.
+      EnsureSelAllCheckBox;
+    end;
 end;
 
 procedure TfrmResourceBrowser.lstCategoriesClick(Sender: TObject);
@@ -329,6 +367,156 @@ begin
   Result := -1;
   if (lvItems.Selected <> nil) then
     Result := lvItems.Selected.Index;
+end;
+
+{ Every ticked row of the current category, in list order - the input of both
+  the Download button (when anything is ticked) and the bulk delete. }
+function TfrmResourceBrowser.CheckedItemIndexes: TArray<Integer>;
+var
+  Cat:   TResourceCategory;
+  Count: Integer;
+  I:     Integer;
+begin
+  Result := nil;
+  if (FCatalog = nil) or not FCatalog.Loaded then
+    Exit;
+  if (lstCategories.ItemIndex < 0) or (lstCategories.ItemIndex > high(FCatalog.Categories)) then
+    Exit;
+  Cat := FCatalog.Categories[lstCategories.ItemIndex];
+  Count := 0;
+  SetLength(Result, lvItems.Items.Count);
+  for I := 0 to lvItems.Items.Count - 1 do
+    if lvItems.Items[I].Checked and (I <= high(Cat.Items)) then
+    begin
+      Result[Count] := I;
+      Inc(Count);
+    end;
+  SetLength(Result, Count);
+end;
+
+{ Which column owns client coordinate X. In vsReport mode the boundaries are
+  exactly the running sum of the column widths, which is what turns a plain
+  MouseUp into "the Delete cell of this row was hit" - TListView reports no
+  per-cell click event on its own. }
+function TfrmResourceBrowser.ColumnAtX(X: Integer): Integer;
+var
+  I:    Integer;
+  Edge: Integer;
+begin
+  Result := -1;
+  Edge := 0;
+  for I := 0 to lvItems.Columns.Count - 1 do
+  begin
+    Inc(Edge, lvItems.Columns[I].Width);
+    if X < Edge then
+      Exit(I);
+  end;
+end;
+
+{ Drives the header's select-all box: it reads as checked only when every row
+  is ticked (an empty list reads as unchecked). }
+function TfrmResourceBrowser.AllItemsChecked: Boolean;
+var
+  I: Integer;
+begin
+  Result := False;
+  if lvItems.Items.Count = 0 then
+    Exit;
+  for I := 0 to lvItems.Items.Count - 1 do
+    if not lvItems.Items[I].Checked then
+      Exit;
+  Result := True;
+end;
+
+procedure TfrmResourceBrowser.ToggleAllChecked;
+var
+  NewState: Boolean;
+  I:        Integer;
+begin
+  NewState := not AllItemsChecked;
+  for I := 0 to lvItems.Items.Count - 1 do
+    lvItems.Items[I].Checked := NewState;
+  // Rows just moved together - bring the header box in line too (the guard
+  // keeps its own SetChecked -> Click path from feeding back).
+  SyncSelAllCheckBox;
+end;
+
+{ Creates (or heals) the select-all box: a real TCheckBox living as a direct
+  child of the FORM, floating over the header's first cell. Parenting it to
+  the form - not to the list - keeps it strictly above the list's entire
+  window tree, so the native header (which sits inside that tree and may be
+  re-created on theme/style changes) can never be raised on top of it. Every
+  call also re-centers the box and brings it to the front, so even a lost or
+  displaced box heals itself on the next show or list refresh. This unit
+  holds no drawing code at all. }
+procedure TfrmResourceBrowser.EnsureSelAllCheckBox;
+var
+  Header:    HWND;
+  HeaderR:   TRect;
+  HeaderH:   Integer;
+  BoxL, BoxT: Integer;
+begin
+  Header := GetDlgItem(lvItems.Handle, 0);
+  HeaderH := 21;
+  if Header <> 0 then
+    if GetWindowRect(Header, HeaderR) then
+      HeaderH := HeaderR.Bottom - HeaderR.Top;
+
+  // If a list-window recycle took the box's HWND with it, drop the dead
+  // shell so the block below rebuilds it fresh.
+  if (FSelAll <> nil) and not IsWindow(FSelAll.Handle) then
+    FreeAndNil(FSelAll);
+
+  if FSelAll = nil then
+  begin
+    if Header = 0 then
+      Exit; // no native header yet - PopulateItems/FormShow will retry
+    FSelAll := TCheckBox.Create(Self);
+    FSelAll.Caption := '';
+    FSelAll.Width := 16;
+    FSelAll.Height := 16;
+    FSelAll.TabStop := False;
+    FSelAll.OnClick := SelAllClick;
+    FSelAll.Parent := Self; // form child: always above lvItems and its header
+  end;
+
+  // Reposition and raise on every call - cheap, and it heals any drift or
+  // burial. Coordinates are mapped from lvItems because the box now lives in
+  // the form's client space, not the list's.
+  if lvItems.Columns.Count > 0 then
+    BoxL := (lvItems.Columns[0].Width - FSelAll.Width) div 2
+  else
+    BoxL := 2;
+  if BoxL < 2 then
+    BoxL := 2;
+  BoxT := (HeaderH - FSelAll.Height) div 2;
+  if BoxT < 2 then
+    BoxT := 2;
+  FSelAll.SetBounds(lvItems.Left + BoxL, lvItems.Top + BoxT, 16, 16);
+  FSelAll.BringToFront;
+  SyncSelAllCheckBox;
+end;
+
+procedure TfrmResourceBrowser.SyncSelAllCheckBox;
+begin
+  if FSelAll = nil then
+    Exit;
+  FUpdatingSelAll := True;
+  try
+    FSelAll.Checked := AllItemsChecked;
+  finally
+    FUpdatingSelAll := False;
+  end;
+end;
+
+procedure TfrmResourceBrowser.SelAllClick(Sender: TObject);
+begin
+  // Re-entrant while SyncSelAllCheckBox mirrors state into the box; the real
+  // user click toggles every row and the sync at the end of that toggle
+  // settles the box on the matching state.
+  if FUpdatingSelAll then
+    Exit;
+  ToggleAllChecked;
 end;
 
 procedure TfrmResourceBrowser.lvItemsSelectItem(Sender: TObject; Item: TListItem; Selected: Boolean);
@@ -361,12 +549,21 @@ procedure TfrmResourceBrowser.UpdateItemStatus(const AIndex: Integer; const AIns
 begin
   if (AIndex < 0) or (AIndex >= lvItems.Items.Count) then
     Exit;
-  if lvItems.Items[AIndex].SubItems.Count < 3 then
+  if lvItems.Items[AIndex].SubItems.Count < 5 then
     Exit;
+  // SubItems: [0]=Name [1]=Version [2]=Size [3]=Status [4]=Delete. Both
+  // trailing cells move together so the Delete label only exists while the
+  // row reads Installed.
   if AInstalled then
-    lvItems.Items[AIndex].SubItems[2] := 'Installed'
+  begin
+    lvItems.Items[AIndex].SubItems[3] := 'Installed';
+    lvItems.Items[AIndex].SubItems[4] := 'Delete';
+  end
   else
-    lvItems.Items[AIndex].SubItems[2] := '';
+  begin
+    lvItems.Items[AIndex].SubItems[3] := '';
+    lvItems.Items[AIndex].SubItems[4] := '';
+  end;
 end;
 
 { States the running edition and where the selected category will actually
@@ -399,34 +596,85 @@ end;
 
 procedure TfrmResourceBrowser.btnDownloadClick(Sender: TObject);
 var
-  Index: Integer;
+  Indexes: TArray<Integer>;
+  Index:   Integer;
 begin
-  index := SelectedItemIndex;
-  if index < 0 then
+  // Ticked rows win; with nothing ticked the plain selection still works, so
+  // a quick "click a row + Download" behaves exactly like it used to.
+  Indexes := CheckedItemIndexes;
+  if Length(Indexes) = 0 then
   begin
-    lblStatus.Caption := 'Select a file first.';
-    Exit;
+    Index := SelectedItemIndex;
+    if Index < 0 then
+    begin
+      lblStatus.Caption := 'Select a file first.';
+      Exit;
+    end;
+    SetLength(Indexes, 1);
+    Indexes[0] := Index;
   end;
-  StartDownload([index]);
+  StartDownload(Indexes);
 end;
 
-procedure TfrmResourceBrowser.btnDownloadAllClick(Sender: TObject);
+{ 1-click delete: the trailing Delete cell removes that row's file right away -
+  no selecting first and then reaching for a button below. When two or more
+  rows are ticked the same click wipes every ticked row instead (confirmed
+  first), which is the bulk path. }
+procedure TfrmResourceBrowser.lvItemsMouseUp(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
 var
-  Cat:     TResourceCategory;
-  Indexes: TArray<Integer>;
-  I:       Integer;
+  Item:    TListItem;
+  Checked: TArray<Integer>;
 begin
+  if Button <> mbLeft then
+    Exit;
+  if FBusy then
+    Exit; // a running download or catalog fetch owns the list
   if (FCatalog = nil) or not FCatalog.Loaded then
     Exit;
-  if (lstCategories.ItemIndex < 0) or (lstCategories.ItemIndex > high(FCatalog.Categories)) then
+
+  Item := lvItems.GetItemAt(X, Y);
+  if Item = nil then
     Exit;
-  Cat := FCatalog.Categories[lstCategories.ItemIndex];
-  if Length(Cat.Items) = 0 then
+  if ColumnAtX(X) <> lvItems.Columns.Count - 1 then
+    Exit; // only the trailing Delete cell acts
+  if (Item.SubItems.Count < 5) or (Item.SubItems[4] <> 'Delete') then
+    Exit; // no Delete label on this row - nothing installed to remove
+
+  Checked := CheckedItemIndexes;
+  if Length(Checked) >= 2 then
+  begin
+    // Same confirmation style the auto-correct editor uses before wiping
+    // entries; 'No' is the default button - a bulk delete must not fire on
+    // an accidental Enter.
+    if Application.MessageBox(PChar(Format('Delete %d selected file(s)?', [Length(Checked)])), 'Avro Keyboard',
+      MB_YESNO + MB_ICONQUESTION + MB_DEFBUTTON2) <> IDYES then
+      Exit;
+    StartDelete(Checked);
+  end
+  else
+    StartDelete([Item.Index]);
+end;
+
+{ The narrow first header cell doubles as select-all: one click ticks every
+  row, or clears them again when they are all ticked. Clicks landing on the
+  floating checkbox itself never reach the header - that child window swallows
+  them - so the two paths cannot double-toggle. }
+procedure TfrmResourceBrowser.lvItemsColumnClick(Sender: TObject; Column: TListColumn);
+begin
+  if Column.Index <> 0 then
     Exit;
-  SetLength(Indexes, Length(Cat.Items));
-  for I := 0 to high(Cat.Items) do
-    Indexes[I] := I;
-  StartDownload(Indexes);
+  if (FCatalog = nil) or not FCatalog.Loaded then
+    Exit;
+  if lvItems.Items.Count = 0 then
+    Exit;
+  ToggleAllChecked;
+end;
+
+procedure TfrmResourceBrowser.lvItemsItemChecked(Sender: TObject; Item: TListItem);
+begin
+  // Any row tick change - mouse or space bar - has to be reflected in the
+  // header's select-all box.
+  SyncSelAllCheckBox;
 end;
 
 procedure TfrmResourceBrowser.StartDownload(const AIndexes: TArray<Integer>);
@@ -469,8 +717,9 @@ begin
       Exit;
     end;
     Item := Cat.Items[AIndexes[I]];
-    // Already-installed files never enter the queue: Download All on a fully
-    // installed category must not re-download and overwrite what is there.
+    // Already-installed files never enter the queue: a bulk download on a
+    // fully installed selection must not re-download and overwrite what is
+    // there.
     if IsResourceInstalled(Item.ResourceType, Item.FileName) then
     begin
       Inc(FSkipCount);
@@ -511,6 +760,106 @@ begin
   RunNextJob;
 end;
 
+{ Deletes the given rows synchronously - the work is a local file removal, so
+  a worker thread would only complicate the UI state. The post-delete hooks
+  mirror the install side of RunNextJob: whatever was loaded out of a removed
+  file must be dropped or refreshed. }
+procedure TfrmResourceBrowser.StartDelete(const AIndexes: TArray<Integer>);
+var
+  Cat:           TResourceCategory;
+  Item:          TResourceItem;
+  Err:           string;
+  LastError:     string;
+  I:             Integer;
+  DeletedCount:  Integer;
+  FailedCount:   Integer;
+  SkipCount:     Integer;
+  TouchedDict:   Boolean;
+  TouchedLayout: Boolean;
+begin
+  if FBusy then
+    Exit;
+  if (FCatalog = nil) or not FCatalog.Loaded then
+  begin
+    lblStatus.Caption := 'The resource catalog is not loaded yet - try again in a moment.';
+    Exit;
+  end;
+  if (lstCategories.ItemIndex < 0) or (lstCategories.ItemIndex > high(FCatalog.Categories)) then
+  begin
+    lblStatus.Caption := 'Select a category first.';
+    Exit;
+  end;
+  if Length(AIndexes) = 0 then
+    Exit;
+
+  Cat := FCatalog.Categories[lstCategories.ItemIndex];
+  DeletedCount := 0;
+  FailedCount := 0;
+  SkipCount := 0;
+  LastError := '';
+  TouchedDict := False;
+  TouchedLayout := False;
+
+  for I := 0 to high(AIndexes) do
+  begin
+    if (AIndexes[I] < 0) or (AIndexes[I] > high(Cat.Items)) then
+      Continue;
+    Item := Cat.Items[AIndexes[I]];
+    // The tick may have been put on a row that is not installed - nothing to
+    // delete there, and it must not be counted as a failure either.
+    if not IsResourceInstalled(Item.ResourceType, Item.FileName) then
+    begin
+      Inc(SkipCount);
+      Continue;
+    end;
+    Err := '';
+    if DeleteInstalledResource(Item.ResourceType, Item.FileName, Err) then
+    begin
+      Inc(DeletedCount);
+      if SameText(Item.ResourceType, 'dict') then
+        TouchedDict := True;
+      if SameText(Item.ResourceType, 'layout') then
+        TouchedLayout := True;
+    end
+    else
+    begin
+      Inc(FailedCount);
+      LastError := Item.Name + ' - ' + Err;
+      Log('Resource delete failed: ' + Item.FileName + ' - ' + Err);
+    end;
+  end;
+
+  // Same reloads the download completion runs: the auto-correct dictionary
+  // and the word database are read lazily / eagerly from these files, and a
+  // layout needs its menu rebuilt (the folder poll would get there too, just
+  // one tick later).
+  if TouchedDict then
+  begin
+    uAutoCorrect.ResetDictLoadState;
+    AvroMainForm1.ReloadWordDatabaseIfUsed;
+  end;
+  if TouchedLayout then
+    AvroMainForm1.RefreshLayoutList;
+
+  // Rebuild the rows: Status loses 'Installed', the Delete cell disappears
+  // with it, and every tick is cleared again.
+  PopulateItems;
+
+  if FailedCount = 0 then
+  begin
+    lblStatus.Caption := Format('Deleted %d file(s).', [DeletedCount]);
+    if SkipCount > 0 then
+      lblStatus.Caption := lblStatus.Caption + Format(' %d not installed.', [SkipCount]);
+  end
+  else
+  begin
+    lblStatus.Caption := Format('Deleted %d, failed %d.', [DeletedCount, FailedCount]);
+    if SkipCount > 0 then
+      lblStatus.Caption := lblStatus.Caption + Format(' %d not installed.', [SkipCount]);
+    lblStatus.Caption := lblStatus.Caption + ' Last: ' + LastError;
+  end;
+end;
+
 procedure TfrmResourceBrowser.RunNextJob;
 var
   Job:         TResourceDownloadJob;
@@ -526,6 +875,9 @@ begin
   FBusy := True;
   SetBusy(Format('Downloading %s (%d of %d)...', [Job.Name, FQueuePos + 1, Length(FDownloadQueue)]));
   pbProgress.Position := 0;
+  // Progress exists only while a download actually runs - it stays hidden
+  // through loading, browsing and every idle moment (see also FinishQueue).
+  pbProgress.Visible := True;
   LastPercent := -1;
 
   TTask.Run(
@@ -639,6 +991,7 @@ var
 begin
   FBusy := False;
   pbProgress.Position := 0;
+  pbProgress.Visible := False;
   InstalledCount := Length(FDownloadQueue) - FFailedCount;
   Message := '';
   if (FSkipCount = 0) and (Length(FDownloadQueue) = 1) then

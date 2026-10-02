@@ -35,6 +35,17 @@ function ResourceTargetPath(const AResourceType, AFileName: string): string;
 
 function IsResourceInstalled(const AResourceType, AFileName: string): Boolean;
 
+{ Removes the installed file(s) of a resource. Fonts can sit in more than one
+  store (the running edition's target, Windows\Fonts, the per-user store, the
+  portable fonts folder), so every existing location is unregistered first
+  (RemoveFontResource + the HKCU Fonts value InstallDownloadedFont wrote) and
+  then deleted.
+
+  True when everything that existed is gone; otherwise False with AError
+  holding the first failure - or 'The file is not installed.' when no
+  candidate existed at all. }
+function DeleteInstalledResource(const AResourceType, AFileName: string; out AError: string): Boolean;
+
 { Downloads AUrl to a temp file, verifies it against AExpectedSha256 (SHA-256,
   hex, case-insensitive; empty skips the check), then moves it into the target
   folder for its type and runs the post-install step (fonts register with the
@@ -163,6 +174,129 @@ begin
     Exit(True);
 
   Result := FileExists(GetAvroDataDir + 'fonts\' + FileName);
+end;
+
+{ Drops the HKCU ...\Fonts value that points at APath - the exact counterpart
+  of InstallDownloadedFont's write. The value name carries the typeface name
+  (which the caller does not know), so the DATA is matched instead. A stale
+  entry would otherwise keep pointing at a file that is gone. }
+procedure RemovePerUserFontRegistryValue(const APath: string);
+var
+  Reg:   TMyRegistry;
+  Names: TStringList;
+  I:     Integer;
+begin
+  Reg := TMyRegistry.Create;
+  Names := TStringList.Create;
+  try
+    Reg.RootKey := HKEY_CURRENT_USER;
+    if Reg.OpenKey('Software\Microsoft\Windows NT\CurrentVersion\Fonts', False) then
+    begin
+      Reg.GetValueNames(Names);
+      for I := 0 to Names.Count - 1 do
+        if SameText(Reg.ReadString(Names[I]), APath) then
+          Reg.DeleteValue(Names[I]);
+    end;
+  finally
+    Names.Free;
+    Reg.Free;
+  end;
+end;
+
+function DeleteInstalledResource(const AResourceType, AFileName: string; out AError: string): Boolean;
+var
+  Candidates:  TStringList;
+  FileName:    string;
+  Path:        string;
+  Windir:      string;
+  I:           Integer;
+  Deleted:     Integer;
+  Failed:      Integer;
+  IsFont:      Boolean;
+  FontChanged: Boolean;
+
+  procedure AddCandidate(const APath: string);
+  begin
+    if (APath <> '') and (Candidates.IndexOf(APath) < 0) then
+      Candidates.Add(APath);
+  end;
+
+begin
+  Result := False;
+  AError := '';
+
+  FileName := LastComponent(AFileName);
+  if FileName = '' then
+  begin
+    AError := 'The catalog entry has no file name.';
+    Exit;
+  end;
+
+  IsFont := SameText(AResourceType, 'font');
+  Candidates := TStringList.Create;
+  try
+    // Mirror IsResourceInstalled's resolution order so the file that made
+    // the row read 'Installed' is exactly the one being removed.
+    AddCandidate(ResourceTargetPath(AResourceType, FileName));
+    if IsFont then
+    begin
+      Windir := GetEnvironmentVariable('WINDIR');
+      if Windir <> '' then
+        AddCandidate(IncludeTrailingPathDelimiter(Windir) + 'Fonts\' + FileName);
+      Path := PerUserFontFolder;
+      if Path <> '' then
+        AddCandidate(Path + FileName);
+      AddCandidate(GetAvroDataDir + 'fonts\' + FileName);
+    end;
+
+    for I := Candidates.Count - 1 downto 0 do
+      if not FileExists(Candidates[I]) then
+        Candidates.Delete(I);
+
+    if Candidates.Count = 0 then
+    begin
+      AError := 'The file is not installed.';
+      Exit;
+    end;
+
+    Deleted := 0;
+    Failed := 0;
+    FontChanged := False;
+    for I := 0 to Candidates.Count - 1 do
+    begin
+      Path := Candidates[I];
+      if IsFont then
+      begin
+        // The font driver keeps a registered file mapped - without a balanced
+        // RemoveFontResource the delete fails until sign-out (the same rule
+        // UnregisterFontFolder documents), so unregister before deleting.
+        RemoveFontResource(PChar(Path));
+        RemovePerUserFontRegistryValue(Path);
+        FontChanged := True;
+      end;
+      if DeleteFile(Path) then
+        Inc(Deleted)
+      else
+      begin
+        if Failed = 0 then
+          // Permission problems are the common case here (a font the
+          // installer put into Windows\Fonts needs admin to remove).
+          AError := 'Could not delete ' + Path + ': ' + SysErrorMessage(GetLastError);
+        Inc(Failed);
+      end;
+    end;
+
+    if FontChanged then
+      SendNotifyMessage(HWND_BROADCAST, WM_FONTCHANGE, 0, 0);
+
+    if Failed > 0 then
+      Exit;
+
+    Log(Format('Resource deleted: %s (%d file(s))', [FileName, Deleted]));
+    Result := True;
+  finally
+    Candidates.Free;
+  end;
 end;
 
 function ComputeFileSha256(const APath: string): string;
