@@ -108,6 +108,8 @@ type
     mnuTraySelectAnsiEncoding: TMenuItem;
     AvroMouseClicknType4: TMenuItem;
     N31: TMenuItem;
+    AboutAvroKeyboard3: TMenuItem;
+    N32: TMenuItem;
     Exit3: TMenuItem;
     AvroPhoneticEnglishtoBangla3: TMenuItem;
     N34: TMenuItem;

@@ -1784,6 +1784,14 @@ object AvroMainForm1: TAvroMainForm1
         OnClick = Options1Click
       end
     end
+    object AboutAvroKeyboard3: TMenuItem
+      Caption = 'About Avro Keyboard...'
+      ImageIndex = 20
+      OnClick = AboutAvroKeyboard1Click
+    end
+    object N32: TMenuItem
+      Caption = '-'
+    end
     object Exit3: TMenuItem
       Caption = 'Exit'
       ImageIndex = 5
