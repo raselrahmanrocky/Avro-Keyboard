@@ -22,7 +22,7 @@ procedure RemoveVirtualFont(FontFilePath: string);
 
 { Registers every .ttf in AFolder with GDI for this session and broadcasts
   WM_FONTCHANGE once. The portable edition calls it on startup for its own
-  fonts\ folder (shipped set plus anything the Download Resources dialog
+  fonts\ folder (shipped set plus anything the Resources Management dialog
   placed there): that folder carries no registry entries, so each session
   re-activates the fonts without touching the registry. }
 procedure RegisterFontFolder(const AFolder: string);

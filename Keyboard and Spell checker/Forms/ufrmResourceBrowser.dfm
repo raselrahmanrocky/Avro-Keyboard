@@ -3,7 +3,7 @@ object frmResourceBrowser: TfrmResourceBrowser
   Top = 0
   BorderIcons = [biSystemMenu]
   BorderStyle = bsDialog
-  Caption = 'Download Resources'
+  Caption = 'Resources Management'
   ClientHeight = 460
   ClientWidth = 676
   Color = clBtnFace

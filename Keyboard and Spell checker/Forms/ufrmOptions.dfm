@@ -434,7 +434,7 @@ object frmOptions: TfrmOptions
         Margins.Top = 5
         Margins.Right = 5
         Margins.Bottom = 5
-        Caption = 'Show shortcut keys on menu'
+        Caption = 'Show Hotkeys on menu'
         TabOrder = 2
       end
       object CheckWarningAnsi: TCheckBox

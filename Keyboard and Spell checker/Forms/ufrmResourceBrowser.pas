@@ -65,6 +65,10 @@ type
       FLastTarget:    string;
       FFailedCount:   Integer;
       FLastError:     string;
+      { How many requested items were left out of the queue because they are
+        already installed - reported by FinishQueue so a Download All on a
+        fully installed category never claims it re-downloaded anything. }
+      FSkipCount:     Integer;
       { Category the caller asked for ('' = default). The catalog arrives
         asynchronously, so the selection is applied after the fetch, not at
         Show time - see SelectCategoryById. }
@@ -427,10 +431,11 @@ end;
 
 procedure TfrmResourceBrowser.StartDownload(const AIndexes: TArray<Integer>);
 var
-  Cat:  TResourceCategory;
-  Item: TResourceItem;
-  Job:  TResourceDownloadJob;
-  I:    Integer;
+  Cat:        TResourceCategory;
+  Item:       TResourceItem;
+  Job:        TResourceDownloadJob;
+  I:          Integer;
+  QueueCount: Integer;
 begin
   if FBusy then
     Exit;
@@ -452,23 +457,51 @@ begin
 
   Cat := FCatalog.Categories[lstCategories.ItemIndex];
   SetLength(FDownloadQueue, Length(AIndexes));
+  FSkipCount := 0;
+  QueueCount := 0;
   for I := 0 to high(AIndexes) do
   begin
     if (AIndexes[I] < 0) or (AIndexes[I] > high(Cat.Items)) then
     begin
       FDownloadQueue := nil;
+      FSkipCount := 0;
       lblStatus.Caption := 'Invalid selection.';
       Exit;
     end;
     Item := Cat.Items[AIndexes[I]];
+    // Already-installed files never enter the queue: Download All on a fully
+    // installed category must not re-download and overwrite what is there.
+    if IsResourceInstalled(Item.ResourceType, Item.FileName) then
+    begin
+      Inc(FSkipCount);
+      Continue;
+    end;
     Job.Url := FCatalog.FileUrl(Item);
     Job.FileName := Item.FileName;
     Job.ResourceType := Item.ResourceType;
     Job.Sha256 := Item.Sha256;
     Job.Name := Item.Name;
     Job.ItemIndex := AIndexes[I];
-    Job.IsOnlyJob := Length(AIndexes) = 1;
-    FDownloadQueue[I] := Job;
+    Job.IsOnlyJob := False; // set below, once the filtered queue size is known
+    FDownloadQueue[QueueCount] := Job;
+    Inc(QueueCount);
+  end;
+  SetLength(FDownloadQueue, QueueCount);
+  if QueueCount > 0 then
+    for I := 0 to high(FDownloadQueue) do
+      FDownloadQueue[I].IsOnlyJob := QueueCount = 1;
+
+  if QueueCount = 0 then
+  begin
+    // Nothing was queued - every requested file is already installed. Say so
+    // instead of showing an empty progress run.
+    if Length(AIndexes) = 1 then
+      lblStatus.Caption := 'Already installed.'
+    else
+      lblStatus.Caption := Format('All %d file(s) are already installed.', [FSkipCount]);
+    FDownloadQueue := nil;
+    FSkipCount := 0;
+    Exit;
   end;
 
   FQueuePos := 0;
@@ -601,35 +634,64 @@ end;
 procedure TfrmResourceBrowser.FinishQueue;
 var
   InstalledCount: Integer;
+  Message:        string;
+  Parts:          string;
 begin
   FBusy := False;
   pbProgress.Position := 0;
-  if FFailedCount > 0 then
+  InstalledCount := Length(FDownloadQueue) - FFailedCount;
+  Message := '';
+  if (FSkipCount = 0) and (Length(FDownloadQueue) = 1) then
   begin
+    // One file, nothing skipped - keep the detailed per-case wording.
     // Keep the detailed reason visible - a SHA mismatch or HTTP error is
     // the only clue the user gets about why a download did not land.
-    if Length(FDownloadQueue) = 1 then
-      SetBusy('Failed: ' + FLastError)
-    else
-    begin
-      InstalledCount := Length(FDownloadQueue) - FFailedCount;
-      if InstalledCount = 0 then
-        SetBusy(Format('All %d download(s) failed. Last: %s', [FFailedCount, FLastError]))
-      else
-        SetBusy(Format('Done - %d installed, %d failed. Last: %s', [InstalledCount, FFailedCount, FLastError]));
-    end;
+    if FFailedCount > 0 then
+      Message := 'Failed: ' + FLastError
+    else if FLastTarget <> '' then
+      // Full path, not just the file name: the folders differ per edition and
+      // per category, this is where the user can confirm exactly where the
+      // file landed.
+      Message := 'Installed: ' + FLastTarget;
   end
-  else if Length(FDownloadQueue) > 1 then
-    SetBusy(Format('Done - %d file(s) installed.', [Length(FDownloadQueue)]))
-  else if FLastTarget <> '' then
-    // Full path, not just the file name: the folders differ per edition and
-    // per category, this is where the user can confirm exactly where the
-    // file landed.
-    SetBusy('Installed: ' + FLastTarget)
   else
-    SetBusy('');
+  begin
+    // Parts after the dash: installed / failed / already installed.
+    Parts := '';
+    if InstalledCount > 0 then
+      Parts := Format('%d installed', [InstalledCount]);
+    if FFailedCount > 0 then
+    begin
+      if Parts <> '' then
+        Parts := Parts + ', ';
+      Parts := Parts + Format('%d failed', [FFailedCount]);
+    end;
+    if FSkipCount > 0 then
+    begin
+      if Parts <> '' then
+        Parts := Parts + ', ';
+      Parts := Parts + Format('%d already installed', [FSkipCount]);
+    end;
+
+    if InstalledCount = 0 then
+    begin
+      Message := Format('All %d download(s) failed', [FFailedCount]);
+      if FSkipCount > 0 then
+        Message := Message + Format(', %d already installed', [FSkipCount]);
+    end
+    else
+      Message := 'Done - ' + Parts + '.';
+    if FFailedCount > 0 then
+      Message := Message + ' Last: ' + FLastError;
+    if Message = '' then
+      // Nothing was ever queued - every requested file was already installed.
+      Message := Format('All %d file(s) are already installed.', [FSkipCount]);
+  end;
+
+  SetBusy(Message);
   FFailedCount := 0;
   FLastError := '';
+  FSkipCount := 0;
   FDownloadQueue := nil;
   FQueuePos := 0;
   // The catalog is unchanged by an install - refresh the installed markers.
