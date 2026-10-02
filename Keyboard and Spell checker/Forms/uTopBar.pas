@@ -121,9 +121,15 @@ type
     procedure FormShow(Sender: TObject);
     procedure FormHide(Sender: TObject);
     procedure HintTimerTimer(Sender: TObject);
+    procedure FormMouseMove(Sender: TObject; Shift: TShiftState; X, Y: Integer);
+    procedure FormMouseUp(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
 
     private
       { Private declarations }
+
+      FDragging:  Boolean;
+      FDragMoved: Boolean;
+      FDragOffset: TPoint;
 
       PrevSkin: string;
 
@@ -489,37 +495,83 @@ end;
 
 { =============================================================================== }
 
+procedure TTopBar.FormMouseMove(Sender: TObject; Shift: TShiftState; X, Y: Integer);
+var
+  P: TPoint;
+  NewLeft, NewTop: Integer;
+begin
+  if not FDragging then
+    Exit;
+
+  if not(ssLeft in Shift) then
+  begin
+    // Mouse capture was lost while dragging. Cancel the drag.
+    FDragging := False;
+    SetCaptureControl(nil);
+    AppIcon_MouseDown := False;
+    AppIcon_DrawState;
+    Exit;
+  end;
+
+  P.X := X;
+  P.Y := Y;
+  P := Self.ClientToScreen(P);
+
+  NewLeft := P.X - FDragOffset.X;
+  NewTop  := P.Y - FDragOffset.Y;
+
+  // Fix XP Snap window bug
+  if NewTop < 0 then
+    NewTop := 0;
+
+  if (NewLeft <> Self.Left) or (NewTop <> Self.Top) then
+    FDragMoved := True;
+
+  Self.SetBounds(NewLeft, NewTop, Self.Width, Self.Height);
+end;
+
+{ =============================================================================== }
+
+procedure TTopBar.FormMouseUp(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+begin
+  if not FDragging then
+    Exit;
+
+  FDragging := False;
+  SetCaptureControl(nil);
+
+  AppIcon_MouseDown := False;
+  AppIcon_DrawState;
+
+  if Button = mbleft then
+  begin
+    // Form wasn't moved. Show menu
+    if not FDragMoved then
+      AvroMainForm1.Popup_Main.Popup(ImgAppIcon.Left + Left, ImgAppIcon.Top + ImgAppIcon.Height + Top);
+  end;
+end;
+
+{ =============================================================================== }
+
 procedure TTopBar.ImgAppIconMouseDown(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
 var
-  MeTop, MeLeft: Integer;
+  P: TPoint;
 begin
   AppIcon_MouseDown := True;
   AppIcon_DrawState;
 
   if Button = mbleft then
   begin
-    MeTop := Self.Top;
-    MeLeft := Self.Left;
+    FDragging := True;
+    FDragMoved := False;
 
-    ReleaseCapture;
-    SendMessage(Self.Handle, WM_SYSCOMMAND, $F012, 0); // SC_DRAGMOVE = $F012;
+    P.X := X;
+    P.Y := Y;
+    P := ImgAppIcon.ClientToScreen(P);
+    FDragOffset.X := P.X - Self.Left;
+    FDragOffset.Y := P.Y - Self.Top;
 
-    if not(GetKeyState(VK_LBUTTON) < 0) then
-    begin
-      AppIcon_MouseDown := False;
-      AppIcon_DrawState;
-
-      // Fix XP Snap window bug
-      if Self.Top < 0 then
-        Self.Top := 0;
-
-      // Was form moved? If not, show menu
-      if ((MeTop = Self.Top) and (MeLeft = Self.Left)) then
-        // Form wasn't moved. Show menu
-        AvroMainForm1.Popup_Main.Popup(ImgAppIcon.Left + Left, ImgAppIcon.Top + ImgAppIcon.Height + Top);
-
-    end;
-
+    SetCaptureControl(Self);
   end;
 end;
 

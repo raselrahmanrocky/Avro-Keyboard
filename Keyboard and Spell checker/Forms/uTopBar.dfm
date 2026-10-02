@@ -66,6 +66,8 @@ object TopBar: TTopBar
   OnCreate = FormCreate
   OnHide = FormHide
   OnKeyDown = FormKeyDown
+  OnMouseMove = FormMouseMove
+  OnMouseUp = FormMouseUp
   OnShow = FormShow
   TextHeight = 13
   object ImgMain: TImage
