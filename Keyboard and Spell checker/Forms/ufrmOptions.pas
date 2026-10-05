@@ -182,12 +182,14 @@ type
       function GetListIndex(List: TStrings; SearchS: string): Integer;
     public
       { Public declarations }
-      { Re-resolves the scroll-box label colours from the style that is active
-        right now and forces one repaint; called at every point where the style
-        can change while this dialog is open. }
-      procedure RefreshStyledLabels;
     protected
       procedure CreateParams(var Params: TCreateParams); override;
+      { Runs while VCL switches this dialog to another style: after the style
+        engine has rebuilt the form's window and every child window, and after
+        CM_STYLECHANGED has been broadcast to the children (TWinControl.WndProc
+        broadcasts first and dispatches the message to the form afterwards).
+        See the implementation for why the refresh has to sit here. }
+      procedure CMStyleChanged(var Message: TMessage); message CM_STYLECHANGED;
   end;
 
 var
@@ -240,11 +242,29 @@ end;
 
 { =============================================================================== }
 
-procedure TfrmOptions.RefreshStyledLabels;
+procedure TfrmOptions.CMStyleChanged(var Message: TMessage);
 begin
-  { ApplyStyledScrollFix only assigns properties - it does not paint - so a live
-    style switch needs the re-assignment and one forced, erased repaint to show
-    the result at once. }
+  { Everything the dialog needs after a live style switch happens here, and
+    deliberately not earlier. Timing is what makes this tricky:
+
+      * The style engine repaints a form's windowed children one at a time while
+        it rebuilds them, and a common control resolves the colour it fills its
+        client area with from the brush its style hook holds (TTreeView asks for
+        scTreeView when its window is created). Forcing a repaint *while the new
+        style is still being loaded* therefore paints the category tree with the
+        previous style's surface - the light column in the middle of an
+        otherwise dark dialog - for as long as it takes VCL to get around to
+        recreating that window (measured: ~450 ms, see the burst captures).
+
+      * By the time this message is dispatched to the form, that recreation has
+        already happened for the whole dialog, so one erased, forced repaint of
+        the form and all of its children puts every control in the new style in
+        the same pass: the dialog flips over as a whole instead of control by
+        control.
+
+    ApplyStyledScrollFix only assigns properties (it makes the labels inside the
+    scroll boxes opaque and paints them with the current style's surface
+    colour), so it has to run again before the repaint to keep them in step. }
   ApplyStyledScrollFix(ScrollBox2);
   ApplyStyledScrollFix(ScrollBox1);
   if HandleAllocated then
@@ -282,9 +302,6 @@ begin
   Self.SaveSettings;
   AvroMainForm1.RefreshSettings;
   BroadcastAppThemeChanged;
-  { The style has just changed under an open dialog: refresh the scroll-box
-    label colours now, before the user sees them. }
-  RefreshStyledLabels;
 
   { Surface the "Settings saved!" status, auto-hidden after 2s
     by LabelHideTimer. Reset the timer in case the user clicks
@@ -326,9 +343,6 @@ begin
   Self.SaveSettings;
   AvroMainForm1.RefreshSettings;
   BroadcastAppThemeChanged;
-  { The style has just changed under an open dialog: refresh the scroll-box
-    label colours now, before the user sees them. }
-  RefreshStyledLabels;
   Self.Close;
 end;
 

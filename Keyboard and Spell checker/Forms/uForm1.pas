@@ -2410,11 +2410,13 @@ begin
 
   // Every caller of this method is a style-switch point: WM_SETTINGCHANGE
   // ('ImmersiveColorSet'), RefreshSettings (the Customize dialog's OK and
-  // Apply), and startup. If that dialog is open, re-resolve the surface colour
-  // its opaque labels were created with and repaint it once - the style engine
-  // updates label fonts, but never a Color property that was cached earlier.
-  if frmOptions <> nil then
-    frmOptions.RefreshStyledLabels;
+  // Apply), and startup. Nothing is refreshed from here on purpose: the style
+  // engine announces the switch to every open form (CM_STYLECHANGED), and the
+  // dialog uses that message to re-resolve the surface colour its opaque labels
+  // were created with and to repaint itself in one pass. Doing it here instead
+  // would paint the dialog while the new style is still being loaded, which
+  // leaves the controls whose colour is resolved when their window is recreated
+  // (the category tree) on the previous style for the rest of the switch.
 end;
 
 procedure TAvroMainForm1.RestoreAvroTopBar1Click(Sender: TObject);

@@ -13,6 +13,24 @@ would notice, not the implementation.
   now repaints its surface opaquely before the next one is drawn; the light
   style looks exactly as before.
 
+- **Labels in the Customize window turned into solid colour bars after a theme
+  switch.** With the window open, switching Light/Dark Theme — from the theme
+  dropdown, from Apply, or by switching Windows itself between light and dark —
+  left “Transparency level”, “Select skin”, “Preview”, the slider value and the
+  checkbox and radio captions sitting on a block of the previous theme's surface
+  colour: pale bars on the dark theme, near-black bars on the light one, with the
+  caption text invisible against them. Closing and reopening the window was the
+  only cure. The labels now follow the active theme the moment the style changes.
+
+- **The Customize window switched its theme control by control.** Changing the
+  theme with the window open left the category list on the left (General,
+  Interface, Global Hotkeys, …) painted in the old theme — a white column inside
+  the dark window, a black one inside the light window — while everything to the
+  right had already changed, and the rest of the window then filled in piece by
+  piece over about half a second. The window is now repainted in one pass, after
+  the style engine has finished rebuilding it, so the whole window changes over
+  together.
+
 ### Changed
 
 - **The 64-bit installer now installs to `C:\Program Files\Avro Keyboard`**
