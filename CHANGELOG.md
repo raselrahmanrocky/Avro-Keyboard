@@ -7,6 +7,17 @@ would notice, not the implementation.
 
 ### Fixed
 
+- **Check boxes and radio buttons in the Customize window could turn into
+  solid bars.** After toggling “Show Preview Window” a few times, the three
+  suggestion-mode radio buttons could keep painting as a solid dark bar (white
+  caption on light theme, the inverted pair on dark) until the window was
+  resized or reopened. A check box or radio button paints its own background by
+  asking its parents to paint into a buffer, and where that leaves any of the
+  buffer untouched the control used to show the buffer's initial content - a
+  solid black. The style's surface colour is now laid down first, so an
+  uncovered region shows the surface instead of black; the real background and
+  the glyph and caption are still drawn by the VCL on top.
+
 - **The Customize window smeared while scrolling in Dark Theme.** Spinning the
   mouse wheel fast, or dragging the scrollbar, could leave ghost trails of text
   behind the rows while the “Windows10 Dark” style was active. Every scroll step
