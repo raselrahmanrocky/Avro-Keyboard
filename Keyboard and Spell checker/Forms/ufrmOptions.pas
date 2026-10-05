@@ -27,6 +27,28 @@ uses
   ComCtrls;
 
 type
+  { Interposer for every TLabel of this dialog. No .dfm edit is needed for it:
+    System.Classes.TReader.GetFieldClass resolves a class name found in a .dfm
+    from the FORM's own field table first (it walks the form class hierarchy and
+    matches by ClassName), so this declaration is what the .dfm's "TLabel"
+    objects bind to.
+
+    Why it exists: ApplyStyledScrollFix (Units\uScrollBoxStyleHookFix.pas) makes
+    the labels inside ScrollBox1/ScrollBox2 opaque and paints them with
+    StyleServices.GetStyleColor(scPanel). That call resolves the colour at the
+    moment it is made, and a runtime style switch updates the label's font but
+    never its Color property - so the label keeps painting the previous style's
+    surface as its own background (black bars on the light style after a
+    dark->light switch, pale bars on the dark style after light->dark).
+    CM_STYLECHANGED is delivered whenever the active style changes, so
+    re-resolving the colour here keeps the labels in step no matter what
+    triggered the switch. }
+  TLabel = class(StdCtrls.TLabel)
+  protected
+    procedure CMStyleChanged(var Message: TMessage); message CM_STYLECHANGED;
+  end;
+
+type
   TfrmOptions = class(TForm)
     Panel1: TPanel;
     Image1: TImage;
@@ -160,6 +182,10 @@ type
       function GetListIndex(List: TStrings; SearchS: string): Integer;
     public
       { Public declarations }
+      { Re-resolves the scroll-box label colours from the style that is active
+        right now and forces one repaint; called at every point where the style
+        can change while this dialog is open. }
+      procedure RefreshStyledLabels;
     protected
       procedure CreateParams(var Params: TCreateParams); override;
   end;
@@ -172,6 +198,7 @@ implementation
 {$R *.dfm}
 
 uses
+  Themes,
   uRegistrySettings,
   uFileFolderHandling,
   SkinLoader,
@@ -182,12 +209,50 @@ uses
   u_Admin,
   ufrmEncodingWarning,
   uKeyboardMacro,
-  uThemeManager;
+  uThemeManager,
+  uScrollBoxStyleHookFix;
 
 const
   Show_Window_in_Taskbar = True;
 
-  { =============================================================================== }
+{ =============================================================================== }
+{ TLabel interposer (see the type declaration in the interface section). }
+{ =============================================================================== }
+
+procedure TLabel.CMStyleChanged(var Message: TMessage);
+begin
+  { Vcl.StdCtrls.pas keeps csOpaque in step with Transparent in its own
+    CM_STYLECHANGED handler, which is private and cannot be reached with
+    "inherited" from here; the same two lines are repeated so the label's
+    opaque/transparent bookkeeping is unchanged. }
+  if not Transparent then
+    ControlStyle := ControlStyle + [csOpaque]
+  else if StyleServices(Self).Enabled and (seClient in StyleElements) then
+    ControlStyle := ControlStyle - [csOpaque];
+
+  { The part that fixes the stale bars: the colour is resolved when it is
+    assigned, so a runtime style change has to re-assign it. Only the labels the
+    scroll fix made opaque are touched - a transparent label ignores its Color,
+    so those are left exactly as before. }
+  if (not Transparent) and StyleServices.Available then
+    Color := StyleServices.GetStyleColor(scPanel);
+end;
+
+{ =============================================================================== }
+
+procedure TfrmOptions.RefreshStyledLabels;
+begin
+  { ApplyStyledScrollFix only assigns properties - it does not paint - so a live
+    style switch needs the re-assignment and one forced, erased repaint to show
+    the result at once. }
+  ApplyStyledScrollFix(ScrollBox2);
+  ApplyStyledScrollFix(ScrollBox1);
+  if HandleAllocated then
+    RedrawWindow(Handle, nil, 0,
+      RDW_INVALIDATE or RDW_ERASE or RDW_ALLCHILDREN or RDW_UPDATENOW);
+end;
+
+{ =============================================================================== }
 
 function IsHotkeyNone(const Text: string): Boolean;
 var
@@ -217,6 +282,9 @@ begin
   Self.SaveSettings;
   AvroMainForm1.RefreshSettings;
   BroadcastAppThemeChanged;
+  { The style has just changed under an open dialog: refresh the scroll-box
+    label colours now, before the user sees them. }
+  RefreshStyledLabels;
 
   { Surface the "Settings saved!" status, auto-hidden after 2s
     by LabelHideTimer. Reset the timer in case the user clicks
@@ -258,6 +326,9 @@ begin
   Self.SaveSettings;
   AvroMainForm1.RefreshSettings;
   BroadcastAppThemeChanged;
+  { The style has just changed under an open dialog: refresh the scroll-box
+    label colours now, before the user sees them. }
+  RefreshStyledLabels;
   Self.Close;
 end;
 
@@ -630,6 +701,14 @@ begin
   RegisterHotkeyFeature(@ConverterLauncherKey, 'Text Converter Launcher', edtConverterLauncher);
   RegisterHotkeyFeature(@LayoutSwitchKey, 'Layout Switch', edtLayoutSwitch);
   RegisterHotkeyFeature(@AnsiVersionSwitchKey, 'ANSI Version Switch', edtAnsiVersion);
+
+  // =======================================================
+  // VCL-style scroll hygiene for both scrollboxes; the smearing fix itself is
+  // the TScrollBox style hook in Units\uScrollBoxStyleHookFix.pas. Must run
+  // after every control above is created - the label walk only sees controls
+  // that already exist.
+  ApplyStyledScrollFix(ScrollBox2);
+  ApplyStyledScrollFix(ScrollBox1);
 end;
 
 { =============================================================================== }

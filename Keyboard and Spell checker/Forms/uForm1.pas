@@ -2407,6 +2407,14 @@ begin
   // flyouts. Re-applying an unchanged theme is a no-op, because this runs after
   // every settings change in the app.
   ApplyAppTheme(AppThemeModeFromSetting(AppThemeMode));
+
+  // Every caller of this method is a style-switch point: WM_SETTINGCHANGE
+  // ('ImmersiveColorSet'), RefreshSettings (the Customize dialog's OK and
+  // Apply), and startup. If that dialog is open, re-resolve the surface colour
+  // its opaque labels were created with and repaint it once - the style engine
+  // updates label fonts, but never a Color property that was cached earlier.
+  if frmOptions <> nil then
+    frmOptions.RefreshStyledLabels;
 end;
 
 procedure TAvroMainForm1.RestoreAvroTopBar1Click(Sender: TObject);

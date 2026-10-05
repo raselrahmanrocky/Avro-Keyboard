@@ -71,6 +71,24 @@ uses
   WindowsDarkMode in 'Units\WindowsDarkMode.pas',
   uThemeManager in 'Units\uThemeManager.pas',
   uStyledMenuBorder in 'Units\uStyledMenuBorder.pas',
+  uScrollBoxStyleHookFix in 'Units\uScrollBoxStyleHookFix.pas',
+  Vcl.Styles.Utils in '..\third_party\vcl-styles-utils\Common\Vcl.Styles.Utils.pas',
+  { Opt-in extras of the vendored VCL Styles Utils - see
+    third_party\vcl-styles-utils\README.md. They change the look of surfaces
+    this application does not own, so none of them is compiled in by default.
+    Uncomment a line to try one:
+      Vcl.Styles.Utils.SysStyleHook / Vcl.Styles.Utils.SysControls
+        style the Windows common controls and the standard system dialogs;
+      Vcl.Styles.Hooks
+        patches user32/themelib process-wide (FillRect, GetSysColorBrush,
+        SetWindowTheme, ...) and additionally needs the Delphi Detours
+        library on the unit search path - it is not part of the upstream
+        repository, so it is not vendored here.
+
+      Vcl.Styles.Hooks in '..\third_party\vcl-styles-utils\Common\Vcl.Styles.Hooks.pas',
+      Vcl.Styles.Utils.SysStyleHook in '..\third_party\vcl-styles-utils\Common\Vcl.Styles.Utils.SysStyleHook.pas',
+      Vcl.Styles.Utils.SysControls in '..\third_party\vcl-styles-utils\Common\Vcl.Styles.Utils.SysControls.pas',
+  }
   uKeyboardMacro in 'Units\uKeyboardMacro.pas',
   uPickerSupport in 'Units\uPickerSupport.pas',
   Avro.Types in 'Units\Avro.Types.pas',

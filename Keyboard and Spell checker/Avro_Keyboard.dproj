@@ -70,6 +70,10 @@
     <DCC_UsePackage>vcl;rtl;vclx;vclactnband;dbrtl;vcldb;vcldbx;bdertl;dsnap;dsnapcon;teeUI;teedb;tee;adortl;vclib;ibxpress;dbxcds;dbexpress;DbxCommonDriver;IndyCore;IndySystem;IndyProtocols;xmlrtl;inet;IntrawebDB_90_100;Intraweb_90_100;VclSmp;vclie;websnap;webdsnap;inetdbbde;inetdbxpress;soaprtl;$(DCC_UsePackage)</DCC_UsePackage>
     <SanitizedProjectName>Avro_Keyboard</SanitizedProjectName>
     <DCC_Namespace>Vcl;Vcl.Imaging;Vcl.Touch;Vcl.Samples;Vcl.Shell;System;Xml;Data;Datasnap;Web;Soap;Winapi;System.Win;$(DCC_Namespace)</DCC_Namespace>
+    <!-- Vendored VCL Styles Utils (third_party\vcl-styles-utils). One path for
+         both platforms so a future unit of the library resolves without a
+         project edit. -->
+    <DCC_UnitSearchPath>..\third_party\vcl-styles-utils\Common;$(DCC_UnitSearchPath)</DCC_UnitSearchPath>
     <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
     <VerInfo_Locale>1033</VerInfo_Locale>
     <VerInfo_Keys>CompanyName=OmicronLab;FileDescription=Avro Keyboard - UNICODE compliant Open source Bangla typing software for Windows;FileVersion=6.0.1.0;InternalName=Avro Keyboard;LegalCopyright=© OmicronLab. All rights reserved.;LegalTrademarks=Avro Keyboard;OriginalFilename=Avro Keyboard.exe;ProductName=Avro Keyboard;ProductVersion=6.0.1.0;Comments=Avro Keyboard - UNICODE compliant Open source Bangla typing software for Windows</VerInfo_Keys>

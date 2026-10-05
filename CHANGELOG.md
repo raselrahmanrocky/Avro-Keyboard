@@ -5,6 +5,14 @@ would notice, not the implementation.
 
 ## Unreleased
 
+### Fixed
+
+- **The Customize window smeared while scrolling in Dark Theme.** Spinning the
+  mouse wheel fast, or dragging the scrollbar, could leave ghost trails of text
+  behind the rows while the “Windows10 Dark” style was active. Every scroll step
+  now repaints its surface opaquely before the next one is drawn; the light
+  style looks exactly as before.
+
 ### Changed
 
 - **The 64-bit installer now installs to `C:\Program Files\Avro Keyboard`**
