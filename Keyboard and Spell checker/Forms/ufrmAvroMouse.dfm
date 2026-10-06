@@ -61,8 +61,8 @@ object frmAvroMouse: TfrmAvroMouse
   OnCreate = FormCreate
   TextHeight = 13
   object Panel1: TPanel
-    Left = -1
-    Top = 0
+    Left = -3
+    Top = 1
     Width = 315
     Height = 155
     BevelEdges = []
@@ -247,7 +247,7 @@ object frmAvroMouse: TfrmAvroMouse
     end
     object BitBtn4: TBitBtn
       Tag = 2459
-      Left = 38
+      Left = 39
       Top = 35
       Width = 32
       Height = 29
@@ -1252,7 +1252,7 @@ object frmAvroMouse: TfrmAvroMouse
     end
     object BitBtn21: TBitBtn
       Tag = 2457
-      Left = 137
+      Left = 138
       Top = 6
       Width = 32
       Height = 29
@@ -1374,7 +1374,7 @@ object frmAvroMouse: TfrmAvroMouse
     end
     object BitBtn25: TBitBtn
       Tag = 2467
-      Left = 137
+      Left = 138
       Top = 64
       Width = 32
       Height = 29
@@ -1870,7 +1870,7 @@ object frmAvroMouse: TfrmAvroMouse
     end
     object BitBtn31: TBitBtn
       Tag = 2489
-      Left = 209
+      Left = 208
       Top = 64
       Width = 32
       Height = 29
@@ -6103,7 +6103,7 @@ object frmAvroMouse: TfrmAvroMouse
     Tag = 2433
     Left = 241
     Top = 122
-    Width = 32
+    Width = 28
     Height = 29
     Margins.Left = 0
     Margins.Top = 0
