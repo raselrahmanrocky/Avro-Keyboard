@@ -355,34 +355,91 @@ end;
 { =============================================================================== }
 
 procedure TfrmOptions.CategoryTreeClick(Sender: TObject);
+var
+  Page: TPanel;
+  ScrollPos: Integer;
 begin
-  { Hide every settings panel first, then show only the one
-    matching the selected tree node. This is robust against
-    the Locale/Language node (added at runtime) being left
-    visible when other categories are clicked. }
-  General_Panel.Visible := False;
-  Interface_Panel.Visible := False;
-  KeyboardMode_Panel.Visible := False;
-  AvroPhonetic_Panel.Visible := False;
-  FixedLayout_Panel.Visible := False;
-  GlobalOutput_Panel.Visible := False;
+  { This handler is wired to three events in the .dfm (OnEnter, OnClick and
+    OnDblClick), so one click on a category runs it more than once: OnEnter
+    when the click moves the focus into the tree, then OnClick, then
+    OnDblClick on a double click. It is also what puts the first page on
+    screen when the dialog opens, because FormCreate leaves every panel
+    hidden and the tree takes the focus on activation. }
+  if CategoryTree.Selected = nil then
+    Exit;
 
+  Page := nil;
   case CategoryTree.Selected.Index of
-    0:
-      General_Panel.Visible := True;
-    1:
-      Interface_Panel.Visible := True;
-    2:
-      KeyboardMode_Panel.Visible := True; { "Global Hotkeys" }
-    3:
-      AvroPhonetic_Panel.Visible := True;
-    4:
-      FixedLayout_Panel.Visible := True;
-    5:
-      GlobalOutput_Panel.Visible := True;
+    0: Page := General_Panel;
+    1: Page := Interface_Panel;
+    2: Page := KeyboardMode_Panel; { "Global Hotkeys" }
+    3: Page := AvroPhonetic_Panel;
+    4: Page := FixedLayout_Panel;
+    5: Page := GlobalOutput_Panel;
   end;
 
-  TopLabel.Caption := CategoryTree.Selected.Text + ' Settings...';
+  { The repeated "jump" when a category is clicked again is this redundant
+    second pass: hiding a page that is already on screen and showing it again
+    makes its window disappear for a frame and makes the scroll box
+    recalculate its range twice, so the page flickers and the position it had
+    is lost. When the page asked for is already the visible one there is
+    nothing to do. }
+  if (Page <> nil) and Page.Visible then
+  begin
+    TopLabel.Caption := CategoryTree.Selected.Text + ' Settings...';
+    Exit;
+  end;
+
+  { The scroll position is kept across the switch. Every page sits at the top
+    of the same scroll box, and the pages do not have the same height, so
+    hiding one and showing another used to move the content under the user
+    (the other half of the same jump). }
+  ScrollPos := ScrollBox2.VertScrollBar.Position;
+
+  { One visible transition, not one per pass. Six panels are hidden and one is
+    shown, and every one of those Visible := calls makes the scroll box paint
+    whatever the call just uncovered - so a single click used to be two to four
+    full repaints of the settings area in a row, which is the flicker that reads
+    as the content jumping. Measured on the reported recording (1111.mp4,
+    680x510 @ 60 fps): one category click produced 2-4 repaints of ~9.4% of the
+    settings area, spread over 4-6 frames.
+
+    With the box's own redrawing switched off, those intermediate paints are
+    dropped (the window simply keeps the picture it already had on screen), the
+    visibility and the layout still take effect, and the one repaint below shows
+    the page that was actually asked for. WM_SETREDRAW only turns the box's
+    paints off; the panels are its children, so nothing inside it can flash
+    either. The forced repaint afterwards is what makes the new page appear -
+    WM_SETREDRAW back to True does not invalidate anything by itself. }
+  SendMessage(ScrollBox2.Handle, WM_SETREDRAW, Ord(False), 0);
+  try
+    { Hide every settings panel first, then show only the one
+      matching the selected tree node. This is robust against
+      a node that has no page of its own being left visible
+      when other categories are clicked. }
+    General_Panel.Visible := False;
+    Interface_Panel.Visible := False;
+    KeyboardMode_Panel.Visible := False;
+    AvroPhonetic_Panel.Visible := False;
+    FixedLayout_Panel.Visible := False;
+    GlobalOutput_Panel.Visible := False;
+
+    if Page <> nil then
+      Page.Visible := True;
+
+    if ScrollBox2.VertScrollBar.Position <> ScrollPos then
+      ScrollBox2.VertScrollBar.Position := ScrollPos;
+
+    TopLabel.Caption := CategoryTree.Selected.Text + ' Settings...';
+  finally
+    SendMessage(ScrollBox2.Handle, WM_SETREDRAW, Ord(True), 0);
+  end;
+
+  { The one repaint the switch is allowed to make. RDW_UPDATENOW so it is done
+    before this returns: a click must never leave the box on screen in a state
+    that is neither the old page nor the new one. }
+  RedrawWindow(ScrollBox2.Handle, nil, 0,
+    RDW_INVALIDATE or RDW_ERASE or RDW_ALLCHILDREN or RDW_UPDATENOW);
 end;
 
 { =============================================================================== }

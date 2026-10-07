@@ -41,10 +41,16 @@ unit uScrollBoxStyleHookFix;
   * PaintBackground is answered with a solid, opaque fill whose colour still
     comes from the active style, so nothing here is hardcoded and both styles
     keep their own surface colour;
-  * after every scroll message (WM_VSCROLL / WM_HSCROLL / WM_MOUSEWHEEL) the
-    whole scrollbox, children included, is invalidated, erased and repainted
-    synchronously - RDW_ERASE is the load-bearing flag, because it runs exactly
-    the opaque erase above.
+  * after a DISCRETE scroll message (one wheel notch, one arrow click, one
+    page, one key, and the SB_ENDSCROLL that ends a thumb drag) the whole
+    scrollbox, children included, is invalidated and erased - RDW_ERASE is the
+    load-bearing flag, because it runs exactly the opaque erase above.
+
+    The continuous part of a thumb drag (SB_THUMBTRACK) is deliberately left
+    alone: the bit-blit ScrollWindow already performed is what the user sees
+    while the thumb is held, and repainting every child after each of those
+    messages is what made the text advance in irregular lumps instead of
+    following the pointer (see RepaintAfterScroll for the measurements).
 
   Base class note: there is no TScrollingWinControlStyleHook in the VCL. The
   hierarchy is TStyleHook -> TScrollingStyleHook -> TScrollBoxStyleHook, all
@@ -369,7 +375,18 @@ begin
     stale pixels behind, so the repair goes right here. }
   inherited;
   case Message.Msg of
-    WM_VSCROLL, WM_HSCROLL, WM_MOUSEWHEEL:
+    WM_VSCROLL, WM_HSCROLL:
+      { The scroll code sits in the low word of WParam: SB_THUMBTRACK while the
+        thumb is held, SB_ENDSCROLL when it is released, SB_LINEUP / SB_LINEDOWN
+        for a wheel notch or an arrow click, SB_PAGEUP / SB_PAGEDOWN for a page.
+        Only the drag itself is skipped; everything else is a step the user
+        cannot be in the middle of, and those are the ones the erase is for.
+        SB_ENDSCROLL is one of them, so the drag still ends with the box fully
+        repainted - see RepaintAfterScroll for why the intermediate ones have
+        to go. }
+      if Message.WParamLo <> SB_THUMBTRACK then
+        RepaintAfterScroll;
+    WM_MOUSEWHEEL:
       RepaintAfterScroll;
   end;
 end;
@@ -381,14 +398,47 @@ begin
 
   { RDW_INVALIDATE - the whole client area, not just the band the scroll
     invalidated.
-    RDW_ERASE      - re-sends WM_ERASEBKGND, which this hook answers with the
-    opaque fill above; this is the flag that actually removes a ghost.
+    RDW_ERASE      - re-sends WM_ERASEBKGND when the window is repainted,
+    which this hook answers with the opaque fill above; this is the flag that
+    actually removes a ghost.
     RDW_ALLCHILDREN - takes the category panels and their controls with it;
     TWinControl.ScrollBy moved them without invalidating them.
-    RDW_UPDATENOW  - completes paint and erase before the next queued scroll
-    message is handled, so a fast wheel spin cannot coalesce frames. }
+
+    RDW_UPDATENOW is deliberately NOT set. It used to be, and it is what made
+    the text shimmer while scrolling: it completes the erase and the repaint
+    before every single scroll message returns, and the scroll box is built
+    with VertScrollBar.Tracking = True, so one thumb drag is a stream of
+    WM_VSCROLL messages - a full erase and repaint of the box and of every
+    child for each of them, several times per frame. Without it the blit that
+    ScrollWindow already performed is what the user sees immediately (so the
+    scroll still tracks the thumb), and the invalid region above simply
+    accumulates, so Windows merges the whole burst into one erased repaint
+    that removes the ghost exactly the same way.
+
+    This is still the expensive path - every control in the page paints through
+    the style engine, each into a freshly allocated bitmap - so WndProc keeps it
+    out of the continuous part of a drag. Two measurements say so:
+
+      * the reported recording (1111.mp4, 680x510 @ 60 fps, Win64, Windows10Dark)
+        shows the settings area advancing in irregular lumps of 2, 2, 4, 5 and
+        8 px at roughly 30 updates per second, with 12-20% of the content region
+        repainted per update and recorder frames repeated in pairs - one whole
+        page repaint per scroll message, which is what the eye reads as the text
+        shivering instead of moving. The pixels themselves were fine: apart from
+        the newly exposed strip each frame was a clean translation of the one
+        before it (best-fit aligned MAD 3.1 of 255).
+      * build\scrollprobe (a throwaway probe that loads this same unit and
+        scrolls a styled box with the same messages) times one drag step at
+        11.7 ms with no residue outside the exposed strip, against 33.2 ms for
+        a step that carries the erase and repaint below. The erase is what
+        costs 20 ms of it, so at 60 Hz it could never keep up: about 30 steps
+        a second is the ceiling with it, which is exactly the rate the video
+        shows.
+
+    SB_ENDSCROLL still comes through WndProc, so a drag ends with the full
+    erase and repaint and cannot leave anything behind. }
   RedrawWindow(Control.Handle, nil, 0,
-    RDW_INVALIDATE or RDW_ERASE or RDW_ALLCHILDREN or RDW_UPDATENOW);
+    RDW_INVALIDATE or RDW_ERASE or RDW_ALLCHILDREN);
 end;
 
 { =============================================================================== }
@@ -426,20 +476,21 @@ begin
   if AScrollBox = nil then
     Exit;
 
-  { No DoubleBuffered here, deliberately. TWinControl.SetDoubleBuffered does not
-    stop at the scrollbox: it walks the whole child tree and every child window
-    ends up DoubleBuffered = True. TWinControl.WMEraseBkgnd then hands a child's
-    erase to PerformEraseBackground, which asks the PARENT to erase - and a
-    styled parent whose hook is double buffered answers that with nothing at all
-    (TStyleHook.WMEraseBkgnd does not paint while FDoubleBuffered is set). A
-    child left with an unpainted background is what makes a click on a check box
-    or radio button flash for one frame. The forced repaint in the hook above is
-    what removes the scroll residue, and it needs no double buffering. }
+  { No DoubleBuffered here, deliberately. It would apply to the scrollbox alone
+    (TWinControl.SetDoubleBuffered only sets the flag, Vcl.Controls.pas:12138 -
+    it does not walk the child tree), and it buys nothing: every control in this
+    dialog already paints through the style engine, which builds its own bitmap
+    per paint (TStyleHook.WMPaint, Vcl.Themes.pas:7538), so the box's solid
+    background fill cannot flicker anyway. What used to flicker was the page,
+    and that is what the hook above and ApplyStyledScrollFix below are for. }
 
-  { With VertScrollBar.Tracking (set in the .dfm) a thumb drag sends a stream
-    of scroll messages, and with Smooth = True the box follows every one of
-    them. Deferring to the end of the drag removes most intermediate frames; the
-    mouse wheel and the arrow buttons are not affected. }
+  { Smooth = True (set in the .dfm) is not about the thumb: TControlScrollBar
+    splits a LINE or PAGE scroll into FLineDiv (4) / FPageDiv (12) animated
+    sub-steps and scrolls once per part (Vcl.Forms.pas:3135, 3412). Each part is
+    a separate scroll of the whole page, so an arrow click or a wheel notch ends
+    up rebuilding the page four times instead of once. False makes it one step;
+    thumb tracking and the range are untouched by this (Vcl.Forms.pas:2973,
+    IsIncrementStored, is the only other reader). }
   AScrollBox.VertScrollBar.Smooth := False;
 
   MakeLabelsOpaque(AScrollBox);
