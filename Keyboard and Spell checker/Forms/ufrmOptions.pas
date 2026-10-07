@@ -24,7 +24,8 @@ uses
   ExtCtrls,
   CategoryButtons,
   StdCtrls,
-  ComCtrls;
+  ComCtrls,
+  ufrmPhoneticOptions;
 
 type
   { Interposer for every TLabel of this dialog. No .dfm edit is needed for it:
@@ -177,6 +178,11 @@ type
     procedure ShortcutEditClick(Sender: TObject);
     private
       { Private declarations }
+      { The Avro Phonetic page: created in FormCreate and embedded into
+        GroupBox3. The dialog's published fields are re-pointed at its
+        controls right after creation, so LoadSettings, SaveSettings and
+        CheckShowPrevWindowClick keep working without a single change. }
+      FPhoneticPage: TfrmPhoneticOptions;
       procedure LoadSettings;
       procedure SaveSettings;
       function GetListIndex(List: TStrings; SearchS: string): Integer;
@@ -552,6 +558,53 @@ begin
   AvroPhonetic_Panel.BevelKind := bknone { bkTile };
   FixedLayout_Panel.BevelKind := bknone { bkTile };
   GlobalOutput_Panel.BevelKind := bknone;
+
+  { The Avro Phonetic page lives in its own form (ufrmPhoneticOptions). Its
+    check boxes and radio buttons used to carry StyleElements = [] so the style
+    engine left their painting to Windows (TStyleHook.AcceptMessage refuses
+    WM_PAINT / WM_ERASEBKGND / WM_CTLCOLOR* once seClient is gone) - that was
+    defence in depth against the black-bar defect, not the fix itself; the paint
+    path that produced the black bars and the white blocks is repaired in
+    Units\uScrollBoxStyleHookFix.pas, and the opt-out has since been removed so
+    those controls now paint in the active style like every other check box and
+    radio button in the program. The form is embedded into GroupBox3 over the
+    group box's client area (alClient), which is the exact spot the controls used
+    to occupy, so no coordinate changes, and every reference the dialog keeps to
+    a moved control is re-pointed below. }
+  FPhoneticPage := TfrmPhoneticOptions.Create(Self);
+  FPhoneticPage.Parent := GroupBox3;
+  FPhoneticPage.Align := alClient;
+  { TCustomForm.InitializeNewForm starts every form with Visible = False
+    (Vcl.Forms.pas) - fine for a top-level window that calls Show later, but
+    an embedded form would otherwise stay hidden forever: its group box
+    frame draws while the whole page inside it stays blank. The property
+    only turns this form's own window on; hiding AvroPhonetic_Panel still
+    hides the page visually, exactly like every other control inside it. }
+  FPhoneticPage.Visible := True;
+  FPhoneticPage.ApplyTheme;
+
+  { Re-point all eleven moved controls. The five labels come across as
+    StdCtrls.TLabel (the new unit cannot see this unit's TLabel interposer -
+    that would be a circular reference), so they need the explicit cast;
+    the instance itself is untouched by a cast, it only silences the type
+    mismatch. }
+  Label_PhoneticTypingMode := TLabel(FPhoneticPage.Label_PhoneticTypingMode);
+  Label1 := TLabel(FPhoneticPage.Label1);
+  Label4 := TLabel(FPhoneticPage.Label4);
+  Label9 := TLabel(FPhoneticPage.Label9);
+  Label12 := TLabel(FPhoneticPage.Label12);
+  CheckShowPrevWindow := FPhoneticPage.CheckShowPrevWindow;
+  optPhoneticMode_Dict := FPhoneticPage.optPhoneticMode_Dict;
+  optPhoneticMode_Char := FPhoneticPage.optPhoneticMode_Char;
+  optPhoneticMode_OnlyChar := FPhoneticPage.optPhoneticMode_OnlyChar;
+  CheckRememberCandidate := FPhoneticPage.CheckRememberCandidate;
+  CheckTabBrowsing := FPhoneticPage.CheckTabBrowsing;
+
+  { The OnClick entry left the .dfm with the moved control (the new form has
+    no event handlers - a leftover entry would raise EResNotFound while
+    streaming and silently kill this constructor), so the dialog wires it
+    back up now that the field points at the moved check box. }
+  CheckShowPrevWindow.OnClick := CheckShowPrevWindowClick;
 
   if CategoryTree.Items.Count > 0 then
     CategoryTree.Items[0].Selected := True;

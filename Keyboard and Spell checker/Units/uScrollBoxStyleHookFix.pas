@@ -53,28 +53,41 @@ unit uScrollBoxStyleHookFix;
   and the styled border that TScrollingStyleHook provides. (TCustomScrollBox
   does not exist either; TScrollBox derives from TScrollingWinControl.)
 
-  The unit also carries a background backstop for the VCL's own check-box and
-  radio-button hooks (TCheckBoxStyleHookFix / TRadioButtonStyleHookFix below).
-  Those two controls are the only ones whose client area is not painted by their
-  own hook at all: their paint is double buffered, the buffer is a freshly
-  allocated bitmap that is never cleared, and the only thing that puts pixels in
-  it is the parent-chain call in TCheckBoxStyleHook.PaintBackground. Wherever
-  that call does not cover the buffer - which the opaque labels of this dialog
-  can cause, because TWinControl.PaintHandler clips a parent's fill around every
-  csOpaque child - the control blits the bitmap's untouched, zeroed content:
-  a solid black bar. Laying the active style's surface colour down first makes
-  such a region show the surface instead of black; the stock painting still runs
-  afterwards and wins wherever it does cover. This file documents the scroll
-  smearing fix; see the class comments below for the backstop.
+  The unit also replaces the VCL's own check-box and radio-button hooks
+  (TCheckBoxStyleHookFix / TRadioButtonStyleHookFix below) in two ways:
+
+  * their background is stated instead of asked for. Those two controls are the
+    only ones whose client area is not painted by their own hook at all: their
+    paint is double buffered, the buffer is a freshly allocated bitmap, and the
+    only thing the stock code puts in it is a request to the PARENT to paint -
+    which either paints nothing (uninitialised buffer: a solid black bar) or
+    paints the parent's own frame and caption into the control, offset by the
+    control's position (stray edges and a half-erased caption, in the surface
+    colour of the active style). Filling the buffer with the active style's
+    surface colour, and nothing else, makes that background deterministic under
+    every style - this is the repair for the black bars the Avro Phonetic page
+    used to opt out of the style engine to avoid (that opt-out is gone now:
+    ufrmPhoneticOptions no longer sets StyleElements = []).
+  * their message interception steps aside for a control that paints itself
+    (StyleElements without seClient - see the class comment below). The stock
+    hook answers every click, every Checked := and every .Enabled := with a
+    SetRedraw(False)/SetRedraw(True) pair and a non-erasing invalidate, i.e.
+    one suppressed frame and one half-erased repaint per interaction. A control
+    that paints itself is given the message and an erasing invalidate instead,
+    which is exactly what happens when no custom style is active at all.
+
+  This file documents the scroll smearing fix; see the class comments below for
+  the button background and the message take-over.
 }
 
 interface
 
 uses
-  Winapi.Windows,   // RedrawWindow, RDW_*, HWND
-  Winapi.Messages,  // WM_VSCROLL, WM_HSCROLL, WM_MOUSEWHEEL
+  Winapi.Windows,   // RedrawWindow, InvalidateRect, RDW_*, HWND
+  Winapi.Messages,  // WM_VSCROLL, WM_HSCROLL, WM_MOUSEWHEEL, WM_LBUTTON*
+  System.Types,     // TRect
   System.Classes,   // TComponent
-  Vcl.Controls,     // TControl, TWinControl
+  Vcl.Controls,     // TControl, TWinControl, seClient
   Vcl.Graphics,     // TCanvas, TColor
   Vcl.StdCtrls,     // TLabel
   Vcl.Themes,       // TCustomStyleEngine, TStyleManager, StyleServices, TStyleColor
@@ -95,23 +108,55 @@ type
     constructor Create(AControl: TWinControl); override;
   end;
 
-  { Surface backstop for TCheckBox. Registered for the whole process by this
-    unit's initialization, after Vcl.StdCtrls's own registration, and the engine
-    instantiates the LAST hook registered for a control class - the same rule
-    the scrollbox hook above already relies on. Only PaintBackground is
-    overridden, so the glyph and the caption keep being drawn by the stock
-    TCheckBoxStyleHook, with the active style's colours for the control's
-    current enabled/checked state. }
+  { Backstop for TCheckBox, in two parts.
+
+    1. PaintBackground defines the whole background of the control, so the
+       style engine's double-buffered paint always starts from a known surface
+       instead of an uninitialised bitmap or a copy of the parent's frame.
+    2. WndProc steps out of the way for a control that paints itself
+       (StyleElements without seClient). The stock TCheckBoxStyleHook answers
+       every mouse message, BM_SETCHECK, CM_ENABLEDCHANGED and VK_SPACE by
+       switching the control's redraw off, letting it handle the message with
+       redrawing suppressed, switching it back on and then invalidating
+       WITHOUT an erase. That is one dropped frame and one half-erased repaint
+       per interaction - the flicker a control does not show when no custom
+       style is active, because then no hook exists at all. For a control that
+       paints itself both parts have to be dropped: the message goes straight
+       to the control, and the invalidate that follows asks for an erase, so
+       the previous state's glyph and caption are cleared before the new ones
+       are drawn.
+
+    Registered for the whole process by this unit's initialization, after
+    Vcl.StdCtrls's own registration. The engine looks the hook class up by
+    walking up from the control's own class and instantiates the LAST class
+    registered for the first class it finds (Vcl.Styles.pas,
+    TStyleEngine.HandleMessage), so this supersedes TCheckBox's stock hook
+    without touching its registration. }
   TCheckBoxStyleHookFix = class(TCheckBoxStyleHook)
+  strict private
+    { True while the control is painted by Windows rather than by the style
+      engine: TStyleHook.AcceptMessage refuses WM_PAINT, WM_ERASEBKGND and
+      WM_CTLCOLOR* as soon as seClient is missing from StyleElements, so every
+      paint override of the stock hook is dead code for such a control and
+      only the message interception below still has an effect. }
+    function NativePaint: Boolean;
   strict protected
     procedure PaintBackground(Canvas: TCanvas); override;
+    procedure WndProc(var Message: TMessage); override;
   end;
 
-  { Same for TRadioButton; TRadioButtonStyleHook derives from
-    TCheckBoxStyleHook, so the inherited glyph+caption painting is unchanged. }
+  { Same for TRadioButton. Its stock hook descends from TCheckBoxStyleHook,
+    not from the fix above, so the two overrides are repeated here - that is
+    the only way to keep the radio glyphs of the styled case (they come from
+    TRadioButtonStyleHook.GetDrawState) while getting the same background and
+    the same message take-over. The bodies below say what they do; the reasons
+    are in the check-box class comment. }
   TRadioButtonStyleHookFix = class(TRadioButtonStyleHook)
+  strict private
+    function NativePaint: Boolean;
   strict protected
     procedure PaintBackground(Canvas: TCanvas); override;
+    procedure WndProc(var Message: TMessage); override;
   end;
 
 { The surface colour of the style that is active right now. One resolution rule
@@ -124,9 +169,10 @@ function StyleSurfaceColor: TColor;
 
     ApplyStyledScrollFix(ScrollBox2);
 
-  It enables double buffering, turns off smooth thumb-drag scrolling and makes
-  every TLabel in the control tree erase its own background with the style's
-  surface colour. See the implementation for what each part is for. }
+  It turns off smooth thumb-drag scrolling and makes every TLabel in the
+  control tree erase its own background with the style's surface colour. It
+  deliberately does NOT enable double buffering - see the implementation for
+  what each part is for and why that one is left alone. }
 procedure ApplyStyledScrollFix(const AScrollBox: TScrollBox);
 
 implementation
@@ -178,35 +224,128 @@ end;
 
 procedure TCheckBoxStyleHookFix.PaintBackground(Canvas: TCanvas);
 begin
-  { TStyleHook.WMPaint (Vcl.Themes.pas:7538) paints a check box into a fresh
-    TBitmap and blits that bitmap over the whole client area, so every pixel the
-    stock code does not touch keeps the bitmap's initial content - black. The
-    stock TCheckBoxStyleHook.PaintBackground (Vcl.StdCtrls.pas:12163) fills the
-    bitmap through LStyle.DrawParentBackground, i.e. by asking the parent chain
-    to paint into it, and that is the only fill there is: the control's own
-    erase is swallowed (the hook sets DoubleBuffered, so TStyleHook.WMEraseBkgnd
-    paints nothing, Vcl.Themes.pas:7617) and a TPanel never fills its client
-    area either (TCustomPanel.ParentBackground clears csOpaque). Whenever a link
-    of that chain paints nothing for this control the bar comes out black, and
-    making the ~40 labels of the Customize dialog opaque is exactly what can
-    clip a parent's fill away: TWinControl.PaintHandler (Vcl.Controls.pas:11331)
-    excludes the rect of every visible csOpaque child before it paints, and
-    PaintControls then paints those labels into whichever DC an ancestor is
-    painting - including the bitmap that is being prepared here.
+  { The whole background of a check box, in one statement, with no help asked
+    from the parent.
 
-    Hence the order below: state the surface first, then let the stock code
-    paint the real parent surface over it. A region the stock chain does cover is
-    unchanged (its pixels win); a region it misses shows the style's own surface
-    colour instead of black. No literal colour is used - both values come from
-    StyleSurfaceColor - and nothing that draws the glyph or the caption moves. }
+    Why the stock code cannot be reused here (RAD Studio 23.0 sources):
+    TStyleHook.WMPaint (Vcl.Themes.pas:7538) paints the control into a fresh
+    TBitmap and blits that bitmap over the whole client area, so every pixel
+    the paint below does not touch keeps the bitmap's initial content - black.
+    There are exactly two things that used to put pixels in it:
+
+      * TStyleHook.WMEraseBkgnd paints nothing at all, because the hook sets
+        DoubleBuffered (Vcl.Themes.pas:7617);
+      * TCheckBoxStyleHook.PaintBackground (Vcl.StdCtrls.pas:12163) asks
+        LStyle.DrawParentBackground for the parent's surface, and for a custom
+        style that ends in DrawControlBackground (Vcl.StyleAPI.pas:7012), which
+        runs the PARENT's window procedure with a DC whose origin has been
+        moved to this control (MoveWindowOrg(DC, -P.X, -P.Y)).
+
+    The parent is a styled window as well - TCustomGroupBox, TCustomForm and
+    TScrollBox all have hooks - and TGroupBoxStyleHook.Paint (Vcl.StdCtrls.pas:
+    12406) and TFormStyleHook.Paint draw the parent's FRAME and its CAPTION,
+    not just a background. Those strokes land in this control's bitmap, offset
+    by the control's position inside the parent, so a check box can show a piece
+    of the group box's border or of the form's edge across its own caption. A
+    link of the chain that paints nothing leaves the untouched bitmap black
+    instead. Both are the same defect from either end, and neither can be
+    predicted from here.
+
+    Stating the colour ourselves removes the dependency: FillRect below covers
+    the control's whole client rect, so the bitmap is fully defined before the
+    caption and the glyph are drawn onto it, and nothing else ever writes into
+    it. The colour is the active style's surface (StyleSurfaceColor), never a
+    literal, so both the light and the dark style keep their own appearance. }
   PaintButtonSurface(Control, Canvas);
+end;
+
+function TCheckBoxStyleHookFix.NativePaint: Boolean;
+begin
+  Result := (Control <> nil) and not (seClient in Control.StyleElements);
+end;
+
+procedure TCheckBoxStyleHookFix.WndProc(var Message: TMessage);
+var
+  OldBounds: TRect;
+  OldVisible: Boolean;
+begin
+  { See the class comment for why these messages are taken over. The set is
+    exactly the one the stock hook wraps in SetRedraw(False)/SetRedraw(True) -
+    WM_LBUTTONDOWN / WM_LBUTTONUP / WM_LBUTTONDBLCLK / WM_KEYDOWN / WM_KEYUP
+    (the last two only for VK_SPACE, which the control itself ignores),
+    BM_SETCHECK (what Checked := True sends) and CM_ENABLEDCHANGED (what
+    .Enabled := False sends). The control still handles the message itself
+    through CallDefaultProc, so nothing about its behaviour changes; only the
+    repaint that follows is different, and it is now an invoking one: the
+    erasing InvalidateRect below sends WM_ERASEBKGND first, so no part of the
+    previous glyph, caption or state colour can survive underneath. }
+  if NativePaint then
+    case Message.Msg of
+      WM_LBUTTONDOWN, WM_LBUTTONUP, WM_LBUTTONDBLCLK,
+      WM_KEYDOWN, WM_KEYUP, BM_SETCHECK, CM_ENABLEDCHANGED:
+        begin
+          { Only WM_LBUTTONUP can resize or hide the control - the other
+            messages never do - so the parent is asked to repaint the old
+            rectangle exactly where the stock hook asks for it. }
+          OldBounds := Control.BoundsRect;
+          OldVisible := Control.Visible;
+          CallDefaultProc(Message);
+          InvalidateRect(Control.Handle, nil, True);
+          if (Message.Msg = WM_LBUTTONUP) and
+             ((OldBounds <> Control.BoundsRect) or (OldVisible <> Control.Visible)) and
+             (Control.Parent <> nil) then
+            InvalidateRect(Control.Parent.Handle, OldBounds, True);
+          Handled := True;
+          Exit;
+        end;
+    end;
+
+  { Every other message, and every message of a control that is still painted
+    by the style engine, keeps going through the stock chain: TStyleHook's
+    WndProc does the drawing and the Dispatch that reaches the stock
+    TCheckBoxStyleHook handlers. }
   inherited;
 end;
 
 procedure TRadioButtonStyleHookFix.PaintBackground(Canvas: TCanvas);
 begin
-  { Identical reason and ordering as the check-box hook above. }
+  { Identical reason as the check-box hook above: TRadioButtonStyleHook derives
+    from TCheckBoxStyleHook and inherits the same parent-chain fill. }
   PaintButtonSurface(Control, Canvas);
+end;
+
+function TRadioButtonStyleHookFix.NativePaint: Boolean;
+begin
+  Result := (Control <> nil) and not (seClient in Control.StyleElements);
+end;
+
+procedure TRadioButtonStyleHookFix.WndProc(var Message: TMessage);
+var
+  OldBounds: TRect;
+  OldVisible: Boolean;
+begin
+  { Same take-over as TCheckBoxStyleHookFix.WndProc above; see its comment for
+    the whole reasoning. It has to be written out again here because this
+    class descends from TRadioButtonStyleHook, not from the check-box fix, and
+    the stock handler it replaces (TRadioButtonStyleHook.WndProc) is the one
+    that would otherwise reach TCheckBoxStyleHook's SetRedraw wrapper. }
+  if NativePaint then
+    case Message.Msg of
+      WM_LBUTTONDOWN, WM_LBUTTONUP, WM_LBUTTONDBLCLK,
+      WM_KEYDOWN, WM_KEYUP, BM_SETCHECK, CM_ENABLEDCHANGED:
+        begin
+          OldBounds := Control.BoundsRect;
+          OldVisible := Control.Visible;
+          CallDefaultProc(Message);
+          InvalidateRect(Control.Handle, nil, True);
+          if (Message.Msg = WM_LBUTTONUP) and
+             ((OldBounds <> Control.BoundsRect) or (OldVisible <> Control.Visible)) and
+             (Control.Parent <> nil) then
+            InvalidateRect(Control.Parent.Handle, OldBounds, True);
+          Handled := True;
+          Exit;
+        end;
+    end;
   inherited;
 end;
 
