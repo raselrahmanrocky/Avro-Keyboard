@@ -105,8 +105,15 @@ type
     (scrollbars, border, colours) is inherited unchanged. }
   TScrollBoxStyleHookFix = class(TScrollBoxStyleHook)
   strict private
+    { The scroll positions the last scroll was measured against, so the band a
+      scroll just uncovered can be computed without being told what the scroll
+      code was. }
+    FLastTop: Integer;
+    FLastLeft: Integer;
+    FHasLast: Boolean;
     function SurfaceColor: TColor;
     procedure RepaintAfterScroll;
+    procedure RepaintUncoveredBand;
   strict protected
     procedure PaintBackground(Canvas: TCanvas); override;
     procedure WndProc(var Message: TMessage); override;
@@ -385,9 +392,80 @@ begin
         repainted - see RepaintAfterScroll for why the intermediate ones have
         to go. }
       if Message.WParamLo <> SB_THUMBTRACK then
-        RepaintAfterScroll;
+        RepaintAfterScroll
+      else
+        { The drag itself. The bit-blit moved the page, but the band the scroll
+          uncovered still holds the previous page's pixels - that band is the
+          "glued", half-drawn line that shows up against the edge being
+          scrolled towards. Repainting only that band keeps the step cheap
+          enough to follow the pointer: see RepaintUncoveredBand. }
+        RepaintUncoveredBand;
     WM_MOUSEWHEEL:
       RepaintAfterScroll;
+  end;
+end;
+
+{ Repaint just the strip the scroll uncovered, on the scrollbox and on every
+  child that reaches into it. This is what a native scroll does; the difference
+  here is that the strip also has to be erased with the style's surface colour,
+  which is the whole point of the hook.
+
+  Why not invalidate the whole box instead: every control in a settings page
+  paints through the style engine, and TStyleHook.WMPaint rebuilds the control
+  into a bitmap the size of the whole control and blits it (Vcl.Themes.pas:7554)
+  - so a full invalidation costs a full repaint of the page whatever changed,
+  which is what made a drag advance in ~30 Hz lumps. A band only makes the
+  controls that intersect the band paint, so a step costs a fraction of that.
+
+  The band is derived from the scroll position rather than from the message, so
+  it works for the thumb, the wheel, the arrows, the keys and the touch
+  gestures alike. }
+procedure TScrollBoxStyleHookFix.RepaintUncoveredBand;
+var
+  Band: TRect;
+  Dy, Dx, Top, Left: Integer;
+begin
+  if (Control = nil) or not Control.HandleAllocated then
+    Exit;
+  if not (Control is TScrollBox) then
+    Exit;
+
+  Top := TScrollBox(Control).VertScrollBar.Position;
+  Left := TScrollBox(Control).HorzScrollBar.Position;
+
+  if not FHasLast then
+  begin
+    FLastTop := Top;
+    FLastLeft := Left;
+    FHasLast := True;
+    Exit;
+  end;
+
+  Dy := Top - FLastTop;
+  Dx := Left - FLastLeft;
+  FLastTop := Top;
+  FLastLeft := Left;
+
+  if Dx <> 0 then
+  begin
+    if Dx > 0 then
+      Band := Rect(Control.ClientWidth - Dx, 0, Control.ClientWidth, Control.ClientHeight)
+    else
+      Band := Rect(0, 0, -Dx, Control.ClientHeight);
+    RedrawWindow(Control.Handle, @Band, 0,
+      RDW_INVALIDATE or RDW_ERASE or RDW_ALLCHILDREN);
+  end;
+
+  if Dy <> 0 then
+  begin
+    { A larger position means the page moved up, so the strip that needs the
+      new page in it is the one at the bottom, and the other way round. }
+    if Dy > 0 then
+      Band := Rect(0, Control.ClientHeight - Dy, Control.ClientWidth, Control.ClientHeight)
+    else
+      Band := Rect(0, 0, Control.ClientWidth, -Dy);
+    RedrawWindow(Control.Handle, @Band, 0,
+      RDW_INVALIDATE or RDW_ERASE or RDW_ALLCHILDREN);
   end;
 end;
 
@@ -395,6 +473,16 @@ procedure TScrollBoxStyleHookFix.RepaintAfterScroll;
 begin
   if (Control = nil) or not Control.HandleAllocated then
     Exit;
+
+  { Whatever the band pass above did, this is the state the drag is compared
+    against next time; keeping it current here too means a discrete scroll right
+    after a drag cannot compute a band from a stale position. }
+  if Control is TScrollBox then
+  begin
+    FLastTop := TScrollBox(Control).VertScrollBar.Position;
+    FLastLeft := TScrollBox(Control).HorzScrollBar.Position;
+    FHasLast := True;
+  end;
 
   { RDW_INVALIDATE - the whole client area, not just the band the scroll
     invalidated.
