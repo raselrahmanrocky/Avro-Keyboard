@@ -41,7 +41,6 @@ uses
   ufrmAvroMouse in 'Forms\ufrmAvroMouse.pas' {frmAvroMouse} ,
   ufrmOptions in 'Forms\ufrmOptions.pas' {frmOptions} ,
   ufrmPhoneticOptions in 'Forms\ufrmPhoneticOptions.pas' {frmPhoneticOptions} ,
-  //uDiagPhoneticPage in 'Units\uDiagPhoneticPage.pas' ,
   ufrmPrevW in 'Forms\ufrmPrevW.pas' {frmPrevW} ,
   ufrmUpdateNotify in 'Forms\ufrmUpdateNotify.pas' {frmUpdateNotify} ,
   uLayoutViewer in 'Forms\uLayoutViewer.pas' {LayoutViewer} ,

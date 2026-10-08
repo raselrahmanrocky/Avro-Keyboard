@@ -46,11 +46,14 @@ unit uScrollBoxStyleHookFix;
     scrollbox, children included, is invalidated and erased - RDW_ERASE is the
     load-bearing flag, because it runs exactly the opaque erase above.
 
-    The continuous part of a thumb drag (SB_THUMBTRACK) is deliberately left
-    alone: the bit-blit ScrollWindow already performed is what the user sees
-    while the thumb is held, and repainting every child after each of those
-    messages is what made the text advance in irregular lumps instead of
-    following the pointer (see RepaintAfterScroll for the measurements).
+    The continuous part of a thumb drag (SB_THUMBTRACK) gets neither of those
+    two. The bit-blit ScrollWindow already performed is what the user sees while
+    the thumb is held, and repainting EVERY child after each of those messages
+    is what made the text advance in irregular lumps instead of following the
+    pointer (see RepaintAfterScroll for the measurements). What it gets instead
+    is the one strip the scroll uncovered, painted before the message returns -
+    see RepaintUncoveredBand, and the frame captures that made the case for
+    painting it immediately rather than leaving it to the next paint.
 
   Base class note: there is no TScrollingWinControlStyleHook in the VCL. The
   hierarchy is TStyleHook -> TScrollingStyleHook -> TScrollBoxStyleHook, all
@@ -419,7 +422,27 @@ end;
 
   The band is derived from the scroll position rather than from the message, so
   it works for the thumb, the wheel, the arrows, the keys and the touch
-  gestures alike. }
+  gestures alike.
+
+  RDW_UPDATENOW is the load-bearing flag here, and it is the one thing this
+  used to leave out. Without it the strip is only invalidated: ScrollWindow has
+  moved the page but the strip still holds the pixels of the content that used
+  to be there, and it keeps them until the queue gets around to the WM_PAINT.
+  A captured drag says exactly what that looks like on screen - the harness in
+  Units\uDiagScrollCapture.pas grabs the frame twice per step, once straight
+  after the scroll and once after the queue has been pumped, and every scroll
+  step moves the content while leaving a strip of the previous content behind
+  it (measured: with four scroll messages per repaint, all 16 "before the queue
+  was pumped" frames were wrong, by up to 32 rows spread over up to 5 bands,
+  against 0 of 16 "after" frames). That strip IS the "text breaks / half-drawn
+  line" that gets reported, the more so the faster the thumb is dragged, and
+  nothing short of painting it before this returns can remove it: leaving it to
+  the next paint is what produced it.
+
+  Painting the strip now is affordable where painting the whole box was not,
+  because the work is bounded by the controls the strip actually crosses rather
+  than by the page. The full-box path below stays without RDW_UPDATENOW and
+  stays out of the drag for exactly that reason; see its comment. }
 procedure TScrollBoxStyleHookFix.RepaintUncoveredBand;
 var
   Band: TRect;
@@ -452,8 +475,14 @@ begin
       Band := Rect(Control.ClientWidth - Dx, 0, Control.ClientWidth, Control.ClientHeight)
     else
       Band := Rect(0, 0, -Dx, Control.ClientHeight);
+    { RDW_ERASE - the strip gets the style's own surface colour under it before
+      anything is drawn on top (see PaintBackground), so no pixel of the old
+      content can survive underneath a control that does not cover every row of
+      the band.
+      RDW_UPDATENOW - paint it now, while the scroll is still being handled,
+      instead of leaving the stale pixels on screen until the next WM_PAINT. }
     RedrawWindow(Control.Handle, @Band, 0,
-      RDW_INVALIDATE or RDW_ERASE or RDW_ALLCHILDREN);
+      RDW_INVALIDATE or RDW_ERASE or RDW_ALLCHILDREN or RDW_UPDATENOW);
   end;
 
   if Dy <> 0 then
@@ -465,7 +494,7 @@ begin
     else
       Band := Rect(0, 0, Control.ClientWidth, -Dy);
     RedrawWindow(Control.Handle, @Band, 0,
-      RDW_INVALIDATE or RDW_ERASE or RDW_ALLCHILDREN);
+      RDW_INVALIDATE or RDW_ERASE or RDW_ALLCHILDREN or RDW_UPDATENOW);
   end;
 end;
 
