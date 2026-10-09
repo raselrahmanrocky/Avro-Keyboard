@@ -28,7 +28,7 @@ uses
 begin
   Application.Initialize;
   Application.MainFormOnTaskbar := True;
-  TStyleManager.TrySetStyle('Windows10');
+  uThemeManager.ApplyStoredAppTheme;
   Application.Title := 'Keyboard Layout Editor for Avro Keyboard';
   Application.CreateForm(TfrmMain, frmMain);
   Application.Run;

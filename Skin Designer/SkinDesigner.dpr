@@ -26,7 +26,7 @@ uses
 begin
   Application.Initialize;
   Application.MainFormOnTaskbar := True;
-  TStyleManager.TrySetStyle('Windows10');
+  uThemeManager.ApplyStoredAppTheme;
   Application.Title := 'Skin Designer';
   Application.CreateForm(TfrmSkinCreator, frmSkinCreator);
   Application.Run;

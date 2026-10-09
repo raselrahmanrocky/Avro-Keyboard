@@ -2401,12 +2401,13 @@ end;
 procedure TAvroMainForm1.HandleThemes;
 begin
   // The stored theme setting is the source of truth: SYSTEM follows Windows,
-  // LIGHT / DARK force the theme even when Windows disagrees. ApplyAppTheme
-  // also switches the VCL style (which is what makes the top bar popup menus
-  // and every dialog match) and caches the resolved theme for the hand-painted
-  // flyouts. Re-applying an unchanged theme is a no-op, because this runs after
-  // every settings change in the app.
-  ApplyAppTheme(AppThemeModeFromSetting(AppThemeMode));
+  // LIGHT / DARK force the built-in themes, and any other value names an
+  // embedded VCL style (what the Customize dialog's Theme list offers).
+  // ApplyAppThemeSetting also switches the VCL style (which is what makes the
+  // top bar popup menus and every dialog match) and caches the resolved theme
+  // for the hand-painted flyouts. Re-applying an unchanged theme is a no-op,
+  // because this runs after every settings change in the app.
+  ApplyAppThemeSetting(AppThemeMode);
 
   // Every caller of this method is a style-switch point: WM_SETTINGCHANGE
   // ('ImmersiveColorSet'), RefreshSettings (the Customize dialog's OK and

@@ -21,22 +21,31 @@ unit uThemeManager;
   use VCL controls for their visuals - the ANSI version picker and the
   layout picker draw every row themselves and used to be hardcoded light.
 
-  The stored mode is the source of truth: atmSystemDefault follows Windows
+  The stored mode is the source of truth: atmWindows (the application
+  default) is the plain native look, atmSystemDefault follows Windows
   (AppsUseLightTheme), while atmLight / atmDark force the theme even when
   Windows disagrees.
 
-  The registry is read in ApplyAppTheme only, never from a paint handler: the
-  resolved theme is cached here, and the pickers are created fresh on every
-  open, so they simply resolve the palette when they are shown. }
+  Besides the two built-ins, the stored setting may name ANY VCL style this
+  build embeds (Project Options -> Appearance -> Custom Styles). The Customize
+  dialog lists exactly the embedded styles (GetAppThemeStyleNames), and
+  ApplyAppThemeSetting applies the named style and re-derives the palette from
+  how dark that style actually is, so a custom style drives the hand-painted
+  surfaces too.
+
+  The registry is read in ApplyAppThemeSetting only, never from a paint
+  handler: the resolved theme is cached here, and the pickers are created
+  fresh on every open, so they simply resolve the palette when they are shown. }
 
 interface
 
 uses
   Winapi.Windows, // HWND, RGB()
+  System.Classes, // TStrings (GetAppThemeStyleNames)
   System.UITypes; // TColor
 
 type
-  TAppThemeMode = (atmSystemDefault, atmLight, atmDark);
+  TAppThemeMode = (atmWindows, atmSystemDefault, atmLight, atmDark);
 
   { One palette for every hand-painted surface. The first five colours are the
     documented theme contract (and are asserted literally by kat_engineswitch);
@@ -56,9 +65,10 @@ const
   APP_STYLE_LIGHT = 'Windows10';
   APP_STYLE_DARK  = 'Windows10 Dark';
 
-  APP_THEME_SETTING_SYSTEM = 'SYSTEM';
-  APP_THEME_SETTING_LIGHT  = 'LIGHT';
-  APP_THEME_SETTING_DARK   = 'DARK';
+  APP_THEME_SETTING_WINDOWS = 'WINDOWS';
+  APP_THEME_SETTING_SYSTEM  = 'SYSTEM';
+  APP_THEME_SETTING_LIGHT   = 'LIGHT';
+  APP_THEME_SETTING_DARK    = 'DARK';
 
   { Section name of the WM_SETTINGCHANGE broadcast sent after the stored
     AppThemeMode changes. Satellite tools listen for it in their
@@ -72,18 +82,38 @@ const
     Windows' own default. }
 function WindowsAppsUseLightTheme: Boolean;
 
-{ The effective theme for a mode. atmSystemDefault follows
-  ASystemUsesLightTheme; the locked modes ignore it. }
+{ The effective theme for a mode. atmWindows is always light (the plain
+  native look), atmSystemDefault follows ASystemUsesLightTheme; the locked
+  modes ignore it. }
 function ResolveAppTheme(AMode: TAppThemeMode; ASystemUsesLightTheme: Boolean): TAppThemeMode;
 
-{ Stored setting <-> mode. Empty or unknown values mean atmSystemDefault, so a
-  hand-edited registry value or XML file can never leave the app themeless. }
+{ Stored setting <-> mode. Empty or unknown values mean atmWindows (the plain
+  native look - the application default), so a hand-edited registry value or
+  XML file can never leave the app themeless. }
 function AppThemeModeFromSetting(const AValue: string): TAppThemeMode;
 function AppThemeModeToSetting(AMode: TAppThemeMode): string;
 
 { The captions of the options dropdown, defined once so the settings UI and any
   other surface cannot drift apart. }
 function AppThemeModeCaption(AMode: TAppThemeMode): string;
+
+{ Fills AList with the names of every VCL style embedded in this build - the
+  Project Options -> Appearance -> Custom Styles list - sorted, without the
+  'Windows' system style, which is not a style the user can pick. This is what
+  the Theme dropdown shows, so enabling a style in the IDE is all it takes for
+  it to appear. }
+procedure GetAppThemeStyleNames(AList: TStrings);
+
+{ True when AName is one of those embedded styles (case-insensitive). A style
+  that was embedded when the setting was written but has since been removed
+  from the project answers False, and the setting falls back to SYSTEM. }
+function IsEmbeddedAppStyle(const AName: string): Boolean;
+
+{ The VCL style a stored setting selects, fully resolved: WINDOWS maps to the
+  system style (the plain native look), SYSTEM follows Windows, LIGHT / DARK
+  map to the built-ins, an embedded style name passes through with its real
+  spelling, anything else behaves like WINDOWS. Never returns an empty string. }
+function AppStyleNameFromSetting(const AValue: string): string;
 
 { Palette of a RESOLVED theme (atmLight / atmDark); anything else is treated as
   light. }
@@ -99,11 +129,16 @@ function CurrentPalette: TAppThemePalette;
   result. This is the single entry point for the application. }
 procedure ApplyAppTheme(const AMode: TAppThemeMode);
 
-{ Persisted AppThemeMode ('SYSTEM'/'LIGHT'/'DARK') from the same store the
-  main app uses: HKCU\Software\OmicronLab\Avro Keyboard (installed) or
-  Settings.xml beside the exe (portable). Missing/garbage => atmSystemDefault.
-  Satellite tools (Layout Editor, Skin Designer, Avro Pad) use this so every
-  Avro window agrees with the Customize dialog, whatever Windows is doing. }
+{ The same, straight from the raw stored setting - the form the Customize
+  dialog writes and every satellite reads. Custom style names only make sense
+  here, which is why this (not ApplyAppTheme) is what the app calls. }
+procedure ApplyAppThemeSetting(const AValue: string);
+
+{ Persisted AppThemeMode from the same store the main app uses:
+  HKCU\Software\OmicronLab\Avro Keyboard (installed) or Settings.xml beside
+  the exe (portable). The raw string may be 'WINDOWS'/'SYSTEM'/'LIGHT'/'DARK'
+  or an embedded style name; missing/garbage behaves as WINDOWS. }
+function StoredAppThemeSetting: string;
 function StoredAppThemeMode: TAppThemeMode;
 procedure ApplyStoredAppTheme;
 
@@ -128,6 +163,7 @@ uses
   Xml.XMLIntf, // IXMLNode
   Vcl.Themes,
   Vcl.Forms,
+  Vcl.Graphics, // ColorToRGB, clBtnFace (ActiveStyleIsDark)
   Winapi.DwmApi,
   Winapi.Messages; // WM_SETTINGCHANGE lives here, not in Winapi.Windows
 
@@ -151,6 +187,10 @@ var
   // False until the first ApplyAppTheme, so the very first call always applies
   // even when its resolved theme happens to be the default light one.
   FApplied: Boolean = False;
+  // The VCL style last applied successfully, for the no-op guard: two settings
+  // that resolve to the same style must not restyle every form, and two
+  // DIFFERENT styles of the same brightness must.
+  FAppliedStyleName: string = '';
   // Attribute id that worked last, so the legacy fallback is probed once.
   FImmersiveAttr: DWORD = DWMWA_USE_IMMERSIVE_DARK_MODE;
 
@@ -184,6 +224,8 @@ end;
 function ResolveAppTheme(AMode: TAppThemeMode; ASystemUsesLightTheme: Boolean): TAppThemeMode;
 begin
   case AMode of
+    atmWindows:
+      Result := atmLight; // the plain native look is a light style
     atmLight:
       Result := atmLight; // forced, whatever Windows is set to
     atmDark:
@@ -198,17 +240,23 @@ end;
 
 function AppThemeModeFromSetting(const AValue: string): TAppThemeMode;
 begin
-  if SameText(AValue, APP_THEME_SETTING_LIGHT) then
+  if SameText(AValue, APP_THEME_SETTING_WINDOWS) then
+    Result := atmWindows
+  else if SameText(AValue, APP_THEME_SETTING_LIGHT) then
     Result := atmLight
   else if SameText(AValue, APP_THEME_SETTING_DARK) then
     Result := atmDark
+  else if SameText(AValue, APP_THEME_SETTING_SYSTEM) then
+    Result := atmSystemDefault
   else
-    Result := atmSystemDefault;
+    Result := atmWindows; // empty / hand-edited garbage: the app default
 end;
 
 function AppThemeModeToSetting(AMode: TAppThemeMode): string;
 begin
   case AMode of
+    atmWindows:
+      Result := APP_THEME_SETTING_WINDOWS;
     atmLight:
       Result := APP_THEME_SETTING_LIGHT;
     atmDark:
@@ -221,13 +269,112 @@ end;
 function AppThemeModeCaption(AMode: TAppThemeMode): string;
 begin
   case AMode of
+    atmWindows:
+      Result := 'Default'; // the plain native look, offered as the default
     atmLight:
       Result := 'Light Theme';
     atmDark:
       Result := 'Dark Theme';
     else
-      Result := 'System Default';
+      Result := 'System';
   end;
+end;
+
+{ =============================================================================== }
+{ Embedded styles (what the Theme dropdown can offer) }
+{ =============================================================================== }
+
+{ The style engine builds its system style lazily, and StyleNames reports it
+  as entry 0 - so a program that has never styled anything (the self-test, or
+  a build whose first TrySetStyle failed) would read a nil field there.
+  StyleServices is the getter every paint goes through; calling it once is
+  what creates the system style. }
+procedure EnsureStyleEngine;
+begin
+  StyleServices;
+end;
+
+procedure GetAppThemeStyleNames(AList: TStrings);
+var
+  Names: TArray<string>;
+  L:     TStringList;
+  S:     string;
+begin
+  EnsureStyleEngine;
+  // TStyleManager.StyleNames answers with the system style ('Windows') first
+  // and the rest in registration order; the dropdown wants only the embedded
+  // styles, in a stable order.
+  Names := TStyleManager.StyleNames;
+  L := TStringList.Create;
+  try
+    L.Sorted     := True;
+    L.CaseSensitive := False;
+    for S in Names do
+      if not SameText(S, TStyleManager.SystemStyleName) then
+        L.Add(S);
+
+    AList.BeginUpdate;
+    try
+      AList.Clear;
+      AList.AddStrings(L);
+    finally
+      AList.EndUpdate;
+    end;
+  finally
+    L.Free;
+  end;
+end;
+
+function IsEmbeddedAppStyle(const AName: string): Boolean;
+var
+  Names: TArray<string>;
+  S:     string;
+begin
+  Result := False;
+  if AName = '' then
+    Exit;
+  EnsureStyleEngine;
+  Names := TStyleManager.StyleNames;
+  for S in Names do
+    if (not SameText(S, TStyleManager.SystemStyleName)) and SameText(S, AName) then
+    begin
+      Result := True;
+      Exit;
+    end;
+end;
+
+function AppStyleNameFromSetting(const AValue: string): string;
+var
+  Names: TArray<string>;
+  S:     string;
+begin
+  if SameText(AValue, APP_THEME_SETTING_LIGHT) then
+    Exit(APP_STYLE_LIGHT);
+  if SameText(AValue, APP_THEME_SETTING_DARK) then
+    Exit(APP_STYLE_DARK);
+  if SameText(AValue, APP_THEME_SETTING_WINDOWS) then
+    Exit(TStyleManager.SystemStyleName);
+
+  if SameText(AValue, APP_THEME_SETTING_SYSTEM) then
+  begin
+    // Follow Windows, exactly as this setting always has.
+    if WindowsAppsUseLightTheme then
+      Exit(APP_STYLE_LIGHT)
+    else
+      Exit(APP_STYLE_DARK);
+  end;
+
+  // Anything else is a custom style name - hand back the embedded spelling of
+  // the name, so the string we pass to TrySetStyle matches the resource
+  // whatever case the store holds.
+  EnsureStyleEngine;
+  Names := TStyleManager.StyleNames;
+  for S in Names do
+    if SameText(S, AValue) then
+      Exit(S);
+
+  // Empty, or a style this build no longer embeds: the plain native look.
+  Result := TStyleManager.SystemStyleName;
 end;
 
 { =============================================================================== }
@@ -305,30 +452,58 @@ begin
   end;
 end;
 
-procedure ApplyAppTheme(const AMode: TAppThemeMode);
+{ How dark the style that is active right now is, measured rather than
+  assumed: a dark style resolves clBtnFace to a dark grey, a light one to a
+  light grey. This is what lets ANY embedded style - not only the two
+  built-ins - drive the hand-painted palettes and the window frame. AFallback
+  is the mode-based guess, used when the style engine has no active style to
+  ask. (IsSystemStyle cannot be used: it is True only for the native system
+  style, while this app always activates a custom style.) }
+function ActiveStyleIsDark(const AFallback: Boolean): Boolean;
 var
-  Resolved:  TAppThemeMode;
+  Face: TColor;
+begin
+  if not StyleServices.Enabled then
+    Exit(AFallback);
+  Face := ColorToRGB(StyleServices.GetSystemColor(clBtnFace));
+  Result := (GetRValue(Face) + GetGValue(Face) + GetBValue(Face)) < 384;
+end;
+
+procedure ApplyAppThemeSetting(const AValue: string);
+var
   StyleName: string;
   Dark:      Boolean;
 begin
-  Resolved := ResolveAppTheme(AMode, WindowsAppsUseLightTheme);
-  if FApplied and (FResolvedMode = Resolved) then
+  StyleName := AppStyleNameFromSetting(AValue);
+  if FApplied and SameText(FAppliedStyleName, StyleName) then
     // RefreshSettings runs after every toggle in the app; re-applying the same
     // VCL style would restyle every form for nothing.
     Exit;
-  FResolvedMode := Resolved;
   FApplied := True;
-  Dark := Resolved = atmDark;
-
-  if Dark then
-    StyleName := APP_STYLE_DARK
-  else
-    StyleName := APP_STYLE_LIGHT;
 
   // False = never show the VCL "Style not found" dialog; a build without the
-  // embedded styles degrades to the light style instead of failing.
-  if not TStyleManager.TrySetStyle(StyleName, False) then
-    TStyleManager.TrySetStyle(APP_STYLE_LIGHT, False);
+  // embedded style degrades to the light style instead of failing.
+  if TStyleManager.TrySetStyle(StyleName, False) then
+    FAppliedStyleName := StyleName
+  else if TStyleManager.TrySetStyle(APP_STYLE_LIGHT, False) then
+    FAppliedStyleName := APP_STYLE_LIGHT
+  else
+    // Nothing we recognise is active: never short-circuit the next attempt.
+    FAppliedStyleName := '';
+
+  // The palette follows the style that actually got applied - including the
+  // WindowsAppsUseLightTheme pick for SYSTEM, which the brightness of
+  // Windows10 / Windows10 Dark reflects anyway. WINDOWS (and anything that
+  // resolves to it) is always light: the native system style stays light even
+  // when Windows itself is dark, so the measurement must not override it.
+  if AppThemeModeFromSetting(AValue) = atmWindows then
+    Dark := False
+  else
+    Dark := ActiveStyleIsDark(AppThemeModeFromSetting(AValue) = atmDark);
+  if Dark then
+    FResolvedMode := atmDark
+  else
+    FResolvedMode := atmLight;
 
   // Frame of our own windows (the Customize dialog while Apply is pressed).
   // A styled window draws its own caption, so this is invisible there; it is
@@ -337,6 +512,11 @@ begin
     ApplyImmersiveDarkMode(Screen.ActiveForm.Handle, Dark);
   if Assigned(Application.MainForm) then
     ApplyImmersiveDarkMode(Application.MainForm.Handle, Dark);
+end;
+
+procedure ApplyAppTheme(const AMode: TAppThemeMode);
+begin
+  ApplyAppThemeSetting(AppThemeModeToSetting(AMode));
 end;
 
 { =============================================================================== }
@@ -390,17 +570,17 @@ begin
 end;
 {$ENDIF}
 
-function StoredAppThemeMode: TAppThemeMode;
+function StoredAppThemeSetting: string;
 {$IFDEF PortableOn}
 begin
-  Result := AppThemeModeFromSetting(PortableAppThemeSetting);
+  Result := PortableAppThemeSetting;
 end;
 {$ELSE}
 
 var
   Reg: TRegistry;
 begin
-  Result := atmSystemDefault;
+  Result := '';
   Reg := nil;
   try
     Reg := TRegistry.Create(KEY_READ);
@@ -408,22 +588,29 @@ begin
     if Reg.OpenKey(AVRO_SETTING_KEY, False) then
       try
         if Reg.ValueExists(AVRO_SETTING_VALUE) then
-          Result := AppThemeModeFromSetting(Reg.ReadString(AVRO_SETTING_VALUE));
+          Result := Trim(Reg.ReadString(AVRO_SETTING_VALUE));
       finally
         Reg.CloseKey;
       end;
   except
     // Wrong value type or a locked-down hive must never break theming:
-    // fall back to SYSTEM.
-    Result := atmSystemDefault;
+    // fall back to '' (= SYSTEM).
+    Result := '';
   end;
   Reg.Free;
 end;
 {$ENDIF}
 
+function StoredAppThemeMode: TAppThemeMode;
+begin
+  Result := AppThemeModeFromSetting(StoredAppThemeSetting);
+end;
+
 procedure ApplyStoredAppTheme;
 begin
-  ApplyAppTheme(StoredAppThemeMode);
+  // The raw string, not StoredAppThemeMode: a custom style name is not one of
+  // the three modes and would be flattened to SYSTEM on the way through.
+  ApplyAppThemeSetting(StoredAppThemeSetting);
 end;
 
 procedure BroadcastAppThemeChanged;

@@ -63,7 +63,7 @@ begin
 
   Application.Initialize;
   Application.MainFormOnTaskbar := True;
-  TStyleManager.TrySetStyle('Windows10');
+  uThemeManager.ApplyStoredAppTheme;
   Application.Title := 'Avro Spell Checker';
   Application.CreateForm(TfrmSpell, frmSpell);
   Application.Run;

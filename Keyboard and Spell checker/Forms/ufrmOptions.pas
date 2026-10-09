@@ -809,11 +809,14 @@ begin
 
   // =======================================================
   // Theme selector (Interface Settings page, control created in the DFM).
-  // Items are added in TAppThemeMode order, so the item index IS the mode.
-  cboAppTheme.Items.Clear;
-  cboAppTheme.Items.Add(AppThemeModeCaption(atmSystemDefault));
-  cboAppTheme.Items.Add(AppThemeModeCaption(atmLight));
-  cboAppTheme.Items.Add(AppThemeModeCaption(atmDark));
+  // Item 0 is "Default" (the plain native look - what every fresh install
+  // starts with), item 1 is "System" (follow Windows), and every item after
+  // that IS the name of a VCL style this build embeds (Project Options ->
+  // Appearance -> Custom Styles), so enabling a style in the IDE is all it
+  // takes for it to show up here.
+  GetAppThemeStyleNames(cboAppTheme.Items);
+  cboAppTheme.Items.Insert(0, AppThemeModeCaption(atmSystemDefault));
+  cboAppTheme.Items.Insert(0, AppThemeModeCaption(atmWindows));
 
   // Load Settings (AFTER controls are created)
   Self.LoadSettings;
@@ -953,8 +956,22 @@ begin
 
   TrackBar_Transparency.Position := StrToInt(TopBarTransparencyLevel);
 
-  // Application theme: SYSTEM follows Windows, LIGHT / DARK force the theme.
-  cboAppTheme.ItemIndex := Ord(AppThemeModeFromSetting(AppThemeMode));
+  // Application theme: item 0 is "Default" (plain native look), item 1 is
+  // "System" (follow Windows), every other item is a VCL style name. LIGHT /
+  // DARK are mapped to their built-in style so a setting written before this
+  // list became dynamic still lands on the right row; GetListIndex answers 0
+  // for a style that is no longer embedded, which is exactly the fallback we
+  // want (the plain Windows look).
+  if (AppThemeMode = '') or SameText(AppThemeMode, APP_THEME_SETTING_WINDOWS) then
+    cboAppTheme.ItemIndex := 0
+  else if SameText(AppThemeMode, APP_THEME_SETTING_SYSTEM) then
+    cboAppTheme.ItemIndex := 1
+  else if SameText(AppThemeMode, APP_THEME_SETTING_LIGHT) then
+    cboAppTheme.ItemIndex := GetListIndex(cboAppTheme.Items, APP_STYLE_LIGHT)
+  else if SameText(AppThemeMode, APP_THEME_SETTING_DARK) then
+    cboAppTheme.ItemIndex := GetListIndex(cboAppTheme.Items, APP_STYLE_DARK)
+  else
+    cboAppTheme.ItemIndex := GetListIndex(cboAppTheme.Items, AppThemeMode);
 
   { Load Skin Names }
   Skins := TStringList.Create;
@@ -1428,13 +1445,22 @@ begin
   else
     ShowShortcutKeysOnMenu := 'NO';
 
-  // Application theme (Interface Settings). The combo items are in
-  // TAppThemeMode order; a missing selection means "follow Windows".
+  // Application theme (Interface Settings). Item 0 ("Default") is the plain
+  // native look and the application default; item 1 ("System") follows
+  // Windows; every other item is a VCL style name, with the two built-ins
+  // stored as LIGHT / DARK so a build that does not know about the dynamic
+  // list still reads them back correctly. A missing selection means "Default".
   // AvroMainForm1.RefreshSettings then applies it to the whole application.
-  if cboAppTheme.ItemIndex < 0 then
-    AppThemeMode := AppThemeModeToSetting(atmSystemDefault)
+  if cboAppTheme.ItemIndex <= 0 then
+    AppThemeMode := APP_THEME_SETTING_WINDOWS
+  else if cboAppTheme.ItemIndex = 1 then
+    AppThemeMode := APP_THEME_SETTING_SYSTEM
+  else if SameText(cboAppTheme.Items[cboAppTheme.ItemIndex], APP_STYLE_LIGHT) then
+    AppThemeMode := APP_THEME_SETTING_LIGHT
+  else if SameText(cboAppTheme.Items[cboAppTheme.ItemIndex], APP_STYLE_DARK) then
+    AppThemeMode := APP_THEME_SETTING_DARK
   else
-    AppThemeMode := AppThemeModeToSetting(TAppThemeMode(cboAppTheme.ItemIndex));
+    AppThemeMode := cboAppTheme.Items[cboAppTheme.ItemIndex];
 
   uRegistrySettings.SaveSettings;
 end;

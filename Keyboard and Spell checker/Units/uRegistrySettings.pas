@@ -43,8 +43,9 @@ var
   InterfaceSkin:           string;
   TrayHintShowTimes:       string;
   TopHintShowTimes:        string;
-  // Application theme: 'SYSTEM' (follow Windows), 'LIGHT' or 'DARK'. Drives
-  // both the VCL style and the hand-painted flyout palettes (uThemeManager).
+  // Application theme: 'SYSTEM' (follow Windows), 'LIGHT', 'DARK', or the
+  // name of an embedded VCL style ('Glow', ...). Drives both the VCL style
+  // and the hand-painted flyout palettes (uThemeManager).
   AppThemeMode: string;
 
   // Webbuddy Options
@@ -235,7 +236,10 @@ begin
   TopBarTransparent := XML.GetValue('TopBarTransparent', 'YES');
   TrayHintShowTimes := XML.GetValue('TrayHintShowTimes', '0');
   TopHintShowTimes := XML.GetValue('TopHintShowTimes', '0');
-  AppThemeMode := UpperCase(XML.GetValue('AppThemeMode', APP_THEME_SETTING_SYSTEM));
+  // Not upper-cased: the value may be a VCL style name ('Glow', 'Sky'), whose
+  // spelling has to survive the round trip. SYSTEM / LIGHT / DARK are matched
+  // case-insensitively wherever they are compared.
+  AppThemeMode := Trim(XML.GetValue('AppThemeMode', APP_THEME_SETTING_WINDOWS));
 
   // Webbuddy Options
   AvroUpdateCheck := UpperCase(XML.GetValue('AvroUpdateCheck', 'Yes'));
@@ -440,7 +444,7 @@ begin
         TopBarTransparent := Reg.ReadStringDef('TopBarTransparent', 'YES');
         TrayHintShowTimes := Reg.ReadStringDef('TrayHintShowTimes', '0');
         TopHintShowTimes := Reg.ReadStringDef('TopHintShowTimes', '0');
-        AppThemeMode := UpperCase(Reg.ReadStringDef('AppThemeMode', APP_THEME_SETTING_SYSTEM));
+        AppThemeMode := Trim(Reg.ReadStringDef('AppThemeMode', APP_THEME_SETTING_WINDOWS));
 
         // Hotkey settings
         ModeSwitchKey := UpperCase(Reg.ReadStringDef('ModeSwitchKey', 'F12'));
@@ -674,7 +678,7 @@ begin
   Need(TopBarTransparencyLevel, '80');
   Need(TrayHintShowTimes, '0');
   Need(TopHintShowTimes, '0');
-  Need(AppThemeMode, APP_THEME_SETTING_SYSTEM);
+  Need(AppThemeMode, APP_THEME_SETTING_WINDOWS);
   Need(AvroUpdateCheck, 'YES');
   Need(CheckBetaUpdates, 'NO');
   Need(PhoneticAutoCorrect, 'YES');
@@ -773,9 +777,14 @@ begin
   if not((TopBarTransparent = 'YES') or (TopBarTransparent = 'NO')) then
     TopBarTransparent := 'YES';
 
-  // Application theme: anything unexpected falls back to following Windows.
-  if not((AppThemeMode = APP_THEME_SETTING_SYSTEM) or (AppThemeMode = APP_THEME_SETTING_LIGHT) or (AppThemeMode = APP_THEME_SETTING_DARK)) then
-    AppThemeMode := APP_THEME_SETTING_SYSTEM;
+  // Application theme: WINDOWS (the plain native look - the default),
+  // SYSTEM / LIGHT / DARK, or the name of a VCL style this build embeds (what
+  // the Theme dropdown offers). Anything else - a style that was removed from
+  // the project, a hand-edited typo - falls back to the plain Windows look.
+  // uThemeManager performs the embedded-style check.
+  if not(SameText(AppThemeMode, APP_THEME_SETTING_WINDOWS) or SameText(AppThemeMode, APP_THEME_SETTING_SYSTEM) or SameText(AppThemeMode, APP_THEME_SETTING_LIGHT) or
+      SameText(AppThemeMode, APP_THEME_SETTING_DARK) or IsEmbeddedAppStyle(AppThemeMode)) then
+    AppThemeMode := APP_THEME_SETTING_WINDOWS;
 
   // Keyboard Mode settings
   // No restrictive validation - the hotkey recording UI ensures only valid
