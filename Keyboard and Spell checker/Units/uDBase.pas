@@ -406,8 +406,7 @@ begin
     FDConnection1.Params.Values['Database'] := GetAvroDataDir + 'Database.db3';
 
     try
-      try
-        { Open belongs INSIDE the guarded region: a corrupt Database.db3 makes
+      { Open belongs INSIDE the guarded region: a corrupt Database.db3 makes
           the driver raise right here ("file is not a database"), and an
           exception escaping this procedure is swallowed by Application.OnException
           with no dialog - startup would abort mid-way and FDatabaseLoading would
@@ -466,7 +465,19 @@ begin
 
         LoadSuffix;
 
-        FDatabase.Close;
+        { FDatabase is only an alias for the TSQLiteDatabase that FDConnection1
+          owns internally (its CliObj). The old code freed it here, leaving the
+          still-registered connection with a dangling CliObj; FireDAC's own
+          finalization then freed that pointer a second time during
+          DLL_PROCESS_DETACH under the loader lock, and the access violation
+          hung the shutdown - Avro_Spell_Checker.exe / AvroSpell.dll stayed
+          alive and locked ("File in Use"). Drop the alias and release the
+          connection instead: destroying it disconnects, which frees the
+          TSQLiteDatabase and closes Database.db3 just as FDatabase.Close did,
+          and leaves nothing registered for FireDAC's finalization to close. }
+        FDatabase := nil;
+        FreeAndNil(FDConnection1);
+        FreeAndNil(FDPhysSQLiteDriverLink1);
 
         {$IF NOT (Defined(SpellChecker) OR Defined(SpellCheckerDll))}
         AvroMainForm1.TrimAppMemorySize;
@@ -477,10 +488,10 @@ begin
       except
         on E: Exception do
         begin
-          { The handle belongs to the connection - drop the reference before
-            the finally below, so nothing is freed twice when the connection
-            is released here. FDatabaseLoaded stays False, so the next settings
-            refresh tries again (and reports this dialog only once). }
+          { The handle belongs to the connection - drop our alias before the
+            connection is released here, so nothing keeps pointing at the
+            TSQLiteDatabase it owns. FDatabaseLoaded stays False, so the next
+            settings refresh tries again (and reports this dialog only once). }
           FDatabase := nil;
           FreeAndNil(FDConnection1);
           FreeAndNil(FDPhysSQLiteDriverLink1);
@@ -494,9 +505,6 @@ begin
           end;
         end;
       end;
-    finally
-      FreeAndNil(FDatabase);
-    end;
   end
   else
   begin
