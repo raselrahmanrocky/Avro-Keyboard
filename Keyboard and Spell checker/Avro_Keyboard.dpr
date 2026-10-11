@@ -39,6 +39,7 @@ uses
   ufrmLayoutToast in 'Forms\ufrmLayoutToast.pas',
   ufrmAnsiToast in 'Forms\ufrmAnsiToast.pas',
   ufrmAvroMouse in 'Forms\ufrmAvroMouse.pas' {frmAvroMouse} ,
+  uMouseKeyFace in 'Units\uMouseKeyFace.pas',
   ufrmOptions in 'Forms\ufrmOptions.pas' {frmOptions} ,
   ufrmPhoneticOptions in 'Forms\ufrmPhoneticOptions.pas' {frmPhoneticOptions} ,
   ufrmPrevW in 'Forms\ufrmPrevW.pas' {frmPrevW} ,
