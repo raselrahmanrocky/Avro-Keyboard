@@ -28,7 +28,10 @@ unit uThemeManager;
 
   Besides the two built-ins, the stored setting may name ANY VCL style this
   build embeds (Project Options -> Appearance -> Custom Styles). The Customize
-  dialog lists exactly the embedded styles (GetAppThemeStyleNames), and
+  dialog lists exactly the embedded styles (GetAppThemeStyleNames), naming the two
+  built-ins after what they are - Light Theme / Dark Theme (see AppStyleCaption,
+  and AppThemeSettingFromCaption for why that wording never reaches the setting)
+  and every other style after itself, and
   ApplyAppThemeSetting applies the named style and re-derives the palette from
   how dark that style actually is, so a custom style drives the hand-painted
   surfaces too.
@@ -65,6 +68,7 @@ const
   APP_STYLE_LIGHT = 'Windows10';
   APP_STYLE_DARK  = 'Windows10 Dark';
 
+
   APP_THEME_SETTING_WINDOWS = 'WINDOWS';
   APP_THEME_SETTING_SYSTEM  = 'SYSTEM';
   APP_THEME_SETTING_LIGHT   = 'LIGHT';
@@ -96,6 +100,17 @@ function AppThemeModeToSetting(AMode: TAppThemeMode): string;
 { The captions of the options dropdown, defined once so the settings UI and any
   other surface cannot drift apart. }
 function AppThemeModeCaption(AMode: TAppThemeMode): string;
+
+{ Caption of an embedded VCL style in the Theme dropdown: the two built-ins show
+  up as Light Theme / Dark Theme, because their style names say nothing about which
+  is which, and every other style is listed under its own name, unchanged. }
+function AppStyleCaption(const AStyleName: string): string;
+
+{ The setting a Theme-dropdown caption stores: the hinted built-ins map back to
+  LIGHT / DARK, every other caption to the style name it is. The dropdown's own
+  wording is therefore never written into AppThemeMode, and re-wording the list
+  cannot change what an existing installation had selected. }
+function AppThemeSettingFromCaption(const ACaption: string): string;
 
 { Fills AList with the names of every VCL style embedded in this build - the
   Project Options -> Appearance -> Custom Styles list - sorted, without the
@@ -278,6 +293,31 @@ begin
     else
       Result := 'System';
   end;
+end;
+
+function AppStyleCaption(const AStyleName: string): string;
+begin
+  // AppThemeModeCaption, not AStyleName, spells the two built-ins: the caption has
+  // to be the same string AppThemeSettingFromCaption recognises later, and the
+  // style engine's own casing is not part of the contract. One consequence, the
+  // price of not naming the style here: an embedded style literally called
+  // 'Light Theme' or 'Dark Theme' would be shadowed by the built-in row.
+  if SameText(AStyleName, APP_STYLE_LIGHT) then
+    Result := AppThemeModeCaption(atmLight)
+  else if SameText(AStyleName, APP_STYLE_DARK) then
+    Result := AppThemeModeCaption(atmDark)
+  else
+    Result := AStyleName;
+end;
+
+function AppThemeSettingFromCaption(const ACaption: string): string;
+begin
+  if SameText(ACaption, AppStyleCaption(APP_STYLE_LIGHT)) then
+    Result := APP_THEME_SETTING_LIGHT
+  else if SameText(ACaption, AppStyleCaption(APP_STYLE_DARK)) then
+    Result := APP_THEME_SETTING_DARK
+  else
+    Result := ACaption; // an embedded style, stored under its own name
 end;
 
 { =============================================================================== }

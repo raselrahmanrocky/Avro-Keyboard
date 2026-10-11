@@ -575,6 +575,8 @@ const
   EDIT_WIDTH    = 180;
   GROUP_HEIGHT  = 75;
   GROUP_SPACING = 12;
+var
+  I: Integer;
 begin
 
   { Arrange Panels }
@@ -811,10 +813,14 @@ begin
   // Theme selector (Interface Settings page, control created in the DFM).
   // Item 0 is "Default" (the plain native look - what every fresh install
   // starts with), item 1 is "System" (follow Windows), and every item after
-  // that IS the name of a VCL style this build embeds (Project Options ->
+  // that is the caption of a VCL style this build embeds (Project Options ->
   // Appearance -> Custom Styles), so enabling a style in the IDE is all it
-  // takes for it to show up here.
+  // takes for it to show up here. The two built-ins are listed as what they are,
+  // "Light Theme" and "Dark Theme", since their style names say nothing about
+  // which is which (AppStyleCaption).
   GetAppThemeStyleNames(cboAppTheme.Items);
+  for I := 0 to cboAppTheme.Items.Count - 1 do
+    cboAppTheme.Items[I] := AppStyleCaption(cboAppTheme.Items[I]);
   cboAppTheme.Items.Insert(0, AppThemeModeCaption(atmSystemDefault));
   cboAppTheme.Items.Insert(0, AppThemeModeCaption(atmWindows));
 
@@ -957,21 +963,24 @@ begin
   TrackBar_Transparency.Position := StrToInt(TopBarTransparencyLevel);
 
   // Application theme: item 0 is "Default" (plain native look), item 1 is
-  // "System" (follow Windows), every other item is a VCL style name. LIGHT /
-  // DARK are mapped to their built-in style so a setting written before this
-  // list became dynamic still lands on the right row; GetListIndex answers 0
-  // for a style that is no longer embedded, which is exactly the fallback we
-  // want (the plain Windows look).
+  // "System" (follow Windows), every other item is a style caption - "Light
+  // Theme" / "Dark Theme" for the two built-ins, its own name for anything else
+  // (AppStyleCaption). LIGHT / DARK are mapped to their built-in style so a
+  // setting written before this list became dynamic still lands on the right row;
+  // GetListIndex answers 0 for a style that is no longer embedded, which is
+  // exactly the fallback we want (the plain Windows look).
   if (AppThemeMode = '') or SameText(AppThemeMode, APP_THEME_SETTING_WINDOWS) then
     cboAppTheme.ItemIndex := 0
   else if SameText(AppThemeMode, APP_THEME_SETTING_SYSTEM) then
     cboAppTheme.ItemIndex := 1
   else if SameText(AppThemeMode, APP_THEME_SETTING_LIGHT) then
-    cboAppTheme.ItemIndex := GetListIndex(cboAppTheme.Items, APP_STYLE_LIGHT)
+    cboAppTheme.ItemIndex := GetListIndex(cboAppTheme.Items, AppStyleCaption(APP_STYLE_LIGHT))
   else if SameText(AppThemeMode, APP_THEME_SETTING_DARK) then
-    cboAppTheme.ItemIndex := GetListIndex(cboAppTheme.Items, APP_STYLE_DARK)
+    cboAppTheme.ItemIndex := GetListIndex(cboAppTheme.Items, AppStyleCaption(APP_STYLE_DARK))
   else
-    cboAppTheme.ItemIndex := GetListIndex(cboAppTheme.Items, AppThemeMode);
+    // An embedded style name - AppStyleCaption gives it its hinted caption when
+    // it is one of the two built-ins, and the name itself otherwise.
+    cboAppTheme.ItemIndex := GetListIndex(cboAppTheme.Items, AppStyleCaption(AppThemeMode));
 
   { Load Skin Names }
   Skins := TStringList.Create;
@@ -1447,20 +1456,18 @@ begin
 
   // Application theme (Interface Settings). Item 0 ("Default") is the plain
   // native look and the application default; item 1 ("System") follows
-  // Windows; every other item is a VCL style name, with the two built-ins
-  // stored as LIGHT / DARK so a build that does not know about the dynamic
-  // list still reads them back correctly. A missing selection means "Default".
+  // Windows; every other item is a style caption, which AppThemeSettingFromCaption
+  // turns into the setting: "Light Theme" / "Dark Theme" as LIGHT / DARK, so a
+  // build that does not know about the dynamic list still reads them back
+  // correctly, and any other style under its own name. A missing selection means
+  // "Default".
   // AvroMainForm1.RefreshSettings then applies it to the whole application.
   if cboAppTheme.ItemIndex <= 0 then
     AppThemeMode := APP_THEME_SETTING_WINDOWS
   else if cboAppTheme.ItemIndex = 1 then
     AppThemeMode := APP_THEME_SETTING_SYSTEM
-  else if SameText(cboAppTheme.Items[cboAppTheme.ItemIndex], APP_STYLE_LIGHT) then
-    AppThemeMode := APP_THEME_SETTING_LIGHT
-  else if SameText(cboAppTheme.Items[cboAppTheme.ItemIndex], APP_STYLE_DARK) then
-    AppThemeMode := APP_THEME_SETTING_DARK
   else
-    AppThemeMode := cboAppTheme.Items[cboAppTheme.ItemIndex];
+    AppThemeMode := AppThemeSettingFromCaption(cboAppTheme.Items[cboAppTheme.ItemIndex]);
 
   uRegistrySettings.SaveSettings;
 end;
