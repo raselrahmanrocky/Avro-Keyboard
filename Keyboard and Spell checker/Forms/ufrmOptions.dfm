@@ -397,7 +397,7 @@ object frmOptions: TfrmOptions
         Margins.Top = 5
         Margins.Right = 5
         Margins.Bottom = 5
-        Caption = 'Output as Unicode (Recommended)'
+        Caption = 'Output as Unicode'
         Font.Charset = DEFAULT_CHARSET
         Font.Color = clBtnText
         Font.Height = -17
@@ -415,7 +415,7 @@ object frmOptions: TfrmOptions
         Margins.Top = 5
         Margins.Right = 5
         Margins.Bottom = 5
-        Caption = 'Output as ANSI (Experimental)'
+        Caption = 'Output as ANSI'
         Font.Charset = DEFAULT_CHARSET
         Font.Color = clBtnText
         Font.Height = -17
