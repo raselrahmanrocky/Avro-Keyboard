@@ -859,7 +859,7 @@ begin
   // duplicate a higher-priority one.
   DeduplicateHotkeys;
 
-  // ANSI Mapping Version: leave '' / 'Default' as-is (unknown). LoadApp
+  // ANSI Encoding Version: leave '' / 'Default' as-is (unknown). LoadApp
   // migrates once to FirstAvailableMappingName and persists that name;
   // never coerce empty back to a compiled-in Default version.
 end;

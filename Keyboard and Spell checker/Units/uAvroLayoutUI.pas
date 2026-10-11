@@ -190,7 +190,7 @@ begin
     end
     else
     begin
-      SaveDialog.Filter := 'ANSI Mapping JSON|*.json';
+      SaveDialog.Filter := 'ANSI Encoding JSON|*.json';
       SaveDialog.DefaultExt := 'json';
     end;
     SaveDialog.Title := 'Export ' + AMapName + ' Mapping';

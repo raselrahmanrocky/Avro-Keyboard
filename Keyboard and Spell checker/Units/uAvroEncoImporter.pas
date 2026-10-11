@@ -476,7 +476,7 @@ begin
   try
     OpenDialog.Filter := 'Avro Encoded Mapping|*.AvroEnco';
     OpenDialog.DefaultExt := 'AvroEnco';
-    OpenDialog.Title := 'Import Avro Encoded ANSI Mapping';
+    OpenDialog.Title := 'Import Avro Encoded ANSI Encoding';
     OpenDialog.Options := OpenDialog.Options + [ofAllowMultiSelect, ofFileMustExist];
 
     if OpenDialog.Execute then

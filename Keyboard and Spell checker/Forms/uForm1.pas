@@ -2352,7 +2352,7 @@ begin
     OutputasANSIAreyousure2.Checked := False;
   end;
 
-  // ANSI Mapping version (engines are already preloaded; this switch is O(1)).
+  // ANSI Encoding version (engines are already preloaded; this switch is O(1)).
   // No compiled-in Default: migrate empty / Default / missing-file to the
   // first usable file mapping, or stay on Unicode with none.
   AnsiMappingDir := GetAvroDataDir + 'AnsiMapping\';
@@ -3420,7 +3420,7 @@ begin
         begin
           FActiveMappingLastWriteTime := MapWriteTime;
           AnsiEngineManager.InvalidateEngine(AnsiVersion);
-          Log('ANSI Mapping Auto-Refreshed: ' + AnsiVersion);
+          Log('ANSI Encoding Auto-Refreshed: ' + AnsiVersion);
         end;
       except
         // file missing or locked - the next throttled tick simply retries
@@ -3712,9 +3712,9 @@ var
 begin
   OpenDialog := TOpenDialog.Create(nil);
   try
-    OpenDialog.Filter := 'ANSI Mapping|*.json;*.AvroEnco';
+    OpenDialog.Filter := 'ANSI Encoding|*.json;*.AvroEnco';
     OpenDialog.DefaultExt := 'AvroEnco';
-    OpenDialog.Title := 'Import ANSI Mapping';
+    OpenDialog.Title := 'Import ANSI Encoding';
     OpenDialog.Options := OpenDialog.Options + [ofAllowMultiSelect, ofFileMustExist];
 
     if OpenDialog.Execute then

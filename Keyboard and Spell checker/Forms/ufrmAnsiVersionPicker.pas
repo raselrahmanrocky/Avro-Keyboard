@@ -697,7 +697,7 @@ begin
   TargetPath := GetActiveEncoFilePath(ASelectedVersion, AnsiMappingDir);
   if TargetPath = '' then
   begin
-    Application.MessageBox(PChar('Mapping file not found: ' + ASelectedVersion), 'ANSI Mapping Error', MB_ICONWARNING or MB_OK or MB_TOPMOST or
+    Application.MessageBox(PChar('Mapping file not found: ' + ASelectedVersion), 'ANSI Encoding Error', MB_ICONWARNING or MB_OK or MB_TOPMOST or
         MB_SETFOREGROUND);
     Exit;
   end;
@@ -940,7 +940,7 @@ begin
       end
       else
       begin
-        SaveDlg.Filter := 'ANSI Mapping JSON|*.json';
+        SaveDlg.Filter := 'ANSI Encoding JSON|*.json';
         SaveDlg.DefaultExt := 'json';
       end;
       SaveDlg.Title := 'Export ' + MapName + ' Mapping';
