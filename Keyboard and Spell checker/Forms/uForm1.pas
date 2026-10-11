@@ -548,7 +548,7 @@ end;
 
 procedure TAvroMainForm1.AvroKeyboardonFacebook1Click(Sender: TObject);
 begin
-  Execute_Something('https://www.omicronlab.com/go.php?id=39');
+  Execute_Something('https://www.facebook.com/AvroCommunity');
 end;
 
 procedure TAvroMainForm1.AvroMouseClicknType2Click(Sender: TObject);

@@ -1358,7 +1358,7 @@ object AvroMainForm1: TAvroMainForm1
       OnClick = UserForum1Click
     end
     object AvroKeyboardonFacebook1: TMenuItem
-      Caption = 'Avro on Facebook (Official)'
+      Caption = 'Avro Community on Facebook'
       ImageIndex = 29
       OnClick = AvroKeyboardonFacebook1Click
     end
