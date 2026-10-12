@@ -134,6 +134,7 @@ type
     Helpfiles2: TMenuItem;
     N39: TMenuItem;
     GetAcrobatReader3: TMenuItem;
+    AvroKeyboardonFacebook2: TMenuItem;
     Aboutcurrentkeyboardlayout2: TMenuItem;
     Options2: TMenuItem;
     FixedKeyboardLayout1: TMenuItem;

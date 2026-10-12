@@ -136,9 +136,9 @@ object frmAutoCorrect: TfrmAutoCorrect
     OnSelectItem = ListSelectItem
   end
   object cmdSave: TButton
-    Left = 216
+    Left = 240
     Top = 509
-    Width = 113
+    Width = 104
     Height = 36
     Margins.Left = 5
     Margins.Top = 5
@@ -150,9 +150,9 @@ object frmAutoCorrect: TfrmAutoCorrect
     OnClick = cmdSaveClick
   end
   object cmdCancel: TButton
-    Left = 338
+    Left = 354
     Top = 509
-    Width = 112
+    Width = 105
     Height = 36
     Margins.Left = 5
     Margins.Top = 5
@@ -299,7 +299,7 @@ object frmAutoCorrect: TfrmAutoCorrect
   object cmdImport: TButton
     Left = 12
     Top = 509
-    Width = 134
+    Width = 104
     Height = 36
     Margins.Left = 5
     Margins.Top = 5
@@ -309,11 +309,31 @@ object frmAutoCorrect: TfrmAutoCorrect
     TabOrder = 10
     OnClick = cmdImportClick
   end
+  object cmdExport: TButton
+    Left = 126
+    Top = 509
+    Width = 104
+    Height = 36
+    Margins.Left = 5
+    Margins.Top = 5
+    Margins.Right = 5
+    Margins.Bottom = 5
+    Caption = 'E&xport...'
+    TabOrder = 11
+    OnClick = cmdExportClick
+  end
   object OpenDialog1: TOpenDialog
     DefaultExt = 'dct'
     Filter = 'Auto correct dictionary (*.dct)|*.dct'
     Options = [ofPathMustExist, ofFileMustExist, ofNoNetworkButton, ofEnableSizing]
     Left = 104
+    Top = 336
+  end
+  object SaveDialog1: TSaveDialog
+    DefaultExt = 'dct'
+    Filter = 'Auto correct dictionary (*.dct)|*.dct'
+    Options = [ofOverwritePrompt, ofHideReadOnly, ofPathMustExist, ofEnableSizing]
+    Left = 232
     Top = 336
   end
   object btnDownloadDict: TButton
@@ -326,7 +346,7 @@ object frmAutoCorrect: TfrmAutoCorrect
     Margins.Right = 5
     Margins.Bottom = 5
     Caption = '&Download Dictionary...'
-    TabOrder = 11
+    TabOrder = 12
     Visible = False
     OnClick = btnDownloadDictClick
   end

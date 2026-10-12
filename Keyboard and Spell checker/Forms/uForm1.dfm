@@ -1683,6 +1683,11 @@ object AvroMainForm1: TAvroMainForm1
           ImageIndex = 33
           OnClick = JoinTelegramCommunity
         end
+        object AvroKeyboardonFacebook2: TMenuItem
+          Caption = 'Avro Community on Facebook'
+          ImageIndex = 29
+          OnClick = AvroKeyboardonFacebook1Click
+        end
       end
       object N48: TMenuItem
         Caption = '-'
