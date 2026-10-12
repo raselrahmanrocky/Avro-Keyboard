@@ -2751,115 +2751,64 @@ begin
     AnsiVersionSubmenu1.ImageIndex := Slot;
 end;
 
-{ Owner-draw handler for ANSI version submenu items.  Renders the gutter
-  checkmark matching the AnsiVersionPicker style and the layout icon badge
-  on the right side. }
+{ ``TMenuItem.AdvancedDrawItem`` is protected; this local descendant only
+  re-exposes it (it adds no field and no behaviour of its own), so the owner-draw
+  handler below can hand a row back to Vcl.Menus and get the very painting every
+  other Avro menu row gets. }
+type
+  TMenuItemNativePainter = class(TMenuItem)
+  public
+    procedure PaintAsVclWould(ACanvas: TCanvas; const ARect: TRect; AState: TOwnerDrawState);
+  end;
+
+procedure TMenuItemNativePainter.PaintAsVclWould(ACanvas: TCanvas; const ARect: TRect; AState: TOwnerDrawState);
+var
+  ParkedHandler: TAdvancedMenuDrawItemEvent;
+  ParkedSimple:  TMenuDrawItemEvent;
+begin
+  { Vcl.Menus takes its own themed path only while the item carries no
+    owner-draw event - TMenuItem.AdvancedDrawItem branches on
+    (Assigned(FOnAdvancedDrawItem) or Assigned(FOnDrawItem)) - so both events are
+    parked for the duration of this one call and put back afterwards, even if the
+    painting raises. }
+  ParkedHandler := OnAdvancedDrawItem;
+  ParkedSimple := OnDrawItem;
+  OnAdvancedDrawItem := nil;
+  OnDrawItem := nil;
+  try
+    AdvancedDrawItem(ACanvas, ARect, AState, False);
+  finally
+    OnDrawItem := ParkedSimple;
+    OnAdvancedDrawItem := ParkedHandler;
+  end;
+end;
+
+{ Owner-draw handler for ANSI version submenu items.
+
+  The row itself is painted by VCL rather than here: an active encoding row now
+  is literally the painting Vcl.Menus produces for any other row of any Avro
+  menu - the same hover band on a hot row, the same gutter, the same check glyph
+  for the item's own checked/enabled/hovered state and the same caption - so this
+  submenu behaves exactly like the native Avro Phonetic Options submenu in the
+  plain Windows look, the light theme and the dark theme alike.  (This handler
+  used to hand-paint the band, the popup-check elements and the caption; each of
+  those decisions could - and did - drift from what VCL does on a hovered or a
+  disabled row.)
+
+  The only thing added on top of the native painting is the layout badge on the
+  right, which is what makes these items owner-draw in the first place. }
 procedure TAvroMainForm1.AnsiVersionItemAdvancedDrawItem(Sender: TObject; ACanvas: TCanvas; ARect: TRect; AState: TOwnerDrawState);
 var
-  Item:                                           TMenuItem;
-  IconHandle:                                     HICON;
-  X, Y:                                           Integer;
-  CapStr:                                         string;
-  TextRect:                                       TRect;
-  GutterRect:                                     TRect;
-  IsHovered:                                      Boolean;
-  CMenuBg, CMenuText, CHighlight, CHighlightText: TColor;
+  Item:       TMenuItem;
+  IconHandle: HICON;
+  X, Y:       Integer;
 const
-  GUTTER_W = 26;
   ICON_SZ  = 16;
   ICON_PAD = 4;
 begin
   Item := Sender as TMenuItem;
-  GutterRect := Rect(ARect.Left, ARect.Top, ARect.Left + GUTTER_W, ARect.Bottom);
-  IsHovered := (odSelected in AState) or (odHotLight in AState);
 
-  { Fetch VCL-theme-aware system colours so the rendering automatically
-    matches the active style (Windows10, Windows10 Dark, or any future
-    custom style). }
-  CMenuBg := StyleServices.GetSystemColor(clMenu);
-  CMenuText := StyleServices.GetSystemColor(clMenuText);
-  CHighlight := StyleServices.GetSystemColor(clHighlight);
-  CHighlightText := StyleServices.GetSystemColor(clHighlightText);
-
-  if IsDarkAppTheme then
-  begin
-    { ===== Dark mode – full-row highlight for checked & hovered ===== }
-    if Item.Checked then
-    begin
-      { Checked: blue gutter + light-blue text area }
-      ACanvas.Brush.Color := RGB(0, 120, 215);
-      ACanvas.FillRect(GutterRect);
-      ACanvas.Brush.Color := RGB(218, 236, 255);
-      ACanvas.FillRect(Rect(ARect.Left + GUTTER_W, ARect.Top, ARect.Right, ARect.Bottom));
-
-      ACanvas.Brush.Color := RGB(0, 120, 215);
-      ACanvas.Font.Color := clWhite;
-      ACanvas.Font.Style := [fsBold];
-      DrawText(ACanvas.Handle, #$2713, -1, GutterRect, DT_CENTER or DT_VCENTER or DT_SINGLELINE);
-      ACanvas.Font.Style := [];
-      ACanvas.Font.Color := RGB(51, 51, 51); { dark text on light blue }
-    end
-    else if IsHovered then
-    begin
-      ACanvas.Brush.Color := CHighlight;
-      ACanvas.FillRect(ARect);
-      ACanvas.Font.Color := CurrentPalette.SelectionText;
-    end
-    else
-    begin
-      ACanvas.Brush.Color := CMenuBg;
-      ACanvas.FillRect(ARect);
-    end;
-  end
-  else
-  begin
-    { ===== Light mode – gutter-only checkmark for checked items ===== }
-    ACanvas.Brush.Color := CMenuBg;
-    ACanvas.FillRect(ARect);
-
-    if (not Item.Checked) and IsHovered then
-    begin
-      ACanvas.Brush.Color := CHighlight;
-      ACanvas.FillRect(ARect);
-    end;
-
-    if Item.Checked then
-    begin
-      ACanvas.Brush.Color := CurrentPalette.SelectionFill;
-      ACanvas.FillRect(GutterRect);
-
-      ACanvas.Brush.Color := CurrentPalette.HoverFill;
-      ACanvas.FillRect(Rect(ARect.Left + GUTTER_W, ARect.Top, ARect.Right, ARect.Bottom));
-
-      ACanvas.Brush.Color := CurrentPalette.SelectionFill;
-      ACanvas.Font.Color := CurrentPalette.SelectionText;
-      ACanvas.Font.Style := [fsBold];
-      DrawText(ACanvas.Handle, #$2713, -1, GutterRect, DT_CENTER or DT_VCENTER or DT_SINGLELINE);
-      ACanvas.Font.Style := [];
-    end;
-
-    if (not Item.Checked) and IsHovered then
-      ACanvas.Font.Color := CHighlightText
-    else
-      ACanvas.Font.Color := CMenuText;
-  end;
-
-  { Caption text }
-  CapStr := Item.Caption;
-  if IsDarkAppTheme then
-  begin
-    if Item.Checked then
-      SetTextColor(ACanvas.Handle, RGB(51, 51, 51)) { dark text on light blue }
-    else if IsHovered then
-      SetTextColor(ACanvas.Handle, ColorToRGB(clWhite))
-    else
-      SetTextColor(ACanvas.Handle, ColorToRGB(CMenuText));
-  end
-  else
-    ACanvas.Font.Color := CMenuText;
-  SetBkMode(ACanvas.Handle, TRANSPARENT);
-  TextRect := Rect(ARect.Left + GUTTER_W + 4, ARect.Top, ARect.Right, ARect.Bottom);
-  DrawText(ACanvas.Handle, PChar(CapStr), -1, TextRect, DT_LEFT or DT_VCENTER or DT_SINGLELINE);
+  TMenuItemNativePainter(Item).PaintAsVclWould(ACanvas, ARect, AState);
 
   { Right-side icon badge.  Resolve THIS row's own badge on demand: the icon
     bytes are dropped whenever the mapping folder is re-scanned
@@ -2880,23 +2829,27 @@ begin
   end;
 end;
 
-{ Owner-draw measure handler: accounts for the trailing icon badge width. }
+{ Owner-draw measure handler: reserves the room for the trailing icon badge.
+
+  Vcl.Menus calls this event at the very end of TMenuItem.MeasureItem, so Width
+  and Height arrive as the size VCL itself computed for the row (text, glyph,
+  DPI scaling and all).  Both are therefore left exactly as they came in: an ANSI
+  version row keeps the very height of every other Avro menu row, which is what
+  makes this submenu match the native ones on screen.  Only the
+  badge's own width is added, and only for the rows that carry one; the height
+  must never be derived from the badge or the gutter, or the rows come out taller
+  than the rest of the application's menus. }
 procedure TAvroMainForm1.AnsiVersionItemMeasureItem(Sender: TObject; ACanvas: TCanvas; var Width, Height: Integer);
 const
-  GUTTER_W = 26;
   ICON_SZ  = 16;
   ICON_PAD = 4;
 var
-  Item:    TMenuItem;
-  HasIcon: Boolean;
+  Item: TMenuItem;
 begin
   Item := Sender as TMenuItem;
-  HasIcon := Item.Hint <> '';
 
-  Width := GUTTER_W + 4 + ACanvas.TextWidth(Item.Caption) + 12;
-  if HasIcon then
-    Width := Width + ICON_SZ + ICON_PAD;
-  Height := Max(GUTTER_W, ACanvas.TextHeight(Item.Caption) + 4);
+  if Item.Hint <> '' then
+    Inc(Width, ICON_SZ + ICON_PAD);
 end;
 
 procedure TAvroMainForm1.UpdateTrayIcon;
@@ -4005,10 +3958,18 @@ var
     MItem.Caption := AName;
     MItem.Hint := AName;
     MItem.GroupIndex := 10;
-    MItem.RadioItem := True;
+    // RadioItem stays FALSE even though the version rows are a mutually
+    // exclusive set: Vcl.Menus paints a radio item's bullet dot, while this row
+    // has always carried the check glyph every other checked Avro item shows -
+    // and that glyph now comes straight from VCL (see
+    // AnsiVersionItemAdvancedDrawItem). The exclusivity itself is not VCL's
+    // radio auto-uncheck but UpdateAnsiVersionMenuChecks/SyncAnsiVersionChecks,
+    // which re-derive every row's Checked from AnsiVersion on each popup and
+    // after each switch. GroupIndex = 10 is what marks a row as a version item.
+    MItem.RadioItem := False;
     MItem.Checked := AChecked;
     // Owner-draw: icon badge rendered on the RIGHT side via OnAdvancedDrawItem,
-    // leaving the LEFT gutter free for the native radio checkmark.
+    // leaving the LEFT gutter free for the native checkmark.
     MItem.OnAdvancedDrawItem := AnsiVersionItemAdvancedDrawItem;
     MItem.OnMeasureItem := AnsiVersionItemMeasureItem;
     MItem.OnClick := AnsiVersionMenuClick;
