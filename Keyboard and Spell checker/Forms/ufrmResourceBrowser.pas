@@ -162,6 +162,7 @@ uses
   uWindowHandlers,
   uFileFolderHandling,
   uResourceInstaller,
+  uAvroMigrationRunner,
   clsFileVersion,
   uAutoCorrect,
   uForm1,
@@ -301,6 +302,10 @@ begin
                 [Length(Catalog.Categories), TrustErr]);
           end;
           SetBusy(lblStatus.Caption);
+          // A repair the migration runner finished while the window was
+          // open, or before it opened, is surfaced here rather than
+          // happening silently in the background.
+          lblStatus.Caption := lblStatus.Caption + AvroMigrationNoteSuffix;
         end);
     end);
 end;

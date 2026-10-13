@@ -476,7 +476,8 @@ uses
   uAvroLayoutUI,
   ufrmResourceBrowser,
   uAvroBaseline,
-  uAnsiEngineManager;
+  uAnsiEngineManager,
+  uAvroMigrationRunner;
 
 var
   { At most one visible startup-failure report per session - see
@@ -1464,6 +1465,11 @@ begin
         SaveAnsiVersionOnly;
       end;
       SyncActiveMappingTimestamp(AnsiVersion);
+      // Rotated-container auto-heal, started only now that the engine
+      // decision above is settled. It is asynchronous and, when every
+      // container still opens, it costs one directory scan and makes no
+      // network request at all.
+      AvroMigrationCheckAsync;
       if (AnsiVersion = '') and (not FNoMappingBalloonShown) and Assigned(Tray) and Tray.Visible then
       begin
         FNoMappingBalloonShown := True;

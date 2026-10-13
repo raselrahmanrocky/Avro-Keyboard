@@ -22,12 +22,22 @@
     avro-manifest-v1                 <- format tag (line 1)
     generated=<iso8601>
     keyid=<key id>
+    keyepoch=<integer>
     resource<TAB>id<TAB>file<TAB>category<TAB>name<TAB>version
              <TAB>formatVersion<TAB>minAppVersion<TAB>size<TAB>sha256<TAB>url<TAB>status
+             <TAB>keyEpoch
     ... one resource line per item, sorted by id ...
 
   (the lock tag is 'avro-lock-v1' and its resource columns are
-   id, file, version, formatVersion, size, sha256)
+   id, file, version, formatVersion, size, sha256, keyEpoch)
+
+  keyEpoch is the only column APPENDED rather than inserted, and that is
+  deliberate: an older reader requires at least the columns it knows and ignores
+  the rest, so appending keeps a signed payload readable by both sides. Inserting
+  it in the middle would have broken every existing reader. The value identifies
+  which AvroShield IKM epoch a container was written for, which is how the
+  runtime tells a stale rotation from ordinary corruption; 0 means the signer did
+  not state one.
 
   COLUMN ORDER IS PART OF THE SIGNED BYTES, so a column added or moved here
   silently invalidates every existing signature. 'file' is the second manifest
@@ -69,6 +79,10 @@ type
     Sha256:        string;
     Url:           string;
     Status:        string; // active | deprecated | revoked
+    { IKM epoch the container was written for (0 = the signer did not state one).
+      Not secret: it is a version number, and it is what lets the runtime decide
+      between "this file is corrupt" and "this build predates the rotation". }
+    KeyEpoch:      Integer;
   end;
 
   TAvroManifest = class
@@ -76,6 +90,7 @@ type
     Kind:      TAvroManifestKind;
     Generated: string;
     KeyId:     string;
+    KeyEpoch:  Integer;
     Signature: TBytes;
     Payload:   string;
     Resources: TArray<TAvroResource>;
@@ -279,6 +294,8 @@ begin
         AManifest.Generated := Copy(Line, 11, MaxInt)
       else if Copy(Line, 1, 6) = 'keyid=' then
         AManifest.KeyId := Copy(Line, 7, MaxInt)
+      else if Copy(Line, 1, 9) = 'keyepoch=' then
+        AManifest.KeyEpoch := ParseIntDef(Copy(Line, 10, MaxInt), 0)
       else if Copy(Line, 1, 9) = 'resource' + #9 then
       begin
         Fields := SplitTabs(Line);
@@ -300,6 +317,10 @@ begin
           Res.FormatVersion := ParseIntDef(Fields[4], 1);
           Res.Size := ParseInt64Def(Fields[5], 0);
           Res.Sha256 := Fields[6];
+          // Trailing column, so a lock written before keyEpoch existed still
+          // parses to 0 instead of failing the length check above.
+          if Length(Fields) >= 8 then
+            Res.KeyEpoch := ParseIntDef(Fields[7], 0);
         end
         else
         begin
@@ -319,6 +340,10 @@ begin
           Res.Sha256 := Fields[9];
           Res.Url := Fields[10];
           Res.Status := Fields[11];
+          // Same forward-compatibility rule as the lock: appended, so an older
+          // manifest without it parses to 0.
+          if Length(Fields) >= 13 then
+            Res.KeyEpoch := ParseIntDef(Fields[12], 0);
         end;
         List.Add(Res);
       end
