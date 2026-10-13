@@ -140,6 +140,21 @@ function CurrentAppThemeMode: TAppThemeMode;
 function IsDarkAppTheme: Boolean;
 function CurrentPalette: TAppThemePalette;
 
+{ True while the plain native look paints this process's popup menus.
+
+  Vcl.Themes only styles a system window class while a custom style is active
+  AND that class is in TStyleManager.SystemHooks (shMenus, the default), so in
+  the native look there is no popup-menu style hook at all: Windows and
+  Vcl.Menus draw the rows themselves and an item that carries its own decoration
+  has to draw it from its owner-draw event. Every other theme paints the popup
+  menus through this application's own popup hook (Units\uStyledMenuBorder.pas),
+  which stamps such a decoration itself.
+
+  This is the condition to ask whenever a menu row carries something of its own:
+  it decides which of the two painters is in force, and it stays correct when the
+  theme is switched while the application runs. }
+function PopupMenusPaintedNatively: Boolean;
+
 { Resolves AMode, applies the VCL style and the window frame, and caches the
   result. This is the single entry point for the application. }
 procedure ApplyAppTheme(const AMode: TAppThemeMode);
@@ -459,6 +474,16 @@ end;
 function CurrentPalette: TAppThemePalette;
 begin
   Result := GetAppThemePalette(FResolvedMode);
+end;
+
+function PopupMenusPaintedNatively: Boolean;
+begin
+  // Both halves of Vcl.Themes' own condition for styling the popup-menu window
+  // class (#32768), mirrored rather than guessed: the engine's CBT hook leaves a
+  // system window alone unless a custom style is active, and a class is only
+  // styled while it is listed in SystemHooks.
+  Result := not (TStyleManager.IsCustomStyleActive and
+    (shMenus in TStyleManager.SystemHooks));
 end;
 
 { =============================================================================== }

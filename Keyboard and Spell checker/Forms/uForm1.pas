@@ -367,6 +367,13 @@ type
         freshly downloaded layout into the menus before the next restart. }
       procedure RefreshLayoutList;
       procedure DrawAnsiRowBadge(ACanvas: TCanvas; const AItemRect: TRect; AItem: TMenuItem);
+      { Hands the version rows of AMenu to the painter that is in force right
+        now (see uThemeManager.PopupMenusPaintedNatively): the plain native look
+        leaves the row to Vcl.Menus and to AnsiVersionItemAdvancedDrawItem below,
+        every theme leaves it to the popup style hook.  Called from the two popup
+        handlers, i.e. right before the rows are shown. }
+      procedure SyncAnsiVersionRowPaintMode(AMenu: TMenuItem);
+      procedure AnsiVersionItemAdvancedDrawItem(Sender: TObject; ACanvas: TCanvas; ARect: TRect; AState: TOwnerDrawState);
       procedure AnsiVersionItemMeasureItem(Sender: TObject; ACanvas: TCanvas; var Width, Height: Integer);
       { The cached HICON for a mapping at the CURRENT small-icon metric, or 0
         when that mapping carries no icon (empty name, a legacy container, a
@@ -2497,6 +2504,10 @@ begin
   EnsureMappingIcon(AnsiVersion);
   // Only update checkmarks on existing items -- do NOT Clear/rebuild during popup
   SyncAnsiVersionChecks(AnsiVersionSubmenu1);
+  // Which of the two painters owns these rows depends on the look in force,
+  // and this is the moment that is known for sure (a theme change mid-session
+  // does not rebuild them).
+  SyncAnsiVersionRowPaintMode(AnsiVersionSubmenu1);
   // The TopBar's tools menu holds its OWN "Select ANSI Encoding" parent item
   // (AnsiVersionSubmenu1), so its left-gutter badge has to be refreshed here
   // too - this popup used to sync only the checkmarks.
@@ -2532,6 +2543,7 @@ begin
   // the active layout's badge has to be ready here.
   EnsureMappingIcon(AnsiVersion);
   SyncAnsiVersionChecks(mnuTraySelectAnsiEncoding);
+  SyncAnsiVersionRowPaintMode(mnuTraySelectAnsiEncoding);
   ReplaceAnsiMenuParentIcon;
 end;
 
@@ -2761,22 +2773,27 @@ const
   ANSI_VERSION_ROW_GROUP = 10;
 
 { Stamps the cached icon of AItem's mapping on the right of its row.  That badge
-  is the one piece of drawing the native popup painting does not do - every other
-  pixel of the row is VCL's.
+  is the one piece of drawing a version row has of its own - every other pixel of
+  the row is the painting the look in force gives every Avro menu row.
 
-  The row is painted by TStyledMenuBorderHook (Units\uStyledMenuBorder.pas), the
-  hook this application registers for the popup-menu window class: it draws the
-  row natively - hover band, gutter, checkmark and caption exactly as every other
-  Avro menu row gets them - and asks DrawAnsiMenuRowBadge below for the trailing
-  badge, which is why nothing here has to paint a row itself.
+  Two painters can call this, and SyncAnsiVersionRowPaintMode below decides which
+  one is in force:
 
-  It lands in the room the native painting already leaves free on a row's right
-  edge (the equivalent of a shortcut's column), and the row itself is measured
-  wider by AnsiVersionItemMeasureItem, so the caption never runs under it.
+  * under every theme, the popup style hook (Units\uStyledMenuBorder.pas): it
+    paints the row with the active style and asks DrawAnsiMenuRowBadge below for
+    the trailing badge;
+  * in the plain native look - where there is no popup style hook at all -
+    AnsiVersionItemAdvancedDrawItem below: it paints the row the way Vcl.Menus
+    paints any other row and then calls here.
+
+  It lands in the room the painting already leaves free on a row's right edge (the
+  equivalent of a shortcut's column), and the row itself is measured wider by
+  AnsiVersionItemMeasureItem, so the caption never runs under it.
 
   A row identifies itself with the mapping's display name in Hint plus the
   version-row GroupIndex (ANSI_VERSION_ROW_GROUP below), and no other item of any
-  Avro menu carries both, so every other row keeps exactly what the hook painted. }
+  Avro menu carries both, so every other row keeps exactly what its painter made
+  of it. }
 procedure TAvroMainForm1.DrawAnsiRowBadge(ACanvas: TCanvas; const AItemRect: TRect;
   AItem: TMenuItem);
 const
@@ -2817,6 +2834,101 @@ begin
     (AItem.GroupIndex = ANSI_VERSION_ROW_GROUP);
   if Result then
     AvroMainForm1.DrawAnsiRowBadge(ACanvas, AItemRect, AItem);
+end;
+
+{ ``TMenuItem.AdvancedDrawItem`` is protected; this local descendant only
+  re-exposes it (it adds no field and no behaviour of its own), so the owner-draw
+  handler below can hand a row back to Vcl.Menus and get the very painting the
+  native look gives every other Avro menu row. }
+type
+  TMenuItemNativePainter = class(TMenuItem)
+  public
+    procedure PaintAsVclWould(ACanvas: TCanvas; const ARect: TRect; AState: TOwnerDrawState);
+  end;
+
+procedure TMenuItemNativePainter.PaintAsVclWould(ACanvas: TCanvas; const ARect: TRect; AState: TOwnerDrawState);
+var
+  ParkedHandler: TAdvancedMenuDrawItemEvent;
+  ParkedSimple:  TMenuDrawItemEvent;
+begin
+  { Vcl.Menus takes its own themed path only while the item carries no
+    owner-draw event - TMenuItem.AdvancedDrawItem branches on
+    (Assigned(FOnAdvancedDrawItem) or Assigned(FOnDrawItem)) - so both events are
+    parked for the duration of this one call and put back afterwards, even if the
+    painting raises. }
+  ParkedHandler := OnAdvancedDrawItem;
+  ParkedSimple := OnDrawItem;
+  OnAdvancedDrawItem := nil;
+  OnDrawItem := nil;
+  try
+    AdvancedDrawItem(ACanvas, ARect, AState, False);
+  finally
+    OnDrawItem := ParkedSimple;
+    OnAdvancedDrawItem := ParkedHandler;
+  end;
+end;
+
+{ Owner-draw handler of a version row in the plain native look.
+
+  The native look has no popup style hook (uThemeManager
+  .PopupMenusPaintedNatively), so Vcl.Menus is the painter of these rows and asks
+  this event for the item's own drawing - but a handler of this event owns the
+  WHOLE row: TMenuItem.AdvancedDrawItem calls it instead of painting anything
+  itself.  Handing the row straight back to Vcl.Menus (PaintAsVclWould) is what
+  keeps a version row the painting every other Avro menu row gets in this look -
+  the hover band on a hot row, the gutter, the check glyph, the caption - and
+  this handler then adds the one thing Vcl.Menus cannot know: the layout badge on
+  the right. }
+procedure TAvroMainForm1.AnsiVersionItemAdvancedDrawItem(Sender: TObject; ACanvas: TCanvas; ARect: TRect; AState: TOwnerDrawState);
+var
+  Item: TMenuItem;
+begin
+  Item := Sender as TMenuItem;
+
+  TMenuItemNativePainter(Item).PaintAsVclWould(ACanvas, ARect, AState);
+
+  // ...and the badge last, so nothing painted above can cover it.
+  DrawAnsiRowBadge(ACanvas, ARect, Item);
+end;
+
+{ Puts the version rows of AMenu on the painter that is in force right now.
+
+  A version row is painted by exactly one of two owners, and the choice is made
+  here - right before the popup is shown - rather than when the rows are built,
+  because a theme change while the application runs switches the painter without
+  rebuilding them:
+
+  * the plain native look has no popup style hook, so Vcl.Menus paints the rows
+    and the rows carry the owner-draw handler that adds the badge
+    (AnsiVersionItemAdvancedDrawItem above);
+  * under every theme the application's popup hook (Units\uStyledMenuBorder.pas)
+    paints the row itself with the active style, and it hands a row to
+    TMenuItem's owner-draw event INSTEAD of drawing the row when one is assigned
+    - so a version row must carry no owner-draw handler then; the same hook
+    stamps the badge instead.
+
+  Everything else about a version row - the room AnsiVersionItemMeasureItem
+  reserves, the checkmark sync, the click handler - is set once when the row is
+  built and is not touched here. }
+procedure TAvroMainForm1.SyncAnsiVersionRowPaintMode(AMenu: TMenuItem);
+var
+  I:   Integer;
+  Row: TMenuItem;
+begin
+  if not Assigned(AMenu) then
+    Exit;
+
+  for I := 0 to AMenu.Count - 1 do
+  begin
+    Row := AMenu.Items[I];
+    if Row.GroupIndex <> ANSI_VERSION_ROW_GROUP then
+      Continue; // the separator and the mapping actions below keep their painting
+
+    if PopupMenusPaintedNatively then
+      Row.OnAdvancedDrawItem := AnsiVersionItemAdvancedDrawItem
+    else
+      Row.OnAdvancedDrawItem := nil;
+  end;
 end;
 
 { Owner-draw measure handler: reserves the room for the trailing icon badge.
@@ -3958,9 +4070,11 @@ var
     // after each switch. GroupIndex = 10 is what marks a row as a version item.
     MItem.RadioItem := False;
     MItem.Checked := AChecked;
-    // The row paints itself natively - band, gutter, checkmark and caption all
-    // come from the popup style hook - and only reserves the room for the icon
-    // badge that the popup hook stamps on its right afterwards.
+    // The row's own pixels come from whichever painter is in force - the popup
+    // style hook under every theme, Vcl.Menus in the plain native look (see
+    // SyncAnsiVersionRowPaintMode, called on every popup) - and it always
+    // reserves the room for the icon badge that painter stamps on the right: the
+    // row is measured wider by that badge's width and nothing else.
     MItem.OnMeasureItem := AnsiVersionItemMeasureItem;
     MItem.OnClick := AnsiVersionMenuClick;
     ParentMenu.Add(MItem);
@@ -4068,9 +4182,10 @@ begin
   BuildSingleMenu(AnsiVersionSubmenu1);
   BuildSingleMenu(mnuTraySelectAnsiEncoding);
 
-  // Child items get their trailing icon badge from TStyledMenuBorderHook, an
-  // owner-draw event and its VCL painter are gone, so SubMenuImages is not
-  // needed for them.  Both root parent items -
+  // Which painter adds a child item's trailing icon badge is decided per popup
+  // by SyncAnsiVersionRowPaintMode (the popup style hook under every theme, the
+  // row's own owner-draw handler in the plain native look), so SubMenuImages is
+  // not needed for them.  Both root parent items -
   // mnuTraySelectAnsiEncoding and AnsiVersionSubmenu1 - get their left-gutter
   // icon from ImageList1 in ReplaceAnsiMenuParentIcon.
 end;
