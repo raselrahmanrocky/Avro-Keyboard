@@ -334,9 +334,16 @@ end;
 
 { =============================================================================== }
 
+{ The Help button of this dialog opens the users' community rather than the
+  "Customizing Avro Keyboard" PDF: questions about a setting are answered there,
+  and in one place, instead of in a document that has to be re-published.
+
+  The help documents are not lost - the application's own Help menu lists the
+  PDFs it finds beside the executable (uForm1.RebuildDynamicHelp), and this
+  button was the only caller of OpenHelpFile(25). }
 procedure TfrmOptions.Button_HelpClick(Sender: TObject);
 begin
-  AvroMainForm1.OpenHelpFile(25);
+  Execute_Something('https://t.me/AvroUsersCommunity');
 end;
 
 { =============================================================================== }
