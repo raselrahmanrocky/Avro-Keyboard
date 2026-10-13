@@ -97,7 +97,7 @@ uses
   uAvroCryptoUtils in 'Units\uAvroCryptoUtils.pas',
   uAvroSecureMem in 'Units\uAvroSecureMem.pas',
   uAvroShieldVM in 'Units\uAvroShieldVM.pas',
-  uAvroShieldSecret in 'Units\uAvroShieldSecret.pas',
+  uAvroShieldSecret in 'Units\Private\uAvroShieldSecret.pas',
   uAvroEncoCrypto in 'Units\uAvroEncoCrypto.pas',
   uAvroEncoManager in 'Units\uAvroEncoManager.pas',
   uAvroEncoIconSection in 'Units\uAvroEncoIconSection.pas',

@@ -111,6 +111,12 @@ function GetAvroEncoProtectionFlag(const AFilePath: string): Byte;
 // (leading U+FEFF / UTF-8 BOM stripped). Returns '' when decryption fails
 // (wrong password, corrupted data, missing file).
 // For flag $00 files APassword is ignored.
+// Explains why a container could not be opened, in terms the user can act
+// on. A build without the secret extension cannot open a DEFAULT-KEY
+// container at all, so answering "password may be incorrect" for a file
+// that never had a password sends the user hunting for one that does not
+// exist.
+function AvroEncoOpenFailureMessage(const AFilePath: string): string;
 function DecryptAvroEncoToString(const AFilePath: string; const APassword: AnsiString): string;
 // True only when the decrypted content looks like a valid mapping JSON
 // (starts with '{' after trimming).
@@ -129,6 +135,7 @@ implementation
 uses
   uAvroCryptoUtils,
   uAvroShield,
+  uAvroShieldSecret,
   DebugLog;
 
 type
@@ -420,6 +427,21 @@ begin
   except
     Result := '';
   end;
+end;
+
+function AvroEncoOpenFailureMessage(const AFilePath: string): string;
+begin
+  // Only a readable DEFAULT-KEY container can be blamed on the missing secret:
+  // a password container never needed it, and flag $FF means the header could
+  // not even be read, which the user cannot fix by rebuilding.
+  if (not IsRealSecretUnit) and
+     (GetAvroEncoProtectionFlag(AFilePath) = AVROENCO_FLAG_DEFAULT_KEY) then
+    Result := 'This build has no secret extension, so it cannot open default-key ' +
+      'containers.' + sLineBreak + sLineBreak +
+      'Rebuild it with tools\secrets\fetch_secrets.ps1 and AVRO_SECRETS_TOKEN. ' +
+      'See SECRETS_SETUP.md.'
+  else
+    Result := 'Failed to decrypt mapping. Password may be incorrect.';
 end;
 
 function ValidateAvroEncoPassword(const AFilePath: string; const APassword: AnsiString): Boolean;

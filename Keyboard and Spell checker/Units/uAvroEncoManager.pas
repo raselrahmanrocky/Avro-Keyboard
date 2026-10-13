@@ -545,7 +545,7 @@ begin
     begin
       Log('LoadMappingFromEnco: decryption failed (wrong password / corrupted file): ' + AFilePath);
       if Assigned(ErrorLog) then
-        ErrorLog.Add('Error: Decryption failed. Invalid password or corrupted file.');
+        ErrorLog.Add('Error: ' + AvroEncoOpenFailureMessage(AFilePath));
       Exit;
     end;
 

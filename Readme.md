@@ -59,6 +59,26 @@ Delphi community edition doesn't come with command line compiler. In order to bu
 - Open `WholeProject.groupproj` in Delphi IDE and run `Build All` from the project group
 - Built and renamed files will be under `build` directory
 
+### The root secret and default-key containers
+
+`Keyboard and Spell checker/Units/Private/uAvroShieldSecret.pas` is checked in
+as a **public stub** with no key material, so a clone builds and runs offline with
+no token and no key file. In that state the keyboard cannot open a **default-key**
+`.AvroEnco` container: it reports that the secret is unavailable instead of
+failing with a confusing decode error, and the release guard refuses the build.
+
+To build with the real unit, fetch it from the private extension repository:
+
+    tools\secrets\fetch_secrets.ps1            # needs AVRO_SECRETS_TOKEN
+
+Then put the stub back before you commit:
+
+    tools\secrets\fetch_secrets.ps1 -Clean
+
+Setup, rotation and the leak gate are documented in `SECRETS_SETUP.md`. Do not
+add key material to the stub: `tools\secrets\check-no-secret-bytes.ps1` fails the
+build if it appears.
+
 ## Where Avro keeps its data
 
 | Edition | Settings | Data (database, mappings, layouts, skins, logs) |

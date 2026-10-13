@@ -130,6 +130,17 @@ keys/
 # tools/resource-sync/fetch_sources.ps1 for a build and never committed.
 assets/*.json
 
+# The secret-bearing root-secret unit. The public repository tracks ONLY the
+# stub at this path; the real unit is fetched by
+# tools\secrets\fetch_secrets.ps1, which overwrites the tracked path in place
+# and marks it skip-worktree so it can never be committed by accident.
+#
+# The negation is what keeps the stub itself tracked. Git ignores the CONTENTS
+# of the directory but not the directory itself, so the exception is reachable;
+# writing 'Units/Private/' would exclude the directory and silence it.
+Keyboard and Spell checker/Units/Private/*
+!Keyboard and Spell checker/Units/Private/uAvroShieldSecret.pas
+
 # Windows Explorer folder artefact: it is written into assets/icons whenever the
 # shell rewrites a file name there (the layout icons are regenerated at
 # runtime), it is read by nothing in the code and nothing in the build.

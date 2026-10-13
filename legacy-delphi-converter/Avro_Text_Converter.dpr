@@ -20,7 +20,7 @@ uses
   uAvroCryptoUtils in '..\Keyboard and Spell checker\Units\uAvroCryptoUtils.pas',
   uAvroSecureMem in '..\Keyboard and Spell checker\Units\uAvroSecureMem.pas',
   uAvroShieldVM in '..\Keyboard and Spell checker\Units\uAvroShieldVM.pas',
-  uAvroShieldSecret in '..\Keyboard and Spell checker\Units\uAvroShieldSecret.pas',
+  uAvroShieldSecret in '..\Keyboard and Spell checker\Units\Private\uAvroShieldSecret.pas',
   uAvroShield in '..\Keyboard and Spell checker\Units\uAvroShield.pas',
   uAvroEncoCrypto in '..\Keyboard and Spell checker\Units\uAvroEncoCrypto.pas',
   uAvroEncoManager in '..\Keyboard and Spell checker\Units\uAvroEncoManager.pas',

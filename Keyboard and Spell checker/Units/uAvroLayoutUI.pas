@@ -251,7 +251,7 @@ begin
     begin
       CachedEncoPassword := '';
       ForgetEncoPassword(SourcePath);
-      MessageDlg('Failed to decrypt mapping. Password may be incorrect.', mtError, [mbOK], 0);
+      MessageDlg(AvroEncoOpenFailureMessage(SourcePath), mtError, [mbOK], 0);
       Exit;
     end;
   end
