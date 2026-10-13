@@ -37,6 +37,13 @@ unit uStyledMenuBorder;
 
   The frame is rendered once per hook instance into a bitmap and re-rendered
   when the style changes (UpdateColors).
+
+  The same DrawItem also asks the application for a row's trailing badge
+  (MenuRowBadge above): an ANSI version row carries the icon of the layout it
+  activates on its right, which is the one thing this hook has no way to know.
+  The badge is stamped last, so neither the border stamp nor a later item can
+  erase it, and the request is answered False for every other row - those rows
+  keep exactly the painting this unit inherits.
 }
 
 interface
@@ -47,8 +54,21 @@ uses
   System.SysUtils,    // FreeAndNil
   System.Types,       // TRect helper
   Vcl.Graphics,
+  Vcl.Menus,          // TMenuItem
   Vcl.Themes,         // TCustomStyleEngine, StyleServices
   Vcl.SysStyles;      // TSysPopupStyleHook
+
+type
+  { A row that carries a trailing badge of its own - an ANSI version row shows
+    the icon of the layout it activates on its right.  This hook knows nothing
+    about layouts, so the application installs the painter (uForm1) and the hook
+    only asks for it while it paints.  True means the badge was drawn. }
+  TMenuRowBadgeFunc = function(ACanvas: TCanvas; const AItemRect: TRect;
+    AMenuItem: TMenuItem): Boolean;
+
+var
+  { Set by the application; nil leaves every row to the native painting. }
+  MenuRowBadge: TMenuRowBadgeFunc = nil;
 
 type
   TStyledMenuBorderHook = class(TSysPopupStyleHook)
@@ -154,9 +174,20 @@ end;
 procedure TStyledMenuBorderHook.DrawItem(Canvas: TCanvas; Index: Integer;
   ItemRect: TRect; ItemText: string; State: TSysPopupItemState;
   Style: TSysPopupItemStyle);
+var
+  Item: TMenuItem;
 begin
+  // The row itself: the painting of the hook this one descends from.
   inherited;
   StampBorder(Canvas);
+
+  // ...then the trailing badge of a row that carries one, last of all so that
+  // nothing painted above can cover it.
+  if (not Assigned(MenuRowBadge)) or (Index < 0) or (Index >= Count) then
+    Exit;
+  Item := Items[Index].VCLMenuItem;
+  if Item <> nil then
+    MenuRowBadge(Canvas, ItemRect, Item);
 end;
 
 initialization

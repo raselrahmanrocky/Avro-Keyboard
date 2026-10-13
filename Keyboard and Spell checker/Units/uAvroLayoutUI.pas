@@ -69,7 +69,9 @@ procedure RebuildAnviVersionMenus;
       MItem.Checked := AChecked;
       MItem.RadioItem := True;
       MItem.Tag := 9903;
-      MItem.OnAdvancedDrawItem := AvroMainForm1.AnsiVersionItemAdvancedDrawItem;
+      // The mapping's display name: the measure handler reserves the badge's
+      // room from it and the popup style hook resolves the badge icon with it.
+      MItem.Hint := AName;
       MItem.OnMeasureItem := AvroMainForm1.AnsiVersionItemMeasureItem;
       MItem.OnClick := AvroMainForm1.AnsiVersionMenuClick;
       AParentMenu.Add(MItem);

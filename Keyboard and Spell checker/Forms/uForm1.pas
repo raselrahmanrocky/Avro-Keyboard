@@ -366,7 +366,7 @@ type
         directory watcher (only AnsiMappingDir does), so nothing else would put a
         freshly downloaded layout into the menus before the next restart. }
       procedure RefreshLayoutList;
-      procedure AnsiVersionItemAdvancedDrawItem(Sender: TObject; ACanvas: TCanvas; ARect: TRect; AState: TOwnerDrawState);
+      procedure DrawAnsiRowBadge(ACanvas: TCanvas; const AItemRect: TRect; AItem: TMenuItem);
       procedure AnsiVersionItemMeasureItem(Sender: TObject; ACanvas: TCanvas; var Width, Height: Integer);
       { The cached HICON for a mapping at the CURRENT small-icon metric, or 0
         when that mapping carries no icon (empty name, a legacy container, a
@@ -376,7 +376,7 @@ type
         startup preload and is freed by ReleaseAnsiIconCache, so a caller must
         never destroy it. Public so the ANSI version picker can draw the very
         same trailing badge the tray's "Select ANSI Encoding" submenu draws
-        (AnsiVersionItemAdvancedDrawItem above). }
+        (DrawAnsiRowBadge below). }
       function GetAnsiTrayIcon(const AName: string): HICON;
 
       procedure BuildAnsiVersionMenus;
@@ -459,6 +459,7 @@ uses
   DebugLog,
   WindowsDarkMode,
   uThemeManager,
+  uStyledMenuBorder,
   System.UITypes,
   uKeyboardMacro,
   uAvroEncoCrypto,
@@ -2489,7 +2490,7 @@ begin
   // after an idle release dropped them (IdleTimerTimer) - the menu just opened
   // is exactly the moment the work is wanted, so it is paid here.
   // Each row resolves its OWN badge while it draws (see
-  // AnsiVersionItemAdvancedDrawItem), so opening this menu no longer pays for
+  // TStyledMenuBorderHook's badge), so opening this menu no longer pays for
   // EnsureMappingIcons - the sweep that decodes every mapping's payload.  Only
   // the active layout's badge is needed up front: it is what the parent item's
   // gutter icon reads.
@@ -2751,82 +2752,71 @@ begin
     AnsiVersionSubmenu1.ImageIndex := Slot;
 end;
 
-{ ``TMenuItem.AdvancedDrawItem`` is protected; this local descendant only
-  re-exposes it (it adds no field and no behaviour of its own), so the owner-draw
-  handler below can hand a row back to Vcl.Menus and get the very painting every
-  other Avro menu row gets. }
-type
-  TMenuItemNativePainter = class(TMenuItem)
-  public
-    procedure PaintAsVclWould(ACanvas: TCanvas; const ARect: TRect; AState: TOwnerDrawState);
-  end;
+const
+  { The GroupIndex every ANSI version row of both menus carries: it is what marks
+    a row as an encoding rather than as one of the mapping actions below them (see
+    BuildAnsiVersionMenus and SyncAnsiVersionChecks).  The badge test below needs
+    it, because a Hint alone names no encoding - the Help menu puts the path of a
+    PDF into its items' Hint. }
+  ANSI_VERSION_ROW_GROUP = 10;
 
-procedure TMenuItemNativePainter.PaintAsVclWould(ACanvas: TCanvas; const ARect: TRect; AState: TOwnerDrawState);
-var
-  ParkedHandler: TAdvancedMenuDrawItemEvent;
-  ParkedSimple:  TMenuDrawItemEvent;
-begin
-  { Vcl.Menus takes its own themed path only while the item carries no
-    owner-draw event - TMenuItem.AdvancedDrawItem branches on
-    (Assigned(FOnAdvancedDrawItem) or Assigned(FOnDrawItem)) - so both events are
-    parked for the duration of this one call and put back afterwards, even if the
-    painting raises. }
-  ParkedHandler := OnAdvancedDrawItem;
-  ParkedSimple := OnDrawItem;
-  OnAdvancedDrawItem := nil;
-  OnDrawItem := nil;
-  try
-    AdvancedDrawItem(ACanvas, ARect, AState, False);
-  finally
-    OnDrawItem := ParkedSimple;
-    OnAdvancedDrawItem := ParkedHandler;
-  end;
-end;
+{ Stamps the cached icon of AItem's mapping on the right of its row.  That badge
+  is the one piece of drawing the native popup painting does not do - every other
+  pixel of the row is VCL's.
 
-{ Owner-draw handler for ANSI version submenu items.
+  The row is painted by TStyledMenuBorderHook (Units\uStyledMenuBorder.pas), the
+  hook this application registers for the popup-menu window class: it draws the
+  row natively - hover band, gutter, checkmark and caption exactly as every other
+  Avro menu row gets them - and asks DrawAnsiMenuRowBadge below for the trailing
+  badge, which is why nothing here has to paint a row itself.
 
-  The row itself is painted by VCL rather than here: an active encoding row now
-  is literally the painting Vcl.Menus produces for any other row of any Avro
-  menu - the same hover band on a hot row, the same gutter, the same check glyph
-  for the item's own checked/enabled/hovered state and the same caption - so this
-  submenu behaves exactly like the native Avro Phonetic Options submenu in the
-  plain Windows look, the light theme and the dark theme alike.  (This handler
-  used to hand-paint the band, the popup-check elements and the caption; each of
-  those decisions could - and did - drift from what VCL does on a hovered or a
-  disabled row.)
+  It lands in the room the native painting already leaves free on a row's right
+  edge (the equivalent of a shortcut's column), and the row itself is measured
+  wider by AnsiVersionItemMeasureItem, so the caption never runs under it.
 
-  The only thing added on top of the native painting is the layout badge on the
-  right, which is what makes these items owner-draw in the first place. }
-procedure TAvroMainForm1.AnsiVersionItemAdvancedDrawItem(Sender: TObject; ACanvas: TCanvas; ARect: TRect; AState: TOwnerDrawState);
-var
-  Item:       TMenuItem;
-  IconHandle: HICON;
-  X, Y:       Integer;
+  A row identifies itself with the mapping's display name in Hint plus the
+  version-row GroupIndex (ANSI_VERSION_ROW_GROUP below), and no other item of any
+  Avro menu carries both, so every other row keeps exactly what the hook painted. }
+procedure TAvroMainForm1.DrawAnsiRowBadge(ACanvas: TCanvas; const AItemRect: TRect;
+  AItem: TMenuItem);
 const
   ICON_SZ  = 16;
   ICON_PAD = 4;
+var
+  IconHandle: HICON;
+  X, Y: Integer;
 begin
-  Item := Sender as TMenuItem;
+  if (AItem = nil) or (AItem.Hint = '') or (AItem.GroupIndex <> ANSI_VERSION_ROW_GROUP) then
+    Exit;
 
-  TMenuItemNativePainter(Item).PaintAsVclWould(ACanvas, ARect, AState);
+  { Resolve THIS row's own badge on demand: the icon bytes are dropped whenever
+    the mapping folder is re-scanned (BuildAnsiVersionMenus ->
+    ReleaseAnsiIconCache), so a row must be able to restore its own artwork while
+    it draws instead of relying on a full sweep of every mapping when the menu
+    opens. }
+  EnsureMappingIcon(AItem.Hint);
+  IconHandle := GetAnsiTrayIcon(AItem.Hint);
+  if IconHandle = 0 then
+    Exit;
 
-  { Right-side icon badge.  Resolve THIS row's own badge on demand: the icon
-    bytes are dropped whenever the mapping folder is re-scanned
-    (BuildAnsiVersionMenus -> ReleaseAnsiIconCache), so a row must be able to
-    restore its own artwork while it draws instead of relying on a full sweep of
-    every mapping when the menu opens. }
-  IconHandle := 0;
-  if Item.Hint <> '' then
-  begin
-    EnsureMappingIcon(Item.Hint);
-    IconHandle := GetAnsiTrayIcon(Item.Hint);
-  end;
-  if IconHandle <> 0 then
-  begin
-    X := ARect.Right - ICON_SZ - ICON_PAD;
-    Y := ARect.Top + ((ARect.Bottom - ARect.Top - ICON_SZ) div 2);
-    DrawIconEx(ACanvas.Handle, X, Y, IconHandle, ICON_SZ, ICON_SZ, 0, 0, DI_NORMAL);
-  end;
+  X := AItemRect.Right - ICON_SZ - ICON_PAD;
+  Y := AItemRect.Top + ((AItemRect.Bottom - AItemRect.Top - ICON_SZ) div 2);
+  DrawIconEx(ACanvas.Handle, X, Y, IconHandle, ICON_SZ, ICON_SZ, 0, 0, DI_NORMAL);
+end;
+
+{ The badge painter the popup hook calls while it paints a row.  It answers False
+  for every row that is not an ANSI version row - every row of every other Avro
+  menu - and the hook then leaves that row exactly as the native painting made
+  it.  The form is reached through the application's form variable because the
+  icon cache belongs to it; before the form exists the hook gets False and no
+  menu is up anyway. }
+function DrawAnsiMenuRowBadge(ACanvas: TCanvas; const AItemRect: TRect;
+  AItem: TMenuItem): Boolean;
+begin
+  Result := (AvroMainForm1 <> nil) and (AItem <> nil) and (AItem.Hint <> '') and
+    (AItem.GroupIndex = ANSI_VERSION_ROW_GROUP);
+  if Result then
+    AvroMainForm1.DrawAnsiRowBadge(ACanvas, AItemRect, AItem);
 end;
 
 { Owner-draw measure handler: reserves the room for the trailing icon badge.
@@ -3957,20 +3947,20 @@ var
     MItem := TMenuItem.Create(ParentMenu);
     MItem.Caption := AName;
     MItem.Hint := AName;
-    MItem.GroupIndex := 10;
+    MItem.GroupIndex := ANSI_VERSION_ROW_GROUP;
     // RadioItem stays FALSE even though the version rows are a mutually
     // exclusive set: Vcl.Menus paints a radio item's bullet dot, while this row
     // has always carried the check glyph every other checked Avro item shows -
-    // and that glyph now comes straight from VCL (see
-    // AnsiVersionItemAdvancedDrawItem). The exclusivity itself is not VCL's
+    // and that glyph comes straight from the popup style hook (see
+    // TStyledMenuBorderHook). The exclusivity itself is not VCL's
     // radio auto-uncheck but UpdateAnsiVersionMenuChecks/SyncAnsiVersionChecks,
     // which re-derive every row's Checked from AnsiVersion on each popup and
     // after each switch. GroupIndex = 10 is what marks a row as a version item.
     MItem.RadioItem := False;
     MItem.Checked := AChecked;
-    // Owner-draw: icon badge rendered on the RIGHT side via OnAdvancedDrawItem,
-    // leaving the LEFT gutter free for the native checkmark.
-    MItem.OnAdvancedDrawItem := AnsiVersionItemAdvancedDrawItem;
+    // The row paints itself natively - band, gutter, checkmark and caption all
+    // come from the popup style hook - and only reserves the room for the icon
+    // badge that the popup hook stamps on its right afterwards.
     MItem.OnMeasureItem := AnsiVersionItemMeasureItem;
     MItem.OnClick := AnsiVersionMenuClick;
     ParentMenu.Add(MItem);
@@ -4078,10 +4068,17 @@ begin
   BuildSingleMenu(AnsiVersionSubmenu1);
   BuildSingleMenu(mnuTraySelectAnsiEncoding);
 
-  // Child items now use OnAdvancedDrawItem for trailing icon badges, so
-  // SubMenuImages is no longer needed for them.  Both root parent items -
+  // Child items get their trailing icon badge from TStyledMenuBorderHook, an
+  // owner-draw event and its VCL painter are gone, so SubMenuImages is not
+  // needed for them.  Both root parent items -
   // mnuTraySelectAnsiEncoding and AnsiVersionSubmenu1 - get their left-gutter
   // icon from ImageList1 in ReplaceAnsiMenuParentIcon.
 end;
 
+initialization
+  { The popup-menu hook paints the rows; an ANSI version row additionally gets the
+    badge of the layout it activates, and the icons that badge is drawn from live
+    in this form.  Handing the painter over is all it takes - row painting itself
+    stays entirely in the hook. }
+  uStyledMenuBorder.MenuRowBadge := DrawAnsiMenuRowBadge;
 end.

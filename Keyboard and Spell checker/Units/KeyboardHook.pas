@@ -308,6 +308,13 @@ begin
 
     // ----------------------------------------------
     // Hotkey Recording Mode (with live preview)
+    //
+    // While recording, the recorder OWNS the keyboard: every key the recorder
+    // itself processes (CASE A/B/C below, and the two paths that end or reject a
+    // recording) is swallowed with "Result := 1" and never handed on to whatever
+    // window has the focus.  Forwarding them - which is what those paths used to
+    // do - meant the shortcut the user just typed was also typed into the editor
+    // or field behind the Options dialog, and contradicted CASE B's own comment.
     // ----------------------------------------------
     if IsRecordingHotkey and ((wParam = 256) or (wParam = 257) or (wParam = 260) or (wParam = 261)) then
     begin
@@ -338,8 +345,10 @@ begin
         // Validate: non-F keys require at least one modifier
         if (not TrackedCtrl) and (not TrackedShift) and (not TrackedAlt) and (not TrackedWin) and ((kbdllhs.vkCode < $70) or (kbdllhs.vkCode > $7B)) then
         begin
-          // Reject this keypress but keep recording session alive
-          Result := CallNextHookEx(HookRetVal, nCode, wParam, lParam);
+          // Reject this keypress but keep recording session alive.  The key is
+          // still swallowed: a combination that is refused as a shortcut must
+          // not land in the application underneath either.
+          Result := 1;
           Exit;
         end;
 
@@ -358,7 +367,9 @@ begin
             IsRecordingHotkey := False;
             RecordingTargetEdit := nil;
             RecordingFinalized := False;
-            Result := CallNextHookEx(HookRetVal, nCode, wParam, lParam);
+            // The recording is over, but this very keypress was consumed by the
+            // recorder (it is what cancelled the conflict dialog): swallow it too.
+            Result := 1;
             Exit;
           end;
           ClearConflictByIndex(ConflictIdx);
@@ -406,7 +417,9 @@ begin
         end;
       end;
 
-      Result := CallNextHookEx(HookRetVal, nCode, wParam, lParam);
+      // CASE A (finalize), CASE B (key up) and CASE C (modifier preview) all
+      // end here: the key was part of the recording session, so it is blocked.
+      Result := 1;
       Exit;
     end;
 

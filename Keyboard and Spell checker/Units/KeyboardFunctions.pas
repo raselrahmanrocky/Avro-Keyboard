@@ -45,6 +45,16 @@ procedure SendInput_Down(const bKey: Integer);
 procedure SendKey_Basic(const Unikey: Integer);
 procedure SendInputBatch_BackspaceAndChar(KeyRepeat: Integer; const CharToSend: string);
 procedure SendInputBatch_Backspace(KeyRepeat: Integer);
+
+{ The batched emitters, but reporting whether the WHOLE batch was inserted.
+  SendInput returns how many events it accepted; a short result means the rest
+  were refused - UIPI stops injection into a window of a higher integrity level,
+  and the call can be interrupted - so those keystrokes are lost.  The two
+  procedures above are thin wrappers around these and drop that outcome, which is
+  what every existing caller needs; a caller that is in a position to react uses
+  the Try* form instead.  Nothing to send counts as delivered. }
+function TrySendInputBatch_BackspaceAndChar(KeyRepeat: Integer; const CharToSend: string): Boolean;
+function TrySendInputBatch_Backspace(KeyRepeat: Integer): Boolean;
 function IsLogicalShift: Boolean;
 function IsTrueShift: Boolean;
 function IsOnlyShift: Boolean;
@@ -74,7 +84,6 @@ var
 implementation
 
 uses
-  DebugLog,
   uRegistrySettings;
 
 { =============================================================================== }
@@ -95,7 +104,34 @@ const
     Flip it back to True ONLY if "backspace deletes too much" reappears. }
   USE_NONAME_HACK: Boolean = False;
 
-  { =========================================================================== }
+{ =============================================================================== }
+
+{ The one place where the outcome of a SendInput call is looked at.
+
+  SendInput returns how many of the events it inserted; anything less means the
+  rest were refused (a window of a higher integrity level cannot be injected into,
+  and the call can also be interrupted) and those keystrokes are gone.  That used
+  to pass unnoticed.
+
+  Nothing is logged here: the hot path stays free of Log() (see the header), so
+  the boolean result IS the report - the Try* batch emitters hand it to a caller
+  that is in a position to react, while the plain procedures still drop it. }
+function SendInputChecked(const Inputs: array of TInput; ACount: Integer): Boolean;
+var
+  Sent: UINT;
+begin
+  { Empty batches never touch Inputs[0] and count as delivered. }
+  if ACount <= 0 then
+    Exit(True);
+
+  { @Inputs[0]: an open-array element is not a variable, so the pointer has to be
+    taken explicitly here (the call sites below pass a record or a dynamic array,
+    where SendInput's own implicit address-of would apply). }
+  Sent := SendInput(ACount, @Inputs[0], SizeOf(TInput));
+  Result := (Sent = UINT(ACount));
+end;
+
+{ =========================================================================== }
 
 function IsIgnorableModifierKey(const KeyCode: Integer): Boolean;
 begin
@@ -279,7 +315,7 @@ begin
     time := 0;
     dwExtraInfo := 0;
   end;
-  SendInput(1, KInput, SizeOf(KInput));
+  SendInputChecked(KInput, 1);
 end;
 
 { =============================================================================== }
@@ -297,7 +333,7 @@ begin
     time := 0;
     dwExtraInfo := 0;
   end;
-  SendInput(1, KInput, SizeOf(KInput));
+  SendInputChecked(KInput, 1);
 end;
 
 { =============================================================================== }
@@ -327,7 +363,7 @@ begin
     dwExtraInfo := 0;
   end;
 
-  SendInput(2, KInput[0], SizeOf(KInput[0]));
+  SendInputChecked(KInput, 2);
 end;
 
 { =============================================================================== }
@@ -354,7 +390,7 @@ end;
 
 { =============================================================================== }
 
-procedure SendInputBatch_BackspaceAndChar(KeyRepeat: Integer; const CharToSend: string);
+function TrySendInputBatch_BackspaceAndChar(KeyRepeat: Integer; const CharToSend: string): Boolean;
 var
   Inputs:                array of TInput;
   TotalEvents, Index, I: Integer;
@@ -365,7 +401,7 @@ begin
 
   TotalEvents := (KeyRepeat * BackspaceEventCount) + (Length(CharToSend) * CharEventCount);
   if TotalEvents = 0 then
-    Exit; // nothing to send - never touch Inputs[0] of an empty array
+    Exit(True); // nothing to send - never touch Inputs[0] of an empty array
 
   SetLength(Inputs, TotalEvents);
   index := 0;
@@ -446,18 +482,24 @@ begin
     end;
   end;
 
-  SendInput(TotalEvents, Inputs[0], SizeOf(Inputs[0]));
+  Result := SendInputChecked(Inputs, TotalEvents);
+end;
+
+{ Kept for every existing caller: the outcome is the Try* form's to report. }
+procedure SendInputBatch_BackspaceAndChar(KeyRepeat: Integer; const CharToSend: string);
+begin
+  TrySendInputBatch_BackspaceAndChar(KeyRepeat, CharToSend);
 end;
 
 { =============================================================================== }
 
-procedure SendInputBatch_Backspace(KeyRepeat: Integer);
+function TrySendInputBatch_Backspace(KeyRepeat: Integer): Boolean;
 var
   Inputs:                array of TInput;
   TotalEvents, Index, I: Integer;
 begin
   if KeyRepeat <= 0 then
-    Exit;
+    Exit(True);
 
   TotalEvents := KeyRepeat * BackspaceEventCount;
   SetLength(Inputs, TotalEvents);
@@ -501,7 +543,13 @@ begin
     end;
   end;
 
-  SendInput(TotalEvents, Inputs[0], SizeOf(Inputs[0]));
+  Result := SendInputChecked(Inputs, TotalEvents);
+end;
+
+{ Kept for every existing caller: the outcome is the Try* form's to report. }
+procedure SendInputBatch_Backspace(KeyRepeat: Integer);
+begin
+  TrySendInputBatch_Backspace(KeyRepeat);
 end;
 
 end.
