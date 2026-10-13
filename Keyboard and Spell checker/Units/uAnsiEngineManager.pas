@@ -224,6 +224,19 @@ type
         protected, never unlocked before) are parsed once here. Returns False
         on failure - the previously active engine stays untouched. }
       function SwitchEngine(const AName: string; ErrorLog: TStringList = nil): Boolean;
+      { LAST-RESORT activation of the compiled-in baseline mapping (uAvroBaseline).
+
+        Used only when NOTHING on disk can serve as an engine - a fresh, wiped or
+        portable install with an empty AnsiMapping folder. It decrypts the
+        embedded container in memory (never writes a file), installs it as the
+        active engine and publishes AVRO_BASELINE_NAME as the display name, so a
+        first run types ANSI instead of silently falling back to Unicode.
+
+        Ordering contract: callers must have already failed to resolve a file
+        mapping. A user mapping always outranks this, because anything on disk is
+        tried first. Returns False when the resource is missing or broken, which
+        leaves the app exactly as it behaves today - Unicode output, no engine. }
+      function ActivateEmbeddedBaseline(ErrorLog: TStringList = nil): Boolean;
       { UI-safe fast path. Never reads/decrypts/parses files and never waits for
         the preload/refresh lock. Returns False immediately if busy/not cached. }
       function TrySwitchCached(const AName: string): Boolean;
@@ -290,6 +303,8 @@ uses
   uAnsiPersistentCache,
   uRegistrySettings,
   uAvroEngineStats,
+  uAvroBaseline,
+  uAvroSecureMem,
   System.IOUtils,
   System.Math,
   DebugLog;
@@ -859,6 +874,72 @@ begin
     FLock.Leave;
   end;
   LogAvroMemStats('preload commit (' + IntToStr(Result) + ' engine(s))');
+end;
+
+function TAnsiEngineManager.ActivateEmbeddedBaseline(ErrorLog: TStringList = nil): Boolean;
+var
+  JsonUtf8: TBytes;
+  JSON:     string;
+  Key, Err: string;
+begin
+  Result := False;
+
+  // Read + decrypt OUTSIDE the lock: AvroBaselineLoad does AES-GCM and zlib
+  // work, and holding FLock across it would stall a concurrent switch/repair.
+  if not AvroBaselineLoad(JsonUtf8, Err) then
+  begin
+    Log('Baseline: not activated - ' + Err);
+    if Assigned(ErrorLog) then
+      ErrorLog.Add('Error: ' + Err);
+    Exit;
+  end;
+
+  try
+    JSON := TEncoding.UTF8.GetString(JsonUtf8);
+    if (JSON = '') or (JSON[1] <> '{') then
+    begin
+      Log('Baseline: decrypted payload is not mapping JSON');
+      if Assigned(ErrorLog) then
+        ErrorLog.Add('Error: embedded baseline is not valid mapping JSON');
+      Exit;
+    end;
+
+    Key := SlotKey(AVRO_BASELINE_NAME);
+    if Key = '' then
+      Exit;
+
+    FLock.Enter;
+    try
+      // '' as the file path is correct and deliberate: the baseline has no file,
+      // so there is nothing for the directory watcher to re-parse and nothing to
+      // invalidate. A later import of a real "Ansi V1" simply replaces the slot.
+      DropSlot(Key);
+      if not ParseJSONIntoSlot(AVRO_BASELINE_NAME, '', JSON, ErrorLog) then
+      begin
+        // ParseJSONIntoSlot restores whatever was parked, so a failure here
+        // cannot cost the app an engine it already had.
+        Log('Baseline: embedded payload produced no engine');
+        Exit;
+      end;
+      ParkCurrent;
+      if not TryRestoreSlot(Key, AVRO_BASELINE_NAME) then
+      begin
+        Log('Baseline: state is hollow after parse');
+        EnsureLiveEngine;
+        Exit;
+      end;
+      Result := True;
+      EvictToLimit;
+    finally
+      FLock.Leave;
+    end;
+    Log('Baseline: activated embedded "' + AVRO_BASELINE_NAME + '" (no mapping file on disk)');
+  finally
+    // The decrypted mapping is the most sensitive buffer in the process; wipe it
+    // here rather than leaving it for the string manager to free later.
+    AvroWipeString(JSON);
+    AvroWipeAndRelease(JsonUtf8);
+  end;
 end;
 
 function TAnsiEngineManager.SwitchEngine(const AName: string; ErrorLog: TStringList = nil): Boolean;

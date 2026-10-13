@@ -243,6 +243,11 @@
     <DCCReference Include="Units\uAvroLayoutUI.pas" />
     <DCCReference Include="Classes\clsResourceCatalog.pas" />
     <DCCReference Include="Units\uResourceInstaller.pas" />
+    <DCCReference Include="Units\uAvroEd25519.pas" />
+    <DCCReference Include="Units\uAvroManifestKey.pas" />
+    <DCCReference Include="Units\uAvroManifest.pas" />
+    <DCCReference Include="Units\uResourceTrust.pas" />
+    <DCCReference Include="Units\uAvroBaseline.pas" />
     <DCCReference Include="Forms\ufrmResourceBrowser.pas">
       <Form>frmResourceBrowser</Form>
     </DCCReference>

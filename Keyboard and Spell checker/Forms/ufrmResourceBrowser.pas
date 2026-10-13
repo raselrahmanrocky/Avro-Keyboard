@@ -23,7 +23,12 @@ uses
   StdCtrls,
   ComCtrls,
   ExtCtrls,
-  clsResourceCatalog;
+  clsResourceCatalog,
+  // Both are interface-level because the form's private fields are: FTrust is a
+  // field and ResolveItem hands back a TAvroResource, so the types must be in
+  // scope where the class is declared, not merely in the implementation.
+  uAvroManifest,
+  uResourceTrust;
 
 type
   { One entry of the download queue. Jobs run sequentially in a single TTask;
@@ -70,6 +75,26 @@ type
         already installed - reported by FinishQueue so a bulk download of a
         fully installed selection never claims it re-downloaded anything. }
       FSkipCount:     Integer;
+      { Authenticates the catalog against the signed manifest.
+
+        index.json is fetched over plain HTTPS with no signature, so a hash it
+        carries proves only that a download was not corrupted - not that anyone
+        meant it. The manifest pins the same files with a signature the app can
+        check against a key compiled into the executable, so every install
+        decision goes through FTrust.ResolveItem and nothing is downloaded on
+        the catalog's word alone. Browsing still works unsigned: listing a
+        resource harms nothing, installing it does. }
+      FTrust:          TResourceTrust;
+      { Items the manifest refused, and why the first was refused. Reported by
+        FinishQueue so a refused selection is explained instead of silently
+        shrinking - a user who ticks three items and gets one installed needs
+        to know the other two were blocked on purpose. }
+      FBlockedCount:    Integer;
+      FLastBlockReason: string;
+      { This executable's own version, compared against each resource's
+        minAppVersion. Read once: a running process's file version cannot
+        change, and reading it per item would hit the disk for every row. }
+      FAppVersion:     string;
       { Category the caller asked for ('' = default). The catalog arrives
         asynchronously, so the selection is applied after the fetch, not at
         Show time - see SelectCategoryById. }
@@ -87,6 +112,10 @@ type
 
       procedure SetBusy(const ACaption: string);
       procedure LoadCatalog;
+      { Fetches and verifies the signed manifest. Runs on the worker inside
+        LoadCatalog, after the catalog, so one completion covers both and the
+        dialog is never briefly openable-but-unloadable. }
+      procedure LoadTrust(var AOk: Boolean; var AError: string);
       procedure PopulateCategories;
       procedure SelectCategoryById(const AId: string);
       procedure PopulateItems;
@@ -133,6 +162,7 @@ uses
   uWindowHandlers,
   uFileFolderHandling,
   uResourceInstaller,
+  clsFileVersion,
   uAutoCorrect,
   uForm1,
   DebugLog;
@@ -155,10 +185,17 @@ constructor TfrmResourceBrowser.Create(AOwner: TComponent);
 begin
   inherited;
   FCatalog := TResourceCatalog.Create;
+  FTrust := TResourceTrust.Create;
+  // The running executable's version resource - the same source the About box
+  // and the update checker use, so minAppVersion is compared against the one
+  // number that is true for this build. An empty version resource yields
+  // '0.0.0.0', which fails every minAppVersion and is the safe direction.
+  FAppVersion := TFileVersion.Create.AsString;
 end;
 
 destructor TfrmResourceBrowser.Destroy;
 begin
+  FTrust.Free;
   FCatalog.Free;
   inherited;
 end;
@@ -209,8 +246,10 @@ begin
   TTask.Run(
       procedure
     var
-      Err: string;
-      Ok: Boolean;
+      Err:      string;
+      Ok:       Boolean;
+      TrustOk:  Boolean;
+      TrustErr: string;
     begin
       Ok := False;
       Err := '';
@@ -225,6 +264,15 @@ begin
           Err := 'Catalog error: ' + E.Message;
         end;
       end;
+      // Sequentially, on this worker, AFTER the catalog: the manifest URL is
+      // derived from the catalog's base URL, and doing both here means the
+      // dialog is never openable-but-unloadable and one completion releases
+      // FBusy for both. The catalog is still shown when this fails -
+      // browsing is not a security decision, installing is.
+      TrustOk := False;
+      TrustErr := '';
+      if Ok then
+        LoadTrust(TrustOk, TrustErr);
       TThread.Queue(nil,
           procedure
         begin
@@ -242,11 +290,46 @@ begin
             PopulateCategories;
             SelectCategoryById(FPendingCategory);
             FPendingCategory := '';
-            lblStatus.Caption := IntToStr(Length(Catalog.Categories)) + ' categories loaded.';
+            if TrustOk then
+              lblStatus.Caption := Format('%d categories loaded. Downloads are verified against the signed manifest.',
+                [Length(Catalog.Categories)])
+            else
+              // Say it up front: the Download button still looks enabled (the
+              // rows are browsable) but every install will be refused, so the
+              // reason has to be visible before the click, not after it.
+              lblStatus.Caption := Format('%d categories loaded, but downloads are disabled: %s',
+                [Length(Catalog.Categories), TrustErr]);
           end;
           SetBusy(lblStatus.Caption);
         end);
     end);
+end;
+
+procedure TfrmResourceBrowser.LoadTrust(var AOk: Boolean; var AError: string);
+var
+  Url: string;
+begin
+  AOk := False;
+  AError := '';
+
+  // Derived from the catalog's own base URL rather than hardcoded a second
+  // time, so a fork that retargets the catalog retargets its manifest too.
+  Url := TResourceTrust.ManifestUrlForBase(FCatalog.BaseUrl);
+  if Url = '' then
+    Url := TResourceTrust.DefaultManifestUrl;
+
+  try
+    AOk := FTrust.Fetch(Url, AError);
+  except
+    on E: Exception do
+    begin
+      AOk := False;
+      AError := 'Manifest error: ' + E.Message;
+    end;
+  end;
+
+  if not AOk then
+    Log('Resource manifest not trusted: ' + AError);
 end;
 
 procedure TfrmResourceBrowser.SetBusy(const ACaption: string);
@@ -682,6 +765,8 @@ var
   Cat:        TResourceCategory;
   Item:       TResourceItem;
   Job:        TResourceDownloadJob;
+  Pin:        TAvroResource;
+  Reason:     string;
   I:          Integer;
   QueueCount: Integer;
 begin
@@ -706,6 +791,8 @@ begin
   Cat := FCatalog.Categories[lstCategories.ItemIndex];
   SetLength(FDownloadQueue, Length(AIndexes));
   FSkipCount := 0;
+  FBlockedCount := 0;
+  FLastBlockReason := '';
   QueueCount := 0;
   for I := 0 to high(AIndexes) do
   begin
@@ -725,10 +812,25 @@ begin
       Inc(FSkipCount);
       Continue;
     end;
-    Job.Url := FCatalog.FileUrl(Item);
+
+    // THE INSTALL GATE. The catalog's own statement about a file is not
+    // evidence: it arrives unsigned, so its hash and URL prove nothing about
+    // who chose the bytes. Resolve against the signed manifest and take the
+    // download facts from THAT answer - the sha256 the transfer is verified
+    // against is the signed one, never the catalog's copy.
+    if not FTrust.ResolveItem(Item.FileName, Item.Sha256, FAppVersion, ResourceAppFormatVersion, Pin, Reason) then
+    begin
+      Inc(FBlockedCount);
+      if FLastBlockReason = '' then
+        FLastBlockReason := Reason;
+      Log(Format('Resource refused by the signed manifest: %s - %s', [Item.FileName, Reason]));
+      Continue;
+    end;
+
+    Job.Url := Pin.Url;
     Job.FileName := Item.FileName;
     Job.ResourceType := Item.ResourceType;
-    Job.Sha256 := Item.Sha256;
+    Job.Sha256 := Pin.Sha256;
     Job.Name := Item.Name;
     Job.ItemIndex := AIndexes[I];
     Job.IsOnlyJob := False; // set below, once the filtered queue size is known
@@ -742,14 +844,20 @@ begin
 
   if QueueCount = 0 then
   begin
-    // Nothing was queued - every requested file is already installed. Say so
-    // instead of showing an empty progress run.
-    if Length(AIndexes) = 1 then
+    // Nothing was queued. Distinguish the two reasons rather than reporting an
+    // empty progress run: a refusal must never look like an already-installed
+    // file, or the user retries forever against a manifest that will keep
+    // saying no.
+    if FBlockedCount > 0 then
+      lblStatus.Caption := Format('%d of %d file(s) cannot be installed. %s', [FBlockedCount, Length(AIndexes), FLastBlockReason])
+    else if Length(AIndexes) = 1 then
       lblStatus.Caption := 'Already installed.'
     else
       lblStatus.Caption := Format('All %d file(s) are already installed.', [FSkipCount]);
     FDownloadQueue := nil;
     FSkipCount := 0;
+    FBlockedCount := 0;
+    FLastBlockReason := '';
     Exit;
   end;
 
@@ -1041,10 +1149,23 @@ begin
       Message := Format('All %d file(s) are already installed.', [FSkipCount]);
   end;
 
+  // A refusal by the signed manifest is not a failed transfer, so it gets its
+  // own clause - and it is reported whenever it happened, because a user who
+  // ticked three items and got one installed has to learn why the other two
+  // were deliberately not offered.
+  if FBlockedCount > 0 then
+  begin
+    if Message <> '' then
+      Message := Message + ' ';
+    Message := Message + Format('%d refused by the signed manifest: %s', [FBlockedCount, FLastBlockReason]);
+  end;
+
   SetBusy(Message);
   FFailedCount := 0;
   FLastError := '';
   FSkipCount := 0;
+  FBlockedCount := 0;
+  FLastBlockReason := '';
   FDownloadQueue := nil;
   FQueuePos := 0;
   // The catalog is unchanged by an install - refresh the installed markers.

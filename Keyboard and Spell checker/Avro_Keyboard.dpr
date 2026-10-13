@@ -111,6 +111,11 @@ uses
   clsResourceCatalog in 'Classes\clsResourceCatalog.pas',
   uResourceInstaller in 'Units\uResourceInstaller.pas',
   ufrmResourceBrowser in 'Forms\ufrmResourceBrowser.pas' {frmResourceBrowser} ,
+  uAvroEd25519 in 'Units\uAvroEd25519.pas',
+  uAvroManifestKey in 'Units\uAvroManifestKey.pas',
+  uAvroManifest in 'Units\uAvroManifest.pas',
+  uResourceTrust in 'Units\uResourceTrust.pas',
+  uAvroBaseline in 'Units\uAvroBaseline.pas',
   uAvroPasswordDlg in 'Forms\uAvroPasswordDlg.pas' {frmAvroPasswordDlg};
 
 var

@@ -475,6 +475,7 @@ uses
   uAvroEncoIconSection,
   uAvroLayoutUI,
   ufrmResourceBrowser,
+  uAvroBaseline,
   uAnsiEngineManager;
 
 var
@@ -1433,11 +1434,26 @@ begin
           if (not AnsiEngineManager.SwitchEngine(DesiredVersion)) and (not AnsiEngineManager.SwitchEngine(DesiredVersion)) then
           begin
             // Two attempts cover the first-run race (cache directory missing,
-            // container just installed and still being written). No compiled-in
-            // Default fallback - if both fail, stay on Unicode and log.
+            // container just installed and still being written).
             Log('Startup: could not activate "' + DesiredVersion + '"');
             DesiredVersion := '';
           end;
+      end
+      else if (not Application.Terminated) and AnsiEngineManager.ActivateEmbeddedBaseline then
+      begin
+        // LAST RESORT, and only after the mapping folder came up empty: the
+        // compiled-in ANSI baseline that ships inside Avro Keyboard.exe.
+        //
+        // This is what makes a fresh, wiped or portable install type ANSI on
+        // the very first run with no download and no file on disk. It is a
+        // versioned fallback, not a pin: the moment a mapping file appears on
+        // disk it wins, because this branch is only reached with zero files.
+        //
+        // DesiredVersion must name the baseline too - the block below would
+        // otherwise blank AnsiVersion, discarding the name the activation just
+        // published and leaving the UI claiming no mapping while one is live.
+        DesiredVersion := AVRO_BASELINE_NAME;
+        Log('Startup: activated the embedded ANSI baseline (mapping folder is empty)');
       end
       else
         Log('Startup: no ANSI mapping files - Unicode only');

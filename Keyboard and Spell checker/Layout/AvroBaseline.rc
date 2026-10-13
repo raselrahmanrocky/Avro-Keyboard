@@ -1,0 +1,26 @@
+/*
+  AvroBaseline.rc - the embedded ANSI baseline container.
+
+  ANSI_BASELINE carries one shipped .AvroEnco container (the installer default,
+  "Ansi V1") as raw bytes. It is linked into Avro Keyboard.exe through
+  {$R ../Layout/AvroBaseline.res} in uAvroBaseline.pas, exactly like
+  Internal_Layout.res / Internal_Skin.res are linked by their loader units.
+
+  WHY THIS EXISTS
+  ---------------
+  With an empty AnsiMapping\ folder the application falls back to Unicode and
+  never to a compiled-in mapping (uForm1.pas, uAvroLayoutUI.pas). This resource
+  is the lowest-priority versioned fallback that guarantees a fresh, wiped or
+  portable install still types ANSI on first run.
+
+  The payload is an AvroShield v3 container - ciphertext - so embedding it in
+  the executable leaks no plaintext mapping. It is loaded in memory only
+  (never written to disk) via AvroShieldLoadForRuntime.
+
+  Compile from this folder with:
+    brcc32 -fo"AvroBaseline.res" "AvroBaseline.rc"
+
+  The path is relative to the compiler's working directory (this folder).
+*/
+
+ANSI_BASELINE RCDATA "..\..\assets\Ansi V1.AvroEnco"

@@ -101,6 +101,35 @@ decrypted/
 keys/
 *.enc
 
+# The *.json guard above exists to keep PLAINTEXT mapping sources
+# (assets\Ansi V*.json and friends) out of the repository. Two JSON artifacts
+# are the opposite: they must be committed, because they are what makes a
+# build reproducible and verifiable.
+#
+#   resources.lock.json          - Ed25519-signed pins (sha256 + size) for every
+#                                  shipped container. Committed: this is the
+#                                  offline gate, and it contains no plaintext.
+#   .../AvroShieldSelfTest/fixtures/*.json
+#                                - signed sample lock/manifest used by the KAT
+#                                  gates. Committed: the gates must run offline
+#                                  on a clean clone with no keys present.
+!resources.lock.json
+!AvroEncoEngine/tools/AvroShieldSelfTest/fixtures/*.json
+
+# The '*.res' guard above is for compiled leftovers. Three .res files are the
+# opposite: they are real inputs, force-added long before this file was tidied.
+#   Layout\Internal_Layout.res, Skin\Internal_Skin.res - the built-in skin and
+#   layout, linked by their loader units.
+#   Layout\AvroBaseline.res - the embedded ANSI baseline, linked by
+#   uAvroBaseline.pas. Its source is AvroBaseline.rc, which needs the plaintext
+#   container to rebuild - so a build must NOT have to run brcc32 to link it,
+#   or a fresh clone (which deliberately has no plaintext) would fail.
+!Keyboard and Spell checker/Layout/AvroBaseline.res
+
+# Maintainer-only plaintext sources, restored by
+# tools/resource-sync/fetch_sources.ps1 for a build and never committed.
+assets/*.json
+
 # Windows Explorer folder artefact: it is written into assets/icons whenever the
 # shell rewrites a file name there (the layout icons are regenerated at
 # runtime), it is read by nothing in the code and nothing in the build.
