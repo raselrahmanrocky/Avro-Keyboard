@@ -75,9 +75,10 @@ Then put the stub back before you commit:
 
     tools\secrets\fetch_secrets.ps1 -Clean
 
-Setup, rotation and the leak gate are documented in `SECRETS_SETUP.md`, and the
-rotation procedure itself in `docs\ROTATION_RUNBOOK.md`. Do not add key material
-to the stub: `tools\secrets\check-no-secret-bytes.ps1` fails the
+Setup, rotation and the leak gate are documented in `SECRETS_SETUP.md`, the
+rotation procedure itself in `docs\ROTATION_RUNBOOK.md`, and replacing a
+history that still carries the key in `docs\ROLLOUT_CHECKLIST.md`. Do not add
+key material to the stub: `tools\secrets\check-no-secret-bytes.ps1` fails the
 build if it appears.
 
 ## Where Avro keeps its data
