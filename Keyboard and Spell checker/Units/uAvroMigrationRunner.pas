@@ -74,7 +74,7 @@ const
     it in lockstep with resources.lock.json and the manifest; a mismatch against
     the signed manifest is what tells the planner that a container is stale after
     a rotation rather than corrupt. }
-  AVRO_APP_KEY_EPOCH = 1;
+  AVRO_APP_KEY_EPOCH = 2;
 
   { The manifest's resource type for the ANSI mappings, which is also the key
     uResourceInstaller.ResourceTargetFolder resolves the destination from. }
