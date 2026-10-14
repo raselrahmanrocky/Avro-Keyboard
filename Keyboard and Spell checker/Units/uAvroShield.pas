@@ -244,11 +244,21 @@ function Pbkdf2HMACSHA256(const APassword, ASalt: TBytes; AIterations, ADkLen: I
   comment text unrecoverable from a shipped container while the runtime keeps
   skipping those fields entirely (see the obfuscation codec doc).
 
+  ATargetVersion selects the container format to write: 3 (the default - keyed
+  metadata mask, separate comment domain) or 2 - the legacy layout, writable
+  only so the self-test can build a real format-v2 container itself instead of
+  freezing one that pins the key it was built with and strands every later
+  key rotation. Format 2 masks the metadata with the constant legacy seed and
+  keeps comment fields in the value domain, exactly what the v2 read path
+  expects; the key schedule and the 58-byte header are identical. Nothing
+  shipped is ever built as v2, and any other value is rejected as
+  asrBadVersion.
+
   On asrOk, AOutBytes holds the complete container and can be written to a
   .AvroEnco file. All intermediate key material and plaintext buffers are
   wiped before the function returns. }
 function AvroShieldBuildFromJson(const AJSONText, APassword: string; const ADefaultKey, ABindToMachine, AUseHardwareFactor: Boolean; out AOutBytes: TBytes;
-  const ADefaultSecretIKM: TBytes = nil; const ACommentsIKM: TBytes = nil): TAvroShieldResult;
+  const ADefaultSecretIKM: TBytes = nil; const ACommentsIKM: TBytes = nil; const ATargetVersion: Byte = 3): TAvroShieldResult;
 
 implementation
 
@@ -1774,8 +1784,8 @@ end;
   Developer documentation fields (OBF_COMMENT_FIELDS) are encoded in their own
   domain under AvroShieldCommentCtx, with a key derived from the developer
   comment IKM - which is never derived from anything the runtime holds. }
-function ObfuscateTree(ANode: TAvroNode; const ACtx: string; const ASeed, ACommentSeed: TBytes; ARev: TDictionary<string, string>;
-  const ASkip: TDictionary<string, Boolean>): TAvroNode;
+function ObfuscateTree(ANode: TAvroNode; const ACtx: string; const ASeed, ACommentSeed: TBytes; ACommentDomain: Boolean;
+  ARev: TDictionary<string, string>; const ASkip: TDictionary<string, Boolean>): TAvroNode;
 var
   I:                         Integer;
   OrigKey, HashedKey:        string;
@@ -1804,17 +1814,21 @@ begin
           if not ARev.ContainsKey(HashedKey) then
             ARev.Add(HashedKey, OrigKey);
           IsComment := AvroShieldIsCommentField(OrigKey);
-          if IsComment then
+          if IsComment and ACommentDomain then
           begin
             ChildSeed := EffCommentSeed;
             ChildCtxPath := AvroShieldCommentCtx(ACtx, HashedKey);
           end
           else
           begin
+            // Value fields, and every comment field in a format-v2 container,
+            // which has no separate comment domain: plain child context and
+            // the value seed - the exact mirror of DeobfValue's
+            // ACommentDomain=False path.
             ChildSeed := ASeed;
             ChildCtxPath := ChildCtx(ACtx, HashedKey);
           end;
-          Child := ObfuscateTree(ANode.Items[I], ChildCtxPath, ChildSeed, EffCommentSeed, ARev, ASkip);
+          Child := ObfuscateTree(ANode.Items[I], ChildCtxPath, ChildSeed, EffCommentSeed, ACommentDomain, ARev, ASkip);
           Result.Keys.Add(HashedKey);
           Result.Items.Add(Child);
         end;
@@ -1823,7 +1837,7 @@ begin
       begin
         Result.Kind := nkArray;
         for I := 0 to ANode.Items.Count - 1 do
-          Result.Items.Add(ObfuscateTree(ANode.Items[I], IndexCtx(ACtx, I), ASeed, EffCommentSeed, ARev, ASkip));
+          Result.Items.Add(ObfuscateTree(ANode.Items[I], IndexCtx(ACtx, I), ASeed, EffCommentSeed, ACommentDomain, ARev, ASkip));
       end;
     nkString:
       begin
@@ -2123,7 +2137,7 @@ end;
 { ---- container assembly ---------------------------------------------------- }
 
 function AvroShieldBuildFromJson(const AJSONText, APassword: string; const ADefaultKey, ABindToMachine, AUseHardwareFactor: Boolean; out AOutBytes: TBytes;
-  const ADefaultSecretIKM: TBytes; const ACommentsIKM: TBytes): TAvroShieldResult;
+  const ADefaultSecretIKM: TBytes; const ACommentsIKM: TBytes; const ATargetVersion: Byte): TAvroShieldResult;
 var
   JSON:                                                       TJSONValue;
   Root, Obf, MetaNode:                                        TAvroNode;
@@ -2144,6 +2158,8 @@ begin
 
   if (not ADefaultKey) and (APassword = '') then
     Exit(asrEmptyPassword);
+  if (ATargetVersion <> AS_VERSION) and (ATargetVersion <> AS_VERSION_LEGACY) then
+    Exit(asrBadVersion);
 
   JSON := TJSONObject.ParseJSONValue(Trim(AJSONText));
   if JSON = nil then
@@ -2163,7 +2179,8 @@ begin
     // Salt and the master key must exist before the obfuscation stage: the
     // metadata blob that carries the value seed and the key map is masked with
     // a key derived from the master key (format v3), never with a constant
-    // compiled into this unit.
+    // compiled into this unit. Format 2 is the deliberate exception - the
+    // legacy layout the v2 read path expects, written only on request.
     FillRandomBytes(Salt, 16);
     if ADefaultKey then
     begin
@@ -2179,7 +2196,10 @@ begin
       Master := ShieldKdfPasswordKey(PasswordIKM, Salt);
       AvroWipeAndRelease(PasswordIKM);
     end;
-    MetaMask := AvroShieldMetaMask(Master);
+    if ATargetVersion = AS_VERSION then
+      MetaMask := AvroShieldMetaMask(Master)
+    else
+      MetaMask := MetaSeed;
 
     // ---- obfuscate ----
     FillRandomBytes(Seed, 32);
@@ -2192,7 +2212,7 @@ begin
     Dummies := TStringList.Create;
     try
       Skip.Add(META_KEY, True);
-      Obf := ObfuscateTree(Root, '', Seed, CommentSeed, Rev, Skip);
+      Obf := ObfuscateTree(Root, '', Seed, CommentSeed, ATargetVersion = AS_VERSION, Rev, Skip);
       // Decoys are injected into the OBFUSCATED tree (their keys must appear
       // exactly once, already hashed, and they are dropped by the
       // deobfuscator via ASkip).
@@ -2271,7 +2291,7 @@ begin
       AStrm := TMemoryStream.Create;
       try
         AStrm.WriteBuffer(AsMagic[0], 8);
-        B := AS_VERSION;
+        B := ATargetVersion;
         AStrm.WriteBuffer(B, 1);
         AStrm.WriteBuffer(Flags, 1);
         AStrm.WriteBuffer(Salt[0], 16);
