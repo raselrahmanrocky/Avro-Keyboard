@@ -168,7 +168,7 @@ Converter/*.obj
 # Delphi keyboard build output (rebuilt by tools\release\build-installers.ps1
 # on every pass; build\ is cleaned before each build)
 /build/
-# Python bytecode from toolsesource-sync\*.py and tools\secrets\*.py. They are
+# Python bytecode from tools\resource-sync\*.py and tools\secrets\*.py. They are
 # run directly, and an import between them drops __pycache__ into a tracked
 # folder - which then reads as a dirty working tree to the rotation script.
 __pycache__/
