@@ -129,6 +129,9 @@ keys/
 # Maintainer-only plaintext sources, restored by
 # tools/resource-sync/fetch_sources.ps1 for a build and never committed.
 assets/*.json
+# Exception: the ANSI version mapping tables (Ansi V1.json .. Ansi V100.json)
+# are committed, so any ANSI version stays reproducible from a clean clone.
+!assets/Ansi V*.json
 
 # The secret-bearing root-secret unit. The public repository tracks ONLY the
 # stub at this path; the real unit is fetched by
