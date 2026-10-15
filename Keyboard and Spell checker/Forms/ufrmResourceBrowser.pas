@@ -63,6 +63,7 @@ type
     procedure lvItemsItemChecked(Sender: TObject; Item: TListItem);
     procedure btnDownloadClick(Sender: TObject);
     procedure btnCloseClick(Sender: TObject);
+    procedure lblStatusMouseEnter(Sender: TObject);
     private
       FCatalog:       TResourceCatalog;
       FBusy:          Boolean;
@@ -342,6 +343,18 @@ begin
   lblStatus.Caption := ACaption;
   btnDownload.Enabled := not FBusy;
   lstCategories.Enabled := not FBusy;
+end;
+
+{ The status label is a fixed 168x46 WordWrap box, so the TAIL of a refusal
+  reason is exactly what gets clipped - which is how "Downloads are disabled
+  because the signed resource manifest could not be verified. The resource
+  manifest could not be trusted: Signed with an unknown key (...)" reached a
+  user as "... The resour". The caption always carries the whole sentence, so
+  the hover hint re-publishes it uncut: one place, every message the label ever
+  shows, no second control to keep in step. }
+procedure TfrmResourceBrowser.lblStatusMouseEnter(Sender: TObject);
+begin
+  lblStatus.Hint := lblStatus.Caption;
 end;
 
 procedure TfrmResourceBrowser.PopulateCategories;

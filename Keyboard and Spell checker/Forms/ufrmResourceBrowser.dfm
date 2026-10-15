@@ -54,7 +54,10 @@ object frmResourceBrowser: TfrmResourceBrowser
     Height = 46
     AutoSize = False
     Caption = ''
+    ParentShowHint = False
+    ShowHint = True
     WordWrap = True
+    OnMouseEnter = lblStatusMouseEnter
   end
   object lstCategories: TListBox
     Left = 8

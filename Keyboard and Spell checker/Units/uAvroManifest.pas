@@ -46,9 +46,13 @@
 
   TRUST RULES
   -----------
-  * A manifest whose signed payload names a keyId other than the embedded one
-    is REFUSED, not verified against the embedded key - that is what makes key
-    rotation detectable instead of silently failing.
+  * A manifest whose signed payload names a keyId that is neither the embedded
+    one nor, while its window is open, the embedded PREDECESSOR, is REFUSED -
+    not verified against whichever key happens to fit. That is what makes key
+    rotation detectable instead of silently failing, and the predecessor entry
+    is only there so a document published before a rotation is not refused the
+    moment the client updates: it is dropped by regenerating uAvroManifestKey
+    without --previous-pas.
   * The wrapper's own keyId/manifestVersion fields are NOT trusted; the payload
     is the only authority.
   * Nothing here decides policy (download, uninstall). It parses, verifies and
@@ -103,8 +107,10 @@ function AvroManifestParse(const AJsonText: string; out AManifest: TAvroManifest
 { Parses a bare canonical payload (no JSON wrapper). Exposed for tests. }
 function AvroManifestParsePayload(const APayload: string; out AManifest: TAvroManifest; out AError: string): Boolean;
 
-{ Verifies the payload signature with the embedded public key and checks the
-  payload keyId against it. Assumes AManifest came from AvroManifestParse. }
+{ Selects the embedded key that the payload's keyId names - the current one,
+  or the predecessor while its window is open - and verifies the signature with
+  it. Any other keyId is refused without trying a signature. Assumes AManifest
+  came from AvroManifestParse. }
 function AvroManifestVerifySignature(const AManifest: TAvroManifest; out AError: string): Boolean;
 
 { Parse + verify in one call - the runtime entry point. On failure AManifest is
@@ -432,8 +438,9 @@ end;
 
 function AvroManifestVerifySignature(const AManifest: TAvroManifest; out AError: string): Boolean;
 var
-  Pub:       TBytes;
+  Pub:         TBytes;
   PayloadUtf8: TBytes;
+  PrevKeyId:   string;
 begin
   Result := False;
   AError := '';
@@ -443,13 +450,25 @@ begin
     Exit;
   end;
 
-  if not ConstEqStr(AManifest.KeyId, AvroManifestKeyId) then
+  { WHICH key decides, not whether SOME key fits. The payload's own keyId picks
+    the candidate - the current key first, the predecessor second while its
+    transition window is open (a rotation republished the document under the new
+    key, but builds shipped before it still exist and must not lose the ability
+    to install until they update). An id with no entry is refused here, before
+    any signature work: verifying against whatever key happens to match would
+    make the keyId line decorative, and it is the line that makes rotation a
+    detectable event rather than a silent swap. }
+  PrevKeyId := AvroManifestPreviousKeyId;
+  if ConstEqStr(AManifest.KeyId, AvroManifestKeyId) then
+    Pub := AvroManifestPublicKey
+  else if (PrevKeyId <> '') and ConstEqStr(AManifest.KeyId, PrevKeyId) then
+    Pub := AvroManifestPreviousPublicKey
+  else
   begin
     AError := 'Signed with an unknown key (' + AManifest.KeyId + '); refusing.';
     Exit;
   end;
 
-  Pub := AvroManifestPublicKey;
   PayloadUtf8 := TEncoding.UTF8.GetBytes(AManifest.Payload);
   try
     if not AvroEd25519Verify(Pub, PayloadUtf8, AManifest.Signature) then
