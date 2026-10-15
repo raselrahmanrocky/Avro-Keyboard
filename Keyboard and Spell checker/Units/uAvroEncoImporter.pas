@@ -243,9 +243,19 @@ begin
       // Test-decrypt the payload in memory with the pure Pascal AES engine.
       // A corrupted payload fails the PKCS#7 padding / JSON check and is
       // reported as an error without ever asking for a password.
+      //
+      // The wording comes from AvroEncoOpenFailureMessage, not from a literal
+      // here: a build WITHOUT the secret extension cannot open a default-key
+      // container at all, and calling such a file "invalid or corrupted" sends
+      // the user hunting for a broken download that is in fact intact. That
+      // helper branches on IsRealSecretUnit (plus the protection flag) and
+      // names the real cause and the fix; a genuinely damaged container in a
+      // real build keeps the plain failure wording. The version picker and the
+      // layout UI already report through the same helper, so all three sites
+      // now agree on what a user is told.
       if not ValidateAvroEncoPassword(ASourcePath, '') then
       begin
-        AErrorMessage := 'Invalid or corrupted .AvroEnco file. Import was not performed.';
+        AErrorMessage := AvroEncoOpenFailureMessage(ASourcePath);
         Exit;
       end;
       Password := '';
