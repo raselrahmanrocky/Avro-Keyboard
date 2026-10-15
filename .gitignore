@@ -98,7 +98,21 @@ Standard edition/
 
 *.json
 decrypted/
-keys/
+# Exactly three key files are TRACKED: the container IKM, the comment IKM and
+# the Ed25519 manifest signing key - they are what lets this repository build
+# its own .AvroEnco containers with no second repository to fetch from.
+#
+# 'keys/*' rather than 'keys/' so the directory itself stays reachable and the
+# negations below can name their files. Everything else under keys\ - most
+# importantly the keys\old\<timestamp>\ copies that rotate_ikm.ps1 writes to
+# preserve a superseded IKM - remains local and untracked.
+#
+# A NEW key file must be added to the negation list below, or it is silently
+# untracked: it would build on this machine and fail to build from a clone.
+keys/*
+!keys/avroenco.key
+!keys/avrocomments.key
+!keys/manifest_ed25519.key
 *.enc
 
 # The *.json guard above exists to keep PLAINTEXT mapping sources
