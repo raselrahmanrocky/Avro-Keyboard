@@ -152,11 +152,25 @@ begin
 end;
 
 class function TResourceTrust.ManifestUrlForBase(const ABaseUrl: string): string;
+var
+  Base: string;
 begin
   Result := '';
-  if Trim(ABaseUrl) = '' then
+  Base := Trim(ABaseUrl);
+  if Base = '' then
     Exit;
-  Result := IncludeTrailingPathDelimiter(Trim(ABaseUrl)) + RESOURCE_MANIFEST_FILE;
+  // A URL is not a file name. IncludeTrailingPathDelimiter appends PathDelim,
+  // so on Windows a base that already ended in '/' became
+  // ".../Avro-Keyboard-Resource/main/\manifest.json" - raw.githubusercontent
+  // answers that with a 404, FStatus stays rtsFailed and every install is
+  // refused while the catalog itself keeps loading normally. Join the
+  // segments with '/' explicitly instead, and tolerate a base that arrives
+  // with a backslash from some other caller.
+  while (Length(Base) > 0) and ((Base[Length(Base)] = '/') or (Base[Length(Base)] = '\')) do
+    Base := Copy(Base, 1, Length(Base) - 1);
+  if Base = '' then
+    Exit;
+  Result := Base + '/' + RESOURCE_MANIFEST_FILE;
 end;
 
 class function TResourceTrust.DefaultManifestUrl: string;
