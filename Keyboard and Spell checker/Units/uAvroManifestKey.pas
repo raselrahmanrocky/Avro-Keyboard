@@ -23,14 +23,14 @@ uses
 const
   { Identifier of the signing key. A manifest whose signed payload names a
     different keyId must be refused rather than verified against this key. }
-  AVRO_MANIFEST_KEY_ID = 'ed25519-2026-1';
+  AVRO_MANIFEST_KEY_ID = 'ed25519-2026-2';
 
   AVRO_MANIFEST_PUBLIC_KEY_LEN = 32;
 
   AVRO_MANIFEST_PUBLIC_KEY: array [0 .. 31] of Byte = (
-        $BF, $2A, $54, $C1, $01, $37, $F4, $FC, $D4, $71, $1D, $6E,
-        $64, $09, $E8, $F4, $3B, $6C, $EB, $87, $5D, $06, $44, $32,
-        $BB, $55, $4A, $DE, $03, $1B, $85, $FA
+        $91, $B3, $80, $D6, $31, $D0, $E5, $9D, $CC, $63, $A8, $1F,
+        $6E, $B3, $C3, $6D, $1A, $9F, $D9, $F8, $1E, $9A, $45, $81,
+        $64, $36, $96, $9F, $51, $23, $BD, $3D
   );
 
 { The pinned public key as a TBytes, ready for AvroEd25519Verify. }
