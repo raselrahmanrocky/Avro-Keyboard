@@ -190,3 +190,10 @@ Converter/*.obj
 # folder - which then reads as a dirty working tree to the rotation script.
 __pycache__/
 *.pyc
+
+# The public update manifests. The '*.xml' guard above would ignore them, but
+# updates\versioninfo.xml and updates\versioninfo_beta.xml ARE the update feed
+# the application reads from Avro-Keyboard main - they must be committed.
+# release\gen_manifest.ps1 writes them, and nothing else may live in updates\.
+!updates/
+!updates/*.xml

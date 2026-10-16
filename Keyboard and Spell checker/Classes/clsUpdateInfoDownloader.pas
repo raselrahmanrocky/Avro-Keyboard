@@ -58,12 +58,12 @@ uses
   DebugLog;
 
 { Returns the update feed URL for the channel the user selected in Options
-  (CheckBetaUpdates). The files live on the main branch of the
-  Avro-Keyboard-Releases repository; pushing a new XML is enough to publish. }
+  (CheckBetaUpdates). The files live under updates\ on the main branch of the
+  Avro-Keyboard repository; publishing a new XML is enough to update the feed. }
 function GetUpdateInfoURL: string;
 const
-  URL_STABLE = 'https://raw.githubusercontent.com/raselrahmanrocky/Avro-Keyboard-Releases/main/versioninfo.xml';
-  URL_BETA   = 'https://raw.githubusercontent.com/raselrahmanrocky/Avro-Keyboard-Releases/main/versioninfo_beta.xml';
+  URL_STABLE = 'https://raw.githubusercontent.com/raselrahmanrocky/Avro-Keyboard/main/updates/versioninfo.xml';
+  URL_BETA   = 'https://raw.githubusercontent.com/raselrahmanrocky/Avro-Keyboard/main/updates/versioninfo_beta.xml';
 begin
   if CheckBetaUpdates = 'YES' then
     Result := URL_BETA
@@ -90,7 +90,7 @@ end;
 
   namedversion is authoritative whenever it is present: a beta tag always
   yields a name containing "beta" (v6.0.1-beta, "... 6.0.1 BETA"), and the
-  sync workflow's beta feed falls back to the stable release when no beta is
+  manifest generator's beta feed falls back to the stable release when no beta is
   published - that fallback keeps a name without "beta", which is exactly
   what makes the answer correct there. The feed URL is only a last resort
   when namedversion is missing entirely. }

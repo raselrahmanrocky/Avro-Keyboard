@@ -46,10 +46,9 @@ or,
 
 The file is checked in with the portable switch **commented out**, and it stays
 that way: the standard (installed) edition is the source default. Portables are
-built only by `tools/release/build-installers.ps1`, which forces the switch on
-for its portable passes and restores `ProjectDefines.inc` byte-for-byte
-before it finishes - so a release does not leave the working tree switched to
-portable.
+built only by the maintainer release pipeline, which forces the switch on for
+its portable passes and restores `ProjectDefines.inc` byte-for-byte before it
+finishes - so a release does not leave the working tree switched to portable.
 
 ### Building Projects
 
@@ -59,27 +58,18 @@ Delphi community edition doesn't come with command line compiler. In order to bu
 - Open `WholeProject.groupproj` in Delphi IDE and run `Build All` from the project group
 - Built and renamed files will be under `build` directory
 
-### The root secret and default-key containers
+### The default-key unit (public source)
 
 `Keyboard and Spell checker/Units/Private/uAvroShieldSecret.pas` is checked in
-as a **public stub** with no key material, so a clone builds and runs offline with
-no token and no key file. In that state the keyboard cannot open a **default-key**
-`.AvroEnco` container: it reports that the secret is unavailable instead of
-failing with a confusing decode error, and the release guard refuses the build.
+as a **public stub** with no key material, so a clone of this repository builds
+and runs offline with no token and no key file. In that state the keyboard
+cannot open a **default-key** `.AvroEnco` container: it reports that the secret
+is unavailable instead of failing with a confusing decode error.
 
-To build with the real unit, fetch it from the private extension repository:
-
-    tools\secrets\fetch_secrets.ps1            # needs AVRO_SECRETS_TOKEN
-
-Then put the stub back before you commit:
-
-    tools\secrets\fetch_secrets.ps1 -Clean
-
-Setup, rotation and the leak gate are documented in `SECRETS_SETUP.md`, the
-rotation procedure itself in `docs\ROTATION_RUNBOOK.md`, and replacing a
-history that still carries the key in `docs\ROLLOUT_CHECKLIST.md`. Do not add
-key material to the stub: `tools\secrets\check-no-secret-bytes.ps1` fails the
-build if it appears.
+Building binaries that DO open default-key containers needs the private key
+material, which is never part of this repository; the maintainer tooling that
+fetches, rotates and verifies it lives in the private development repository.
+Do not add key material to the stub: a leak gate fails the build if it appears.
 
 ## Where Avro keeps its data
 

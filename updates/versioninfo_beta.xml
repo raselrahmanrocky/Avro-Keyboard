@@ -1,0 +1,13 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<versioninfo>
+  <versionmajor>6</versionmajor>
+  <versionminor>0</versionminor>
+  <versionrevision>0</versionrevision>
+  <versionbuild>0</versionbuild>
+  <channel>stable</channel>
+  <downloadurl>https://github.com/raselrahmanrocky/Avro-Keyboard</downloadurl>
+  <changelogurl>https://github.com/raselrahmanrocky/Avro-Keyboard</changelogurl>
+  <productpageurl>https://github.com/raselrahmanrocky/Avro-Keyboard</productpageurl>
+  <releasedate></releasedate>
+  <namedversion>Avro Keyboard 6.0.0</namedversion>
+</versioninfo>
