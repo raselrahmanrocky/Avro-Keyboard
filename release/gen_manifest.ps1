@@ -108,23 +108,33 @@ function Invoke-GitHubApi {
 }
 
 Write-Step 'Fetch releases'
-try {
-    $releases = @(Invoke-GitHubApi -Uri "https://api.github.com/repos/$Repo/releases?per_page=100")
-}
-catch {
-    Write-Fail $_.Exception.Message
-    Write-Fail "'could not check' is never a pass; nothing was written."
-    exit 2
+# The list endpoint can lag behind a release that was JUST created (observed:
+# an authenticated list right after the first create returned an empty array),
+# and an empty list is indistinguishable from the legitimate zero state - it
+# would silently write baseline manifests over a live release. Retry the empty
+# answer; a genuinely empty repository merely pays a few seconds.
+$releases = @()
+for ($attempt = 1; $attempt -le 4; $attempt++) {
+    try {
+        $rawResponse = Invoke-GitHubApi -Uri "https://api.github.com/repos/$Repo/releases?per_page=100"
+    }
+    catch {
+        Write-Fail $_.Exception.Message
+        Write-Fail "'could not check' is never a pass; nothing was written."
+        exit 2
+    }
+    # PowerShell 5.1: an empty JSON array survives the function return as ONE
+    # nested empty Object[] element (or null), so a bare $releases.Count reads 1
+    # on an empty answer and the loop would break without retrying. Filter by
+    # the expected property first, then count what actually remains.
+    $releases = @($rawResponse | Where-Object { $_ -and $_.PSObject.Properties['tag_name'] })
+    if ($releases.Count -gt 0 -or $attempt -eq 4) { break }
+    Write-Warn "the release list came back empty (attempt $attempt); retrying in 5s"
+    Start-Sleep -Seconds 5
 }
 if ($releases.Count -eq 100) {
     Write-Warn 'exactly 100 releases returned (the per_page ceiling); older ones were not listed'
 }
-# PowerShell 5.1: an EMPTY JSON array returned from a function materialises as
-# one nested empty Object[] element, which is truthy for -ne $null and then
-# explodes under StrictMode on the first property probe. Filter by the presence
-# of the expected property instead - that drops $null, empty-array and
-# wrong-shape elements alike.
-$releases = @($releases | Where-Object { $_ -and $_.PSObject.Properties['tag_name'] })
 $active = @($releases | Where-Object { -not $_.draft })
 $active = @($active | Sort-Object -Property @{ Expression = { if ($_.published_at) { [DateTime]$_.published_at } else { [DateTime]::MinValue } }; Descending = $true },
                                           @{ Expression = { $_.id }; Descending = $true })
