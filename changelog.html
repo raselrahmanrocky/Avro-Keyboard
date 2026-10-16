@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light" data-lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title data-i18n="cl.meta.title">Release changelog — Avro Keyboard Community Edition</title>
+<meta name="description" data-i18n-content="cl.meta.desc" content="The complete changelog of every Avro Keyboard Community Edition release — what is new, what was fixed, the file list and SHA-256. Live from the GitHub releases API.">
+<link rel="canonical" href="https://raselrahmanrocky.github.io/Avro-Keyboard/changelog.html">
+<link rel="alternate" hreflang="en" href="https://raselrahmanrocky.github.io/Avro-Keyboard/changelog.html">
+<link rel="alternate" hreflang="bn" href="https://raselrahmanrocky.github.io/Avro-Keyboard/changelog.html?lang=bn">
+<link rel="alternate" hreflang="x-default" href="https://raselrahmanrocky.github.io/Avro-Keyboard/changelog.html">
+<meta name="theme-color" content="#6d20d6">
+<meta name="color-scheme" content="light dark">
+
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Avro Keyboard Community Edition">
+<meta property="og:title" content="Release changelog — Avro Keyboard Community Edition">
+<meta property="og:description" content="Every release's full notes, file list and SHA-256 — live from the GitHub releases API.">
+<meta property="og:url" content="https://raselrahmanrocky.github.io/Avro-Keyboard/changelog.html">
+<meta property="og:image" content="https://raselrahmanrocky.github.io/Avro-Keyboard/img/og-cover.jpg">
+<meta property="og:locale" content="en_US">
+<meta property="og:locale:alternate" content="bn_BD">
+<meta name="twitter:card" content="summary_large_image">
+
+<link rel="icon" href="img/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="img/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="img/logo-192.png">
+
+<link rel="preload" href="fonts/hind-siliguri-bengali-400.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/inter-latin-400.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="css/fonts.css">
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/pages.css">
+
+<script>
+/* Runs before the stylesheets paint. Resolves the language so a Bangla
+   visitor never sees a flash of English prose, and reapplies a stored dark
+   theme so it never flashes light — first-time visitors always start on the
+   light theme. js/i18n.js clears the pending flag; the timeout is a backstop
+   in case that file never loads. */
+(function () {
+  var root = document.documentElement;
+
+  var lang = 'en';
+  try {
+    var wanted = /[?&]lang=(en|bn)\b/.exec(location.search);
+    var stored = localStorage.getItem('avro-lang');
+    lang = wanted ? wanted[1] : (stored === 'bn' ? 'bn' : 'en');
+    localStorage.setItem('avro-lang', lang);
+    if (localStorage.getItem('avro-theme') === 'dark') {
+      root.setAttribute('data-theme', 'dark');
+    }
+  } catch (e) { /* English and the light theme are the defaults */ }
+
+  root.setAttribute('lang', lang);
+  root.setAttribute('data-lang', lang);
+
+  if (lang !== 'en') {
+    root.setAttribute('data-i18n-pending', '1');
+    setTimeout(function () { root.removeAttribute('data-i18n-pending'); }, 1500);
+  }
+})();
+</script>
+</head>
+<body>
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true" focusable="false">
+  <symbol id="i-keyboard" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6.2" width="19" height="11.6" rx="2.4"/><path d="M6 9.6h.01M9.4 9.6h.01M12.8 9.6h.01M16.2 9.6h.01M6.6 12.6h.01M10 12.6h.01M13.4 12.6h.01M16.8 12.6h.01M8 15.2h8"/></symbol>
+  <symbol id="i-package" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.8 20.4 7v10L12 21.2 3.6 17V7z"/><path d="M3.6 7 12 11.4 20.4 7M12 11.4v9.8"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5v10.2M8 10l4 3.7 4-3.7"/><path d="M4.5 17.5v1.6a1.4 1.4 0 0 0 1.4 1.4h12.2a1.4 1.4 0 0 0 1.4-1.4v-1.6"/></symbol>
+  <symbol id="i-external" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M13.6 4.2h6.2v6.2"/><path d="M19.8 4.2 11.2 12.8"/><path d="M17.8 14.2v4.2a1.4 1.4 0 0 1-1.4 1.4H5.6a1.4 1.4 0 0 1-1.4-1.4V7.6a1.4 1.4 0 0 1 1.4-1.4h4.2"/></symbol>
+  <symbol id="i-archive" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.4" width="18" height="4" rx="1.2"/><path d="M4.6 8.4v9.8a1.4 1.4 0 0 0 1.4 1.4h12a1.4 1.4 0 0 0 1.4-1.4V8.4"/><path d="M9.6 12.2h4.8"/></symbol>
+</svg>
+
+<a class="skip-link" href="#main" data-i18n="nav.skip">Skip to main content</a>
+
+<header class="topbar">
+  <div class="wrap nav">
+    <a class="brand" href="index.html">
+      <img src="img/logo.jpg" width="44" height="44" alt="">
+      <span><b data-i18n="brand.name">Avro Keyboard<span class="ce-tag">Community Edition</span></b><small data-i18n="brand.tagline">Open source · MPL-2.0</small></span>
+    </a>
+    <nav class="navlinks" data-i18n-aria-label="nav.main" aria-label="Main navigation">
+      <a href="index.html#improvements" data-i18n="nav.improvements">Improvements</a>
+      <a href="index.html#features" data-i18n="nav.features">Features</a>
+      <a href="index.html#install" data-i18n="nav.install">Install</a>
+      <a href="index.html#download" data-i18n="nav.download">Download</a>
+      <a href="changelog.html" data-i18n="nav.changelog">Changelog</a>
+    </nav>
+    <div class="navright">
+      <div class="langswitch" role="group" data-i18n-aria-label="lang.label" aria-label="Language">
+        <button type="button" data-lang-set="en" data-i18n="lang.en" data-i18n-aria-label="lang.enFull" data-i18n-title="lang.enFull" aria-pressed="false" aria-label="English" title="English">EN</button>
+        <button type="button" data-lang-set="bn" data-i18n="lang.bn" data-i18n-aria-label="lang.bnFull" data-i18n-title="lang.bnFull" aria-pressed="false" aria-label="বাংলা" title="বাংলা">বাং</button>
+      </div>
+      <button class="theme" id="themeBtn" type="button" aria-pressed="false" aria-label="Switch to dark theme" title="Switch to dark theme">☾</button>
+      <a class="btn btn-primary" href="index.html#download"><span data-i18n="actions.download">Download</span> <span aria-hidden="true">↓</span></a>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+  <section class="page-hero">
+    <div class="wrap">
+      <p class="crumbs"><a href="index.html" data-i18n="nav.home">Home</a><span aria-hidden="true">/</span><span data-i18n="cl.crumb">Changelog</span></p>
+      <h1 data-i18n="cl.h1">The <span class="gradient">complete changelog</span> for every release</h1>
+      <p data-i18n="cl.lead">
+        Every release's notes, download files, sizes, download counts and SHA-256 — all fetched
+        live from the GitHub releases API. Publish a new release and it joins this page by
+        itself; nothing needs editing by hand.
+      </p>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="wrap">
+      <p class="status-note" data-state="loading" id="clStatus">
+        <span class="dot" data-live-dot data-state="loading"></span>
+        <span data-note-text>Fetching the changelog…</span>
+      </p>
+
+      <div class="cl-layout">
+        <aside class="tag-nav" id="tagNav" data-i18n-aria-label="nav.variants" aria-label="Version list"></aside>
+        <div id="changelog">
+          <p class="release-empty">Loading the release list…</p>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="footer">
+  <div class="wrap">
+    <p class="legal" data-i18n="footer.legal">
+      Avro Keyboard Community Edition — an independent continuation of Avro Keyboard's
+      open-source code (MPL-2.0). <strong>Not affiliated with OmicronLab or its original
+      developers</strong>. The original source and copyright of Avro Keyboard belong to
+      OmicronLab (Mehdi Hasan Khan).
+    </p>
+  </div>
+  <div class="wrap footrow">
+    <div class="footbrand">
+      <img src="img/logo.jpg" width="34" height="34" alt="" loading="lazy" decoding="async">
+      <span>
+        <strong>Avro Keyboard Community Edition</strong><br>
+        <span data-i18n="footer.ahead"><span data-ahead-note>—</span> commits ahead of the official baseline · MPL-2.0</span>
+      </span>
+    </div>
+    <nav class="footer-links" data-i18n-aria-label="nav.footer" aria-label="Footer links">
+      <a href="index.html#improvements" data-i18n="nav.improvements">Improvements</a>
+      <a href="index.html#features" data-i18n="nav.features">Features</a>
+      <a href="index.html#install" data-i18n="nav.install">Install</a>
+      <a href="changelog.html" data-i18n="nav.changelog">Changelog</a>
+      <a href="privacy.html" data-i18n="nav.privacy">Privacy</a>
+      <a href="https://github.com/raselrahmanrocky/Avro-Keyboard/issues" target="_blank" rel="noopener noreferrer" data-i18n="footer.reportBug">Report a bug ↗</a>
+    </nav>
+  </div>
+</footer>
+
+<script src="js/config.js" defer></script>
+<script src="js/i18n.js" defer></script>
+<script src="js/snapshot.js" defer></script>
+<script src="js/github.js" defer></script>
+<script src="js/theme.js" defer></script>
+<script src="js/ahead-note.js" defer></script>
+<script src="js/vendor/marked.min.js" defer></script>
+<script src="js/vendor/purify.min.js" defer></script>
+<script src="js/changelog.js" defer></script>
+</body>
+</html>

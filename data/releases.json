@@ -1,0 +1,45 @@
+{
+  "captured": "2026-10-16T11:27:45.151Z",
+  "releases": [
+    {
+      "tag_name": "v6.0.2-beta",
+      "name": "Avro Keyboard 6.0.2-beta",
+      "html_url": "https://github.com/raselrahmanrocky/Avro-Keyboard/releases/tag/v6.0.2-beta",
+      "published_at": "2026-10-16T04:39:40Z",
+      "created_at": "2026-10-16T04:58:30Z",
+      "prerelease": true,
+      "draft": false,
+      "body": "> ⚠️ **এটি একটি Pre-release (বিটা)।** দৈনন্দিন কাজের জন্য স্থিতিশীল ভার্সন চাইলে পেজের **[Latest release](https://github.com/raselrahmanrocky/Avro-Keyboard/releases/latest)** লিংক ব্যবহার করুন। বিটা চ্যানেলে থাকতে চাইলে নিচের নোটগুলো পড়ে ইনস্টল করুন।\r\n---\r\n\r\n# 🇧🇩 বাংলা\r\n\r\n## এই ভার্সনে যা যা পাবেন\r\n\r\n- **সক্রিয় রক্ষণাবেক্রণ।** অফিসিয়াল Avro Keyboard-এর সর্বশেষ রিলিজ **5.6.0 — ২৭ আগস্ট ২০১৯**; অফিসিয়াল GitHub রিপো **৯ আগস্ট ২০২৬-এ archive** করা হয়েছে (এখন শুধু পড়ার জন্য)। এখানে Windows 10/11 যুগের সমস্যাগুলো চলমানভাবে ঠিক করা হচ্ছে।\r\n- **৬৪-বিট ও ৩২-বিট — আলাদা নেটিভ বিল্ড।** অফিসিয়ালে একটাই ৩২-বিট ইনস্টলার; এখানে ৪টি ফাইল — ইনস্টলার ও পোর্টেবল, দুই আর্কিটেকচারে। ৬৪-বিট বিল্ড বড় ডকুমেন্ট ও দীর্ঘ সেশনে বেশি স্থিতিশীল।\r\n- **সত্যিকারের পোর্টেবল এডিশন।** সেটিংস `Settings.xml` exe-এর পাশেই থাকে, ডেটাবেজ-স্কিন-লেআউট ফোল্ডারের ভেতরে থেকে লোড হয়। USB থেকে চালান, শেষে ফোল্ডারটা মুছে দিন — মেশিনে আর কিছু থাকে না। পোর্টেবল বিল্ডে আপডেট এলে পোর্টেবল প্যাকেজই অফার হয় (ইনস্টলার নয়)।\r\n- **নতুন ANSI/Bijoy কনভার্সন ইঞ্জিন।** ভেতরের একমাত্র হার্ডকোডেড ম্যাপিং সরিয়ে V1–V4 প্রতিটি এনকোডিং **ফাইল-ভিত্তিক**। ইঞ্জিন আগে থেকেই গরম থাকে (প্রথম ব্যবহারে জ্যাম), ভার্সন সুইচ হয় **শূন্য-অ্যালোকেশনে**, ক্যাশ রিস্টার্টের পরেও টিকে থাকে। ব্যাকস্পেস এখন **পুরো অক্ষর-গ্রুপ (grapheme)** মুছে — যৌগিক অক্ষর ভেঙে একক মাত্রা রেখে যেতে না দেয়। V3/V4 ম্যাপিং টেবেল ভুল গ্লিফের জন্য হালনাগাদ।\r\n- **Avro Text Converter এখন অ্যাপের ভেতরেই।** ট্রে মেনু থেকে বা **Ctrl+Alt+T** চেপে চালু করুন; Unicode ↔ ANSI দুই দিকেই কনভার্ট করে, আর বড় লেখা কনভার্ট করার সময় উইন্ডো ফ্রিজ হয় না (ব্যাকগ্রাউন্ডে চলে)।\r\n- **ইন-অ্যাপ \"Download Resources\" ব্রাউজার।** লেআউট, স্কিন ও ANSI ম্যাপিং প্যাক অ্যাপের ভেতর থেকেই খুঁজে নামান — প্রতিটি ফাইল **SHA-256 দিয়ে যাচাই** হয়ে তবেই ইনস্টল হয়, এবং **রিস্টার্ট ছাড়াই** লোড হয়ে যায়।\r\n- **অটো আপডেট — এই GitHub hub থেকে।** আপনার চালু আর্কিটেকচারের সঠিক ফাইল বেছে দেয়, ডাউনলোড লিংক **লাইভ যাচাই** করে তবেই অফার দেয় (মৃত লিংকে পাঠায় না), পোর্টেবল বিল্ডে পোর্টেবল লিংক দেয়, এবং **বিটা চ্যানেলের টগল** আছে — অপশন চালু থাকলেই বিটা বিল্ডের খবর পাবেন।\r\n- **নতুন ইন্টারফেস।** অ্যাপ-ওয়াইড **থিম ও প্যালেট সিস্টেম**, ট্রেতে **\"Select ANSI Encoding\"** মেনু (সব পিকারের সাথে একসাথে সিঙ্ক), লেআউট-ভিত্তিক **আইকন**, এবং V1 → V5-এর মতো সঠিক **নেচারাল সোর্ট** তালিকা।\r\n- **বিশ্বস্ত গ্লোবাল হটকি।** যেকোনো অ্যাপে কাজ করবে; সেভ করার আগেই **কী-কনফ্লিক্ট ধরে**, ডুপ্লিকেট সেটিংস নিজে থেকে সরায়, ট্রে মেনু ও অন-স্ক্রিন পিকার একসাথে রাখে।\r\n- **স্টার্টআপ কখনো নীরবে ব্যর্থ হয় না + `AvroStartup.log`।** খারাপ সেটিংস, লক করা রেজিস্ট্রি, হারানো ফন্ট, নষ্ট `Database.db3` — এসব আগে চুপচাপ কোনো উইন্ডো না দেখায়ে অ্যাপ বন্ধ করে দিত; এবার প্রতিটি ধাপ সুরক্ষিত, একটি দৃশ্যমান রিপোর্ট ও একটি লগ ফাইল থাকে।\r\n- **নতুন লেআউট/স্কিন সাথে সাথেই দেখা যায়।** ফোল্ডারে ফাইল ফেললেই মেনু অটো-রিফ্রেশ হয় — অ্যাপ রিস্টার্ট করতে হয় না, আর মেনু খোলা থাকা অবস্থায় রিবিল্ড না হওয়ায় মেনু ঝরে পড়ে না।\r\n\r\n## Honest notes & limitations\r\n\r\n- **This is an unofficial continuation.** A separate continuation of Avro Keyboard's open-source code (MPL-2.0) — **not affiliated with OmicronLab**. The official site and older versions remain at [omicronlab.com](https://www.omicronlab.com).\r\n- **The binaries are not code-signed** (official 5.6.0 was signed), so Windows SmartScreen may show **\"More info → Run anyway\"**. Checking the above makes it safe to run.\r\n- **Even the portable edition writes three `HKCU` keys:** `LowLevelHooksTimeout` (so Windows does not silently drop the keyboard hook) and two IE font values while the portable Siyam Rupali font is registered (restored when the font is removed). Nothing is installed system-wide.\r\n- **This is a beta.** If something misbehaves, please open an [Issue](https://github.com/raselrahmanrocky/Avro-Keyboard/issues) with your Windows version, which file you downloaded, and the version from the About box.\r\n\r\n## Support\r\n\r\n| I want to | Go here |\r\n| --- | --- |\r\n| 🐛 Report a bug, wrong conversion, download/install problem | **[Avro-Keyboard Issues](https://github.com/raselrahmanrocky/Avro-Keyboard/issues)** |\r\n| 💬 Usage questions or show off your setup | **[Avro Users Community (Telegram)](https://t.me/AvroUsersCommunity)** |\r\n\r\n---\r\n\r\n**Assets:** `win64-setup` · `win32-setup` · `win64-portable` · `win32-portable` · `SHA256SUMS.txt`\r\n**Source:** [raselrahmanrocky/Avro-Keyboard ](https://github.com/raselrahmanrocky/Avro-Keyboard/) · License: MPL-2.0\r\n",
+      "assets": [
+        {
+          "name": "AvroKeyboard-6.0.2-beta-win32-portable.zip",
+          "size": 34096826,
+          "download_count": 3,
+          "browser_download_url": "https://github.com/raselrahmanrocky/Avro-Keyboard/releases/download/v6.0.2-beta/AvroKeyboard-6.0.2-beta-win32-portable.zip",
+          "digest": "sha256:32fc629849769895811c72b13c0481c7aa562908251ad33b40d03dbfbc964aa0"
+        },
+        {
+          "name": "AvroKeyboard-6.0.2-beta-win32-setup.exe",
+          "size": 22171195,
+          "download_count": 3,
+          "browser_download_url": "https://github.com/raselrahmanrocky/Avro-Keyboard/releases/download/v6.0.2-beta/AvroKeyboard-6.0.2-beta-win32-setup.exe",
+          "digest": "sha256:b99f0baec96dfc3686ea187344df2dcc3e248102e2a1a64d4b639bb6b7c065fa"
+        },
+        {
+          "name": "AvroKeyboard-6.0.2-beta-win64-portable.zip",
+          "size": 37257658,
+          "download_count": 3,
+          "browser_download_url": "https://github.com/raselrahmanrocky/Avro-Keyboard/releases/download/v6.0.2-beta/AvroKeyboard-6.0.2-beta-win64-portable.zip",
+          "digest": "sha256:4f69371bf61d004604567305fb598c325c4b1e4864b403cc54326ecf6bad72a1"
+        },
+        {
+          "name": "AvroKeyboard-6.0.2-beta-win64-setup.exe",
+          "size": 23976408,
+          "download_count": 5,
+          "browser_download_url": "https://github.com/raselrahmanrocky/Avro-Keyboard/releases/download/v6.0.2-beta/AvroKeyboard-6.0.2-beta-win64-setup.exe",
+          "digest": "sha256:28008206f5d788a0ad2a7c95b8e165d23a6ca8e3717baab9ecd8ce09463c99e9"
+        }
+      ]
+    }
+  ]
+}

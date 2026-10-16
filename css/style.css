@@ -1,0 +1,790 @@
+/* ==========================================================================
+   Avro Keyboard Community Edition — core stylesheet
+   Palette, type scale, and component shapes come from the approved purple
+   redesign concept. New sections extend that same vocabulary rather than
+   introducing a second one.
+   ========================================================================== */
+
+/* 1. Design tokens ========================================================= */
+:root {
+  color-scheme: light;
+  --bg: #faf7ff;
+  --surface: #fff;
+  --surface2: #f2eaff;
+  --text: #24123d;
+  --muted: #6c5b81;
+  --line: #e7d9fb;
+  --purple: #7628d9;
+  --purple2: #a855f7;
+  --pink: #df8dff;
+  --shadow: 0 18px 55px #55209a18;
+  --nav: rgba(250, 247, 255, .82);
+  --yes: #14714a;
+  --amber: #9a4a06;
+  --ribbon-live: linear-gradient(115deg, #7426d6, #a13bec);
+  --ribbon-pre: linear-gradient(115deg, #b45309, #d97706);
+  --ribbon-portable: linear-gradient(115deg, #4338ca, #6366f1);
+  --ribbon-official: linear-gradient(115deg, #4b5563, #6b7280);
+  --code-bg: #170c25;
+  --code-fg: #e7d5ff;
+  --maxw: 1120px;
+  --r-lg: 22px;
+  --r: 18px;
+  --r-sm: 13px;
+}
+
+/* The toggle in the topbar switches to this palette; a first visit always
+   starts light. */
+[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #10091c;
+  --surface: #1b1029;
+  --surface2: #28163b;
+  --text: #f7efff;
+  --muted: #b3a1c6;
+  --line: #3b2553;
+  --purple: #b77aff;
+  --purple2: #8b35ec;
+  --pink: #e4b1ff;
+  --shadow: 0 18px 55px #0005;
+  --nav: rgba(16, 9, 28, .82);
+  --yes: #4ecf95;
+  --amber: #f0b45f;
+}
+
+/* 2. Base ================================================================== */
+* { box-sizing: border-box; }
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 96px;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: Inter, "Hind Siliguri", "Noto Sans Bengali", system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 16px;
+  line-height: 1.65;
+  transition: background .25s, color .25s;
+}
+
+a { color: inherit; text-decoration: none; }
+button { font: inherit; cursor: pointer; }
+img { max-width: 100%; height: auto; }
+
+:focus-visible {
+  outline: 3px solid var(--purple);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+::selection { background: var(--pink); color: #1b0730; }
+
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 60;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  padding: 12px 18px;
+  border-radius: var(--r-sm);
+  font-weight: 700;
+}
+.skip-link:focus { left: 12px; top: 12px; }
+
+.wrap { width: min(var(--maxw), calc(100% - 40px)); margin: auto; }
+.muted { color: var(--muted); }
+.mono { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; }
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+  }
+}
+
+/* 3. Top bar =============================================================== */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: var(--nav);
+  backdrop-filter: blur(18px);
+  border-bottom: 1px solid var(--line);
+}
+
+.nav {
+  min-height: 76px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 22px;
+}
+
+.brand { display: flex; align-items: center; gap: 11px; font-weight: 800; letter-spacing: -.3px; }
+.brand img { width: 44px; height: 44px; border-radius: 13px; box-shadow: 0 5px 18px #7825d92c; }
+.brand small { display: block; color: var(--muted); font-size: 14px; font-weight: 600; letter-spacing: .4px; }
+.brand b { display: block; font-size: 15.5px; line-height: 1.25; }
+
+.ce-tag {
+  display: inline-block;
+  margin-left: 7px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--surface2);
+  border: 1px solid var(--line);
+  color: var(--purple);
+  font-size: 14px;
+  font-weight: 850;
+  letter-spacing: .6px;
+  text-transform: uppercase;
+  vertical-align: 1px;
+}
+
+.navlinks { display: flex; align-items: center; gap: 25px; color: var(--muted); font-size: 14px; }
+.navlinks a:hover { color: var(--purple); }
+.navright { display: flex; gap: 10px; align-items: center; }
+
+/* Language switcher — a compact segmented pair. Both labels are always
+   visible: a two-way language choice is clearer as an explicit pair than as a
+   toggle. */
+.langswitch {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  border-radius: 14px;
+}
+.langswitch button {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: .02em;
+  padding: 8px 9px;
+  border-radius: 11px;
+  line-height: 1;
+  cursor: pointer;
+}
+.langswitch button:hover { color: var(--text); }
+.langswitch button[aria-pressed="true"] {
+  background: linear-gradient(115deg, #7426d6, #a13bec);
+  color: #fff;
+}
+
+/* Theme toggle — a single square button matching the switcher's height. */
+.theme {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--text);
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+.theme:hover { border-color: var(--purple); color: var(--purple); }
+
+/* Someone who chose Bangla should never see English prose flash past before
+   the dictionary applies. The head script sets data-lang and schedules the
+   pending flag's removal, so content can never stay hidden if js/i18n.js
+   fails to load. */
+html[data-lang="bn"][data-i18n-pending] [data-i18n] { visibility: hidden; }
+
+/* 4. Buttons =============================================================== */
+.btn {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  gap: 9px;
+  padding: 13px 18px;
+  border-radius: var(--r-sm);
+  font-size: 14px;
+  font-weight: 750;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--text);
+  transition: transform .18s, box-shadow .18s, border-color .18s;
+}
+.btn:hover { transform: translateY(-2px); }
+.btn-primary {
+  background: linear-gradient(115deg, #7426d6, #a13bec);
+  color: #fff;
+  border-color: transparent;
+  box-shadow: 0 10px 25px #7828d936;
+}
+.btn-ghost { background: var(--surface); color: var(--text); }
+.btn-sm { padding: 10px 14px; font-size: 14px; }
+.btn[disabled], .btn[aria-disabled="true"] { opacity: .55; pointer-events: none; }
+
+/* The square info button stretches to the download button's height (see
+   .rc-actions) and centres the icon in whatever height it ends up. */
+.btn-icon {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  min-height: 46px;
+  height: auto;
+  padding: 0;
+  border-radius: var(--r-sm);
+  background: var(--surface2);
+  border: 1px solid var(--line);
+  color: var(--purple);
+}
+.btn-icon:hover { border-color: var(--purple); }
+
+/* 5. Hero ================================================================== */
+.hero {
+  position: relative;
+  overflow: hidden;
+  padding: 40px 0 60px;
+  background:
+    radial-gradient(ellipse at 14% 35%, #e9c8ff 0, transparent 38%),
+    radial-gradient(ellipse at 85% 0%, #d8b4ff 0, transparent 36%),
+    linear-gradient(135deg, var(--bg), var(--surface2));
+  border-bottom: 1px solid var(--line);
+}
+[data-theme="dark"] .hero {
+  background:
+    radial-gradient(ellipse at 15% 25%, #6424a855 0, transparent 38%),
+    radial-gradient(ellipse at 90% 0%, #8d35db33 0, transparent 36%),
+    linear-gradient(135deg, var(--bg), var(--surface2));
+}
+.hero-grid { display: grid; grid-template-columns: 1.08fr .92fr; align-items: center; gap: 48px; }
+
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  border: 1px solid #b982ee66;
+  background: var(--surface);
+  border-radius: 999px;
+  color: var(--purple);
+  font-size: 14px;
+  font-weight: 750;
+  letter-spacing: .3px;
+}
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #35b877;
+  box-shadow: 0 0 0 4px #35b87722;
+  flex: 0 0 auto;
+  --dot-ring: #35b87733;
+  --dot-ring-off: #35b87700;
+}
+.dot[data-state="snapshot"] {
+  background: #c98a2e;
+  box-shadow: 0 0 0 4px #c98a2e22;
+  --dot-ring: #c98a2e33;
+  --dot-ring-off: #c98a2e00;
+}
+.dot[data-state="loading"] {
+  background: var(--purple2);
+  box-shadow: 0 0 0 4px #a855f722;
+  --dot-ring: #a855f733;
+  --dot-ring-off: #a855f700;
+}
+.dot[data-state="error"] { background: var(--amber); box-shadow: 0 0 0 4px #9a4a0622; }
+
+/* The status dot breathes: a soft ring grows out of it and fades, so the
+   live / saved-snapshot / loading state is visible at a glance. The static
+   glow above is what stays when motion is reduced. */
+@keyframes dot-pulse {
+  from { box-shadow: 0 0 0 0 var(--dot-ring); }
+  70% { box-shadow: 0 0 0 8px var(--dot-ring-off); }
+  to { box-shadow: 0 0 0 0 var(--dot-ring-off); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .dot[data-state="live"],
+  .dot[data-state="snapshot"],
+  .dot[data-state="loading"] { animation: dot-pulse 2.4s ease-out infinite; }
+}
+
+.hero h1 { font-size: clamp(38px, 5.2vw, 64px); line-height: 1.15; letter-spacing: -1.8px; margin: 20px 0 18px; }
+.gradient {
+  background: linear-gradient(100deg, #7224d6, #bb5cf4 62%, #8b45e9);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+[data-theme="dark"] .gradient { background: linear-gradient(100deg, #c79bff, #e0b6ff 55%, #b07cff); -webkit-background-clip: text; background-clip: text; }
+.hero p { max-width: 590px; color: var(--muted); font-size: 17px; }
+.actions { display: flex; flex-wrap: wrap; gap: 12px; }
+.micro { font-size: 14px; color: var(--muted); margin-top: 16px; }
+
+.showcase { position: relative; }
+.splash {
+  width: 100%;
+  display: block;
+  border-radius: var(--r-lg);
+  border: 1px solid #ffffff8c;
+  box-shadow: 0 28px 75px #58208b30;
+  transform: rotate(1.2deg);
+}
+[data-theme="dark"] .splash { border-color: #ffffff1f; }
+.float-tag {
+  position: absolute;
+  left: -20px;
+  bottom: 20px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  padding: 12px 15px;
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+  font-size: 14px;
+  font-weight: 700;
+}
+.float-tag b { color: var(--purple); }
+
+/* 6. Live stats ============================================================ */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(158px, 1fr));
+  gap: 14px;
+  padding: 25px 0 15px;
+}
+
+.stat {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 20px 14px;
+  position: relative;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.stat strong { display: block; font-size: 25px; line-height: 1.2; letter-spacing: -.7px; font-variant-numeric: tabular-nums; }
+.stat span { display: block; color: var(--muted); font-size: 14px; margin-top: 6px; }
+.stat .src { display: none; }
+.stat[data-state="snapshot"] { border-style: dashed; }
+.stat[data-state="loading"] strong { color: var(--muted); }
+
+/* 7. Section furniture ===================================================== */
+.section { padding: 76px 0; }
+.section-head { max-width: 660px; margin: 0 auto 34px; text-align: center; }
+.kicker { color: var(--purple); font-size: 14px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.4px; }
+.section h2 { font-size: clamp(29px, 3.6vw, 42px); line-height: 1.2; letter-spacing: -1px; margin: 10px 0 12px; }
+.section-head p { margin: 0; color: var(--muted); }
+.section-head + .status-note { justify-content: center; }
+.note { font-size: 14px; color: var(--muted); margin-top: 14px; }
+
+.status-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--muted);
+  margin-top: 16px;
+}
+.status-note[data-state="snapshot"] { color: var(--amber); }
+.status-note[data-state="error"] { color: var(--amber); }
+
+.skeleton {
+  background: linear-gradient(90deg, var(--surface2) 25%, var(--line) 37%, var(--surface2) 63%);
+  background-size: 300% 100%;
+  animation: shimmer 1.5s linear infinite;
+  border-radius: 8px;
+  color: transparent !important;
+}
+@keyframes shimmer {
+  from { background-position: 150% 0; }
+  to { background-position: -150% 0; }
+}
+
+/* 8. Features ============================================================== */
+.feature-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.feature { background: var(--surface); border: 1px solid var(--line); padding: 24px; border-radius: var(--r); box-shadow: var(--shadow); }
+.ico {
+  display: grid;
+  place-items: center;
+  width: 45px;
+  height: 45px;
+  border-radius: 14px;
+  background: var(--surface2);
+  color: var(--purple);
+  font-size: 21px;
+  font-weight: 800;
+  margin-bottom: 16px;
+}
+.ico svg { width: 22px; height: 22px; }
+.feature h3 { margin: 0 0 7px; font-size: 18px; line-height: 1.35; }
+.feature p { margin: 0; color: var(--muted); font-size: 14px; }
+
+/* 9. Flagship comparison =================================================== */
+.audit-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 26px; }
+
+.audit {
+  position: relative;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: 26px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+.audit--official { background: var(--surface2); }
+.audit--official h3 { color: var(--muted); }
+.audit--ce { border-color: #b982ee66; }
+.audit h3 { margin: 0 0 4px; font-size: 20px; letter-spacing: -.4px; }
+.audit .sub { margin: 0; color: var(--muted); font-size: 14px; }
+
+.stamp {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 850;
+  letter-spacing: .7px;
+  text-transform: uppercase;
+}
+.stamp--live { background: var(--ribbon-live); color: #fff; border-color: transparent; }
+.stamp--archived { color: var(--amber); border-color: currentColor; }
+
+.audit dl { display: grid; grid-template-columns: auto 1fr; gap: 9px 16px; margin: 20px 0 0; font-size: 14px; }
+.audit dt { color: var(--muted); }
+.audit dd { margin: 0; font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
+
+.compare-wrap { overflow: auto; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); box-shadow: var(--shadow); }
+table { border-collapse: collapse; width: 100%; min-width: 620px; text-align: left; }
+th, td { padding: 15px 20px; border-bottom: 1px solid var(--line); font-size: 14px; vertical-align: top; }
+th { background: var(--surface2); font-size: 14px; color: var(--muted); letter-spacing: .4px; text-transform: uppercase; }
+tr:last-child td { border-bottom: 0; }
+tbody td:first-child { font-weight: 700; }
+tbody td:nth-child(2) { color: var(--muted); }
+tbody td:nth-child(3) { font-weight: 650; }
+
+.group-row th {
+  background: var(--bg);
+  color: var(--purple);
+  font-size: 14px;
+  letter-spacing: 1.1px;
+  border-top: 1px solid var(--line);
+}
+
+.yes { color: var(--yes); margin-right: 7px; font-weight: 800; }
+.no { color: var(--muted); margin-right: 7px; font-weight: 800; }
+
+.detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(272px, 1fr)); gap: 16px; margin-top: 26px; }
+.detail { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 22px; }
+.detail h4 { margin: 12px 0 7px; font-size: 16.5px; letter-spacing: -.3px; }
+.detail p { margin: 0; color: var(--muted); font-size: 14px; }
+.detail .tag {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--surface2);
+  border: 1px solid var(--line);
+  color: var(--purple);
+  font-size: 14px;
+  font-weight: 850;
+  letter-spacing: .7px;
+  text-transform: uppercase;
+}
+
+.honest {
+  margin-top: 26px;
+  padding: 22px 26px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--amber);
+  border-radius: 14px;
+  background: var(--surface);
+}
+.honest h3 { margin: 0 0 10px; font-size: 17px; }
+.honest ul { margin: 0; padding-left: 20px; }
+.honest li { color: var(--muted); font-size: 14px; margin-bottom: 8px; }
+.honest li:last-child { margin-bottom: 0; }
+.honest strong { color: var(--text); }
+
+.timeline { position: relative; margin-top: 30px; padding-left: 26px; }
+.timeline::before {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: 6px;
+  bottom: 6px;
+  width: 2px;
+  background: linear-gradient(var(--purple2), transparent);
+}
+.tl-item { position: relative; padding-bottom: 22px; }
+.tl-item:last-child { padding-bottom: 0; }
+.tl-item::before {
+  content: "";
+  position: absolute;
+  left: -26px;
+  top: 7px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--purple);
+  border: 3px solid var(--bg);
+}
+.tl-item time { font-size: 14px; font-weight: 800; letter-spacing: .8px; text-transform: uppercase; color: var(--purple); }
+.tl-item h4 { margin: 4px 0 3px; font-size: 16px; }
+.tl-item p { margin: 0; color: var(--muted); font-size: 14px; }
+
+/* 10. Install steps ======================================================== */
+.install {
+  background: var(--surface2);
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+.steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.step { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 23px; }
+.num { font-size: 14px; font-weight: 850; color: var(--purple); letter-spacing: 1px; }
+.step h3 { margin: 8px 0; font-size: 17px; }
+.step p { font-size: 14px; color: var(--muted); margin: 0 0 16px; }
+.code {
+  background: var(--code-bg);
+  color: var(--code-fg);
+  padding: 12px 13px;
+  border-radius: 10px;
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+/* 11. Releases ============================================================= */
+.releases-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 26px;
+  flex-wrap: wrap;
+}
+.releases-head .section-head { margin: 0; text-align: left; max-width: 520px; }
+
+.filters {
+  display: inline-flex;
+  gap: 4px;
+  padding: 5px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+}
+.chip {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  padding: 9px 16px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 750;
+}
+.chip[aria-pressed="true"] { background: var(--ribbon-live); color: #fff; }
+
+.release-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+
+/* Elements hidden by the filter chips must stay hidden even though the card
+   rule below sets an explicit display value. */
+.release-card[hidden], .release-empty[hidden] { display: none; }
+
+.release-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: 30px 26px 26px;
+  box-shadow: var(--shadow);
+}
+.release-card--official { background: var(--surface2); }
+
+.ribbon {
+  position: absolute;
+  top: 0;
+  right: 0;
+  padding: 7px 15px 7px 17px;
+  border-bottom-left-radius: 14px;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 850;
+  letter-spacing: .9px;
+  text-transform: uppercase;
+  background: var(--ribbon-official);
+}
+.ribbon--live { background: var(--ribbon-live); }
+.ribbon--pre { background: var(--ribbon-pre); }
+.ribbon--portable { background: var(--ribbon-portable); }
+
+.rc-head { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; }
+.rc-icon {
+  display: grid;
+  place-items: center;
+  width: 50px;
+  height: 50px;
+  flex: 0 0 auto;
+  border-radius: 15px;
+  background: var(--surface2);
+  color: var(--purple);
+  border: 1px solid var(--line);
+}
+.rc-icon svg { width: 24px; height: 24px; }
+.ic { width: 1.05em; height: 1.05em; display: block; flex: 0 0 auto; }
+.rc-icon .ic, .rc-actions .ic { width: 20px; height: 20px; }
+.btn-icon .ic { width: 19px; height: 19px; }
+.rc-head h3 { margin: 0; font-size: 19.5px; letter-spacing: -.5px; }
+.rc-head .when { margin: 2px 0 0; color: var(--muted); font-size: 14px; }
+
+.release-card > p { margin: 0 0 18px; color: var(--muted); font-size: 14px; }
+
+.spec {
+  background: var(--surface2);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 4px 14px;
+  margin: 0 0 20px;
+}
+.release-card--official .spec { background: var(--bg); }
+.spec div { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.spec div:last-child { border-bottom: 0; }
+.spec dt { color: var(--muted); font-size: 14px; }
+.spec dd { margin: 0; font-size: 14px; font-weight: 750; text-align: right; font-variant-numeric: tabular-nums; }
+
+.rc-actions { margin-top: auto; display: grid; grid-template-columns: 1fr auto; align-items: stretch; gap: 10px; }
+
+.release-empty {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 40px 26px;
+  border: 1px dashed var(--line);
+  border-radius: var(--r);
+  color: var(--muted);
+}
+
+/* 12. Download CTA ========================================================= */
+.download-card {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 25px;
+  padding: 32px;
+  border-radius: var(--r-lg);
+  background: linear-gradient(115deg, #7023cf, #9a3de7 60%, #bd62ef);
+  color: #fff;
+  box-shadow: 0 20px 45px #7828d933;
+}
+.download-card h2 { margin: 0 0 7px; font-size: 30px; letter-spacing: -.8px; }
+.download-card p { margin: 0; color: #f3e4ff; }
+.download-card .btn { background: #fff; color: #6221b4; border-color: #fff; white-space: nowrap; }
+.download-card .kicker { color: #f0d4ff; }
+
+/* 13. Footer =============================================================== */
+.footer { padding: 34px 0; color: var(--muted); font-size: 14px; border-top: 1px solid var(--line); }
+.footrow { display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
+.footbrand { display: flex; align-items: center; gap: 10px; }
+.footbrand img { width: 50px; height: 50px; border-radius: 10px; }
+.footer-links { display: flex; gap: 18px; flex-wrap: wrap; }
+.footer a:hover { color: var(--purple); }
+/* The legal line opens the footer, above the brand/links row. */
+.legal { margin: 0 0 22px; font-size: 14px; line-height: 1.7; }
+
+/* 14. Responsive =========================================================== */
+/* Desktop should look the way 125% browser zoom renders today: the whole
+   design scales up while the topbar keeps its full 1160px worth of room, so
+   the zoom only kicks in from 1450px of viewport width. Phones and tablets
+   keep their native scale. */
+@media (min-width: 1450px) {
+  body { zoom: 1.25; }
+}
+
+@media (max-width: 980px) {
+  .release-grid { grid-template-columns: repeat(2, 1fr); }
+  .feature-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* With the 14px floor in place, the brand + navlinks + controls row needs
+   the full 1120px container (viewport ≥ 1160). Below that the bar keeps its
+   single sticky row by dropping the links; they stay reachable from the
+   footer on every page. */
+@media (max-width: 1159px) {
+  .navlinks { display: none; }
+}
+
+@media (max-width: 850px) {
+  .hero-grid { grid-template-columns: 1fr; gap: 36px; }
+  .hero { padding-top: 52px; }
+  .showcase { max-width: 650px; margin: auto; }
+  .float-tag { left: 10px; }
+  .stats { grid-template-columns: repeat(2, 1fr); }
+  .audit-grid { grid-template-columns: 1fr; }
+  .steps { grid-template-columns: 1fr; }
+  .download-card { grid-template-columns: 1fr; }
+  .download-card .btn { justify-self: start; }
+}
+
+@media (max-width: 680px) {
+  .release-grid { grid-template-columns: 1fr; }
+  /* Brand + controls alone no longer fit beside the edition badge below
+     ~680px; the badge reappears in the hero eyebrow and the footer. */
+  .ce-tag { display: none; }
+}
+
+@media (max-width: 540px) {
+  .wrap { width: min(100% - 28px, var(--maxw)); }
+  .nav { min-height: 66px; flex-wrap: wrap; gap: 6px 8px; padding-block: 5px; }
+  .brand { min-width: 0; }
+  .brand img { width: 39px; height: 39px; }
+  /* The tagline and the edition badge both reappear in the hero eyebrow and
+     the footer; dropping them here is what actually keeps the sticky bar on
+     one line now that it also carries the language switcher. At 373px the
+     brand measures 305px wide, so without this the controls wrap onto a
+     second permanent row. */
+  .brand small { display: none; }
+  .ce-tag { display: none; }
+  .navright { gap: 6px; margin-left: auto; }
+  .langswitch { padding: 2px; }
+  .langswitch button { padding: 7px 6px; font-size: 14px; }
+  .theme { width: 36px; height: 36px; font-size: 16px; border-radius: 12px; }
+  /* The sticky header would otherwise take a second row and hold ~100px of a
+     phone screen permanently. The hero's own download button sits directly
+     below on the first screen, so this copy is the redundant one. */
+  .navright > .btn { display: none; }
+  .hero h1 { font-size: 40px; letter-spacing: -1.2px; }
+  .hero p { font-size: 15px; }
+  .feature-grid { grid-template-columns: 1fr; }
+  .section { padding: 55px 0; }
+  .stats { gap: 9px; }
+  .stat { padding: 14px; }
+  .stat strong { font-size: 22px; }
+  .download-card { padding: 24px; }
+  .footrow { align-items: flex-start; flex-direction: column; }
+  .btn { padding: 12px 14px; }
+  /* Four chips do not fit a 320px phone on one line; letting them wrap
+     inside the pill beats forcing the page wider than the viewport. */
+  .filters { width: 100%; flex-wrap: wrap; justify-content: center; }
+}

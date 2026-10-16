@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light" data-lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title data-i18n="pv.meta.title">Privacy policy — Avro Keyboard Community Edition</title>
+<meta name="description" data-i18n-content="pv.meta.desc" content="The privacy policy for the Avro Keyboard Community Edition website and desktop app — which data lives where, what is never collected, and how to remove all of it.">
+<link rel="canonical" href="https://raselrahmanrocky.github.io/Avro-Keyboard/privacy.html">
+<link rel="alternate" hreflang="en" href="https://raselrahmanrocky.github.io/Avro-Keyboard/privacy.html">
+<link rel="alternate" hreflang="bn" href="https://raselrahmanrocky.github.io/Avro-Keyboard/privacy.html?lang=bn">
+<link rel="alternate" hreflang="x-default" href="https://raselrahmanrocky.github.io/Avro-Keyboard/privacy.html">
+<meta name="theme-color" content="#6d20d6">
+<meta name="color-scheme" content="light dark">
+<meta name="robots" content="index, follow">
+
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Avro Keyboard Community Edition">
+<meta property="og:title" content="Privacy policy — Avro Keyboard Community Edition">
+<meta property="og:description" content="Which data lives where, what is never collected, and how to remove all of it.">
+<meta property="og:url" content="https://raselrahmanrocky.github.io/Avro-Keyboard/privacy.html">
+<meta property="og:image" content="https://raselrahmanrocky.github.io/Avro-Keyboard/img/og-cover.jpg">
+<meta property="og:locale" content="en_US">
+<meta property="og:locale:alternate" content="bn_BD">
+<meta name="twitter:card" content="summary_large_image">
+
+<link rel="icon" href="img/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="img/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="img/logo-192.png">
+
+<link rel="preload" href="fonts/hind-siliguri-bengali-400.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/inter-latin-400.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="css/fonts.css">
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/pages.css">
+
+<script>
+/* Runs before the stylesheets paint. Resolves the language so a Bangla
+   visitor never sees a flash of English prose, and reapplies a stored dark
+   theme so it never flashes light — first-time visitors always start on the
+   light theme. js/i18n.js clears the pending flag; the timeout is a backstop
+   in case that file never loads. */
+(function () {
+  var root = document.documentElement;
+
+  var lang = 'en';
+  try {
+    var wanted = /[?&]lang=(en|bn)\b/.exec(location.search);
+    var stored = localStorage.getItem('avro-lang');
+    lang = wanted ? wanted[1] : (stored === 'bn' ? 'bn' : 'en');
+    localStorage.setItem('avro-lang', lang);
+    if (localStorage.getItem('avro-theme') === 'dark') {
+      root.setAttribute('data-theme', 'dark');
+    }
+  } catch (e) { /* English and the light theme are the defaults */ }
+
+  root.setAttribute('lang', lang);
+  root.setAttribute('data-lang', lang);
+
+  if (lang !== 'en') {
+    root.setAttribute('data-i18n-pending', '1');
+    setTimeout(function () { root.removeAttribute('data-i18n-pending'); }, 1500);
+  }
+})();
+</script>
+</head>
+<body>
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true" focusable="false">
+  <symbol id="i-external" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M13.6 4.2h6.2v6.2"/><path d="M19.8 4.2 11.2 12.8"/><path d="M17.8 14.2v4.2a1.4 1.4 0 0 1-1.4 1.4H5.6a1.4 1.4 0 0 1-1.4-1.4V7.6a1.4 1.4 0 0 1 1.4-1.4h4.2"/></symbol>
+</svg>
+
+<a class="skip-link" href="#main" data-i18n="nav.skip">Skip to main content</a>
+
+<header class="topbar">
+  <div class="wrap nav">
+    <a class="brand" href="index.html">
+      <img src="img/logo.jpg" width="44" height="44" alt="">
+      <span><b data-i18n="brand.name">Avro Keyboard<span class="ce-tag">Community Edition</span></b><small data-i18n="brand.tagline">Open source · MPL-2.0</small></span>
+    </a>
+    <nav class="navlinks" data-i18n-aria-label="nav.main" aria-label="Main navigation">
+      <a href="index.html#improvements" data-i18n="nav.improvements">Improvements</a>
+      <a href="index.html#features" data-i18n="nav.features">Features</a>
+      <a href="index.html#install" data-i18n="nav.install">Install</a>
+      <a href="index.html#download" data-i18n="nav.download">Download</a>
+      <a href="changelog.html" data-i18n="nav.changelog">Changelog</a>
+    </nav>
+    <div class="navright">
+      <div class="langswitch" role="group" data-i18n-aria-label="lang.label" aria-label="Language">
+        <button type="button" data-lang-set="en" data-i18n="lang.en" data-i18n-aria-label="lang.enFull" data-i18n-title="lang.enFull" aria-pressed="false" aria-label="English" title="English">EN</button>
+        <button type="button" data-lang-set="bn" data-i18n="lang.bn" data-i18n-aria-label="lang.bnFull" data-i18n-title="lang.bnFull" aria-pressed="false" aria-label="বাংলা" title="বাংলা">বাং</button>
+      </div>
+      <button class="theme" id="themeBtn" type="button" aria-pressed="false" aria-label="Switch to dark theme" title="Switch to dark theme">☾</button>
+      <a class="btn btn-primary" href="index.html#download"><span data-i18n="actions.download">Download</span> <span aria-hidden="true">↓</span></a>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+  <section class="page-hero">
+    <div class="wrap">
+      <p class="crumbs"><a href="index.html" data-i18n="nav.home">Home</a><span aria-hidden="true">/</span><span data-i18n="pv.crumb">Privacy</span></p>
+      <h1 data-i18n="pv.h1">Privacy <span class="gradient">policy</span></h1>
+      <p data-i18n="pv.lead">
+        This document covers two separate things — this website first, then the Avro Keyboard
+        Community Edition desktop app. In both cases it says what actually happens.
+      </p>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="wrap doc-layout">
+      <aside class="tag-nav" data-i18n-aria-label="nav.toc" aria-label="Table of contents">
+        <h2 data-i18n="pv.toc.heading">Table of contents</h2>
+        <ol>
+          <li><a href="#summary" data-i18n="pv.toc.summary">In short</a></li>
+          <li><a href="#website" data-i18n="pv.toc.website">The website</a></li>
+          <li><a href="#storage" data-i18n="pv.toc.storage">What your browser stores</a></li>
+          <li><a href="#no-collect" data-i18n="pv.toc.noCollect">What we do not do</a></li>
+          <li><a href="#links" data-i18n="pv.toc.links">Outside links</a></li>
+          <li><a href="#app" data-i18n="pv.toc.app">Data in the desktop app</a></li>
+          <li><a href="#log" data-i18n="pv.toc.log">AvroStartup.log</a></li>
+          <li><a href="#network" data-i18n="pv.toc.network">When the app uses the network</a></li>
+          <li><a href="#remove" data-i18n="pv.toc.remove">Removing all of it</a></li>
+          <li><a href="#contact" data-i18n="pv.toc.contact">Changes and contact</a></li>
+        </ol>
+      </aside>
+
+      <div class="doc">
+        <p class="doc-meta" data-i18n="pv.meta.line">
+          <strong>Last updated:</strong> 16 October 2026 ·
+          <strong>Applies to:</strong> this website and the Avro Keyboard Community Edition desktop build
+        </p>
+
+        <section id="summary">
+          <h2 data-i18n="pv.summary.h">In short</h2>
+          <div class="callout">
+            <p data-i18n="pv.summary.callout">
+              In short — <strong>no</strong> account, <strong>no</strong> cookies,
+              <strong>no</strong> analytics, <strong>no</strong> ads, <strong>no</strong> tracking.
+              We neither ask you for personal information nor receive any. The desktop app sends
+              no telemetry and never stores the text you type.
+            </p>
+          </div>
+          <p data-i18n="pv.summary.p">
+            The only network traffic is from your own browser to GitHub's public API, and — in the
+            app — from GitHub Releases, at your own request, when you download resources or an update.
+          </p>
+        </section>
+
+        <section id="website">
+          <h2 data-i18n="pv.website.h">⓵ What happens on this website</h2>
+          <h3 data-i18n="pv.website.hosting.h">Hosting</h3>
+          <p data-i18n="pv.website.hosting.p">
+            The site is a static site hosted on <strong>GitHub Pages</strong>. We run no server of
+            our own, keep no database and store no logs. But as with any web hosting, GitHub may
+            record a visitor's IP address, browser/device information and the time of the request
+            in its own system logs. Those logs are under GitHub's control, not ours — see
+            <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement" target="_blank" rel="noopener noreferrer">GitHub's privacy statement</a>
+            for the details.
+          </p>
+
+          <h3 data-i18n="pv.website.api.h">API calls for the live data</h3>
+          <p data-i18n="pv.website.api.p">
+            To load the counters, release cards and changelog, <strong>your browser</strong> sends
+            requests straight to <code>api.github.com</code>. What that means:
+          </p>
+          <ul>
+            <li data-i18n="pv.website.api.li1">Your IP address reaches GitHub — exactly as it already did just by loading this site from GitHub Pages.</li>
+            <li data-i18n="pv.website.api.li2">We ask only for <em>public</em> repository and release data — who you are, or any identity of yours, is never sent anywhere.</li>
+            <li data-i18n="pv.website.api.li3">No API token, login or cookie is used; the request is entirely anonymous.</li>
+            <li data-i18n="pv.website.api.li4">Nothing is profiled — this data is not stored anywhere on our side, because there is no server of ours to store it on.</li>
+          </ul>
+        </section>
+
+        <section id="storage">
+          <h2 data-i18n="pv.storage.h">⓶ What your browser stores</h2>
+          <p data-i18n="pv.storage.p">
+            The site uses only <code>localStorage</code> — no cookies at all. These keys live in
+            your browser and are only used to make your next visit work better:
+          </p>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th scope="col" data-i18n="pv.storage.th.key">Key</th>
+                  <th scope="col" data-i18n="pv.storage.th.what">What it holds</th>
+                  <th scope="col" data-i18n="pv.storage.th.why">Why</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><code>avro-theme</code></td>
+                  <td data-i18n="pv.storage.tr1.what">Only <code>light</code> or <code>dark</code></td>
+                  <td data-i18n="pv.storage.tr1.why">To keep the theme you chose across later page loads</td>
+                </tr>
+                <tr>
+                  <td><code>avro-gh-v1</code></td>
+                  <td data-i18n="pv.storage.tr2.what">A cache of public data fetched from the GitHub API (repository stats, release list) and when it was fetched</td>
+                  <td data-i18n="pv.storage.tr2.why">So the same data is not fetched again and again, sparing the API's hourly limit</td>
+                </tr>
+                <tr>
+                  <td><code>avro-snap-v1</code></td>
+                  <td data-i18n="pv.storage.tr3.what">A snapshot of the last public data received (repository stats, releases, the official baseline) and when it was taken</td>
+                  <td data-i18n="pv.storage.tr3.why">So the real numbers can still be shown if the GitHub API later stops responding — newer data than the snapshot bundled with the site</td>
+                </tr>
+                <tr>
+                  <td><code>avro-lang</code></td>
+                  <td data-i18n="pv.storage.tr4.what">The language you chose — <code>en</code> or <code>bn</code></td>
+                  <td data-i18n="pv.storage.tr4.why">To show later page loads in the language you picked</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="note" data-i18n="pv.storage.note">
+            There is no personal information in this storage — it is the same public data anybody
+            can see on GitHub. The cache normally expires by itself after about ten minutes, and
+            the snapshot is refreshed with new data on your next visit.
+          </p>
+        </section>
+
+        <section id="no-collect">
+          <h2 data-i18n="pv.noCollect.h">⓷ What we do not do</h2>
+          <ul>
+            <li data-i18n="pv.noCollect.li1"><strong>No analytics</strong> — no Google Analytics or anything like it.</li>
+            <li data-i18n="pv.noCollect.li2"><strong>No tracking and no fingerprinting</strong> — no pixels, beacons or scripts.</li>
+            <li data-i18n="pv.noCollect.li3"><strong>No advertising</strong>, and no ad network either.</li>
+            <li data-i18n="pv.noCollect.li4"><strong>No forms and no accounts</strong> — no sign-up, newsletter or email collection.</li>
+            <li data-i18n="pv.noCollect.li5"><strong>No third parties</strong> — no CDN, font server or social button is loaded from outside; even the fonts come from inside this site.</li>
+            <li data-i18n="pv.noCollect.li6"><strong>No selling or sharing of data</strong> — because there is no data of yours here to sell.</li>
+          </ul>
+        </section>
+
+        <section id="links">
+          <h2 data-i18n="pv.links.h">⓸ Outside links</h2>
+          <p data-i18n="pv.links.p">
+            Some links on these pages lead off this site. Following them puts you under that site's
+            own policy — we are not responsible for it:
+          </p>
+          <ul>
+            <li data-i18n="pv.links.li1"><strong>github.com</strong> — source code, release downloads, issue tracking and the API.</li>
+            <li data-i18n="pv.links.li2"><strong>omicronlab.com</strong> — downloads and information for older official Avro Keyboard versions.</li>
+            <li data-i18n="pv.links.li3"><strong>t.me/AvroUsersCommunity</strong> — the community's Telegram group.</li>
+          </ul>
+          <p data-i18n="pv.links.p2">
+            Every outside link opens in a new tab with <code>rel="noopener noreferrer"</code>.
+          </p>
+        </section>
+
+        <section id="app">
+          <h2 data-i18n="pv.app.h">⓹ The desktop app: where the data lives</h2>
+          <p data-i18n="pv.app.p">
+            The app keeps all of its data on your own computer. Where depends on which edition you
+            are running:
+          </p>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th scope="col" data-i18n="pv.app.th.edition">Edition</th>
+                  <th scope="col" data-i18n="pv.app.th.settings">Settings</th>
+                  <th scope="col" data-i18n="pv.app.th.data">Data (database, mappings, layouts, skins, logs)</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td data-i18n="pv.app.tr1.edition">Standard (installed)</td>
+                  <td><code>HKEY_CURRENT_USER\Software\OmicronLab\Avro Keyboard</code></td>
+                  <td data-i18n="pv.app.tr1.data"><code>%ProgramData%\Avro Keyboard\</code></td>
+                </tr>
+                <tr>
+                  <td data-i18n="pv.app.tr2.edition">Portable</td>
+                  <td data-i18n="pv.app.tr2.settings"><code>Settings.xml</code> beside the exe</td>
+                  <td data-i18n="pv.app.tr2.data">In the folder that contains <code>Avro Keyboard.exe</code></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p data-i18n="pv.app.p2">
+            Both editions write three registry entries — saying "no registry changes at all" would
+            not be accurate:
+          </p>
+          <ul>
+            <li data-i18n="pv.app.li1"><code>HKCU\Control Panel\Desktop\LowLevelHooksTimeout</code> (5000 ms) — so that Windows does not silently drop the keyboard hook if another app stalls for a moment.</li>
+            <li data-i18n="pv.app.li2">Two IE font values (<code>IEFixedFontName</code>, <code>IEPropFontName</code>) while the portable Siyam Rupali font is registered — the previous values are kept in <code>_Prev</code> entries and restored when the font is removed.</li>
+          </ul>
+          <p data-i18n="pv.app.p3">
+            The portable edition installs and registers nothing system-wide; the folder can be
+            moved or deleted at any time.
+          </p>
+        </section>
+
+        <section id="log">
+          <h2 data-i18n="pv.log.h">⓺ AvroStartup.log — what is written, and what is not</h2>
+          <p data-i18n="pv.log.p">
+            So that a problem at startup does not end in a silent exit, the app writes a diagnostic
+            log. It contains: the startup steps, which edition is running, the paths to the exe and
+            the data folder, whether the folder is writable, the database file's size and
+            modification time, the Windows build number, and — if a step fails — that exception's
+            class and message.
+          </p>
+          <div class="callout callout--warn">
+            <p data-i18n="pv.log.callout">
+              <strong>This log never contains anything you typed.</strong> No keystroke, no word
+              and no sentence is ever recorded in it — at runtime the most that is written is an
+              exception class. The debug log (<code>Log()</code>) writes to a debugger only, never
+              to a file.
+            </p>
+          </div>
+          <p data-i18n="pv.log.p2">
+            The log sits beside the data files and rotates into
+            <code>AvroStartup.log.old</code> once it passes 256 KB. If the data folder cannot be
+            written it falls back to <code>%LOCALAPPDATA%\AvroKeyboard\</code>, then to
+            <code>%TEMP%\AvroKeyboard\</code>; if nowhere is writable the log is quietly dropped —
+            startup never depends on the log.
+          </p>
+        </section>
+
+        <section id="network">
+          <h2 data-i18n="pv.network.h">⓻ When the app uses the network</h2>
+          <p data-i18n="pv.network.p">
+            The app sends nothing anywhere on its own. The network is used only when
+            <strong>you</strong> ask it to download something:
+          </p>
+          <ul>
+            <li data-i18n="pv.network.li1">Downloading layout, skin or ANSI mapping packs from <strong>“Download Resources”</strong> in the tray menu.</li>
+            <li data-i18n="pv.network.li2">Downloading a new build through the in-app <strong>auto-update</strong>.</li>
+          </ul>
+          <p data-i18n="pv.network.p2">
+            Both requests go to GitHub, and every downloaded file is verified with
+            <strong>SHA-256</strong> before it installs. No crash reports, usage statistics or
+            personal identifiers are sent anywhere.
+          </p>
+        </section>
+
+        <section id="remove">
+          <h2 data-i18n="pv.remove.h">⓼ Removing all of it</h2>
+          <p data-i18n="pv.remove.p">To remove every trace of the app from your machine:</p>
+          <ul>
+            <li data-i18n="pv.remove.li1"><strong>Portable:</strong> delete the folder, then delete the <code>HKCU\Control Panel\Desktop\LowLevelHooksTimeout</code> entry.</li>
+            <li data-i18n="pv.remove.li2"><strong>Standard:</strong> uninstall, then delete the <code>%ProgramData%\Avro Keyboard\</code> folder and the <code>HKEY_CURRENT_USER\Software\OmicronLab\Avro Keyboard</code> key.</li>
+            <li data-i18n="pv.remove.li3"><strong>Update folder:</strong> if you used auto-update, downloaded packages may be inside the data folder — removing the whole data folder takes those with it.</li>
+            <li data-i18n="pv.remove.li4"><strong>This website:</strong> delete the <code>avro-gh-v1</code>, <code>avro-snap-v1</code>, <code>avro-lang</code> and <code>avro-theme</code> keys from your browser settings, or clear this site's data.</li>
+            <li data-i18n="pv.remove.li5"><strong>Logs:</strong> <code>AvroStartup.log</code> and <code>AvroStartup.log.old</code> also live in the data folder — they go with it.</li>
+          </ul>
+        </section>
+
+        <section id="contact">
+          <h2 data-i18n="pv.contact.h">⓽ Changes, contact and licence</h2>
+          <p data-i18n="pv.contact.p1">
+            If this policy changes it will be updated on this page and the “last updated” date
+            above will move. This site collects no personal information, so there is no data
+            request process either.
+          </p>
+          <p data-i18n="pv.contact.p2">
+            For any question, correction or concern, open a GitHub issue:
+            <a href="https://github.com/raselrahmanrocky/Avro-Keyboard/issues" target="_blank" rel="noopener noreferrer">raselrahmanrocky/Avro-Keyboard/issues ↗</a>
+          </p>
+          <p data-i18n="pv.contact.p3">
+            Avro Keyboard Community Edition is an independent continuation — built from Avro
+            Keyboard's open-source code under the MPL-2.0 licence. <strong>Not affiliated with
+            OmicronLab or its original developers</strong>, and not endorsed by them. The original
+            source and copyright belong to OmicronLab (Mehdi Hasan Khan). The Qt converter runs
+            under Qt's LGPLv3 terms.
+          </p>
+        </section>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="footer">
+  <div class="wrap">
+    <p class="legal" data-i18n="footer.legal">
+      Avro Keyboard Community Edition — an independent continuation of Avro Keyboard's
+      open-source code (MPL-2.0). <strong>Not affiliated with OmicronLab or its original
+      developers</strong>. The original source and copyright of Avro Keyboard belong to
+      OmicronLab (Mehdi Hasan Khan).
+    </p>
+  </div>
+  <div class="wrap footrow">
+    <div class="footbrand">
+      <img src="img/logo.jpg" width="34" height="34" alt="" loading="lazy" decoding="async">
+      <span>
+        <strong>Avro Keyboard Community Edition</strong><br>
+        <span data-i18n="footer.licenceNote">MPL-2.0 · Not affiliated with OmicronLab</span>
+      </span>
+    </div>
+    <nav class="footer-links" data-i18n-aria-label="nav.footer" aria-label="Footer links">
+      <a href="index.html#improvements" data-i18n="nav.improvements">Improvements</a>
+      <a href="index.html#features" data-i18n="nav.features">Features</a>
+      <a href="index.html#install" data-i18n="nav.install">Install</a>
+      <a href="changelog.html" data-i18n="nav.changelog">Changelog</a>
+      <a href="privacy.html" data-i18n="nav.privacy">Privacy</a>
+      <a href="https://github.com/raselrahmanrocky/Avro-Keyboard/issues" target="_blank" rel="noopener noreferrer" data-i18n="footer.reportBug">Report a bug ↗</a>
+    </nav>
+  </div>
+</footer>
+
+<script src="js/config.js" defer></script>
+<script src="js/i18n.js" defer></script>
+<script src="js/theme.js" defer></script>
+<script src="js/privacy.js" defer></script>
+</body>
+</html>

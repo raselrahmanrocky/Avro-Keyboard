@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light" data-lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title data-i18n="meta.title">Avro Keyboard Community Edition — type Bangla, type it reliably</title>
+<meta name="description" data-i18n-content="meta.desc" content="Avro Keyboard Community Edition — an independent continuation of the official Avro Keyboard's open-source code (MPL-2.0). Native 64/32-bit builds, a new ANSI/Bijoy engine, an in-app converter and auto-update.">
+<link rel="canonical" href="https://raselrahmanrocky.github.io/Avro-Keyboard/">
+<link rel="alternate" hreflang="en" href="https://raselrahmanrocky.github.io/Avro-Keyboard/">
+<link rel="alternate" hreflang="bn" href="https://raselrahmanrocky.github.io/Avro-Keyboard/?lang=bn">
+<link rel="alternate" hreflang="x-default" href="https://raselrahmanrocky.github.io/Avro-Keyboard/">
+<meta name="theme-color" content="#6d20d6">
+<meta name="color-scheme" content="light dark">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Avro Keyboard Community Edition">
+<meta property="og:title" content="Avro Keyboard Community Edition — type Bangla, type it reliably">
+<meta property="og:description" content="An open-source continuation (MPL-2.0) — native 64/32-bit builds, a new ANSI/Bijoy engine, an in-app converter and auto-update. Not affiliated with OmicronLab.">
+<meta property="og:url" content="https://raselrahmanrocky.github.io/Avro-Keyboard/">
+<meta property="og:image" content="https://raselrahmanrocky.github.io/Avro-Keyboard/img/og-cover.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="en_US">
+<meta property="og:locale:alternate" content="bn_BD">
+<meta name="twitter:card" content="summary_large_image">
+
+<link rel="icon" href="img/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="img/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="img/logo-192.png">
+
+<link rel="preload" href="fonts/hind-siliguri-bengali-400.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/inter-latin-400.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="css/fonts.css">
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/pages.css">
+
+<script>
+/* Runs before the stylesheets paint. Resolves the language so a Bangla
+   visitor never sees a flash of English prose, and reapplies a stored dark
+   theme so it never flashes light — first-time visitors always start on the
+   light theme. js/i18n.js clears the pending flag; the timeout is a backstop
+   in case that file never loads. */
+(function () {
+  var root = document.documentElement;
+
+  var lang = 'en';
+  try {
+    var wanted = /[?&]lang=(en|bn)\b/.exec(location.search);
+    var stored = localStorage.getItem('avro-lang');
+    lang = wanted ? wanted[1] : (stored === 'bn' ? 'bn' : 'en');
+    localStorage.setItem('avro-lang', lang);
+    if (localStorage.getItem('avro-theme') === 'dark') {
+      root.setAttribute('data-theme', 'dark');
+    }
+  } catch (e) { /* English and the light theme are the defaults */ }
+
+  root.setAttribute('lang', lang);
+  root.setAttribute('data-lang', lang);
+
+  if (lang !== 'en') {
+    root.setAttribute('data-i18n-pending', '1');
+    setTimeout(function () { root.removeAttribute('data-i18n-pending'); }, 1500);
+  }
+})();
+</script>
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Avro Keyboard Community Edition",
+  "alternateName": "Avro Keyboard CE",
+  "description": "An independent continuation (MPL-2.0) of the open-source Avro Keyboard — a Bangla input method and spell checker for Windows.",
+  "applicationCategory": "UtilitiesApplication",
+  "operatingSystem": "Windows",
+  "softwareVersion": "6.0.2-beta",
+  "license": "https://www.mozilla.org/en-US/MPL/2.0/",
+  "isAccessibleForFree": true,
+  "codeRepository": "https://github.com/raselrahmanrocky/Avro-Keyboard",
+  "downloadUrl": "https://github.com/raselrahmanrocky/Avro-Keyboard/releases",
+  "inLanguage": ["en", "bn"],
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "BDT" }
+}
+</script>
+</head>
+<body>
+
+<!-- Icon sprite. Kept inline so `currentColor` resolves against the element
+     that uses it, and so no extra request is needed. -->
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true" focusable="false">
+  <symbol id="i-keyboard" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6.2" width="19" height="11.6" rx="2.4"/><path d="M6 9.6h.01M9.4 9.6h.01M12.8 9.6h.01M16.2 9.6h.01M6.6 12.6h.01M10 12.6h.01M13.4 12.6h.01M16.8 12.6h.01M8 15.2h8"/></symbol>
+  <symbol id="i-package" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.8 20.4 7v10L12 21.2 3.6 17V7z"/><path d="M3.6 7 12 11.4 20.4 7M12 11.4v9.8"/></symbol>
+  <symbol id="i-archive" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.4" width="18" height="4" rx="1.2"/><path d="M4.6 8.4v9.8a1.4 1.4 0 0 0 1.4 1.4h12a1.4 1.4 0 0 0 1.4-1.4V8.4"/><path d="M9.6 12.2h4.8"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5v10.2M8 10l4 3.7 4-3.7"/><path d="M4.5 17.5v1.6a1.4 1.4 0 0 0 1.4 1.4h12.2a1.4 1.4 0 0 0 1.4-1.4v-1.6"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.6"/><path d="M12 11v5.2M12 8.1h.01"/></symbol>
+  <symbol id="i-star" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.6l2.6 5.3 5.8.85-4.2 4.1 1 5.8-5.2-2.75-5.2 2.75 1-5.8-4.2-4.1 5.8-.85z"/></symbol>
+  <symbol id="i-fork" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="6.5" cy="5" r="2.4"/><circle cx="17.5" cy="5" r="2.4"/><circle cx="12" cy="19" r="2.4"/><path d="M6.5 7.4v2.9a2 2 0 0 0 2 2h7a2 2 0 0 0 2-2V7.4M12 12.4v4.2"/></symbol>
+  <symbol id="i-commit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.4"/><path d="M12 2.6v6M12 15.4v6"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9.2" cy="8" r="3.3"/><path d="M2.9 20a6.3 6.3 0 0 1 12.6 0"/><path d="M16.4 5.6a3.3 3.3 0 0 1 0 6.4M17.6 14.6A6.3 6.3 0 0 1 21.1 20"/></symbol>
+  <symbol id="i-bolt" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M13.3 2.6 4.9 13.4h5.9l-1.3 8 8.4-10.8h-5.9z"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 19 5.8v5.6c0 4.3-2.9 7.6-7 9.6-4.1-2-7-5.3-7-9.6V5.8z"/><path d="M9.2 12.1l2 2 3.6-3.9"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11.6a8 8 0 1 1-2.5-5.4"/><path d="M20.2 3.9v4.7h-4.7"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4.6 12.6l5 5 9.8-11"/></symbol>
+  <symbol id="i-external" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M13.6 4.2h6.2v6.2"/><path d="M19.8 4.2 11.2 12.8"/><path d="M17.8 14.2v4.2a1.4 1.4 0 0 1-1.4 1.4H5.6a1.4 1.4 0 0 1-1.4-1.4V7.6a1.4 1.4 0 0 1 1.4-1.4h4.2"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3.9 12a8.1 8.1 0 1 0 2.5-5.9"/><path d="M3.6 3.6v4.6h4.6"/><path d="M12 7.6V12l2.9 1.8"/></symbol>
+  <symbol id="i-code" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 7.5 4.2 12 9 16.5M15 7.5 19.8 12 15 16.5"/></symbol>
+</svg>
+
+<a class="skip-link" href="#main" data-i18n="nav.skip">Skip to main content</a>
+
+<header class="topbar">
+  <div class="wrap nav">
+    <a class="brand" href="#home">
+      <img src="img/logo.jpg" width="44" height="44" alt="">
+      <span><b data-i18n="brand.name">Avro Keyboard<span class="ce-tag">Community Edition</span></b><small data-i18n="brand.tagline">Open source · MPL-2.0</small></span>
+    </a>
+    <nav class="navlinks" data-i18n-aria-label="nav.main" aria-label="Main navigation">
+      <a href="#improvements" data-i18n="nav.improvements">Improvements</a>
+      <a href="#features" data-i18n="nav.features">Features</a>
+      <a href="#install" data-i18n="nav.install">Install</a>
+      <a href="#download" data-i18n="nav.download">Download</a>
+      <a href="changelog.html" data-i18n="nav.changelog">Changelog</a>
+    </nav>
+    <div class="navright">
+      <div class="langswitch" role="group" data-i18n-aria-label="lang.label" aria-label="Language">
+        <button type="button" data-lang-set="en" data-i18n="lang.en" data-i18n-aria-label="lang.enFull" data-i18n-title="lang.enFull" aria-pressed="false" aria-label="English" title="English">EN</button>
+        <button type="button" data-lang-set="bn" data-i18n="lang.bn" data-i18n-aria-label="lang.bnFull" data-i18n-title="lang.bnFull" aria-pressed="false" aria-label="বাংলা" title="বাংলা">বাং</button>
+      </div>
+      <button class="theme" id="themeBtn" type="button" aria-pressed="false" aria-label="Switch to dark theme" title="Switch to dark theme">☾</button>
+      <a class="btn btn-primary" href="#download"><span data-i18n="actions.download">Download</span> <span aria-hidden="true">↓</span></a>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+
+  <section class="hero" id="home">
+    <div class="wrap hero-grid">
+      <div>
+        <p class="eyebrow"><span class="dot" data-live-dot data-state="loading"></span> <span data-i18n="hero.eyebrow">Open-source Bangla IME · Community Edition</span></p>
+        <h1 data-i18n="hero.h1">Type Bangla,<br><span class="gradient">type it reliably.</span></h1>
+        <p data-i18n="hero.lead">
+          Avro Keyboard Community Edition — an independent continuation of the official
+          Avro Keyboard's open-source code (MPL-2.0). The project that stalled after 2019 is
+          being taken through the Windows 10/11 era problem by problem, and every change
+          stays in this GitHub repository.
+        </p>
+        <div class="actions">
+          <a class="btn btn-primary" href="#download" data-i18n="hero.ctaDownload">Download the latest build <span aria-hidden="true">↓</span></a>
+          <a class="btn btn-ghost" href="https://github.com/raselrahmanrocky/Avro-Keyboard" target="_blank" rel="noopener noreferrer" data-i18n="hero.ctaSource">View the source code ↗</a>
+        </div>
+        <p class="micro" data-i18n="hero.micro">Free · Open source · MPL-2.0 · Not affiliated with OmicronLab</p>
+      </div>
+      <div class="showcase">
+        <picture>
+          <source srcset="img/splash-screen.webp" type="image/webp">
+          <img class="splash" src="img/splash-screen.jpg" width="1534" height="1025"
+               data-i18n-alt="hero.alt" alt="The Avro Keyboard splash screen — the Avro logo on a purple background" fetchpriority="high" decoding="async">
+        </picture>
+        <div class="float-tag" data-i18n="hero.floatTag">✦ <b>Language should be open</b><br>Community Edition</div>
+      </div>
+    </div>
+  </section>
+
+  <div class="wrap">
+    <div class="stats" role="group" data-i18n-aria-label="stats.group" aria-label="Live project statistics">
+      <div class="stat" data-stat="commits"><strong data-value>—</strong><span data-i18n="stat.commits">Total git commits</span></div>
+      <div class="stat" data-stat="stars"><strong data-value>—</strong><span data-i18n="stat.stars">GitHub stars</span></div>
+      <div class="stat" data-stat="forks"><strong data-value>—</strong><span data-i18n="stat.forks">Forks</span></div>
+      <div class="stat" data-stat="contributors"><strong data-value>—</strong><span data-i18n="stat.contributors">Contributors (full history)</span></div>
+      <div class="stat" data-stat="ahead"><strong data-value>—</strong><span data-i18n="stat.ahead">Commits ahead of the official baseline</span></div>
+      <div class="stat" data-stat="pushed"><strong data-value>—</strong><span data-i18n="stat.pushed">Last push</span></div>
+    </div>
+    <p class="status-note" data-state="loading" id="statsStatus">
+      <span class="dot" data-live-dot data-state="loading"></span>
+      <span data-note-text>Fetching live data…</span>
+    </p>
+  </div>
+
+  <!-- ================= Flagship: official vs Community Edition ============ -->
+  <section class="section" id="improvements">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="kicker" data-i18n="improvements.kicker">The difference that matters most</p>
+        <h2 data-i18n="improvements.h2">The official Avro Keyboard, <span class="gradient">and what we changed.</span></h2>
+        <p data-i18n="improvements.lead">
+          The last official release was <strong>5.6.0, 27 August 2019</strong>. After that the
+          canonical source repository was made read-only. The comparison below is between that
+          baseline and where this Community Edition stands today.
+        </p>
+      </div>
+
+      <div class="audit-grid">
+        <article class="audit audit--ce" id="auditCe" data-state="snapshot">
+          <span class="stamp stamp--live" data-i18n="audit.ce.stamp">Active</span>
+          <h3 data-i18n="audit.ce.title">Avro Keyboard Community Edition</h3>
+          <p class="sub" data-i18n="audit.ce.sub">This repository · Actively maintained</p>
+          <dl>
+            <dt data-i18n="audit.ce.latest">Latest tag</dt><dd data-audit="latest">v6.0.2-beta</dd>
+            <dt data-i18n="audit.ce.when">Released</dt><dd data-audit="when">16 October 2026</dd>
+            <dt data-i18n="audit.ce.commits">Total commits</dt><dd data-audit="commits">—</dd>
+            <dt data-i18n="audit.ce.ahead">Ahead of the baseline</dt><dd data-audit="ahead">—</dd>
+            <dt data-i18n="audit.ce.contributors">Contributors</dt><dd data-audit="contributors">—</dd>
+            <dt data-i18n="audit.ce.language">Language / licence</dt><dd data-audit="language">Pascal</dd>
+          </dl>
+          <p class="note" data-audit="freshness"></p>
+        </article>
+
+        <article class="audit audit--official" id="auditOfficial" data-state="snapshot">
+          <span class="stamp stamp--archived" data-i18n="audit.official.stamp">Archived</span>
+          <h3 data-i18n="audit.official.title">The official Avro Keyboard</h3>
+          <p class="sub" data-i18n="audit.official.sub">OmicronLab · Baseline build</p>
+          <dl>
+            <dt data-i18n="audit.official.latestRelease">Latest software release</dt><dd data-audit="released">27 August 2019</dd>
+            <dt data-i18n="audit.official.sourceState">Source repository state</dt><dd data-audit="archived">Read-only (archived)</dd>
+            <dt data-i18n="audit.official.stars">GitHub stars</dt><dd data-audit="stars">—</dd>
+            <dt data-i18n="audit.official.forks">Forks</dt><dd data-audit="forks">—</dd>
+            <dt data-i18n="audit.official.issues">Open issues</dt><dd data-audit="issues">—</dd>
+            <dt data-i18n="audit.official.pushed">Last push</dt><dd data-audit="pushed">—</dd>
+          </dl>
+          <p class="note" data-audit="freshness"></p>
+        </article>
+      </div>
+
+      <p class="note" data-i18n="ahead.note">
+        There are already <span data-ahead-note>—</span> commits on top of the canonical official
+        source — this is a continuation that keeps the whole history, not a rewrite.
+      </p>
+
+      <div class="compare-wrap">
+        <table>
+          <caption class="sr-only" data-i18n="compare.caption">The official Avro Keyboard 5.6.0 compared with the Community Edition</caption>
+          <thead>
+            <tr>
+              <th scope="col" data-i18n="compare.th.topic">Topic</th>
+              <th scope="col" data-i18n="compare.th.official">Official 5.6.0</th>
+              <th scope="col" data-i18n="compare.th.ce">Community Edition</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            <tr class="group-row"><th colspan="3" scope="colgroup" data-i18n="cmp.g1">Maintenance and distribution</th></tr>
+            <tr><td data-i18n="cmp.g1.r1.t">Active updates</td><td data-i18n="cmp.g1.r1.o">Last release 27 August 2019; source repo archived</td><td data-i18n="cmp.g1.r1.c"><span class="yes">✓</span>Continuous maintenance with tagged releases</td></tr>
+            <tr><td data-i18n="cmp.g1.r2.t">Installers</td><td data-i18n="cmp.g1.r2.o">A single 32-bit installer</td><td data-i18n="cmp.g1.r2.c"><span class="yes">✓</span>Installer and portable — 64- and 32-bit, four files in total</td></tr>
+            <tr><td data-i18n="cmp.g1.r3.t">Code signing</td><td data-i18n="cmp.g1.r3.o">5.6.0 was signed</td><td data-i18n="cmp.g1.r3.c"><span class="no">✗</span>Not signed yet — verify the SHA-256 yourself</td></tr>
+          </tbody>
+
+          <tbody>
+            <tr class="group-row"><th colspan="3" scope="colgroup" data-i18n="cmp.g2">Engine and conversion</th></tr>
+            <tr><td data-i18n="cmp.g2.r1.t">ANSI / Bijoy mapping</td><td data-i18n="cmp.g2.r1.o">One hardcoded mapping</td><td data-i18n="cmp.g2.r1.c"><span class="yes">✓</span>Every V1–V4 encoding is file-based</td></tr>
+            <tr><td data-i18n="cmp.g2.r2.t">First use</td><td data-i18n="cmp.g2.r2.o">Cold engine — stutters on first use</td><td data-i18n="cmp.g2.r2.c"><span class="yes">✓</span>Engine is already warm; switching versions allocates nothing</td></tr>
+            <tr><td data-i18n="cmp.g2.r3.t">Backspace</td><td data-i18n="cmp.g2.r3.o">Breaks a compound character and leaves a stray vowel sign</td><td data-i18n="cmp.g2.r3.c"><span class="yes">✓</span>Deletes the whole grapheme</td></tr>
+            <tr><td data-i18n="cmp.g2.r4.t">V3 / V4 glyphs</td><td data-i18n="cmp.g2.r4.o">Some wrong glyphs</td><td data-i18n="cmp.g2.r4.c"><span class="yes">✓</span>Mapping tables updated</td></tr>
+            <tr><td data-i18n="cmp.g2.r5.t">Cache restart</td><td data-i18n="cmp.g2.r5.o">—</td><td data-i18n="cmp.g2.r5.c"><span class="yes">✓</span>The encoding setting survives a cache restart</td></tr>
+          </tbody>
+
+          <tbody>
+            <tr class="group-row"><th colspan="3" scope="colgroup" data-i18n="cmp.g3">Interface</th></tr>
+            <tr><td data-i18n="cmp.g3.r1.t">Theme</td><td data-i18n="cmp.g3.r1.o">Limited</td><td data-i18n="cmp.g3.r1.c"><span class="yes">✓</span>App-wide theme and palette system</td></tr>
+            <tr><td data-i18n="cmp.g3.r2.t">Encoding selection</td><td data-i18n="cmp.g3.r2.o">A separate picker</td><td data-i18n="cmp.g3.r2.c"><span class="yes">✓</span>“Select ANSI Encoding” in the tray, kept in sync with every picker</td></tr>
+            <tr><td data-i18n="cmp.g3.r3.t">List sorting</td><td data-i18n="cmp.g3.r3.o">Plain sort</td><td data-i18n="cmp.g3.r3.c"><span class="yes">✓</span>Natural sort from V1 → V5</td></tr>
+            <tr><td data-i18n="cmp.g3.r4.t">Icons</td><td data-i18n="cmp.g3.r4.o">Plain</td><td data-i18n="cmp.g3.r4.c"><span class="yes">✓</span>Layout-aware icons</td></tr>
+            <tr><td data-i18n="cmp.g3.r5.t">Global hotkey</td><td data-i18n="cmp.g3.r5.o">Limited</td><td data-i18n="cmp.g3.r5.c"><span class="yes">✓</span>Works in any app; catches key conflicts before you save</td></tr>
+          </tbody>
+
+          <tbody>
+            <tr class="group-row"><th colspan="3" scope="colgroup" data-i18n="cmp.g4">Reliability</th></tr>
+            <tr><td data-i18n="cmp.g4.r1.t">Startup failure</td><td data-i18n="cmp.g4.r1.o">Bad settings, a locked registry, missing fonts or a corrupt Database.db3 shut it down silently</td><td data-i18n="cmp.g4.r1.c"><span class="yes">✓</span>Every step guarded, with a visible report</td></tr>
+            <tr><td data-i18n="cmp.g4.r2.t">Diagnostic log</td><td data-i18n="cmp.g4.r2.o">None</td><td data-i18n="cmp.g4.r2.c"><span class="yes">✓</span>AvroStartup.log — never records a keystroke</td></tr>
+            <tr><td data-i18n="cmp.g4.r3.t">New layout / skin</td><td data-i18n="cmp.g4.r3.o">Needed an app restart to take effect</td><td data-i18n="cmp.g4.r3.c"><span class="yes">✓</span>The menu refreshes itself as soon as the file lands</td></tr>
+            <tr><td data-i18n="cmp.g4.r4.t">Resource downloads</td><td data-i18n="cmp.g4.r4.o">Manually, from a separate site</td><td data-i18n="cmp.g4.r4.c"><span class="yes">✓</span>In-app browser, installed only after SHA-256 verification</td></tr>
+            <tr><td data-i18n="cmp.g4.r5.t">Updates</td><td data-i18n="cmp.g4.r5.o">You had to find and download them yourself</td><td data-i18n="cmp.g4.r5.c"><span class="yes">✓</span>In-app auto-update — correct architecture, beta channel toggle</td></tr>
+          </tbody>
+
+          <tbody>
+            <tr class="group-row"><th colspan="3" scope="colgroup" data-i18n="cmp.g5">Converter, build and licence</th></tr>
+            <tr><td data-i18n="cmp.g5.r1.t">Text Converter</td><td data-i18n="cmp.g5.r1.o">Needed a separate install</td><td data-i18n="cmp.g5.r1.c"><span class="yes">✓</span>Built into the app — Ctrl+Alt+T, and it does not freeze on large text</td></tr>
+            <tr><td data-i18n="cmp.g5.r2.t">Qt converter</td><td data-i18n="cmp.g5.r2.o">Did not exist</td><td data-i18n="cmp.g5.r2.c"><span class="yes">✓</span>A Qt 6 C++ port, with a <code>--mapping-dir</code> switch</td></tr>
+            <tr><td data-i18n="cmp.g5.r3.t">Build setup</td><td data-i18n="cmp.g5.r3.o">Delphi 2010 plus proprietary DISQLite3, ICS, JVCL/JCL</td><td data-i18n="cmp.g5.r3.c"><span class="yes">✓</span>Delphi 12 Community Edition, with no third-party dependency</td></tr>
+            <tr><td data-i18n="cmp.g5.r4.t">Licence</td><td data-i18n="cmp.g5.r4.o">MPL-1.1 (official source)</td><td data-i18n="cmp.g5.r4.c"><span class="yes">✓</span>MPL-2.0, with Qt's LGPLv3 terms documented</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="note" data-i18n="compare.sources">
+        The official column comes from the release information published on omicronlab.com and
+        the archived upstream repository's metadata. Every claim in the Community Edition column
+        traces back to this repository's Readme and the 6.0.2-beta release notes.
+      </p>
+
+      <div class="detail-grid">
+        <article class="detail">
+          <span class="tag">Engine</span>
+          <h4 data-i18n="detail.1.title">A new ANSI/Bijoy conversion engine</h4>
+          <p data-i18n="detail.1.body">The single hardcoded mapping inside has been removed so every V1–V4 encoding is file-based. The engine is pre-warmed, switching versions allocates nothing, and the setting survives a cache restart.</p>
+        </article>
+        <article class="detail">
+          <span class="tag">Converter</span>
+          <h4 data-i18n="detail.2.title">Avro Text Converter is now inside the app</h4>
+          <p data-i18n="detail.2.body">Open it from the tray menu or by pressing <strong>Ctrl+Alt+T</strong>. It converts both ways, Unicode ↔ ANSI, and the window no longer freezes on large text — the work runs in the background.</p>
+        </article>
+        <article class="detail">
+          <span class="tag">Resources</span>
+          <h4 data-i18n="detail.3.title">In-app “Download Resources”</h4>
+          <p data-i18n="detail.3.body">Find and download layout, skin and ANSI mapping packs from inside the app. Every file is verified with <strong>SHA-256</strong> before it installs, and it loads without a restart.</p>
+        </article>
+        <article class="detail">
+          <span class="tag">Updates</span>
+          <h4 data-i18n="detail.4.title">Auto-update straight from this GitHub repository</h4>
+          <p data-i18n="detail.4.body">Picks the right file for the architecture you are running, verifies the download link live before offering it, hands portable builds the portable package, and keeps a beta channel toggle.</p>
+        </article>
+        <article class="detail">
+          <span class="tag">Reliability</span>
+          <h4 data-i18n="detail.5.title">Startup never fails silently</h4>
+          <p data-i18n="detail.5.body">Bad settings, a locked registry, missing fonts or a corrupt <code>Database.db3</code> used to close the app without ever showing a window. Every step is guarded now, with a visible report and <code>AvroStartup.log</code>.</p>
+        </article>
+        <article class="detail">
+          <span class="tag">UI</span>
+          <h4 data-i18n="detail.6.title">Interface and theming</h4>
+          <p data-i18n="detail.6.body">An app-wide theme and palette system, a “Select ANSI Encoding” tray menu that stays in sync with every picker, layout-aware icons, and correct natural sorting like V1 → V5.</p>
+        </article>
+        <article class="detail">
+          <span class="tag">Packaging</span>
+          <h4 data-i18n="detail.7.title">Native 64/32-bit and genuinely portable</h4>
+          <p data-i18n="detail.7.body">The official build was a single 32-bit installer; here you get an installer and a portable build, on both architectures. In the portable build the settings live in <code>Settings.xml</code> beside the exe, so you can run it from a USB stick and leave a clean machine behind.</p>
+        </article>
+        <article class="detail">
+          <span class="tag">Build</span>
+          <h4 data-i18n="detail.8.title">Built for community contribution</h4>
+          <p data-i18n="detail.8.body">Builds with no third-party dependency in the latest free Delphi Community Edition (<code>build-ce.bat</code>). Contributions are welcome in both Delphi and the Qt converter — not just one of them.</p>
+        </article>
+        <article class="detail">
+          <span class="tag">Privacy</span>
+          <h4 data-i18n="detail.9.title">No tracking, no telemetry</h4>
+          <p data-i18n="detail.9.body">The app sends no telemetry, and <code>AvroStartup.log</code> never contains the text you type. Use the portable folder without installing and nothing system-wide is registered at all.</p>
+        </article>
+      </div>
+
+      <aside class="honest">
+        <h3 data-i18n="honest.title">What is still limited — better said plainly</h3>
+        <ul>
+          <li data-i18n="honest.i1"><strong>This is an independent continuation.</strong> A separate continuation from Avro Keyboard's open-source code (MPL-2.0) — not affiliated with OmicronLab. The official site and the older versions are still at omicronlab.com as before.</li>
+          <li data-i18n="honest.i2"><strong>The binaries are not code-signed yet</strong> (the official 5.6.0 was), so Windows SmartScreen may show “More info → Run anyway”. Comparing the SHA-256 of the file you downloaded settles it.</li>
+          <li data-i18n="honest.i3"><strong>The portable edition still writes three HKCU keys</strong> — <code>LowLevelHooksTimeout</code> (so Windows does not silently drop the keyboard hook) and two IE font values while the portable Siyam Rupali font is registered, which revert when the font is removed. Nothing system-wide is installed.</li>
+          <li data-i18n="honest.i4"><strong>Some resources are not in the public repository.</strong> The proprietary ANSI encoding configuration, certain mapping files and the key material were kept private. So a build made from a clone of this repository cannot open the default-key <code>.AvroEnco</code> container — instead of a confusing decode error it says plainly that the secret is unavailable. That is the expected behaviour of a clone build.</li>
+          <li data-i18n="honest.i5"><strong>This is a beta.</strong> If something behaves oddly, open an issue with your Windows version, which file you downloaded and the version shown in the About box.</li>
+        </ul>
+      </aside>
+
+      <div class="timeline">
+        <div class="tl-item">
+          <time data-i18n="tl.when1">27 Aug 2019</time>
+          <h4 data-i18n="tl.1.title">The last official release — Avro Keyboard 5.6.0</h4>
+          <p data-i18n="tl.1.body">No new official version has appeared since. This is still the newest official download on omicronlab.com.</p>
+        </div>
+        <div class="tl-item">
+          <time data-i18n="tl.when2">9 Aug 2026</time>
+          <h4 data-i18n="tl.2.title">The canonical source repository goes read-only</h4>
+          <p data-i18n="tl.2.body">The official upstream repository was archived — meaning nobody was fixing the problems newer Windows versions brought any more.</p>
+        </div>
+        <div class="tl-item">
+          <time data-i18n="tl.when3">15 Oct 2026</time>
+          <h4 data-i18n="tl.3.title">Community Edition source begins</h4>
+          <p data-i18n="tl.3.body">Independent maintenance starts from that same open-source code under the MPL-2.0 licence — with the full history and the upstream baseline kept intact.</p>
+        </div>
+        <div class="tl-item">
+          <time data-i18n="tl.when4">16 Oct 2026</time>
+          <h4 data-i18n="tl.4.title">The first public build — 6.0.2-beta</h4>
+          <p data-i18n="tl.4.body">Native 64/32-bit installer and portable, the new ANSI engine, the in-app converter, the resource browser and auto-update — all at once.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================== Features ============================== -->
+  <section class="section" id="features">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="kicker" data-i18n="features.kicker">What is inside</p>
+        <h2 data-i18n="features.h2">The things that make a difference <span class="gradient">in everyday typing</span></h2>
+        <p data-i18n="features.lead">Every point is written down in the 6.0.2-beta release notes or in this repository's Readme.</p>
+      </div>
+      <div class="feature-grid">
+        <article class="feature">
+          <div class="ico"><svg class="ic" aria-hidden="true"><use href="#i-keyboard"></use></svg></div>
+          <h3 data-i18n="feature.1.title">Native 64- and 32-bit</h3>
+          <p data-i18n="feature.1.body">Separate builds for both architectures. The 64-bit build is steadier on large documents and long sessions.</p>
+        </article>
+        <article class="feature">
+          <div class="ico"><svg class="ic" aria-hidden="true"><use href="#i-package"></use></svg></div>
+          <h3 data-i18n="feature.2.title">Genuinely portable</h3>
+          <p data-i18n="feature.2.body">Settings sit beside the exe, inside the data folder. Run it from a USB stick, delete the folder when you are done.</p>
+        </article>
+        <article class="feature">
+          <div class="ico"><svg class="ic" aria-hidden="true"><use href="#i-bolt"></use></svg></div>
+          <h3 data-i18n="feature.3.title">A file-based ANSI engine</h3>
+          <p data-i18n="feature.3.body">Every V1–V4 encoding loads from its own file — no hardcoded mapping is left.</p>
+        </article>
+        <article class="feature">
+          <div class="ico"><svg class="ic" aria-hidden="true"><use href="#i-shield"></use></svg></div>
+          <h3 data-i18n="feature.4.title">Startup never fails silently</h3>
+          <p data-i18n="feature.4.body">Every step is guarded, with a visible report and <code>AvroStartup.log</code>.</p>
+        </article>
+        <article class="feature">
+          <div class="ico"><svg class="ic" aria-hidden="true"><use href="#i-refresh"></use></svg></div>
+          <h3 data-i18n="feature.5.title">Downloads verified with SHA-256</h3>
+          <p data-i18n="feature.5.body">Resources and updates alike only install once the file hash matches.</p>
+        </article>
+        <article class="feature">
+          <div class="ico"><svg class="ic" aria-hidden="true"><use href="#i-check"></use></svg></div>
+          <h3 data-i18n="feature.6.title">Grapheme-aware backspace</h3>
+          <p data-i18n="feature.6.body">A compound character no longer breaks leaving a stray vowel sign behind — the whole grapheme goes at once.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- =============================== Install ============================== -->
+  <section class="section install" id="install">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="kicker" data-i18n="install.kicker">Getting started</p>
+        <h2 data-i18n="install.h2">Bangla typing in three steps</h2>
+        <p data-i18n="install.lead">From download to typing Bangla — installer or portable, whichever suits you.</p>
+      </div>
+      <div class="steps">
+        <article class="step">
+          <p class="num">STEP 01</p>
+          <h3 data-i18n="install.s1.title">Download the right file</h3>
+          <p data-i18n="install.s1.body">The cards below read your Windows architecture and pick the correct installer or portable ZIP for you.</p>
+          <div class="code">AvroKeyboard-&lt;version&gt;-win64-setup.exe</div>
+        </article>
+        <article class="step">
+          <p class="num">STEP 02</p>
+          <h3 data-i18n="install.s2.title">Install, or just extract</h3>
+          <p data-i18n="install.s2.body">Run the setup, or extract the ZIP and use it straight from the folder — the portable build needs no installation.</p>
+          <div class="code" data-i18n="install.s2.code">Settings.xml ← next to the exe</div>
+        </article>
+        <article class="step">
+          <p class="num">STEP 03</p>
+          <h3 data-i18n="install.s3.title">Start typing Bangla</h3>
+          <p data-i18n="install.s3.body">Choose Avro Phonetic from the tray icon. Need the text converter? Press <strong>Ctrl+Alt+T</strong>.</p>
+          <div class="code">Ctrl + Alt + T</div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================== Releases ============================== -->
+  <section class="section" id="download">
+    <div class="wrap">
+      <div class="releases-head">
+        <div class="section-head">
+          <p class="kicker" data-i18n="download.kicker">Download and archive</p>
+          <h2 data-i18n="download.h2">Avro Keyboard releases</h2>
+          <p data-i18n="download.lead">
+            These cards come live from the GitHub releases API. There has only been one build so
+            far, so the official 5.6.0 baseline card is shown as well to fill the grid.
+          </p>
+        </div>
+        <div class="filters" role="group" data-i18n-aria-label="download.filters" aria-label="Release filters">
+          <button class="chip" type="button" data-filter="all" aria-pressed="true" disabled data-i18n="download.filter.all">All releases</button>
+          <button class="chip" type="button" data-filter="installer" aria-pressed="false" disabled data-i18n="download.filter.installer">Installer</button>
+          <button class="chip" type="button" data-filter="portable" aria-pressed="false" disabled data-i18n="download.filter.portable">Portable</button>
+          <button class="chip" type="button" data-filter="official" aria-pressed="false" disabled data-i18n="download.filter.official">Official</button>
+        </div>
+      </div>
+
+      <div class="release-grid" id="releaseGrid">
+        <p class="release-empty">Loading the release list…</p>
+      </div>
+
+      <p class="status-note" data-state="loading" id="releasesStatus">
+        <span class="dot" data-live-dot data-state="loading"></span>
+        <span data-note-text>Fetching releases…</span>
+      </p>
+      <p class="note" data-i18n="download.note">
+        The detailed notes and SHA-256 for every release are on the <a href="changelog.html">changelog page</a>.
+      </p>
+    </div>
+  </section>
+
+  <!-- ============================== CTA ================================== -->
+  <section class="section">
+    <div class="wrap">
+      <div class="download-card">
+        <div>
+          <p class="kicker" data-i18n="cta.kicker">Spread Bangla</p>
+          <h2 data-i18n="cta.h2">Language should be open.</h2>
+          <p data-i18n="cta.body">Report a bug, contribute code, or just join the community — all of it is welcome.</p>
+        </div>
+        <a class="btn" href="https://github.com/raselrahmanrocky/Avro-Keyboard" target="_blank" rel="noopener noreferrer" data-i18n="cta.button">View the repo on GitHub ↗</a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="footer">
+  <div class="wrap">
+    <p class="legal" data-i18n="footer.legal">
+      Avro Keyboard Community Edition — an independent continuation of Avro Keyboard's
+      open-source code (MPL-2.0). <strong>Not affiliated with OmicronLab or its original
+      developers</strong>. The original source and copyright of Avro Keyboard belong to
+      OmicronLab (Mehdi Hasan Khan).
+    </p>
+  </div>
+  <div class="wrap footrow">
+    <div class="footbrand">
+      <img src="img/logo.jpg" width="34" height="34" alt="" loading="lazy" decoding="async">
+      <span>
+        <strong>Avro Keyboard Community Edition</strong><br>
+        <span data-i18n="footer.ahead"><span data-ahead-note>—</span> commits ahead of the official baseline · MPL-2.0</span>
+      </span>
+    </div>
+    <nav class="footer-links" data-i18n-aria-label="nav.footer" aria-label="Footer links">
+      <a href="#improvements" data-i18n="nav.improvements">Improvements</a>
+      <a href="#features" data-i18n="nav.features">Features</a>
+      <a href="#install" data-i18n="nav.install">Install</a>
+      <a href="changelog.html" data-i18n="nav.changelog">Changelog</a>
+      <a href="privacy.html" data-i18n="nav.privacy">Privacy</a>
+      <a href="https://github.com/raselrahmanrocky/Avro-Keyboard/issues" target="_blank" rel="noopener noreferrer" data-i18n="footer.reportBug">Report a bug ↗</a>
+    </nav>
+  </div>
+</footer>
+
+<script src="js/config.js" defer></script>
+<script src="js/i18n.js" defer></script>
+<script src="js/snapshot.js" defer></script>
+<script src="js/github.js" defer></script>
+<script src="js/theme.js" defer></script>
+<script src="js/stats.js" defer></script>
+<script src="js/audit.js" defer></script>
+<script src="js/ahead-note.js" defer></script>
+<script src="js/releases.js" defer></script>
+</body>
+</html>

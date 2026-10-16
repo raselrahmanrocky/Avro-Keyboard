@@ -1,0 +1,9 @@
+# Local agent/tool state — never part of the published site.
+.freebuff/
+
+# Editor and OS noise.
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/

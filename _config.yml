@@ -1,0 +1,27 @@
+# GitHub Pages configuration.
+#
+# NOTE: this branch also contains a `.nojekyll` file, which disables Jekyll
+# entirely — so the values below are documentation, not build settings. That is
+# deliberate: it guarantees the CSS, JS, fonts and data files are served
+# byte-for-byte and that nothing in the JavaScript is mistaken for a Liquid
+# template. If you would rather let Jekyll process the site, delete `.nojekyll`
+# and these values take effect.
+
+title: Avro Keyboard Community Edition
+description: >-
+  Avro Keyboard-এর ওপেন সোর্স কোড (MPL-2.0) থেকে স্বতন্ত্রভাবে রক্ষণাবেক্ষণ করা
+  কন্টিনিউয়েশন — Windows-এর জন্য বাংলা ইনপুট মেথড ও স্পেল চেকার।
+url: https://raselrahmanrocky.github.io
+baseurl: /Avro-Keyboard
+
+lang: bn
+author: Md Rasel Rahman Rocky
+license: MPL-2.0
+
+# Kept out of the published output.
+exclude:
+  - README.md
+  - Gemfile
+  - Gemfile.lock
+  - vendor
+  - .gitignore

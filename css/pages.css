@@ -1,0 +1,238 @@
+/* ==========================================================================
+   Avro Keyboard Community Edition — page styles
+   Layout for the changelog and privacy pages, plus the markdown "prose"
+   block that release notes are rendered into.
+   ========================================================================== */
+
+/* 1. Compact page hero ===================================================== */
+.page-hero {
+  padding: 54px 0 40px;
+  background: linear-gradient(135deg, var(--bg), var(--surface2));
+  border-bottom: 1px solid var(--line);
+}
+.page-hero h1 { font-size: clamp(31px, 4.4vw, 46px); line-height: 1.18; letter-spacing: -1.2px; margin: 14px 0 12px; }
+.page-hero p { margin: 0; color: var(--muted); max-width: 660px; }
+.crumbs { font-size: 14px; color: var(--muted); }
+.crumbs a:hover { color: var(--purple); }
+.crumbs span { margin: 0 7px; opacity: .6; }
+
+/* 2. Changelog ============================================================= */
+.cl-layout { display: grid; grid-template-columns: 232px 1fr; gap: 40px; align-items: start; }
+
+/* Grid items default to min-width:auto, so a wide markdown table (or any other
+   wide child) would stretch the whole column past the viewport instead of
+   scrolling inside its own wrapper. These zeroes let the scroll containers do
+   their job. */
+.cl-layout > *,
+.doc-layout > * { min-width: 0; }
+
+.tag-nav { position: sticky; top: 96px; }
+.tag-nav h2 {
+  margin: 0 0 12px;
+  font-size: 14px;
+  font-weight: 850;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.tag-nav ol { list-style: none; margin: 0; padding: 0; }
+.tag-nav li { margin-bottom: 3px; }
+.tag-nav a {
+  display: block;
+  padding: 9px 13px;
+  border-radius: 11px;
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--muted);
+  border: 1px solid transparent;
+}
+.tag-nav a:hover { background: var(--surface); border-color: var(--line); color: var(--text); }
+.tag-nav a[aria-current="true"] { background: var(--surface); border-color: var(--line); color: var(--purple); }
+.tag-nav .nav-when { display: block; font-size: 14px; font-weight: 500; color: var(--muted); }
+
+.rel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: 30px 32px;
+  margin-bottom: 26px;
+  box-shadow: var(--shadow);
+  scroll-margin-top: 96px;
+}
+.rel--official { background: var(--surface2); }
+.rel:target { border-color: var(--purple); }
+
+.rel-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; flex-wrap: wrap; margin-bottom: 6px; }
+.rel-head h2 { margin: 0; font-size: clamp(23px, 2.6vw, 30px); letter-spacing: -.7px; }
+.rel-head .when { margin: 5px 0 0; color: var(--muted); font-size: 14px; }
+
+.marks { display: flex; gap: 7px; flex-wrap: wrap; }
+.mark {
+  padding: 5px 11px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 850;
+  letter-spacing: .7px;
+  text-transform: uppercase;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--muted);
+}
+.mark--pre { background: var(--ribbon-pre); color: #fff; border-color: transparent; }
+.mark--live { background: var(--ribbon-live); color: #fff; border-color: transparent; }
+.mark--archived { color: var(--amber); border-color: currentColor; }
+.mark--auto { color: var(--purple); border-color: currentColor; }
+
+.rel-actions { display: flex; gap: 10px; flex-wrap: wrap; margin: 18px 0 0; }
+
+details.assets { margin-top: 22px; border: 1px solid var(--line); border-radius: 14px; background: var(--bg); }
+details.assets summary {
+  cursor: pointer;
+  padding: 14px 18px;
+  font-size: 14px;
+  font-weight: 750;
+  list-style: none;
+}
+details.assets summary::-webkit-details-marker { display: none; }
+details.assets summary::before { content: "▸ "; color: var(--purple); font-weight: 850; }
+details.assets[open] summary::before { content: "▾ "; }
+details.assets[open] summary { border-bottom: 1px solid var(--line); }
+
+.asset-list { list-style: none; margin: 0; padding: 6px 18px 14px; }
+.asset-list li { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; padding: 11px 0; border-bottom: 1px solid var(--line); }
+.asset-list li:last-child { border-bottom: 0; }
+.asset-name { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 14px; overflow-wrap: anywhere; }
+.asset-meta { color: var(--muted); font-size: 14px; text-align: right; white-space: nowrap; }
+.asset-hash { display: block; color: var(--muted); font-size: 14px; font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; overflow-wrap: anywhere; }
+
+.commit-notes { list-style: none; margin: 18px 0 0; padding: 0; }
+.commit-notes li { display: flex; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
+.commit-notes li:last-child { border-bottom: 0; }
+.commit-notes code { color: var(--purple); font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 14px; flex: 0 0 auto; }
+
+/* 3. Prose (rendered release notes) ======================================== */
+.prose { font-size: 15px; }
+.prose > *:first-child { margin-top: 25px; }
+.prose > *:last-child { margin-bottom: 0; }
+
+.prose h1, .prose h2, .prose h3, .prose h4 {
+  line-height: 1.3;
+  letter-spacing: -.5px;
+  margin: 30px 0 10px;
+}
+.prose h1 { font-size: 25px; }
+.prose h2 { font-size: 21px; }
+.prose h3 { font-size: 17.5px; }
+.prose h4 { font-size: 15.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .8px; }
+
+.prose p { margin: 0 0 14px; }
+.prose strong { font-weight: 800; }
+.prose a { color: var(--purple); text-decoration: underline; text-underline-offset: 3px; }
+.prose a:hover { color: var(--purple2); }
+
+.prose ul, .prose ol { margin: 0 0 16px; padding-left: 22px; }
+.prose li { margin-bottom: 9px; }
+.prose li::marker { color: var(--purple2); }
+
+.prose code {
+  background: var(--surface2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 1px 6px;
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 14px;
+  color: var(--purple);
+  overflow-wrap: anywhere;
+}
+.prose pre {
+  background: var(--code-bg);
+  color: var(--code-fg);
+  padding: 16px 18px;
+  border-radius: 13px;
+  overflow: auto;
+  font-size: 14px;
+  line-height: 1.6;
+}
+.prose pre code { background: none; border: 0; padding: 0; color: inherit; }
+
+.prose blockquote {
+  margin: 0 0 18px;
+  padding: 14px 18px;
+  border-left: 4px solid var(--purple2);
+  background: var(--surface2);
+  border-radius: 12px;
+  color: var(--text);
+}
+.prose blockquote p:last-child { margin-bottom: 0; }
+
+.prose hr { border: 0; border-top: 1px solid var(--line); margin: 26px 0; }
+
+.prose img { border-radius: 13px; border: 1px solid var(--line); }
+
+.prose-table { overflow: auto; margin: 0 0 18px; max-width: 100%; }
+.prose .prose-table table { min-width: 480px; }
+.prose .prose-table th, .prose .prose-table td { padding: 11px 14px; }
+
+/* 4. Privacy / document pages ============================================== */
+.doc-layout { display: grid; grid-template-columns: 224px 1fr; gap: 40px; align-items: start; }
+
+.doc { font-size: 15.5px; max-width: 780px; }
+.doc section { scroll-margin-top: 96px; margin-bottom: 34px; }
+.doc h2 { font-size: 23px; letter-spacing: -.6px; margin: 0 0 12px; }
+.doc h3 { font-size: 16.5px; margin: 22px 0 8px; letter-spacing: -.3px; }
+.doc p { margin: 0 0 13px; }
+.doc ul, .doc ol { margin: 0 0 15px; padding-left: 22px; }
+.doc li { margin-bottom: 8px; color: var(--muted); }
+.doc li strong { color: var(--text); }
+.doc a { color: var(--purple); text-decoration: underline; text-underline-offset: 3px; }
+.doc code {
+  background: var(--surface2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 1px 6px;
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.doc table { min-width: 520px; }
+.doc .table-wrap { overflow: auto; border: 1px solid var(--line); border-radius: 14px; margin: 0 0 16px; background: var(--surface); }
+
+.callout {
+  padding: 18px 20px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--purple);
+  background: var(--surface);
+  margin: 0 0 16px;
+}
+.callout p:last-child { margin-bottom: 0; }
+.callout--warn { border-left-color: var(--amber); }
+
+.doc-meta {
+  font-size: 14px;
+  color: var(--muted);
+  padding: 14px 18px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  margin-bottom: 30px;
+}
+.doc-meta strong { color: var(--text); }
+
+/* 5. Responsive ============================================================ */
+@media (max-width: 980px) {
+  .cl-layout, .doc-layout { grid-template-columns: 1fr; gap: 26px; }
+  .tag-nav { position: static; }
+  .tag-nav ol { display: flex; flex-wrap: wrap; gap: 6px; }
+  .tag-nav li { margin: 0; }
+  .tag-nav a { border: 1px solid var(--line); background: var(--surface); }
+  .tag-nav .nav-when { display: none; }
+}
+
+@media (max-width: 540px) {
+  .rel { padding: 24px 20px; }
+  .rel-head h2 { font-size: 22px; }
+  .asset-list li { flex-direction: column; gap: 4px; }
+  .asset-meta { text-align: left; white-space: normal; }
+}
