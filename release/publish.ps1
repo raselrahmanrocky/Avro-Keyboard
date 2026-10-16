@@ -267,6 +267,7 @@ $releaseId = $null
 $releaseExists = $false
 if ($SkipCreate) {
     Write-Step 'Release (create) - skipped (-SkipCreate)'
+    $releaseExists = $true
 }
 else {
     Write-Step 'Create release'
