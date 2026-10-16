@@ -109,13 +109,13 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Cfg_1_Win32)'!=''">
     <AppDPIAwarenessMode>PerMonitorV2</AppDPIAwarenessMode>
-    <VerInfo_Build>5</VerInfo_Build>
-    <VerInfo_Keys>CompanyName=;FileDescription=LayoutEditor;FileVersion=1.0.0.5;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductName=LayoutEditor;ProductVersion=1.0.0.0;Comments=;ProgramID=com.embarcadero.LayoutEditor</VerInfo_Keys>
+    <VerInfo_Build>7</VerInfo_Build>
+    <VerInfo_Keys>CompanyName=;FileDescription=LayoutEditor;FileVersion=1.0.0.7;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductName=LayoutEditor;ProductVersion=1.0.0.0;Comments=;ProgramID=com.embarcadero.LayoutEditor</VerInfo_Keys>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Cfg_1_Win64)'!=''">
     <AppDPIAwarenessMode>PerMonitorV2</AppDPIAwarenessMode>
-    <VerInfo_Build>7</VerInfo_Build>
-    <VerInfo_Keys>CompanyName=;FileDescription=$(MSBuildProjectName);FileVersion=1.0.0.7;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProgramID=com.embarcadero.$(MSBuildProjectName);ProductName=$(MSBuildProjectName);ProductVersion=1.0.0.0;Comments=</VerInfo_Keys>
+    <VerInfo_Build>9</VerInfo_Build>
+    <VerInfo_Keys>CompanyName=;FileDescription=LayoutEditor;FileVersion=1.0.0.9;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProgramID=com.embarcadero.LayoutEditor;ProductName=LayoutEditor;ProductVersion=1.0.0.0;Comments=</VerInfo_Keys>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Cfg_2)'!=''">
     <DCC_Define>DEBUG;$(DCC_Define)</DCC_Define>
