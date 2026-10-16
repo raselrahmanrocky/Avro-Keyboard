@@ -316,17 +316,26 @@ if ($releaseExists -and -not $releaseId) {
 #    resumes instead of restarting, which is what -SkipCreate is for.
 # ---------------------------------------------------------------------------
 Write-Step "Upload assets ($releaseId)"
+# Same empty-list edge lag as the releases list: an empty answer is legal
+# (nothing uploaded yet) but is also what a stale cache returns right after
+# an upload - trusting it meant re-uploading files that already exist (422).
+# Retry the empty answer a few times; a genuinely empty release pays seconds.
 $existingAssets = @()
-try {
-    $existingAssets = @(Invoke-GitHubApi -Uri "https://api.github.com/repos/$Repo/releases/$releaseId/assets?per_page=100")
+for ($attempt = 1; $attempt -le 4; $attempt++) {
+    try {
+        $rawAssets = Invoke-GitHubApi -Uri "https://api.github.com/repos/$Repo/releases/$releaseId/assets?per_page=100"
+    }
+    catch {
+        Write-Fail $_.Exception.Message
+        exit 1
+    }
+    # PowerShell 5.1: an empty JSON array from a function can arrive as one
+    # nested empty Object[] element; filter by expected property before any probe.
+    $existingAssets = @($rawAssets | Where-Object { $_ -and $_.PSObject.Properties['name'] })
+    if ($existingAssets.Count -gt 0 -or $attempt -eq 4) { break }
+    Write-Warn "the asset list came back empty (attempt $attempt); retrying in 5s"
+    Start-Sleep -Seconds 5
 }
-catch {
-    Write-Fail $_.Exception.Message
-    exit 1
-}
-# PowerShell 5.1: an empty JSON array from a function can arrive as one nested
-# empty Object[] element; filter by expected property before any probe.
-$existingAssets = @($existingAssets | Where-Object { $_ -and $_.PSObject.Properties['name'] })
 $existingNames = @($existingAssets | ForEach-Object { $_.name })
 $uploadFailed = $false
 foreach ($name in $assets) {
@@ -345,6 +354,19 @@ foreach ($name in $assets) {
     catch {
         $status = ''
         if ($_.Exception.Response) { $status = [int]$_.Exception.Response.StatusCode }
+        if ($status -eq 422) {
+            # Duplicate name: the listing above raced a stale cache. Confirm
+            # the asset really is on the release before calling this a failure.
+            try {
+                $recheck = @(Invoke-GitHubApi -Uri "https://api.github.com/repos/$Repo/releases/$releaseId/assets?per_page=100")
+                $recheckNames = @($recheck | Where-Object { $_ -and $_.PSObject.Properties['name'] } | ForEach-Object { $_.name })
+                if ($recheckNames -contains $name) {
+                    Write-Warn "asset already on the release, skipping: $name"
+                    continue
+                }
+            }
+            catch { }
+        }
         Write-Fail "upload failed for $name ($status): $($_.Exception.Message)"
         $uploadFailed = $true
     }
