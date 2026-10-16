@@ -2,12 +2,16 @@
 <versioninfo>
   <versionmajor>6</versionmajor>
   <versionminor>0</versionminor>
-  <versionrevision>0</versionrevision>
+  <versionrevision>2</versionrevision>
   <versionbuild>0</versionbuild>
-  <channel>stable</channel>
-  <downloadurl>https://github.com/raselrahmanrocky/Avro-Keyboard</downloadurl>
-  <changelogurl>https://github.com/raselrahmanrocky/Avro-Keyboard</changelogurl>
+  <channel>beta</channel>
+  <downloadurl>https://github.com/raselrahmanrocky/Avro-Keyboard/releases/download/v6.0.2-beta/AvroKeyboard-6.0.2-beta-win64-setup.exe</downloadurl>
+  <downloadurl32>https://github.com/raselrahmanrocky/Avro-Keyboard/releases/download/v6.0.2-beta/AvroKeyboard-6.0.2-beta-win32-setup.exe</downloadurl32>
+  <downloadurl64>https://github.com/raselrahmanrocky/Avro-Keyboard/releases/download/v6.0.2-beta/AvroKeyboard-6.0.2-beta-win64-setup.exe</downloadurl64>
+  <downloadurlportable32>https://github.com/raselrahmanrocky/Avro-Keyboard/releases/download/v6.0.2-beta/AvroKeyboard-6.0.2-beta-win32-portable.zip</downloadurlportable32>
+  <downloadurlportable64>https://github.com/raselrahmanrocky/Avro-Keyboard/releases/download/v6.0.2-beta/AvroKeyboard-6.0.2-beta-win64-portable.zip</downloadurlportable64>
+  <changelogurl>https://github.com/raselrahmanrocky/Avro-Keyboard/releases/tag/v6.0.2-beta</changelogurl>
   <productpageurl>https://github.com/raselrahmanrocky/Avro-Keyboard</productpageurl>
-  <releasedate></releasedate>
-  <namedversion>Avro Keyboard 6.0.0</namedversion>
+  <releasedate>2026-10-16</releasedate>
+  <namedversion>Avro Keyboard 6.0.2-beta</namedversion>
 </versioninfo>
