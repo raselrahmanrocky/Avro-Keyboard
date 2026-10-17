@@ -56,8 +56,9 @@
   /* -------------------------------------------------------------- reveal -- */
   /* One observer feeds a document-order queue: elements join the queue as
      they touch the viewport, then reveal strictly top to bottom, one every
-     STEP ms. A fast scroll can land on several groups at once, but a lower
-     element can never animate before a higher one that is still pending. */
+     STEP ms. An element the reader has already scrolled past releases
+     instantly, so a fast scroll can never leave the final viewport waiting
+     on a backlog of off-screen animations. */
   var revealIO = null;
 
   function scanReveal(scope) {
@@ -84,28 +85,42 @@
       return (a.compareDocumentPosition(b) & 4) ? -1 : 1;
     }
 
+    function onScreen(el) {
+      var r = el.getBoundingClientRect();
+      return r.bottom > 0 && r.top < (window.innerHeight || doc.documentElement.clientHeight);
+    }
+
     function pump() {
-      if (pumpTimer || !queue.length) return;
-      var wait = queue[0].at - performance.now();
-      if (wait > 4) {
-        pumpTimer = setTimeout(function () { pumpTimer = null; pump(); }, wait);
-        return;
+      if (pumpTimer) return;
+      var now = performance.now();
+      while (queue.length) {
+        var el = queue[0];
+        if (el.classList.contains('is-visible')) {
+          queue.shift();
+          continue;
+        }
+        if (!onScreen(el)) {
+          /* Scrolled past while it waited: nobody would see the motion, so
+             it lands instantly and the cadence stays for what is on screen. */
+          queue.shift();
+          el.classList.add('is-visible');
+          continue;
+        }
+        var wait = clock - now;
+        if (wait > 4) {
+          pumpTimer = setTimeout(function () { pumpTimer = null; pump(); }, wait);
+          return;
+        }
+        queue.shift();
+        el.classList.add('is-visible');
+        clock = now + STEP;
+        now = performance.now();
       }
-      while (queue.length && queue[0].at - performance.now() <= 4) {
-        var el = queue.shift().el;
-        if (!el.classList.contains('is-visible')) el.classList.add('is-visible');
-      }
-      pump();
     }
 
     function enqueue(nodes) {
-      var batch = Array.prototype.slice.call(nodes).sort(inDocumentOrder);
-      for (var i = 0; i < batch.length; i++) {
-        var at = Math.max(performance.now(), clock);
-        clock = at + STEP;
-        queue.push({ el: batch[i], at: at });
-      }
-      queue.sort(function (a, b) { return a.at - b.at; });
+      for (var i = 0; i < nodes.length; i++) queue.push(nodes[i]);
+      queue.sort(inDocumentOrder);
       pump();
     }
 
@@ -117,7 +132,7 @@
         batch.push(entries[i].target);
       }
       if (batch.length) enqueue(batch);
-    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+    }, { threshold: 0, rootMargin: '0px 0px -40px 0px' });
 
     scanReveal(doc);
   }
