@@ -253,6 +253,37 @@ html[data-lang="bn"][data-i18n-pending] [data-i18n] { visibility: hidden; }
 }
 .btn-icon:hover { border-color: var(--purple); }
 
+/* 4b. Back to top ========================================================== */
+/* The floating control ships in the HTML but starts invisible and out of the
+   tab order; js/motion.js adds .is-shown once the page has scrolled past a
+   screen. With no JS there is nothing it could do, so it stays hidden. All
+   animation lives in css/motion.css behind the reduced-motion gate. */
+.to-top {
+  position: fixed;
+  right: 22px;
+  bottom: 22px;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  color: #fff;
+  background: linear-gradient(115deg, #7426d6, #a13bec);
+  box-shadow: 0 10px 25px #7828d936;
+  cursor: pointer;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+.to-top .ic { width: 20px; height: 20px; }
+.to-top.is-shown { opacity: 1; visibility: visible; pointer-events: auto; }
+@media (max-width: 600px) {
+  .to-top { right: 16px; bottom: 16px; width: 44px; height: 44px; }
+}
+
 /* 5. Hero ================================================================== */
 .hero {
   position: relative;

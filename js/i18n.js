@@ -87,7 +87,7 @@ window.AVRO_I18N = (function () {
       'releases.noFile': 'File not available',
       'releases.portable': 'Portable',
       'releases.details': '{title} — changelog and details',
-      'releases.official.cta': 'Get it from omicronlab.com',
+      'releases.official.cta': 'From OmicronLab',
       'releases.official.summary':
         'The last official stable release. No update has appeared since 2019 — this is the baseline the comparison is measured against.',
       'releases.officialPortable.summary':
@@ -125,7 +125,7 @@ window.AVRO_I18N = (function () {
       'changelog.nav.official': 'Official {version}',
       'changelog.official.when': 'Last official release: {date}',
       'changelog.official.status': 'Archived / read-only',
-      'changelog.official.download': 'Official download at omicronlab.com',
+      'changelog.official.download': 'Official download at OmicronLab.com',
       'changelog.official.source': 'Archived source',
       'changelog.unknownMonth': 'Unknown',
 
@@ -165,7 +165,7 @@ window.AVRO_I18N = (function () {
       'releases.status.error': 'GitHub releases API সাড়া দেয়নি এবং স্ন্যাপশটও নেই।',
       'releases.empty.filtered': 'এই ফিল্টারে এখন কোনো বিল্ড নেই।',
       'releases.empty.none': 'কোনো রিলিজ পাওয়া যায়নি।',
-      'releases.ribbon.prerelease': 'Pre-release (beta)',
+      'releases.ribbon.prerelease': 'ইন্সটলার এডিশন',
       'releases.ribbon.stable': 'সর্বশেষ স্থিতিশীল',
       'releases.ribbon.portable': 'পোর্টেবল এডিশন',
       'releases.ribbon.officialPortable': 'অফিসিয়াল পোর্টেবল',
@@ -185,7 +185,7 @@ window.AVRO_I18N = (function () {
       'releases.noFile': 'ফাইল পাওয়া যায়নি',
       'releases.portable': 'পোর্টেবল',
       'releases.details': '{title} — চেঞ্জলগ ও বিস্তারিত',
-      'releases.official.cta': 'omicronlab.com থেকে নিন',
+      'releases.official.cta': 'OmicronLab থেকে নিন',
       'releases.official.summary':
         'অফিসিয়াল সর্বশেষ স্থিতিশীল রিলিজ। ২০১৯ সালের পর আর কোনো আপডেট আসেনি — এটিই সেই বেসলাইন যার সঙ্গে তুলনা করা হয়েছে।',
       'releases.officialPortable.summary':
@@ -223,7 +223,7 @@ window.AVRO_I18N = (function () {
       'changelog.nav.official': 'অফিসিয়াল {version}',
       'changelog.official.when': 'অফিসিয়াল সর্বশেষ রিলিজ: {date}',
       'changelog.official.status': 'Archived / read-only',
-      'changelog.official.download': 'omicronlab.com-এ অফিসিয়াল ডাউনলোড',
+      'changelog.official.download': 'OmicronLab.com-এ অফিসিয়াল ডাউনলোড',
       'changelog.official.source': 'আর্কাইভ করা সোর্স',
       'changelog.unknownMonth': 'অজানা',
 
@@ -233,6 +233,7 @@ window.AVRO_I18N = (function () {
 
       /* ---- shared chrome ---- */
       'nav.skip': 'মূল কনটেন্টে যান',
+      'nav.toTop': 'উপরে ফিরুন',
       'nav.main': 'প্রধান নেভিগেশন',
       'nav.footer': 'ফুটার লিংক',
       'nav.variants': 'সংস্করণ তালিকা',
@@ -296,7 +297,7 @@ window.AVRO_I18N = (function () {
       'compare.th.topic': 'বিষয়',
       'compare.th.official': 'অফিসিয়াল 5.6.0',
       'compare.th.ce': 'Community Edition',
-      'compare.sources': 'অফিসিয়াল কলামের তথ্যগুলো আসে omicronlab.com-এর প্রকাশিত রিলিজ তথ্য এবং আর্কাইভ করা আপস্ট্রিম রিপোর মেটাডেটা থেকে। Community Edition কলামের প্রতিটি দাবির উৎস এই রিপোর Readme এবং 6.0.2-beta-এর release notes।',
+      'compare.sources': 'অফিসিয়াল কলামের তথ্যগুলো আসে OmicronLab.com-এর প্রকাশিত রিলিজ তথ্য এবং আর্কাইভ করা আপস্ট্রিম রিপোর মেটাডেটা থেকে। Community Edition কলামের প্রতিটি দাবির উৎস এই রিপোর Readme এবং 6.0.2-beta-এর release notes।',
 
       'cmp.g1': 'রক্ষণাবেক্ষণ ও ডিস্ট্রিবিউশন',
       'cmp.g1.r1.t': 'সক্রিয় আপডেট', 'cmp.g1.r1.o': 'সর্বশেষ রিলিজ 27 আগস্ট 2019; সোর্স রিপো archived', 'cmp.g1.r1.c': '<span class="yes">✓</span>চলমান রক্ষণাবেক্ষণ, ট্যাগ করা রিলিজ',
@@ -350,14 +351,14 @@ window.AVRO_I18N = (function () {
       'detail.9.body': 'অ্যাপ কোনো টেলিমেট্রি পাঠায় না, আর <code>AvroStartup.log</code>-এ কখনো আপনার টাইপ করা লেখা থাকে না। ইনস্টল না করে পোর্টেবল ফোল্ডার ব্যবহার করলে সিস্টেম-ওয়াইড কিছুই রেজিস্টার হয় না।',
 
       'honest.title': 'যা এখনো সীমাবদ্ধতা — সোজাসুজি বলে রাখা ভালো',
-      'honest.i1': '<strong>এটি একটি স্বতন্ত্র কন্টিনিউয়েশন।</strong> Avro Keyboard-এর ওপেন সোর্স কোড (MPL-2.0) থেকে আলাদা একটি কন্টিনিউয়েশন — OmicronLab-এর সঙ্গে সম্পৃক্ত নয়। অফিসিয়াল সাইট ও পুরোনো ভার্সন আগের মতোই omicronlab.com-এ আছে।',
+      'honest.i1': '<strong>এটি একটি স্বতন্ত্র কন্টিনিউয়েশন।</strong> Avro Keyboard-এর ওপেন সোর্স কোড (MPL-2.0) থেকে আলাদা একটি কন্টিনিউয়েশন — OmicronLab-এর সঙ্গে সম্পৃক্ত নয়। অফিসিয়াল সাইট ও পুরোনো ভার্সন আগের মতোই OmicronLab.com-এ আছে।',
       'honest.i2': '<strong>বাইনঅ্যারিগুলো এখনো কোড-সাইন করা নয়</strong> (অফিসিয়াল 5.6.0 সাইন করা ছিল), তাই Windows SmartScreen “More info → Run anyway” দেখাতে পারে। ডাউনলোড করা ফাইলের SHA-256 মিলিয়ে নিলে নিশ্চিত থাকা যায়।',
       'honest.i3': '<strong>পোর্টেবল এডিশনও তিনটি HKCU কী লেখে</strong> — <code>LowLevelHooksTimeout</code> (যাতে Windows নীরবে কীবোর্ড হুক ফেলে না দেয়) এবং পোর্টেবল Siyam Rupali ফন্ট নিবন্ধিত থাকা অবস্থায় দুটি IE ফন্ট মান, যা ফন্ট সরালে আগের অবস্থায় ফিরে যায়। সিস্টেম-ওয়াইড কিছুই ইনস্টল হয় না।',
       'honest.i4': '<strong>কিছু রিসোর্স পাবলিক রিপোতে নেই।</strong> মালিকানাধীন ANSI এনকোডিং কনফিগারেশন, নির্দিষ্ট ম্যাপিং ফাইল ও কী মেটেরিয়াল আলাদা রাখা হয়েছে। ফলে এই রিপো ক্লোন করে বিল্ড করলে অ্যাপ ডিফল্ট-কী <code>.AvroEnco</code> কন্টেইনার খুলতে পারে না — তখন বিভ্রান্তিকর ডিকোড এররের বদলে স্পষ্টভাবে “secret unavailable” জানায়। এটাই ক্লোন বিল্ডের প্রত্যাশিত আচরণ।',
       'honest.i5': '<strong>এটি একটি বেটা।</strong> কিছু অদ্ভুত আচরণ করলে Issues-এ আপনার Windows ভার্সন, কোন ফাইল নেমেছেন এবং About বক্সের ভার্সন লিখে জানান।',
 
       'tl.1.title': 'অফিসিয়াল সর্বশেষ রিলিজ — Avro Keyboard 5.6.0',
-      'tl.1.body': 'এরপর অফিসিয়াল কোনো নতুন ভার্সন আসেনি। আজও omicronlab.com-এ এটিই সর্বশেষ ডাউনলোড।',
+      'tl.1.body': 'এরপর অফিসিয়াল কোনো নতুন ভার্সন আসেনি। আজও OmicronLab.com-এ এটিই সর্বশেষ ডাউনলোড।',
       'tl.2.title': 'ক্যানোনিকাল সোর্স রিপো read-only',
       'tl.2.body': 'অফিসিয়াল সোর্সের মূল রিপোটি archive করা হয় — অর্থাৎ উইন্ডোজের নতুন সংস্করণের সমস্যাগুলো আর কেউ ঠিক করছিল না।',
       'tl.3.title': 'Community Edition-এর সোর্স শুরু',
@@ -468,7 +469,7 @@ window.AVRO_I18N = (function () {
       'pv.links.h': '⓸ বাইরের লিংক',
       'pv.links.p': 'পেজে এমন কিছু লিংক আছে যা এই সাইটের বাইরে যায়। সেগুলোতে ক্লিক করলে আপনি সেই সাইটের নিজস্ব নীতির আওতায় চলে যাবেন — আমরা তার জন্য দায়ী নই:',
       'pv.links.li1': '<strong>github.com</strong> — সোর্স কোড, রিলিজ ডাউনলোড, ইস্যু ট্র্যাকিং ও API।',
-      'pv.links.li2': '<strong>omicronlab.com</strong> — অফিসিয়াল Avro Keyboard-এর পুরোনো ভার্সন ডাউনলোড ও তথ্য।',
+      'pv.links.li2': '<strong>OmicronLab.com</strong> — অফিসিয়াল Avro Keyboard-এর পুরোনো ভার্সন ডাউনলোড ও তথ্য।',
       'pv.links.li3': '<strong>t.me/AvroUsersCommunity</strong> — কমিউনিটির Telegram গ্রুপ।',
       'pv.links.p2': 'বাইরের সব লিংক নতুন ট্যাবে ও <code>rel="noopener noreferrer"</code> দিয়ে খোলে।',
       'pv.app.h': '⓹ ডেস্কটপ অ্যাপ: ডেটা কোথায় থাকে',

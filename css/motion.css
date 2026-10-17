@@ -194,12 +194,49 @@ main, .footer { position: relative; z-index: 1; }
   html.js .marquee-track { animation: marquee 34s linear infinite; }
 }
 
+/* 8b. Back to top ========================================================= */
+/* Entrance rise, hover lift and a slow breathing halo: a transparent disc
+   exactly over the button whose outer box-shadow pulses, so the glow hugs
+   the circle without ever painting over its face. Reduced motion keeps the
+   button — it is a visibility aid — but every state is instant. */
+@keyframes to-top-breathe {
+  0%, 100% { box-shadow: 0 0 0 0 #9d4ef000; }
+  50% { box-shadow: 0 0 26px 8px #9d4ef045; }
+}
+@keyframes to-top-hint {
+  0%, 78%, 100% { transform: none; }
+  84% { transform: translateY(-3px); }
+  90% { transform: none; }
+  96% { transform: translateY(-3px); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .to-top {
+    transition: opacity .28s ease, transform .28s cubic-bezier(.22, .61, .36, 1),
+      box-shadow .25s ease;
+    transform: translateY(12px) scale(.96);
+  }
+  .to-top.is-shown { transform: none; }
+  .to-top:hover { transform: translateY(-3px); box-shadow: 0 14px 34px #7828d95c; }
+  .to-top:active { transform: translateY(-1px) scale(.96); }
+  .to-top::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    pointer-events: none;
+  }
+  .to-top.is-shown::before { animation: to-top-breathe 3.4s ease-in-out .6s infinite; }
+  .to-top.is-shown .ic { animation: to-top-hint 6s ease-in-out 1.4s infinite; }
+}
+
 /* 9. Reduced-motion hard stops ============================================ */
 @media (prefers-reduced-motion: reduce) {
   .progress { transition: none; }
   .logo-sweep::after,
   .marquee-track,
   .glow i,
-  .gradient { animation: none !important; }
+  .gradient,
+  .to-top::before,
+  .to-top .ic { animation: none !important; }
   .type-caret { display: none; }
 }

@@ -32,9 +32,9 @@ window.AVRO = {
     repo: 'Avro-Keyboard',
     version: '5.6.0',
     released: '2019-08-27',
-    site: 'https://www.omicronlab.com/',
-    installerUrl: 'https://www.omicronlab.com/avro-keyboard-download.html',
-    portableUrl: 'https://www.omicronlab.com/avro-keyboard-portable-download.html',
+    site: 'https://www.OmicronLab.com/',
+    installerUrl: 'https://www.OmicronLab.com/avro-keyboard-download.html',
+    portableUrl: 'https://www.OmicronLab.com/avro-keyboard-portable-download.html',
     platform: {
       en: 'Windows 10, 8.1, 8, XP — 32-bit and 64-bit',
       bn: 'Windows 10, 8.1, 8, XP — ৩২-bit ও ৬৪-bit'
@@ -115,7 +115,7 @@ window.AVRO = {
   },
 
   /* Editorial copy for the changelog's archival entry describing the last
-     official release. Facts verified against omicronlab.com and the archived
+     official release. Facts verified against OmicronLab.com and the archived
      upstream repository's metadata. */
   officialArchive: {
     tag: 'official-5.6.0',

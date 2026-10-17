@@ -4,7 +4,7 @@
    Every figure here is fetched live (with the saved snapshot first and the
    bundled snapshot second as fallbacks). Nothing is hardcoded except the
    officially published facts — the last official version, its release date,
-   and the platform list from omicronlab.com.
+   and the platform list from OmicronLab.com.
    ========================================================================== */
 (function () {
   'use strict';

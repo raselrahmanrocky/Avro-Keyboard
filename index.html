@@ -90,6 +90,12 @@
 <div class="glow" aria-hidden="true"><i></i><i></i></div>
 <div class="progress" data-progress aria-hidden="true"></div>
 
+<!-- Floating back to top: hidden until js/motion.js sees the page scrolled
+     past a screen, then it fades in and glides home on click. -->
+<button class="to-top" data-to-top type="button" aria-label="Back to top" title="Back to top" data-i18n-aria-label="nav.toTop" data-i18n-title="nav.toTop">
+  <svg class="ic" aria-hidden="true"><use href="#i-arrow-up"></use></svg>
+</button>
+
 <!-- Icon sprite. Kept inline so `currentColor` resolves against the element
      that uses it, and so no extra request is needed. -->
 <svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true" focusable="false">
@@ -109,6 +115,7 @@
   <symbol id="i-external" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M13.6 4.2h6.2v6.2"/><path d="M19.8 4.2 11.2 12.8"/><path d="M17.8 14.2v4.2a1.4 1.4 0 0 1-1.4 1.4H5.6a1.4 1.4 0 0 1-1.4-1.4V7.6a1.4 1.4 0 0 1 1.4-1.4h4.2"/></symbol>
   <symbol id="i-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3.9 12a8.1 8.1 0 1 0 2.5-5.9"/><path d="M3.6 3.6v4.6h4.6"/><path d="M12 7.6V12l2.9 1.8"/></symbol>
   <symbol id="i-code" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 7.5 4.2 12 9 16.5M15 7.5 19.8 12 15 16.5"/></symbol>
+  <symbol id="i-arrow-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 18.6V5.8M5.9 11.9 12 5.8l6.1 6.1"/></symbol>
 </svg>
 
 <a class="skip-link" href="#main" data-i18n="nav.skip">Skip to main content</a>
@@ -296,7 +303,7 @@
         </table>
       </div>
       <p class="note" data-i18n="compare.sources">
-        The official column comes from the release information published on omicronlab.com and
+        The official column comes from the release information published on OmicronLab.com and
         the archived upstream repository's metadata. Every claim in the Community Edition column
         traces back to this repository's Readme and the 6.0.2-beta release notes.
       </p>
@@ -352,7 +359,7 @@
       <aside class="honest reveal">
         <h3 data-i18n="honest.title">What is still limited — better said plainly</h3>
         <ul>
-          <li data-i18n="honest.i1"><strong>This is an independent continuation.</strong> A separate continuation from Avro Keyboard's open-source code (MPL-2.0) — not affiliated with OmicronLab. The official site and the older versions are still at omicronlab.com as before.</li>
+          <li data-i18n="honest.i1"><strong>This is an independent continuation.</strong> A separate continuation from Avro Keyboard's open-source code (MPL-2.0) — not affiliated with OmicronLab. The official site and the older versions are still at OmicronLab.com as before.</li>
           <li data-i18n="honest.i2"><strong>The binaries are not code-signed yet</strong> (the official 5.6.0 was), so Windows SmartScreen may show “More info → Run anyway”. Comparing the SHA-256 of the file you downloaded settles it.</li>
           <li data-i18n="honest.i3"><strong>The portable edition still writes three HKCU keys</strong> — <code>LowLevelHooksTimeout</code> (so Windows does not silently drop the keyboard hook) and two IE font values while the portable Siyam Rupali font is registered, which revert when the font is removed. Nothing system-wide is installed.</li>
           <li data-i18n="honest.i4"><strong>Some resources are not in the public repository.</strong> The proprietary ANSI encoding configuration, certain mapping files and the key material were kept private. So a build made from a clone of this repository cannot open the default-key <code>.AvroEnco</code> container — instead of a confusing decode error it says plainly that the secret is unavailable. That is the expected behaviour of a clone build.</li>
@@ -364,7 +371,7 @@
         <div class="tl-item reveal">
           <time data-i18n="tl.when1">27 Aug 2019</time>
           <h4 data-i18n="tl.1.title">The last official release — Avro Keyboard 5.6.0</h4>
-          <p data-i18n="tl.1.body">No new official version has appeared since. This is still the newest official download on omicronlab.com.</p>
+          <p data-i18n="tl.1.body">No new official version has appeared since. This is still the newest official download on OmicronLab.com.</p>
         </div>
         <div class="tl-item reveal">
           <time data-i18n="tl.when2">9 Aug 2026</time>

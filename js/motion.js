@@ -1,7 +1,7 @@
 /* ==========================================================================
    Motion layer: scroll progress, reveal-on-scroll, the looping hero h1
-   typewriter, hero particles, the marquee clone, magnetic buttons and card
-   tilt.
+   typewriter, hero particles, the marquee clone, magnetic buttons, card
+   tilt and the floating back-to-top control.
 
    Every effect here is decorative and opt-out friendly: reduced motion skips
    all of it, a missing IntersectionObserver restores the reveal content, and
@@ -634,6 +634,37 @@
     }
   }
 
+  /* --------------------------------------------------------- back to top -- */
+  /* The floating control fades in after about a screen of scrolling and
+     glides home on click — instantly when reduced motion is on. */
+  function initBackToTop() {
+    var btn = doc.querySelector('[data-to-top]');
+    if (!btn) return;
+    var shown = false;
+    var ticking = false;
+
+    function update() {
+      ticking = false;
+      var next = (window.scrollY || root.scrollTop || 0) > 600;
+      if (next === shown) return;
+      shown = next;
+      btn.classList.toggle('is-shown', shown);
+    }
+
+    function request() {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(update);
+    }
+
+    window.addEventListener('scroll', request, { passive: true });
+    window.addEventListener('resize', request, { passive: true });
+    btn.addEventListener('click', function () {
+      window.scrollTo({ top: 0, behavior: reduceMotion() ? 'auto' : 'smooth' });
+    });
+    update();
+  }
+
   /* ----------------------------------------------------------------- boot -- */
   window.AVRO_MOTION = { scan: scanReveal };
 
@@ -645,6 +676,7 @@
     initMarquee();
     initMagnetic();
     initTilt();
+    initBackToTop();
   }
 
   if (doc.readyState === 'loading') {

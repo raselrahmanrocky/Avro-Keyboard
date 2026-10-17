@@ -70,8 +70,15 @@
 <div class="glow" aria-hidden="true"><i></i><i></i></div>
 <div class="progress" data-progress aria-hidden="true"></div>
 
+<!-- Floating back to top: hidden until js/motion.js sees the page scrolled
+     past a screen, then it fades in and glides home on click. -->
+<button class="to-top" data-to-top type="button" aria-label="Back to top" title="Back to top" data-i18n-aria-label="nav.toTop" data-i18n-title="nav.toTop">
+  <svg class="ic" aria-hidden="true"><use href="#i-arrow-up"></use></svg>
+</button>
+
 <svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true" focusable="false">
   <symbol id="i-external" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M13.6 4.2h6.2v6.2"/><path d="M19.8 4.2 11.2 12.8"/><path d="M17.8 14.2v4.2a1.4 1.4 0 0 1-1.4 1.4H5.6a1.4 1.4 0 0 1-1.4-1.4V7.6a1.4 1.4 0 0 1 1.4-1.4h4.2"/></symbol>
+  <symbol id="i-arrow-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 18.6V5.8M5.9 11.9 12 5.8l6.1 6.1"/></symbol>
 </svg>
 
 <a class="skip-link" href="#main" data-i18n="nav.skip">Skip to main content</a>
@@ -243,7 +250,7 @@
           </p>
           <ul>
             <li data-i18n="pv.links.li1"><strong>github.com</strong> — source code, release downloads, issue tracking and the API.</li>
-            <li data-i18n="pv.links.li2"><strong>omicronlab.com</strong> — downloads and information for older official Avro Keyboard versions.</li>
+            <li data-i18n="pv.links.li2"><strong>OmicronLab.com</strong> — downloads and information for older official Avro Keyboard versions.</li>
             <li data-i18n="pv.links.li3"><strong>t.me/AvroUsersCommunity</strong> — the community's Telegram group.</li>
           </ul>
           <p data-i18n="pv.links.p2">
