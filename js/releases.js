@@ -71,7 +71,7 @@
       primary = '<span class="btn" aria-disabled="true">' + esc(t('releases.noFile')) + '</span>';
     }
 
-    return '<article class="release-card' + (card.kind === 'official' ? ' release-card--official' : '') + '"' +
+    return '<article class="release-card reveal' + (card.kind === 'official' ? ' release-card--official' : '') + '"' +
       ' data-kind="' + esc(card.kind) + '" data-tag="' + esc(card.tag || '') + '">' +
       ribbon +
       '<div class="rc-head">' +
@@ -243,6 +243,8 @@
 
     grid.innerHTML = cards.map(cardHTML).join('') +
       '<p class="release-empty" hidden>' + esc(t('releases.empty.filtered')) + '</p>';
+
+    if (window.AVRO_MOTION) { window.AVRO_MOTION.scan(grid); }
 
     /* The chips ship disabled in the HTML so nothing is clickable before the
        data lands; they become usable the moment there are cards to filter. */

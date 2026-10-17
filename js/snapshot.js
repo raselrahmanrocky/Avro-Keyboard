@@ -18,7 +18,10 @@
 window.AVRO_SNAP = (function () {
   'use strict';
 
-  var KEY = 'avro-snap-v1';
+  /* v2: "pushed" now means the main-branch head commit, not the repo-wide
+     pushed_at. A stored v1 value could be a gh-pages deploy, so old entries
+     are dropped rather than shown against their new meaning. */
+  var KEY = 'avro-snap-v2';
 
   /* The anonymous GitHub API allows 60 requests/hour per visitor IP. Keeping
      each entry small means one busy release with a long changelog can never

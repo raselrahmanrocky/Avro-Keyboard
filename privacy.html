@@ -28,10 +28,11 @@
 <link rel="apple-touch-icon" href="img/logo-192.png">
 
 <link rel="preload" href="fonts/hind-siliguri-bengali-400.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="preload" href="fonts/inter-latin-400.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/manrope-latin-variable.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="css/fonts.css">
 <link rel="stylesheet" href="css/style.css">
 <link rel="stylesheet" href="css/pages.css">
+<link rel="stylesheet" href="css/motion.css">
 
 <script>
 /* Runs before the stylesheets paint. Resolves the language so a Bangla
@@ -41,6 +42,7 @@
    in case that file never loads. */
 (function () {
   var root = document.documentElement;
+  root.classList.add('js');
 
   var lang = 'en';
   try {
@@ -65,6 +67,9 @@
 </head>
 <body>
 
+<div class="glow" aria-hidden="true"><i></i><i></i></div>
+<div class="progress" data-progress aria-hidden="true"></div>
+
 <svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true" focusable="false">
   <symbol id="i-external" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M13.6 4.2h6.2v6.2"/><path d="M19.8 4.2 11.2 12.8"/><path d="M17.8 14.2v4.2a1.4 1.4 0 0 1-1.4 1.4H5.6a1.4 1.4 0 0 1-1.4-1.4V7.6a1.4 1.4 0 0 1 1.4-1.4h4.2"/></symbol>
 </svg>
@@ -74,7 +79,7 @@
 <header class="topbar">
   <div class="wrap nav">
     <a class="brand" href="index.html">
-      <img src="img/logo.jpg" width="44" height="44" alt="">
+      <span class="logo-sweep"><img src="img/logo.jpg" width="44" height="44" alt=""></span>
       <span><b data-i18n="brand.name">Avro Keyboard<span class="ce-tag">Community Edition</span></b><small data-i18n="brand.tagline">Open source · MPL-2.0</small></span>
     </a>
     <nav class="navlinks" data-i18n-aria-label="nav.main" aria-label="Main navigation">
@@ -131,7 +136,7 @@
           <strong>Applies to:</strong> this website and the Avro Keyboard Community Edition desktop build
         </p>
 
-        <section id="summary">
+        <section class="reveal" id="summary">
           <h2 data-i18n="pv.summary.h">In short</h2>
           <div class="callout">
             <p data-i18n="pv.summary.callout">
@@ -147,7 +152,7 @@
           </p>
         </section>
 
-        <section id="website">
+        <section class="reveal" id="website">
           <h2 data-i18n="pv.website.h">⓵ What happens on this website</h2>
           <h3 data-i18n="pv.website.hosting.h">Hosting</h3>
           <p data-i18n="pv.website.hosting.p">
@@ -172,7 +177,7 @@
           </ul>
         </section>
 
-        <section id="storage">
+        <section class="reveal" id="storage">
           <h2 data-i18n="pv.storage.h">⓶ What your browser stores</h2>
           <p data-i18n="pv.storage.p">
             The site uses only <code>localStorage</code> — no cookies at all. These keys live in
@@ -218,7 +223,7 @@
           </p>
         </section>
 
-        <section id="no-collect">
+        <section class="reveal" id="no-collect">
           <h2 data-i18n="pv.noCollect.h">⓷ What we do not do</h2>
           <ul>
             <li data-i18n="pv.noCollect.li1"><strong>No analytics</strong> — no Google Analytics or anything like it.</li>
@@ -230,7 +235,7 @@
           </ul>
         </section>
 
-        <section id="links">
+        <section class="reveal" id="links">
           <h2 data-i18n="pv.links.h">⓸ Outside links</h2>
           <p data-i18n="pv.links.p">
             Some links on these pages lead off this site. Following them puts you under that site's
@@ -246,7 +251,7 @@
           </p>
         </section>
 
-        <section id="app">
+        <section class="reveal" id="app">
           <h2 data-i18n="pv.app.h">⓹ The desktop app: where the data lives</h2>
           <p data-i18n="pv.app.p">
             The app keeps all of its data on your own computer. Where depends on which edition you
@@ -289,7 +294,7 @@
           </p>
         </section>
 
-        <section id="log">
+        <section class="reveal" id="log">
           <h2 data-i18n="pv.log.h">⓺ AvroStartup.log — what is written, and what is not</h2>
           <p data-i18n="pv.log.p">
             So that a problem at startup does not end in a silent exit, the app writes a diagnostic
@@ -315,7 +320,7 @@
           </p>
         </section>
 
-        <section id="network">
+        <section class="reveal" id="network">
           <h2 data-i18n="pv.network.h">⓻ When the app uses the network</h2>
           <p data-i18n="pv.network.p">
             The app sends nothing anywhere on its own. The network is used only when
@@ -332,7 +337,7 @@
           </p>
         </section>
 
-        <section id="remove">
+        <section class="reveal" id="remove">
           <h2 data-i18n="pv.remove.h">⓼ Removing all of it</h2>
           <p data-i18n="pv.remove.p">To remove every trace of the app from your machine:</p>
           <ul>
@@ -344,7 +349,7 @@
           </ul>
         </section>
 
-        <section id="contact">
+        <section class="reveal" id="contact">
           <h2 data-i18n="pv.contact.h">⓽ Changes, contact and licence</h2>
           <p data-i18n="pv.contact.p1">
             If this policy changes it will be updated on this page and the “last updated” date
@@ -379,7 +384,7 @@
   </div>
   <div class="wrap footrow">
     <div class="footbrand">
-      <img src="img/logo.jpg" width="34" height="34" alt="" loading="lazy" decoding="async">
+      <span class="logo-sweep"><img src="img/logo.jpg" width="34" height="34" alt="" loading="lazy" decoding="async"></span>
       <span>
         <strong>Avro Keyboard Community Edition</strong><br>
         <span data-i18n="footer.licenceNote">MPL-2.0 · Not affiliated with OmicronLab</span>
@@ -400,5 +405,6 @@
 <script src="js/i18n.js" defer></script>
 <script src="js/theme.js" defer></script>
 <script src="js/privacy.js" defer></script>
+<script src="js/motion.js" defer></script>
 </body>
 </html>

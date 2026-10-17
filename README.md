@@ -55,7 +55,8 @@ js/                 config.js   repositories, cache policy, card summaries
                     vendor/     marked + DOMPurify (vendored, no CDN)
 data/               repo.json, releases.json, official.json — the committed
                     snapshots the pages paint from before the live refresh
-fonts/              self-hosted Inter + Hind Siliguri (WOFF2, latin + bengali)
+fonts/              self-hosted Manrope (variable) + Hind Siliguri (WOFF2,
+                    latin + bengali)
                     with fonts/LICENSE.txt (SIL OFL 1.1)
 img/                logo, favicons, splash-screen.webp (+ jpg fallback),
                     og-cover.jpg

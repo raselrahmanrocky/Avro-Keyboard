@@ -2,20 +2,20 @@ Fonts bundled with this site
 ============================
 
 fonts/ holds the WOFF2 webfaces used by this site, subset to the latin and
-bengali ranges. Both families are licensed under the SIL Open Font License,
+bengali ranges. All families are licensed under the SIL Open Font License,
 Version 1.1, and are redistributed here unmodified apart from that subsetting.
 
-  Inter (400, 600, 800) ............ Copyright 2020 The Inter Project Authors
-                                     https://github.com/rsms/inter
+  Manrope (variable, 200-800) ...... Copyright 2019 The Manrope Project Authors
+                                     https://github.com/sharanda/manrope
   Hind Siliguri (400, 600, 700) .... Copyright (c) 2015 Indian Type Foundry
                                      info@indiantypefoundry.com
 
 The full licence text for each family follows.
 
 ==========================================================================
-SIL OPEN FONT LICENSE 1.1 - Inter
+SIL OPEN FONT LICENSE 1.1 - Manrope
 ==========================================================================
-Copyright 2020 The Inter Project Authors (https://github.com/rsms/inter)
+Copyright 2019 The Manrope Project Authors (https://github.com/sharanda/manrope)
 
 This Font Software is licensed under the SIL Open Font License, Version 1.1.
 This license is copied below, and is also available with a FAQ at:

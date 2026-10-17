@@ -153,7 +153,7 @@
   /* ------------------------------------------------------------ sections -- */
   function releaseSection(release) {
     var el = document.createElement('article');
-    el.className = 'rel';
+    el.className = 'rel reveal';
     el.id = release.tag;
 
     var hasBody = !!(release.body && release.body.trim());
@@ -212,7 +212,7 @@
     });
 
     var el = document.createElement('article');
-    el.className = 'rel';
+    el.className = 'rel reveal';
     el.id = 'history';
     el.innerHTML = headHTML(
       t('changelog.history.title', { tag: release.tag }),
@@ -232,7 +232,7 @@
 
   function officialSection() {
     var el = document.createElement('article');
-    el.className = 'rel rel--official';
+    el.className = 'rel rel--official reveal';
     el.id = cfg.officialArchive.tag;
 
     var spec = [
@@ -412,6 +412,8 @@
 
     buildNav(navEntries);
     watchSections();
+
+    if (window.AVRO_MOTION) { window.AVRO_MOTION.scan(host); }
 
     /* Only the first build may move the viewport to a deep link. */
     if (firstBuild) deepLink();

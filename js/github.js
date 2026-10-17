@@ -44,6 +44,7 @@ window.AVRO_GH = (function () {
 
   var U = {
     repo: BASE + '/repos/' + SLUG,
+    branch: BASE + '/repos/' + SLUG + '/branches/' + encodeURIComponent(SRC.branch),
     commits: BASE + '/repos/' + SLUG + '/commits?per_page=1',
     contributors: BASE + '/repos/' + SLUG + '/contributors',
     compare: BASE + '/repos/' + SLUG + '/compare/' + SRC.baseline + '...' + SRC.branch,
@@ -426,11 +427,23 @@ window.AVRO_GH = (function () {
         out.forks = d.forks_count;
         out.issues = d.open_issues_count;
         out.watchers = d.subscribers_count;
-        out.pushed = d.pushed_at;
+        /* Repo-wide push time: the last push to *any* branch. Kept only as a
+           fallback for the branch read below, because a documentation-site
+           push to gh-pages would otherwise make "Last push" claim fresher
+           work on the project than the main branch actually saw. */
+        out.pushedFallback = d.pushed_at;
         out.language = d.language;
         out.licence = (d.license || {}).spdx_id || null;
         out.created = d.created_at;
         ok++;
+      }),
+      /* The head commit of the main branch is what "last updated" should
+         mean; GitHub's repo payload does not expose a per-branch push time. */
+      get(U.branch).then(function (r) {
+        var c = (r.data && r.data.commit) || {};
+        var commit = c.commit || {};
+        var stamp = (commit.committer || {}).date || (commit.author || {}).date;
+        if (stamp) { out.pushed = stamp; ok++; }
       }),
       commitCount().then(function (n) {
         if (typeof n === 'number') { out.commits = n; ok++; }
@@ -448,6 +461,13 @@ window.AVRO_GH = (function () {
     ];
 
     await Promise.all(jobs.map(function (p) { return p.catch(function () { }); }));
+
+    /* The main-branch head commit is authoritative; the repo-wide push time is
+       only the fallback when the branch read failed. */
+    if (out.pushed === undefined && out.pushedFallback !== undefined) {
+      out.pushed = out.pushedFallback;
+    }
+    delete out.pushedFallback;
 
     /* Every real response is folded into the saved snapshot so a later visit
        still gets these numbers when the API is unavailable. Only the fields

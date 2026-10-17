@@ -1,0 +1,205 @@
+/* ==========================================================================
+   Motion and ambient layer: scroll progress, reveal-on-scroll, the h1 typing
+   caret, gradient shimmer, logo sweep, floating glow, hero particles and the
+   marquee. Loaded after style.css on every page. Everything here is purely
+   additive and decorative: with reduced motion, without JavaScript, or
+   without IntersectionObserver the static design in style.css stands.
+   ========================================================================== */
+
+/* 1. Scroll progress ====================================================== */
+.progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 3px;
+  width: 0;
+  z-index: 55;
+  pointer-events: none;
+  border-radius: 0 3px 3px 0;
+  background: linear-gradient(90deg, var(--purple), var(--purple2) 55%, #d9a13c);
+}
+
+/* 2. Reveal on scroll ===================================================== */
+@media (prefers-reduced-motion: no-preference) {
+  html.js .reveal {
+    opacity: 0;
+    transform: translateY(18px);
+    transition: opacity .55s ease, transform .55s cubic-bezier(.22, .61, .36, 1);
+  }
+  html.js .reveal.is-visible { opacity: 1; transform: none; }
+  /* Compare table rows slide as whole <tr>s and settle quicker than cards.
+     The separators are inset shadows on the cells (style.css), so they move
+     and fade together with the row. */
+  html.js .compare-wrap tr.reveal {
+    transition: opacity .36s ease, transform .36s cubic-bezier(.22, .61, .36, 1);
+  }
+  html.js .compare-wrap tr.reveal:not(.is-visible) { transform: translateY(12px); }
+}
+
+/* 3. H1 typing caret ====================================================== */
+.type-caret {
+  display: inline-block;
+  width: 3px;
+  height: .82em;
+  margin-left: .06em;
+  vertical-align: -.06em;
+  border-radius: 2px;
+  background: var(--purple);
+}
+[data-theme="dark"] .type-caret { background: #c79bff; }
+@keyframes caret-blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .type-caret { animation: caret-blink 1.05s steps(2, jump-none) infinite; }
+}
+
+/* 4. Gradient shimmer ===================================================== */
+@keyframes text-shimmer {
+  from { background-position: 0% 50%; }
+  to { background-position: 100% 50%; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .gradient,
+  [data-theme="dark"] .gradient {
+    background-size: 220% 100%;
+    animation: text-shimmer 7s ease-in-out infinite alternate;
+  }
+}
+
+/* 5. Logo sweep =========================================================== */
+.logo-sweep {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  overflow: hidden;
+  border-radius: 13px;
+  box-shadow: 0 5px 18px #7825d92c;
+}
+.logo-sweep img {
+  display: block;
+  border-radius: inherit;
+  box-shadow: none;
+}
+.logo-sweep::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  transform: translateX(-130%);
+  background: linear-gradient(105deg, transparent 32%, #ffffff8f 50%, transparent 68%);
+}
+@keyframes logo-sweep {
+  0%, 52% { transform: translateX(-130%); }
+  74%, 100% { transform: translateX(130%); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .logo-sweep::after { animation: logo-sweep 4.6s ease-in-out infinite; }
+}
+.footbrand .logo-sweep { border-radius: 10px; box-shadow: none; }
+
+/* 6. Floating glow ======================================================== */
+.glow {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.glow i {
+  position: absolute;
+  display: block;
+  border-radius: 50%;
+  filter: blur(70px);
+}
+.glow i:nth-child(1) {
+  width: 620px;
+  height: 620px;
+  top: -230px;
+  left: -170px;
+  opacity: .17;
+  background: radial-gradient(circle, #b06cf0 0%, #b06cf000 68%);
+}
+.glow i:nth-child(2) {
+  width: 540px;
+  height: 540px;
+  top: 24%;
+  right: -190px;
+  opacity: .14;
+  background: radial-gradient(circle, #e2a63d 0%, #e2a63d00 66%);
+}
+[data-theme="dark"] .glow i:nth-child(1) {
+  opacity: .22;
+  background: radial-gradient(circle, #7d3ff0 0%, #7d3ff000 68%);
+}
+[data-theme="dark"] .glow i:nth-child(2) {
+  opacity: .16;
+  background: radial-gradient(circle, #2fb5a3 0%, #2fb5a300 66%);
+}
+@keyframes glow-a {
+  from { transform: translate(0, 0) scale(1); }
+  to { transform: translate(70px, 50px) scale(1.14); }
+}
+@keyframes glow-b {
+  from { transform: translate(0, 0) scale(1); }
+  to { transform: translate(-60px, -40px) scale(1.1); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .glow i:nth-child(1) { animation: glow-a 22s ease-in-out infinite alternate; }
+  .glow i:nth-child(2) { animation: glow-b 26s ease-in-out infinite alternate; }
+}
+main, .footer { position: relative; z-index: 1; }
+
+/* 7. Hero particles ======================================================= */
+.hero { position: relative; }
+.hero-particles {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
+  opacity: .55;
+}
+[data-theme="dark"] .hero-particles { opacity: .5; }
+.hero > .wrap { position: relative; z-index: 1; }
+
+/* 8. Marquee ============================================================== */
+.marquee {
+  position: relative;
+  overflow: hidden;
+  margin-top: 6px;
+  padding: 13px 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 7%, #000 93%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 7%, #000 93%, transparent);
+}
+.marquee-track { display: flex; width: max-content; }
+.marquee-half { display: flex; align-items: center; gap: 36px; padding-right: 36px; }
+.marquee-half span {
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: .8px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.marquee-half i { color: var(--purple); font-style: normal; font-size: 14px; }
+@keyframes marquee {
+  to { transform: translateX(-50%); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  html.js .marquee-track { animation: marquee 34s linear infinite; }
+}
+
+/* 9. Reduced-motion hard stops ============================================ */
+@media (prefers-reduced-motion: reduce) {
+  .progress { transition: none; }
+  .logo-sweep::after,
+  .marquee-track,
+  .glow i,
+  .gradient { animation: none !important; }
+  .type-caret { display: none; }
+}

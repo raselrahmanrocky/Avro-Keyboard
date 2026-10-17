@@ -29,10 +29,11 @@
 <link rel="apple-touch-icon" href="img/logo-192.png">
 
 <link rel="preload" href="fonts/hind-siliguri-bengali-400.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="preload" href="fonts/inter-latin-400.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/manrope-latin-variable.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="css/fonts.css">
 <link rel="stylesheet" href="css/style.css">
 <link rel="stylesheet" href="css/pages.css">
+<link rel="stylesheet" href="css/motion.css">
 
 <script>
 /* Runs before the stylesheets paint. Resolves the language so a Bangla
@@ -42,6 +43,7 @@
    in case that file never loads. */
 (function () {
   var root = document.documentElement;
+  root.classList.add('js');
 
   var lang = 'en';
   try {
@@ -85,6 +87,9 @@
 </head>
 <body>
 
+<div class="glow" aria-hidden="true"><i></i><i></i></div>
+<div class="progress" data-progress aria-hidden="true"></div>
+
 <!-- Icon sprite. Kept inline so `currentColor` resolves against the element
      that uses it, and so no extra request is needed. -->
 <svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true" focusable="false">
@@ -111,7 +116,7 @@
 <header class="topbar">
   <div class="wrap nav">
     <a class="brand" href="#home">
-      <img src="img/logo.jpg" width="44" height="44" alt="">
+      <span class="logo-sweep"><img src="img/logo.jpg" width="44" height="44" alt=""></span>
       <span><b data-i18n="brand.name">Avro Keyboard<span class="ce-tag">Community Edition</span></b><small data-i18n="brand.tagline">Open source · MPL-2.0</small></span>
     </a>
     <nav class="navlinks" data-i18n-aria-label="nav.main" aria-label="Main navigation">
@@ -135,6 +140,7 @@
 <main id="main">
 
   <section class="hero" id="home">
+    <canvas class="hero-particles" aria-hidden="true"></canvas>
     <div class="wrap hero-grid">
       <div>
         <p class="eyebrow"><span class="dot" data-live-dot data-state="loading"></span> <span data-i18n="hero.eyebrow">Open-source Bangla IME · Community Edition</span></p>
@@ -146,8 +152,8 @@
           stays in this GitHub repository.
         </p>
         <div class="actions">
-          <a class="btn btn-primary" href="#download" data-i18n="hero.ctaDownload">Download the latest build <span aria-hidden="true">↓</span></a>
-          <a class="btn btn-ghost" href="https://github.com/raselrahmanrocky/Avro-Keyboard" target="_blank" rel="noopener noreferrer" data-i18n="hero.ctaSource">View the source code ↗</a>
+          <a class="btn btn-primary magnetic" href="#download" data-i18n="hero.ctaDownload">Download the latest build <span aria-hidden="true">↓</span></a>
+          <a class="btn btn-ghost magnetic" href="https://github.com/raselrahmanrocky/Avro-Keyboard" target="_blank" rel="noopener noreferrer" data-i18n="hero.ctaSource">View the source code ↗</a>
         </div>
         <p class="micro" data-i18n="hero.micro">Free · Open source · MPL-2.0 · Not affiliated with OmicronLab</p>
       </div>
@@ -161,6 +167,14 @@
       </div>
     </div>
   </section>
+
+  <div class="marquee" aria-hidden="true">
+    <div class="marquee-track" data-marquee>
+      <div class="marquee-half">
+        <span>Open source</span><i>✦</i><span>MPL-2.0</span><i>✦</i><span>Native 64/32-bit</span><i>✦</i><span>Portable</span><i>✦</i><span>SHA-256 verified</span><i>✦</i><span>Auto-update</span><i>✦</i><span>No telemetry</span><i>✦</i><span>ভুল কমুক</span><i>✦</i><span>বাংলা ছড়িয়ে পড়ুক</span><i>✦</i>
+      </div>
+    </div>
+  </div>
 
   <div class="wrap">
     <div class="stats" role="group" data-i18n-aria-label="stats.group" aria-label="Live project statistics">
@@ -180,7 +194,7 @@
   <!-- ================= Flagship: official vs Community Edition ============ -->
   <section class="section" id="improvements">
     <div class="wrap">
-      <div class="section-head">
+      <div class="section-head reveal">
         <p class="kicker" data-i18n="improvements.kicker">The difference that matters most</p>
         <h2 data-i18n="improvements.h2">The official Avro Keyboard, <span class="gradient">and what we changed.</span></h2>
         <p data-i18n="improvements.lead">
@@ -191,7 +205,7 @@
       </div>
 
       <div class="audit-grid">
-        <article class="audit audit--ce" id="auditCe" data-state="snapshot">
+        <article class="audit audit--ce reveal" id="auditCe" data-state="snapshot">
           <span class="stamp stamp--live" data-i18n="audit.ce.stamp">Active</span>
           <h3 data-i18n="audit.ce.title">Avro Keyboard Community Edition</h3>
           <p class="sub" data-i18n="audit.ce.sub">This repository · Actively maintained</p>
@@ -206,7 +220,7 @@
           <p class="note" data-audit="freshness"></p>
         </article>
 
-        <article class="audit audit--official" id="auditOfficial" data-state="snapshot">
+        <article class="audit audit--official reveal" id="auditOfficial" data-state="snapshot">
           <span class="stamp stamp--archived" data-i18n="audit.official.stamp">Archived</span>
           <h3 data-i18n="audit.official.title">The official Avro Keyboard</h3>
           <p class="sub" data-i18n="audit.official.sub">OmicronLab · Baseline build</p>
@@ -239,45 +253,45 @@
           </thead>
 
           <tbody>
-            <tr class="group-row"><th colspan="3" scope="colgroup" data-i18n="cmp.g1">Maintenance and distribution</th></tr>
-            <tr><td data-i18n="cmp.g1.r1.t">Active updates</td><td data-i18n="cmp.g1.r1.o">Last release 27 August 2019; source repo archived</td><td data-i18n="cmp.g1.r1.c"><span class="yes">✓</span>Continuous maintenance with tagged releases</td></tr>
-            <tr><td data-i18n="cmp.g1.r2.t">Installers</td><td data-i18n="cmp.g1.r2.o">A single 32-bit installer</td><td data-i18n="cmp.g1.r2.c"><span class="yes">✓</span>Installer and portable — 64- and 32-bit, four files in total</td></tr>
-            <tr><td data-i18n="cmp.g1.r3.t">Code signing</td><td data-i18n="cmp.g1.r3.o">5.6.0 was signed</td><td data-i18n="cmp.g1.r3.c"><span class="no">✗</span>Not signed yet — verify the SHA-256 yourself</td></tr>
+            <tr class="group-row reveal"><th colspan="3" scope="colgroup" data-i18n="cmp.g1">Maintenance and distribution</th></tr>
+            <tr class="reveal"><td data-i18n="cmp.g1.r1.t">Active updates</td><td data-i18n="cmp.g1.r1.o">Last release 27 August 2019; source repo archived</td><td data-i18n="cmp.g1.r1.c"><span class="yes">✓</span>Continuous maintenance with tagged releases</td></tr>
+            <tr class="reveal"><td data-i18n="cmp.g1.r2.t">Installers</td><td data-i18n="cmp.g1.r2.o">A single 32-bit installer</td><td data-i18n="cmp.g1.r2.c"><span class="yes">✓</span>Installer and portable — 64- and 32-bit, four files in total</td></tr>
+            <tr class="reveal"><td data-i18n="cmp.g1.r3.t">Code signing</td><td data-i18n="cmp.g1.r3.o">5.6.0 was signed</td><td data-i18n="cmp.g1.r3.c"><span class="no">✗</span>Not signed yet — verify the SHA-256 yourself</td></tr>
           </tbody>
 
           <tbody>
-            <tr class="group-row"><th colspan="3" scope="colgroup" data-i18n="cmp.g2">Engine and conversion</th></tr>
-            <tr><td data-i18n="cmp.g2.r1.t">ANSI / Bijoy mapping</td><td data-i18n="cmp.g2.r1.o">One hardcoded mapping</td><td data-i18n="cmp.g2.r1.c"><span class="yes">✓</span>Every V1–V4 encoding is file-based</td></tr>
-            <tr><td data-i18n="cmp.g2.r2.t">First use</td><td data-i18n="cmp.g2.r2.o">Cold engine — stutters on first use</td><td data-i18n="cmp.g2.r2.c"><span class="yes">✓</span>Engine is already warm; switching versions allocates nothing</td></tr>
-            <tr><td data-i18n="cmp.g2.r3.t">Backspace</td><td data-i18n="cmp.g2.r3.o">Breaks a compound character and leaves a stray vowel sign</td><td data-i18n="cmp.g2.r3.c"><span class="yes">✓</span>Deletes the whole grapheme</td></tr>
-            <tr><td data-i18n="cmp.g2.r4.t">V3 / V4 glyphs</td><td data-i18n="cmp.g2.r4.o">Some wrong glyphs</td><td data-i18n="cmp.g2.r4.c"><span class="yes">✓</span>Mapping tables updated</td></tr>
-            <tr><td data-i18n="cmp.g2.r5.t">Cache restart</td><td data-i18n="cmp.g2.r5.o">—</td><td data-i18n="cmp.g2.r5.c"><span class="yes">✓</span>The encoding setting survives a cache restart</td></tr>
+            <tr class="group-row reveal"><th colspan="3" scope="colgroup" data-i18n="cmp.g2">Engine and conversion</th></tr>
+            <tr class="reveal"><td data-i18n="cmp.g2.r1.t">ANSI / Bijoy mapping</td><td data-i18n="cmp.g2.r1.o">One hardcoded mapping</td><td data-i18n="cmp.g2.r1.c"><span class="yes">✓</span>Every V1–V4 encoding is file-based</td></tr>
+            <tr class="reveal"><td data-i18n="cmp.g2.r2.t">First use</td><td data-i18n="cmp.g2.r2.o">Cold engine — stutters on first use</td><td data-i18n="cmp.g2.r2.c"><span class="yes">✓</span>Engine is already warm; switching versions allocates nothing</td></tr>
+            <tr class="reveal"><td data-i18n="cmp.g2.r3.t">Backspace</td><td data-i18n="cmp.g2.r3.o">Breaks a compound character and leaves a stray vowel sign</td><td data-i18n="cmp.g2.r3.c"><span class="yes">✓</span>Deletes the whole grapheme</td></tr>
+            <tr class="reveal"><td data-i18n="cmp.g2.r4.t">V3 / V4 glyphs</td><td data-i18n="cmp.g2.r4.o">Some wrong glyphs</td><td data-i18n="cmp.g2.r4.c"><span class="yes">✓</span>Mapping tables updated</td></tr>
+            <tr class="reveal"><td data-i18n="cmp.g2.r5.t">Cache restart</td><td data-i18n="cmp.g2.r5.o">—</td><td data-i18n="cmp.g2.r5.c"><span class="yes">✓</span>The encoding setting survives a cache restart</td></tr>
           </tbody>
 
           <tbody>
-            <tr class="group-row"><th colspan="3" scope="colgroup" data-i18n="cmp.g3">Interface</th></tr>
-            <tr><td data-i18n="cmp.g3.r1.t">Theme</td><td data-i18n="cmp.g3.r1.o">Limited</td><td data-i18n="cmp.g3.r1.c"><span class="yes">✓</span>App-wide theme and palette system</td></tr>
-            <tr><td data-i18n="cmp.g3.r2.t">Encoding selection</td><td data-i18n="cmp.g3.r2.o">A separate picker</td><td data-i18n="cmp.g3.r2.c"><span class="yes">✓</span>“Select ANSI Encoding” in the tray, kept in sync with every picker</td></tr>
-            <tr><td data-i18n="cmp.g3.r3.t">List sorting</td><td data-i18n="cmp.g3.r3.o">Plain sort</td><td data-i18n="cmp.g3.r3.c"><span class="yes">✓</span>Natural sort from V1 → V5</td></tr>
-            <tr><td data-i18n="cmp.g3.r4.t">Icons</td><td data-i18n="cmp.g3.r4.o">Plain</td><td data-i18n="cmp.g3.r4.c"><span class="yes">✓</span>Layout-aware icons</td></tr>
-            <tr><td data-i18n="cmp.g3.r5.t">Global hotkey</td><td data-i18n="cmp.g3.r5.o">Limited</td><td data-i18n="cmp.g3.r5.c"><span class="yes">✓</span>Works in any app; catches key conflicts before you save</td></tr>
+            <tr class="group-row reveal"><th colspan="3" scope="colgroup" data-i18n="cmp.g3">Interface</th></tr>
+            <tr class="reveal"><td data-i18n="cmp.g3.r1.t">Theme</td><td data-i18n="cmp.g3.r1.o">Limited</td><td data-i18n="cmp.g3.r1.c"><span class="yes">✓</span>App-wide theme and palette system</td></tr>
+            <tr class="reveal"><td data-i18n="cmp.g3.r2.t">Encoding selection</td><td data-i18n="cmp.g3.r2.o">A separate picker</td><td data-i18n="cmp.g3.r2.c"><span class="yes">✓</span>“Select ANSI Encoding” in the tray, kept in sync with every picker</td></tr>
+            <tr class="reveal"><td data-i18n="cmp.g3.r3.t">List sorting</td><td data-i18n="cmp.g3.r3.o">Plain sort</td><td data-i18n="cmp.g3.r3.c"><span class="yes">✓</span>Natural sort from V1 → V5</td></tr>
+            <tr class="reveal"><td data-i18n="cmp.g3.r4.t">Icons</td><td data-i18n="cmp.g3.r4.o">Plain</td><td data-i18n="cmp.g3.r4.c"><span class="yes">✓</span>Layout-aware icons</td></tr>
+            <tr class="reveal"><td data-i18n="cmp.g3.r5.t">Global hotkey</td><td data-i18n="cmp.g3.r5.o">Limited</td><td data-i18n="cmp.g3.r5.c"><span class="yes">✓</span>Works in any app; catches key conflicts before you save</td></tr>
           </tbody>
 
           <tbody>
-            <tr class="group-row"><th colspan="3" scope="colgroup" data-i18n="cmp.g4">Reliability</th></tr>
-            <tr><td data-i18n="cmp.g4.r1.t">Startup failure</td><td data-i18n="cmp.g4.r1.o">Bad settings, a locked registry, missing fonts or a corrupt Database.db3 shut it down silently</td><td data-i18n="cmp.g4.r1.c"><span class="yes">✓</span>Every step guarded, with a visible report</td></tr>
-            <tr><td data-i18n="cmp.g4.r2.t">Diagnostic log</td><td data-i18n="cmp.g4.r2.o">None</td><td data-i18n="cmp.g4.r2.c"><span class="yes">✓</span>AvroStartup.log — never records a keystroke</td></tr>
-            <tr><td data-i18n="cmp.g4.r3.t">New layout / skin</td><td data-i18n="cmp.g4.r3.o">Needed an app restart to take effect</td><td data-i18n="cmp.g4.r3.c"><span class="yes">✓</span>The menu refreshes itself as soon as the file lands</td></tr>
-            <tr><td data-i18n="cmp.g4.r4.t">Resource downloads</td><td data-i18n="cmp.g4.r4.o">Manually, from a separate site</td><td data-i18n="cmp.g4.r4.c"><span class="yes">✓</span>In-app browser, installed only after SHA-256 verification</td></tr>
-            <tr><td data-i18n="cmp.g4.r5.t">Updates</td><td data-i18n="cmp.g4.r5.o">You had to find and download them yourself</td><td data-i18n="cmp.g4.r5.c"><span class="yes">✓</span>In-app auto-update — correct architecture, beta channel toggle</td></tr>
+            <tr class="group-row reveal"><th colspan="3" scope="colgroup" data-i18n="cmp.g4">Reliability</th></tr>
+            <tr class="reveal"><td data-i18n="cmp.g4.r1.t">Startup failure</td><td data-i18n="cmp.g4.r1.o">Bad settings, a locked registry, missing fonts or a corrupt Database.db3 shut it down silently</td><td data-i18n="cmp.g4.r1.c"><span class="yes">✓</span>Every step guarded, with a visible report</td></tr>
+            <tr class="reveal"><td data-i18n="cmp.g4.r2.t">Diagnostic log</td><td data-i18n="cmp.g4.r2.o">None</td><td data-i18n="cmp.g4.r2.c"><span class="yes">✓</span>AvroStartup.log — never records a keystroke</td></tr>
+            <tr class="reveal"><td data-i18n="cmp.g4.r3.t">New layout / skin</td><td data-i18n="cmp.g4.r3.o">Needed an app restart to take effect</td><td data-i18n="cmp.g4.r3.c"><span class="yes">✓</span>The menu refreshes itself as soon as the file lands</td></tr>
+            <tr class="reveal"><td data-i18n="cmp.g4.r4.t">Resource downloads</td><td data-i18n="cmp.g4.r4.o">Manually, from a separate site</td><td data-i18n="cmp.g4.r4.c"><span class="yes">✓</span>In-app browser, installed only after SHA-256 verification</td></tr>
+            <tr class="reveal"><td data-i18n="cmp.g4.r5.t">Updates</td><td data-i18n="cmp.g4.r5.o">You had to find and download them yourself</td><td data-i18n="cmp.g4.r5.c"><span class="yes">✓</span>In-app auto-update — correct architecture, beta channel toggle</td></tr>
           </tbody>
 
           <tbody>
-            <tr class="group-row"><th colspan="3" scope="colgroup" data-i18n="cmp.g5">Converter, build and licence</th></tr>
-            <tr><td data-i18n="cmp.g5.r1.t">Text Converter</td><td data-i18n="cmp.g5.r1.o">Needed a separate install</td><td data-i18n="cmp.g5.r1.c"><span class="yes">✓</span>Built into the app — Ctrl+Alt+T, and it does not freeze on large text</td></tr>
-            <tr><td data-i18n="cmp.g5.r2.t">Qt converter</td><td data-i18n="cmp.g5.r2.o">Did not exist</td><td data-i18n="cmp.g5.r2.c"><span class="yes">✓</span>A Qt 6 C++ port, with a <code>--mapping-dir</code> switch</td></tr>
-            <tr><td data-i18n="cmp.g5.r3.t">Build setup</td><td data-i18n="cmp.g5.r3.o">Delphi 2010 plus proprietary DISQLite3, ICS, JVCL/JCL</td><td data-i18n="cmp.g5.r3.c"><span class="yes">✓</span>Delphi 12 Community Edition, with no third-party dependency</td></tr>
-            <tr><td data-i18n="cmp.g5.r4.t">Licence</td><td data-i18n="cmp.g5.r4.o">MPL-1.1 (official source)</td><td data-i18n="cmp.g5.r4.c"><span class="yes">✓</span>MPL-2.0, with Qt's LGPLv3 terms documented</td></tr>
+            <tr class="group-row reveal"><th colspan="3" scope="colgroup" data-i18n="cmp.g5">Converter, build and licence</th></tr>
+            <tr class="reveal"><td data-i18n="cmp.g5.r1.t">Text Converter</td><td data-i18n="cmp.g5.r1.o">Needed a separate install</td><td data-i18n="cmp.g5.r1.c"><span class="yes">✓</span>Built into the app — Ctrl+Alt+T, and it does not freeze on large text</td></tr>
+            <tr class="reveal"><td data-i18n="cmp.g5.r2.t">Qt converter</td><td data-i18n="cmp.g5.r2.o">Did not exist</td><td data-i18n="cmp.g5.r2.c"><span class="yes">✓</span>A Qt 6 C++ port, with a <code>--mapping-dir</code> switch</td></tr>
+            <tr class="reveal"><td data-i18n="cmp.g5.r3.t">Build setup</td><td data-i18n="cmp.g5.r3.o">Delphi 2010 plus proprietary DISQLite3, ICS, JVCL/JCL</td><td data-i18n="cmp.g5.r3.c"><span class="yes">✓</span>Delphi 12 Community Edition, with no third-party dependency</td></tr>
+            <tr class="reveal"><td data-i18n="cmp.g5.r4.t">Licence</td><td data-i18n="cmp.g5.r4.o">MPL-1.1 (official source)</td><td data-i18n="cmp.g5.r4.c"><span class="yes">✓</span>MPL-2.0, with Qt's LGPLv3 terms documented</td></tr>
           </tbody>
         </table>
       </div>
@@ -288,54 +302,54 @@
       </p>
 
       <div class="detail-grid">
-        <article class="detail">
+        <article class="detail reveal">
           <span class="tag">Engine</span>
           <h4 data-i18n="detail.1.title">A new ANSI/Bijoy conversion engine</h4>
           <p data-i18n="detail.1.body">The single hardcoded mapping inside has been removed so every V1–V4 encoding is file-based. The engine is pre-warmed, switching versions allocates nothing, and the setting survives a cache restart.</p>
         </article>
-        <article class="detail">
+        <article class="detail reveal">
           <span class="tag">Converter</span>
           <h4 data-i18n="detail.2.title">Avro Text Converter is now inside the app</h4>
           <p data-i18n="detail.2.body">Open it from the tray menu or by pressing <strong>Ctrl+Alt+T</strong>. It converts both ways, Unicode ↔ ANSI, and the window no longer freezes on large text — the work runs in the background.</p>
         </article>
-        <article class="detail">
+        <article class="detail reveal">
           <span class="tag">Resources</span>
           <h4 data-i18n="detail.3.title">In-app “Download Resources”</h4>
           <p data-i18n="detail.3.body">Find and download layout, skin and ANSI mapping packs from inside the app. Every file is verified with <strong>SHA-256</strong> before it installs, and it loads without a restart.</p>
         </article>
-        <article class="detail">
+        <article class="detail reveal">
           <span class="tag">Updates</span>
           <h4 data-i18n="detail.4.title">Auto-update straight from this GitHub repository</h4>
           <p data-i18n="detail.4.body">Picks the right file for the architecture you are running, verifies the download link live before offering it, hands portable builds the portable package, and keeps a beta channel toggle.</p>
         </article>
-        <article class="detail">
+        <article class="detail reveal">
           <span class="tag">Reliability</span>
           <h4 data-i18n="detail.5.title">Startup never fails silently</h4>
           <p data-i18n="detail.5.body">Bad settings, a locked registry, missing fonts or a corrupt <code>Database.db3</code> used to close the app without ever showing a window. Every step is guarded now, with a visible report and <code>AvroStartup.log</code>.</p>
         </article>
-        <article class="detail">
+        <article class="detail reveal">
           <span class="tag">UI</span>
           <h4 data-i18n="detail.6.title">Interface and theming</h4>
           <p data-i18n="detail.6.body">An app-wide theme and palette system, a “Select ANSI Encoding” tray menu that stays in sync with every picker, layout-aware icons, and correct natural sorting like V1 → V5.</p>
         </article>
-        <article class="detail">
+        <article class="detail reveal">
           <span class="tag">Packaging</span>
           <h4 data-i18n="detail.7.title">Native 64/32-bit and genuinely portable</h4>
           <p data-i18n="detail.7.body">The official build was a single 32-bit installer; here you get an installer and a portable build, on both architectures. In the portable build the settings live in <code>Settings.xml</code> beside the exe, so you can run it from a USB stick and leave a clean machine behind.</p>
         </article>
-        <article class="detail">
+        <article class="detail reveal">
           <span class="tag">Build</span>
           <h4 data-i18n="detail.8.title">Built for community contribution</h4>
           <p data-i18n="detail.8.body">Builds with no third-party dependency in the latest free Delphi Community Edition (<code>build-ce.bat</code>). Contributions are welcome in both Delphi and the Qt converter — not just one of them.</p>
         </article>
-        <article class="detail">
+        <article class="detail reveal">
           <span class="tag">Privacy</span>
           <h4 data-i18n="detail.9.title">No tracking, no telemetry</h4>
           <p data-i18n="detail.9.body">The app sends no telemetry, and <code>AvroStartup.log</code> never contains the text you type. Use the portable folder without installing and nothing system-wide is registered at all.</p>
         </article>
       </div>
 
-      <aside class="honest">
+      <aside class="honest reveal">
         <h3 data-i18n="honest.title">What is still limited — better said plainly</h3>
         <ul>
           <li data-i18n="honest.i1"><strong>This is an independent continuation.</strong> A separate continuation from Avro Keyboard's open-source code (MPL-2.0) — not affiliated with OmicronLab. The official site and the older versions are still at omicronlab.com as before.</li>
@@ -347,22 +361,22 @@
       </aside>
 
       <div class="timeline">
-        <div class="tl-item">
+        <div class="tl-item reveal">
           <time data-i18n="tl.when1">27 Aug 2019</time>
           <h4 data-i18n="tl.1.title">The last official release — Avro Keyboard 5.6.0</h4>
           <p data-i18n="tl.1.body">No new official version has appeared since. This is still the newest official download on omicronlab.com.</p>
         </div>
-        <div class="tl-item">
+        <div class="tl-item reveal">
           <time data-i18n="tl.when2">9 Aug 2026</time>
           <h4 data-i18n="tl.2.title">The canonical source repository goes read-only</h4>
           <p data-i18n="tl.2.body">The official upstream repository was archived — meaning nobody was fixing the problems newer Windows versions brought any more.</p>
         </div>
-        <div class="tl-item">
+        <div class="tl-item reveal">
           <time data-i18n="tl.when3">15 Oct 2026</time>
           <h4 data-i18n="tl.3.title">Community Edition source begins</h4>
           <p data-i18n="tl.3.body">Independent maintenance starts from that same open-source code under the MPL-2.0 licence — with the full history and the upstream baseline kept intact.</p>
         </div>
-        <div class="tl-item">
+        <div class="tl-item reveal">
           <time data-i18n="tl.when4">16 Oct 2026</time>
           <h4 data-i18n="tl.4.title">The first public build — 6.0.2-beta</h4>
           <p data-i18n="tl.4.body">Native 64/32-bit installer and portable, the new ANSI engine, the in-app converter, the resource browser and auto-update — all at once.</p>
@@ -374,7 +388,7 @@
   <!-- ============================== Features ============================== -->
   <section class="section" id="features">
     <div class="wrap">
-      <div class="section-head">
+      <div class="section-head reveal">
         <p class="kicker" data-i18n="features.kicker">What is inside</p>
         <h2 data-i18n="features.h2">The things that make a difference <span class="gradient">in everyday typing</span></h2>
         <p data-i18n="features.lead">Every point is written down in the 6.0.2-beta release notes or in this repository's Readme.</p>
@@ -417,25 +431,25 @@
   <!-- =============================== Install ============================== -->
   <section class="section install" id="install">
     <div class="wrap">
-      <div class="section-head">
+      <div class="section-head reveal">
         <p class="kicker" data-i18n="install.kicker">Getting started</p>
         <h2 data-i18n="install.h2">Bangla typing in three steps</h2>
         <p data-i18n="install.lead">From download to typing Bangla — installer or portable, whichever suits you.</p>
       </div>
       <div class="steps">
-        <article class="step">
+        <article class="step reveal">
           <p class="num">STEP 01</p>
           <h3 data-i18n="install.s1.title">Download the right file</h3>
           <p data-i18n="install.s1.body">The cards below read your Windows architecture and pick the correct installer or portable ZIP for you.</p>
           <div class="code">AvroKeyboard-&lt;version&gt;-win64-setup.exe</div>
         </article>
-        <article class="step">
+        <article class="step reveal">
           <p class="num">STEP 02</p>
           <h3 data-i18n="install.s2.title">Install, or just extract</h3>
           <p data-i18n="install.s2.body">Run the setup, or extract the ZIP and use it straight from the folder — the portable build needs no installation.</p>
           <div class="code" data-i18n="install.s2.code">Settings.xml ← next to the exe</div>
         </article>
-        <article class="step">
+        <article class="step reveal">
           <p class="num">STEP 03</p>
           <h3 data-i18n="install.s3.title">Start typing Bangla</h3>
           <p data-i18n="install.s3.body">Choose Avro Phonetic from the tray icon. Need the text converter? Press <strong>Ctrl+Alt+T</strong>.</p>
@@ -449,7 +463,7 @@
   <section class="section" id="download">
     <div class="wrap">
       <div class="releases-head">
-        <div class="section-head">
+        <div class="section-head reveal">
           <p class="kicker" data-i18n="download.kicker">Download and archive</p>
           <h2 data-i18n="download.h2">Avro Keyboard releases</h2>
           <p data-i18n="download.lead">
@@ -482,13 +496,13 @@
   <!-- ============================== CTA ================================== -->
   <section class="section">
     <div class="wrap">
-      <div class="download-card">
+      <div class="download-card reveal">
         <div>
           <p class="kicker" data-i18n="cta.kicker">Spread Bangla</p>
           <h2 data-i18n="cta.h2">Language should be open.</h2>
           <p data-i18n="cta.body">Report a bug, contribute code, or just join the community — all of it is welcome.</p>
         </div>
-        <a class="btn" href="https://github.com/raselrahmanrocky/Avro-Keyboard" target="_blank" rel="noopener noreferrer" data-i18n="cta.button">View the repo on GitHub ↗</a>
+        <a class="btn magnetic" href="https://github.com/raselrahmanrocky/Avro-Keyboard" target="_blank" rel="noopener noreferrer" data-i18n="cta.button">View the repo on GitHub ↗</a>
       </div>
     </div>
   </section>
@@ -505,7 +519,7 @@
   </div>
   <div class="wrap footrow">
     <div class="footbrand">
-      <img src="img/logo.jpg" width="34" height="34" alt="" loading="lazy" decoding="async">
+      <span class="logo-sweep"><img src="img/logo.jpg" width="34" height="34" alt="" loading="lazy" decoding="async"></span>
       <span>
         <strong>Avro Keyboard Community Edition</strong><br>
         <span data-i18n="footer.ahead"><span data-ahead-note>—</span> commits ahead of the official baseline · MPL-2.0</span>
@@ -531,5 +545,6 @@
 <script src="js/audit.js" defer></script>
 <script src="js/ahead-note.js" defer></script>
 <script src="js/releases.js" defer></script>
+<script src="js/motion.js" defer></script>
 </body>
 </html>

@@ -1,5 +1,6 @@
 # Local agent/tool state — never part of the published site.
 .freebuff/
+server.pid
 
 # Editor and OS noise.
 .DS_Store
@@ -7,3 +8,4 @@ Thumbs.db
 *.swp
 .idea/
 .vscode/
+.freebuff/

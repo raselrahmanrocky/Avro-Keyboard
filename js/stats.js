@@ -19,6 +19,12 @@
   var dots = Array.prototype.slice.call(document.querySelectorAll('[data-live-dot]'));
   var painted = {};
 
+  /* Counters wait for the strip to scroll into view once. Until then the real
+     values are painted straight away so nothing is ever blank; the first
+     intersection replays them as a count-up. */
+  var pendingCounts = [];
+  var stripVisible = !('IntersectionObserver' in window);
+
   /* The two passes, remembered so a language change can redraw the strip
      without asking GitHub for anything again. */
   var snapshotPass = null;
@@ -86,6 +92,45 @@
     setTimeout(settle, duration + 200);
   }
 
+  function queueAnimation(el, value) {
+    if (stripVisible) {
+      animate(el, value);
+      return;
+    }
+
+    el.textContent = GH.fmt.num(value);
+
+    for (var i = 0; i < pendingCounts.length; i++) {
+      if (pendingCounts[i].el === el) {
+        pendingCounts[i].value = value;
+        return;
+      }
+    }
+    pendingCounts.push({ el: el, value: value });
+  }
+
+  (function watchStrip() {
+    if (stripVisible) return;
+
+    var strip = document.querySelector('.stats');
+    if (!strip) {
+      stripVisible = true;
+      return;
+    }
+
+    var io = new IntersectionObserver(function (entries) {
+      if (!entries.length || !entries[0].isIntersecting) return;
+      stripVisible = true;
+      io.disconnect();
+
+      var queued = pendingCounts;
+      pendingCounts = [];
+      queued.forEach(function (item) { animate(item.el, item.value); });
+    }, { threshold: 0.2 });
+
+    io.observe(strip);
+  })();
+
   function paint(data, state, instant) {
     tiles.forEach(function (tile) {
       var key = tile.getAttribute('data-stat');
@@ -103,7 +148,7 @@
           el.textContent = GH.fmt.num(value);
           painted[key] = value;
         } else if (painted[key] !== value) {
-          animate(el, value);
+          queueAnimation(el, value);
           painted[key] = value;
         }
       } else {
