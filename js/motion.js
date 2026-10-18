@@ -798,27 +798,82 @@
   }
 
   /* ------------------------------------------------------------ card tilt -- */
+  /* Two card families share one tilt engine: the .feature cards keep their
+     gentler angles, the .detail cards follow the reference concept (12deg at
+     perspective 800, -6px lift). The transform is written straight on each
+     mousemove with no CSS transition on it — a transform transition keeps
+     Chrome on a low-resolution animation raster, which is exactly what
+     blurs the text while the pointer rests anywhere on the card. Only the
+     glow (box-shadow / border-color) eases. Reveal-hidden cards stay flat
+     until they have entered the viewport. */
   function initTilt() {
     if (reduceMotion() || !finePointer()) return;
-    var cards = doc.querySelectorAll('.feature');
+    var sets = [
+      { sel: '.feature', max: 6, persp: 900, lift: 4 },
+      { sel: '.detail', max: 12, persp: 800, lift: 6 }
+    ];
+    for (var s = 0; s < sets.length; s++) {
+      var cards = doc.querySelectorAll(sets[s].sel);
+      for (var i = 0; i < cards.length; i++) bindTilt(cards[i], sets[s]);
+    }
+  }
+
+  function bindTilt(card, cfg) {
+    var glowIn = 'box-shadow .35s ease, border-color .35s ease';
+    var glowOut = 'transform .38s ease, box-shadow .38s ease, border-color .38s ease';
+    card.addEventListener('mouseenter', function () {
+      if (card.classList.contains('reveal') && !card.classList.contains('is-visible')) return;
+      card.style.transition = glowIn;
+    });
+    card.addEventListener('mousemove', function (e) {
+      if (card.classList.contains('reveal') && !card.classList.contains('is-visible')) return;
+      var b = card.getBoundingClientRect();
+      var px = (e.clientX - b.left) / b.width - .5;
+      var py = (e.clientY - b.top) / b.height - .5;
+      card.style.transform = 'translateY(-' + cfg.lift + 'px) perspective(' + cfg.persp + 'px) rotateY(' +
+        (px * cfg.max).toFixed(2) + 'deg) rotateX(' + (-py * cfg.max).toFixed(2) + 'deg)';
+    });
+    card.addEventListener('mouseleave', function () {
+      card.style.transition = glowOut;
+      card.style.transitionDelay = '0ms';
+      card.style.transform = '';
+      setTimeout(function () {
+        card.style.transition = '';
+        card.style.transitionDelay = '';
+      }, 420);
+    });
+  }
+
+  /* --------------------------------------------------------- click ripple -- */
+  /* A click anywhere on a .detail or .feature card drops one expanding
+     circle, the way the reference concept's ripple card behaves. Positions
+     are measured from the bounding-box centre — that point is
+     rotation-invariant while the tilt is active — then pulled back into
+     layout pixels, because on wide screens body{zoom:1.25} scales the
+     painted page. */
+  function initRipple() {
+    if (reduceMotion()) return;
+    var cards = doc.querySelectorAll('.detail, .feature');
     for (var i = 0; i < cards.length; i++) {
       (function (card) {
-        card.addEventListener('mousemove', function (e) {
-          if (card.classList.contains('reveal') && !card.classList.contains('is-visible')) return;
-          var b = card.getBoundingClientRect();
-          var px = (e.clientX - b.left) / b.width - .5;
-          var py = (e.clientY - b.top) / b.height - .5;
-          card.style.transform = 'translateY(-4px) perspective(900px) rotateY(' +
-            (px * 6).toFixed(2) + 'deg) rotateX(' + (-py * 6).toFixed(2) + 'deg)';
-        });
-        card.addEventListener('mouseleave', function () {
-          card.style.transition = 'transform .35s ease';
-          card.style.transitionDelay = '0ms';
-          card.style.transform = '';
-          setTimeout(function () {
-            card.style.transition = '';
-            card.style.transitionDelay = '';
-          }, 380);
+        card.addEventListener('click', function (e) {
+          var zoom = parseFloat(window.getComputedStyle(doc.body).zoom) || 1;
+          var rect = card.getBoundingClientRect();
+          var cx = rect.left + rect.width / 2;
+          var cy = rect.top + rect.height / 2;
+          var d = Math.max(card.offsetWidth, card.offsetHeight);
+          var circle = doc.createElement('span');
+          circle.className = 'ripple';
+          circle.setAttribute('aria-hidden', 'true');
+          circle.style.width = circle.style.height = d + 'px';
+          circle.style.left = ((e.clientX - cx) / zoom + card.offsetWidth / 2 - d / 2) + 'px';
+          circle.style.top = ((e.clientY - cy) / zoom + card.offsetHeight / 2 - d / 2) + 'px';
+          var old = card.querySelector('.ripple');
+          if (old && old.parentNode) old.parentNode.removeChild(old);
+          card.appendChild(circle);
+          circle.addEventListener('animationend', function () {
+            if (circle.parentNode) circle.parentNode.removeChild(circle);
+          });
         });
       })(cards[i]);
     }
@@ -866,6 +921,7 @@
     initMarquee();
     initMagnetic();
     initTilt();
+    initRipple();
     initBackToTop();
   }
 

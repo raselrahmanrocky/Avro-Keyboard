@@ -269,7 +269,82 @@ main, .footer { position: relative; z-index: 1; }
   .to-top.is-shown .ic { animation: to-top-hint 6s ease-in-out 1.4s infinite; }
 }
 
-/* 9. Reduced-motion hard stops ============================================ */
+/* 9. Detail card effects ================================================== */
+/* Four ideas from the card concept share the .detail and .feature cards:
+   a gradient ring that spins along the edge while hovered, a chip that pops
+   (the tag on .detail, the icon box on .feature), a click ripple, and the
+   3D tilt that §card tilt in js/motion.js drives. The conic gradient is
+   masked down to a 2px frame (content-box xor), so the cards can keep
+   overflow:hidden for the ripple without the ring being clipped. All colours
+   come from the theme tokens, so both palettes stay in sync. */
+@property --ring-angle {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+@media (prefers-reduced-motion: no-preference) {
+  html.js .detail,
+  html.js .feature { overflow: hidden; }
+
+  html.js .detail::before,
+  html.js .feature::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    padding: 2px;
+    border-radius: inherit;
+    background: conic-gradient(from var(--ring-angle), transparent, var(--purple), var(--purple2), var(--pink), transparent 42%);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    mask-composite: exclude;
+    opacity: 0;
+    transition: opacity .4s ease;
+    pointer-events: none;
+  }
+  html.js .detail:hover::before,
+  html.js .feature:hover::before {
+    opacity: 1;
+    animation: ring-spin 4s linear infinite;
+  }
+  @keyframes ring-spin { to { --ring-angle: 360deg; } }
+
+  /* The static 1px border steps aside while the ring is up (its fade is
+     part of the inline transition the tilt sets), leaving the edge to the
+     gradient alone, exactly like the concept. */
+  html.js .detail:hover,
+  html.js .feature:hover {
+    border-color: transparent;
+    box-shadow: 0 22px 48px -18px color-mix(in srgb, var(--purple) 42%, transparent);
+  }
+
+  html.js .detail:hover .tag,
+  html.js .feature:hover .ico {
+    animation: tag-pop .5s cubic-bezier(.175, .885, .32, 1.275) forwards;
+    background: var(--purple);
+    border-color: transparent;
+    color: var(--bg);
+  }
+  @keyframes tag-pop {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.15) rotate(-3deg); }
+    100% { transform: scale(1.05) rotate(0); }
+  }
+
+  html.js .ripple {
+    position: absolute;
+    z-index: 0;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--purple2) 30%, transparent);
+    transform: scale(0);
+    animation: ripple-out .6s linear;
+    pointer-events: none;
+  }
+  @keyframes ripple-out { to { transform: scale(4); opacity: 0; } }
+}
+
+/* 10. Reduced-motion hard stops =========================================== */
 @media (prefers-reduced-motion: reduce) {
   .progress { transition: none; }
   .logo-sweep::after,
