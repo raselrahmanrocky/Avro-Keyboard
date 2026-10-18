@@ -243,3 +243,99 @@ details.assets[open] summary { border-bottom: 1px solid var(--line); }
   .asset-list li { flex-direction: column; gap: 4px; }
   .asset-meta { text-align: left; white-space: normal; }
 }
+
+/* 6. Blog ================================================================== */
+.blog-list { display: grid; gap: 22px; max-width: 860px; }
+
+.blog-card h2 { font-size: clamp(20px, 2.2vw, 24px); }
+.blog-card h2 a { color: inherit; }
+.blog-card h2 a:hover { color: var(--purple); }
+.blog-card:hover { border-color: var(--purple); }
+
+.blog-excerpt { margin: 2px 0 16px; color: var(--muted); max-width: 68ch; }
+
+.mark--lang { color: var(--purple); border-color: currentColor; }
+
+.post .prose { max-width: 74ch; }
+.blog-lang-note { margin: 0 0 6px; }
+.blog-post-foot { margin-top: 26px; }
+
+/* --- author byline ---------------------------------------------------------
+   Photo in a gradient ring, name, role and date. A missing photo swaps to
+   initials on the same ring, so the block never shows a broken image. */
+.byline { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+.byline__avatar {
+  position: relative; flex: 0 0 auto;
+  display: inline-grid; place-items: center; border-radius: 50%;
+  transition: box-shadow .25s ease;
+}
+.byline__avatar:hover { box-shadow: 0 0 0 5px rgba(118, 40, 217, .14); }
+
+.byline__img,
+.byline__initials {
+  width: 100%; height: 100%; border-radius: 50%;
+  transition: transform .25s ease;
+}
+.byline__img { object-fit: cover; display: block; }
+.byline__initials {
+  display: grid; place-items: center;
+  background: var(--surface2); color: var(--purple);
+  font-weight: 700; letter-spacing: .5px;
+}
+.byline__avatar:hover .byline__img,
+.byline__avatar:hover .byline__initials { transform: scale(1.05); }
+
+/* The UA's [hidden] loses to the display rules above, exactly like the
+   release cards — restore it for the two swappable pieces. */
+.byline__img[hidden],
+.byline__initials[hidden] { display: none; }
+
+.byline__avatar--sm {
+  width: 28px; height: 28px; padding: 1.5px;
+  background: linear-gradient(135deg, rgba(118, 40, 217, .55), rgba(79, 140, 255, .45));
+}
+.byline__avatar--sm .byline__initials { font-size: 9px; }
+
+.byline__avatar--lg {
+  width: 56px; height: 56px; padding: 2.5px;
+  background: linear-gradient(135deg, var(--purple), #4f8cff);
+}
+.byline__avatar--lg .byline__initials { font-size: 16px; }
+
+.byline__name { font-weight: 600; color: var(--text); }
+.byline--sm .byline__name { font-size: 13.5px; }
+a.byline__name { text-decoration: none; }
+a.byline__name:hover { color: var(--purple); text-decoration: underline; text-underline-offset: 3px; }
+
+.byline__role { display: block; margin-top: 1px; color: var(--muted); font-size: 13px; }
+.byline__sep { color: var(--muted); }
+
+.byline__when {
+  display: inline-flex; align-items: center; gap: 6px;
+  color: var(--muted); font-size: 13px;
+}
+.byline__when .ic { font-size: 11px; opacity: .85; }
+
+.byline--sm { margin: 10px 0 12px; }
+
+.byline--lg {
+  gap: 14px;
+  margin: 16px 0 22px; padding: 14px 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+.byline--lg .byline__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.byline--lg .byline__name { font-size: 16px; }
+
+.byline__meta {
+  margin: 0 0 0 auto;
+  display: flex; flex-direction: column; gap: 2px;
+  text-align: right;
+}
+.byline__meta time { color: var(--muted); font-size: 13.5px; }
+.byline__updated { color: var(--muted); font-size: 12.5px; }
+
+@media (max-width: 540px) {
+  .byline__meta { margin-left: 0; text-align: left; }
+}

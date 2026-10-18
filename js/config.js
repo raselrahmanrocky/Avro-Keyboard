@@ -26,6 +26,34 @@ window.AVRO = {
     baseline: 'official'
   },
 
+  /* Blog. Posts are plain markdown files under blog/ on the published
+     branch. The site reads the index (blog/posts.json) and the post bodies
+     from the raw GitHub CDN at runtime, so a new post never waits for a site
+     deploy. blog/posts.json, data/blog.json and feed.xml are rebuilt by
+     .github/workflows/blog-index.yml on every push that touches a post. */
+  blog: {
+    branch: 'gh-pages',
+    dir: 'blog'
+  },
+
+  /* The byline shown on every blog post. Editorial values follow the
+     { en, bn } convention so one language switch renames the author in
+     place. A post may override any of these in its front matter (author,
+     authorRole, authorAvatar); the profile link only ever applies to the
+     default author, never to an override. */
+  author: {
+    name: {
+      en: 'Rasel Rahman Rocky',
+      bn: 'রাসেল রহমান রকি'
+    },
+    role: {
+      en: 'Maintainer, Avro Keyboard Community Edition',
+      bn: 'মেইনটেইনার, অভ্র কিবোর্ড কমিউনিটি এডিশন'
+    },
+    avatar: 'img/authors/raselrahmanrocky.jpg',
+    url: 'https://github.com/raselrahmanrocky'
+  },
+
   /* The archived official upstream, shown as the comparison baseline. */
   official: {
     owner: 'mugli',

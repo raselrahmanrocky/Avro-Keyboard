@@ -1,0 +1,44 @@
+# Rebuilds the blog index, feed and bundled copy whenever blog/ changes.
+# The pushed file is always a markdown post; the files this workflow commits
+# back (blog/posts.json, data/blog.json, feed.xml) are excluded from the
+# trigger and, because they are pushed with GITHUB_TOKEN, cannot loop anyway.
+name: blog-index
+
+on:
+  push:
+    branches: [gh-pages]
+    paths:
+      - 'blog/**'
+      - '!blog/posts.json'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: blog-index
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Rebuild the index, feed and bundled copy
+        run: node .github/scripts/build-blog-index.mjs
+
+      - name: Commit the results
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add blog/posts.json data/blog.json feed.xml
+          if git diff --cached --quiet; then
+            echo "Already up to date - nothing to commit."
+          else
+            git commit -m "chore(blog): rebuild index and feed"
+            git push
+          fi

@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light" data-lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title data-i18n="blog.meta.title">Blog — Avro Keyboard Community Edition</title>
+<meta name="description" data-i18n-content="blog.meta.desc" content="Development notes, guides and announcements from the Avro Keyboard Community Edition project — published straight from the repository.">
+<link rel="canonical" href="https://raselrahmanrocky.github.io/Avro-Keyboard/blog.html">
+<link rel="alternate" hreflang="en" href="https://raselrahmanrocky.github.io/Avro-Keyboard/blog.html">
+<link rel="alternate" hreflang="bn" href="https://raselrahmanrocky.github.io/Avro-Keyboard/blog.html?lang=bn">
+<link rel="alternate" hreflang="x-default" href="https://raselrahmanrocky.github.io/Avro-Keyboard/blog.html">
+<link rel="alternate" type="application/rss+xml" title="Avro Keyboard Community Edition — Blog" href="feed.xml">
+<meta name="theme-color" content="#6d20d6">
+<meta name="color-scheme" content="light dark">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Avro Keyboard Community Edition">
+<meta property="og:title" content="Blog — Avro Keyboard Community Edition">
+<meta property="og:description" content="Development notes, guides and announcements — published straight from the repository.">
+<meta property="og:url" content="https://raselrahmanrocky.github.io/Avro-Keyboard/blog.html">
+<meta property="og:image" content="https://raselrahmanrocky.github.io/Avro-Keyboard/img/og-cover.jpg">
+<meta property="og:locale" content="en_US">
+<meta property="og:locale:alternate" content="bn_BD">
+<meta name="twitter:card" content="summary_large_image">
+
+<link rel="icon" href="img/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="img/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="img/logo-192.png">
+
+<link rel="preload" href="fonts/hind-siliguri-bengali-400.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/manrope-latin-variable.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="css/vendor/fontawesome/webfonts/fa-solid-900.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="css/vendor/fontawesome/css/all.min.css">
+<link rel="stylesheet" href="css/fonts.css">
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/pages.css">
+<link rel="stylesheet" href="css/motion.css">
+
+<script>
+/* Runs before the stylesheets paint. Resolves the language so a Bangla
+   visitor never sees a flash of English prose, and reapplies a stored dark
+   theme so it never flashes light — first-time visitors always start on the
+   light theme. js/i18n.js clears the pending flag; the timeout is a backstop
+   in case that file never loads. */
+(function () {
+  var root = document.documentElement;
+  root.classList.add('js');
+
+  var lang = 'en';
+  try {
+    var wanted = /[?&]lang=(en|bn)\b/.exec(location.search);
+    var stored = localStorage.getItem('avro-lang');
+    lang = wanted ? wanted[1] : (stored === 'bn' ? 'bn' : 'en');
+    localStorage.setItem('avro-lang', lang);
+    if (localStorage.getItem('avro-theme') === 'dark') {
+      root.setAttribute('data-theme', 'dark');
+    }
+  } catch (e) { /* English and the light theme are the defaults */ }
+
+  root.setAttribute('lang', lang);
+  root.setAttribute('data-lang', lang);
+
+  if (lang !== 'en') {
+    root.setAttribute('data-i18n-pending', '1');
+    setTimeout(function () { root.removeAttribute('data-i18n-pending'); }, 1500);
+  }
+})();
+</script>
+</head>
+<body>
+
+<div class="glow" aria-hidden="true"><i></i><i></i></div>
+<div class="progress" data-progress aria-hidden="true"></div>
+
+<!-- Floating back to top: hidden until js/motion.js sees the page scrolled
+     past a screen, then it fades in and glides home on click. -->
+<button class="to-top" data-to-top type="button" aria-label="Back to top" title="Back to top" data-i18n-aria-label="nav.toTop" data-i18n-title="nav.toTop">
+  <i class="fa-solid fa-arrow-up ic" aria-hidden="true"></i>
+</button>
+
+<a class="skip-link" href="#main" data-i18n="nav.skip">Skip to main content</a>
+
+<header class="topbar">
+  <div class="wrap nav">
+    <a class="brand" href="index.html">
+      <span class="logo-sweep"><img src="img/logo.jpg" width="44" height="44" alt=""></span>
+      <span><b data-i18n="brand.name">Avro Keyboard<span class="ce-tag">Community Edition</span></b><small data-i18n="brand.tagline">Open source · MPL-2.0</small></span>
+    </a>
+    <nav class="navlinks" data-i18n-aria-label="nav.main" aria-label="Main navigation">
+      <a href="index.html#improvements" data-i18n="nav.improvements">Improvements</a>
+      <a href="index.html#features" data-i18n="nav.features">Features</a>
+      <a href="index.html#install" data-i18n="nav.install">Install</a>
+      <a href="index.html#download" data-i18n="nav.download">Download</a>
+      <a href="blog.html" data-i18n="nav.blog" aria-current="page">Blog</a>
+      <a href="changelog.html" data-i18n="nav.changelog">Changelog</a>
+    </nav>
+    <div class="navright">
+      <button class="langswitch" type="button" data-lang-toggle aria-label="বাংলা" title="বাংলা"><span data-lang-code="en" data-active="true">EN</span><span data-lang-code="bn" data-active="false">বাং</span></button>
+      <button class="theme" id="themeBtn" type="button" aria-pressed="false" aria-label="Switch to dark theme" title="Switch to dark theme"><i class="fa-solid fa-moon" aria-hidden="true"></i></button>
+      <a class="btn btn-primary" href="index.html#download"><span data-i18n="actions.download">Download</span> <i class="fa-solid fa-download" aria-hidden="true"></i></a>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+  <section class="page-hero">
+    <div class="wrap">
+      <p class="crumbs"><a href="index.html" data-i18n="nav.home">Home</a><span aria-hidden="true">/</span><span data-i18n="blog.crumb">Blog</span></p>
+      <h1 data-i18n="blog.h1">Notes, guides and updates from the <span class="gradient">Community Edition</span></h1>
+      <p data-i18n="blog.lead">
+        Development notes and announcements, written in markdown and published straight from this
+        repository. Every post is in one language — Bangla and English posts sit side by side, and
+        the active language comes first.
+      </p>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="wrap">
+      <p class="status-note" data-state="loading" id="blogStatus">
+        <span class="dot" data-live-dot data-state="loading"></span>
+        <span data-note-text>Loading posts…</span>
+      </p>
+
+      <div id="blogHost">
+        <p class="release-empty">Loading the post list…</p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="footer">
+  <div class="wrap">
+    <p class="legal" data-i18n="footer.legal">
+      Avro Keyboard Community Edition — an independent continuation of Avro Keyboard's
+      open-source code (MPL-2.0). <strong>Not affiliated with OmicronLab or its original
+      developers</strong>. The original source and copyright of Avro Keyboard belong to
+      OmicronLab (Mehdi Hasan Khan).
+    </p>
+  </div>
+  <div class="wrap footrow">
+    <div class="footbrand">
+      <span class="logo-sweep"><img src="img/logo.jpg" width="34" height="34" alt="" loading="lazy" decoding="async"></span>
+      <span>
+        <strong>Avro Keyboard Community Edition</strong><br>
+        <span data-i18n="footer.ahead"><span data-ahead-note>—</span> commits ahead of the official baseline · MPL-2.0</span>
+      </span>
+    </div>
+    <nav class="footer-links" data-i18n-aria-label="nav.footer" aria-label="Footer links">
+      <a href="index.html#improvements" data-i18n="nav.improvements">Improvements</a>
+      <a href="index.html#features" data-i18n="nav.features">Features</a>
+      <a href="index.html#install" data-i18n="nav.install">Install</a>
+      <a href="blog.html" data-i18n="nav.blog">Blog</a>
+      <a href="changelog.html" data-i18n="nav.changelog">Changelog</a>
+      <a href="privacy.html" data-i18n="nav.privacy">Privacy</a>
+      <a href="feed.xml">RSS <i class="fa-solid fa-rss" aria-hidden="true"></i></a>
+      <a href="https://github.com/raselrahmanrocky/Avro-Keyboard/issues" target="_blank" rel="noopener noreferrer" data-i18n="footer.reportBug">Report a bug <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i></a>
+    </nav>
+  </div>
+</footer>
+
+<script src="js/config.js" defer></script>
+<script src="js/noselect.js" defer></script>
+<script src="js/i18n.js" defer></script>
+<script src="js/snapshot.js" defer></script>
+<script src="js/github.js" defer></script>
+<script src="js/theme.js" defer></script>
+<script src="js/ahead-note.js" defer></script>
+<script src="js/vendor/marked.min.js" defer></script>
+<script src="js/vendor/purify.min.js" defer></script>
+<script src="js/blog.js" defer></script>
+<script src="js/motion.js" defer></script>
+</body>
+</html>

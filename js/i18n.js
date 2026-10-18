@@ -130,7 +130,24 @@ window.AVRO_I18N = (function () {
       'changelog.unknownMonth': 'Unknown',
       'audit.archived': 'Read-only (archived)',
       'audit.active': 'Active',
-      'audit.freshness': 'Last updated {when}'
+      'audit.freshness': 'Last updated {when}',
+
+      /* ---- blog.html ---- */
+      'blog.status.loading': 'Loading posts…',
+      'blog.status.live': 'Live from the repository · {n} posts',
+      'blog.status.live.one': 'Live from the repository · {n} post',
+      'blog.status.saved': 'From the snapshot saved on your last visit ({when})',
+      'blog.status.bundled': 'From the bundled snapshot ({when})',
+      'blog.status.error': 'The posts could not be loaded right now',
+      'blog.empty': 'No posts yet — the first one is on its way.',
+      'blog.loadFailed': 'This post could not be loaded.',
+      'blog.notFound': 'That post could not be found.',
+      'blog.back': 'All posts',
+      'blog.readMore': 'Read post',
+      'blog.when': 'Published: {date}',
+      'blog.updated': 'Updated: {date}',
+      'blog.langNote': 'This post is written in {lang}.',
+      'blog.edit': 'Edit on GitHub'
     },
 
     /* ------------------------------------------------------------- Bangla --
@@ -226,6 +243,22 @@ window.AVRO_I18N = (function () {
       'changelog.official.source': 'আর্কাইভ করা সোর্স',
       'changelog.unknownMonth': 'অজানা',
 
+      /* ---- blog (JavaScript-rendered) ---- */
+      'blog.status.loading': 'পোস্ট লোড হচ্ছে…',
+      'blog.status.live': 'রিপোজিটরি থেকে লাইভ · {n}টি পোস্ট',
+      'blog.status.saved': 'আপনার গত ভিজিটে সংরক্ষিত স্ন্যাপশট ({when})',
+      'blog.status.bundled': 'সাইটের সঙ্গে দেওয়া স্ন্যাপশট ({when})',
+      'blog.status.error': 'এই মুহূর্তে পোস্টগুলো লোড করা গেল না',
+      'blog.empty': 'এখনো কোনো পোস্ট নেই — প্রথমটি আসছে।',
+      'blog.loadFailed': 'পোস্টটি লোড করা গেল না।',
+      'blog.notFound': 'পোস্টটি খুঁজে পাওয়া গেল না।',
+      'blog.back': 'সব পোস্ট',
+      'blog.readMore': 'পোস্ট পড়ুন',
+      'blog.when': 'প্রকাশ: {date}',
+      'blog.updated': 'আপডেট: {date}',
+      'blog.langNote': 'পোস্টটি লেখা হয়েছে {lang}-এ।',
+      'blog.edit': 'GitHub-এ সম্পাদনা',
+
       /* ---- shared chrome ---- */
       'nav.skip': 'মূল কনটেন্টে যান',
       'nav.toTop': 'উপরে ফিরুন',
@@ -238,6 +271,7 @@ window.AVRO_I18N = (function () {
       'nav.features': 'ফিচার',
       'nav.install': 'ইনস্টল',
       'nav.download': 'ডাউনলোড',
+      'nav.blog': 'ব্লগ',
       'nav.changelog': 'চেঞ্জলগ',
       'nav.privacy': 'প্রাইভেসি',
       'brand.name': 'অভ্র কিবোর্ড<span class="ce-tag">Community Edition</span>',
@@ -418,6 +452,13 @@ window.AVRO_I18N = (function () {
       'cl.h1': 'প্রতিটি রিলিজের <span class="gradient">পূর্ণ চেঞ্জলগ</span>',
       'cl.lead': 'প্রতিটি রিলিজের নোট, ডাউনলোড ফাইল, সাইজ, ডাউনলোড সংখ্যা ও SHA-256 — সবই GitHub releases API থেকে লাইভ আনা হয়। নতুন রিলিজ প্রকাশ করলে এই পেজে নিজে থেকেই যুক্ত হয়ে যাবে; কিছু হাতে বদলাতে হবে না।',
 
+      /* ---- blog.html ---- */
+      'blog.meta.title': 'ব্লগ — Avro Keyboard Community Edition',
+      'blog.meta.desc': 'Avro Keyboard Community Edition-এর ডেভেলপমেন্ট নোট, গাইড ও ঘোষণা — সরাসরি রিপোজিটরির Markdown ফাইল থেকে প্রকাশিত।',
+      'blog.crumb': 'ব্লগ',
+      'blog.h1': 'নোট, গাইড ও আপডেট — <span class="gradient">কমিউনিটি এডিশন</span> থেকে',
+      'blog.lead': 'ডেভেলপমেন্ট নোট ও ঘোষণা, Markdown-এ লেখা এবং সরাসরি এই রিপোজিটরি থেকেই প্রকাশিত। প্রতিটি পোস্ট একটি ভাষায় — বাংলা ও ইংরেজি পোস্ট পাশাপাশি থাকে, আর আপনার বেছে নেওয়া ভাষার পোস্টগুলো আগে দেখানো হয়।',
+
       /* ---- privacy.html ---- */
       'pv.meta.title': 'প্রাইভেসি পলিসি — Avro Keyboard Community Edition',
       'pv.meta.desc': 'Avro Keyboard Community Edition ওয়েবসাইট ও ডেস্কটপ অ্যাপের প্রাইভেসি পলিসি — কোন ডেটা কোথায় থাকে, কী সংগ্রহ করা হয় না, এবং সব মুছে ফেলার উপায়।',
@@ -435,15 +476,15 @@ window.AVRO_I18N = (function () {
       'pv.toc.network': 'অ্যাপের নেটওয়ার্ক ব্যবহার',
       'pv.toc.remove': 'সব মুছে ফেলা',
       'pv.toc.contact': 'পরিবর্তন ও যোগাযোগ',
-      'pv.meta.line': '<strong>সর্বশেষ আপডেট:</strong> 16 অক্টোবর 2026 · <strong>প্রযোজ্য:</strong> এই ওয়েবসাইট এবং Avro Keyboard Community Edition ডেস্কটপ বিল্ড',
+      'pv.meta.line': '<strong>সর্বশেষ আপডেট:</strong> 18 অক্টোবর 2026 · <strong>প্রযোজ্য:</strong> এই ওয়েবসাইট এবং Avro Keyboard Community Edition ডেস্কটপ বিল্ড',
       'pv.summary.h': 'সংক্ষেপে',
       'pv.summary.callout': 'সংক্ষেপে বললে — <strong>না</strong> অ্যাকাউন্ট, <strong>না</strong> কুকি, <strong>না</strong> অ্যানালিটিক্স, <strong>না</strong> বিজ্ঞাপন, <strong>না</strong> ট্র্যাকিং। আমরা আপনার কাছ থেকে কোনো ব্যক্তিগত তথ্য চাই না এবং পাইও না। ডেস্কটপ অ্যাপটি কোনো টেলিমেট্রি পাঠায় না, আর আপনার টাইপ করা লেখা কোথাও জমা রাখে না।',
-      'pv.summary.p': 'একমাত্র নেটওয়ার্ক যোগাযোগ হয় আপনার নিজের ব্রাউজার থেকে GitHub-এর পাবলিক API-তে, এবং অ্যাপে আপনার নিজের অনুরোধে (রিসোর্স বা আপডেট নামানোর সময়) GitHub Releases থেকে।',
+      'pv.summary.p': 'একমাত্র নেটওয়ার্ক যোগাযোগ হয় আপনার নিজের ব্রাউজার থেকে GitHub-এর পাবলিক API-তে (ব্লগের পোস্ট ফাইলগুলোর জন্য GitHub-এর <code>raw.githubusercontent.com</code>-এ), এবং অ্যাপে আপনার নিজের অনুরোধে (রিসোর্স বা আপডেট নামানোর সময়) GitHub Releases থেকে।',
       'pv.website.h': '⓵ এই ওয়েবসাইটে কী ঘটে',
       'pv.website.hosting.h': 'হোস্টিং',
       'pv.website.hosting.p': 'সাইটটি <strong>GitHub Pages</strong>-এ হোস্ট করা একটি স্ট্যাটিক সাইট। আমরা নিজেরা কোনো সার্ভার চালাই না, কোনো ডেটাবেজ রাখি না এবং কোনো লগ সংরক্ষণ করি না। তবে যেকোনো ওয়েব হোস্টিংয়ের মতো GitHub তাদের নিজের সিস্টেম লগে ভিজিটরের IP অ্যাড্রেস, ব্রাউজার/ডিভাইসের তথ্য এবং অনুরোধের সময় সংরক্ষণ করতে পারে। সেই লগ GitHub-এর নিয়ন্ত্রণে, আমাদের নয় — বিস্তারিত <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement" target="_blank" rel="noopener noreferrer">GitHub-এর প্রাইভেসি স্টেটমেন্টে</a>।',
       'pv.website.api.h': 'লাইভ ডেটার জন্য API কল',
-      'pv.website.api.p': 'পেজের কাউন্টার, রিলিজ কার্ড ও চেঞ্জলগ লোড করতে <strong>আপনার ব্রাউজার</strong> সরাসরি <code>api.github.com</code>-এ অনুরোধ পাঠায়। ফলাফল:',
+      'pv.website.api.p': 'পেজের কাউন্টার, রিলিজ কার্ড, চেঞ্জলগ ও ব্লগ পোস্ট লোড করতে <strong>আপনার ব্রাউজার</strong> সরাসরি <code>api.github.com</code>-এ অনুরোধ পাঠায়; ব্লগের পোস্ট ফাইলগুলো আসে GitHub-এর <code>raw.githubusercontent.com</code> থেকে — দুটোই GitHub-এর পরিষেবা। ফলাফল:',
       'pv.website.api.li1': 'আপনার IP অ্যাড্রেস GitHub পর্যন্ত পৌঁছায় — ঠিক যেভাবে এই সাইটটি লোড হওয়ার সময়ই GitHub Pages পর্যন্ত পৌঁছেছে।',
       'pv.website.api.li2': 'আমরা শুধু <em>পাবলিক</em> রিপো ও রিলিজের তথ্য চাই — আপনি কে বা আপনার কী পরিচয়, তা কোথাও পাঠানো হয় না।',
       'pv.website.api.li3': 'কোনো API টোকেন, লগইন বা কুকি ব্যবহার হয় না; অনুরোধ সম্পূর্ণ অ্যানোনিমাস।',
@@ -457,7 +498,7 @@ window.AVRO_I18N = (function () {
       'pv.storage.tr1.why': 'আপনি যে থিম বেছে নেন, সেটি পরের পেজ লোডেও রাখতে',
       'pv.storage.tr2.what': 'GitHub API থেকে পাওয়া পাবলিক ডেটার ক্যাশ (রিপো স্ট্যাট, রিলিজ তালিকা) ও তার সময়',
       'pv.storage.tr2.why': 'একই ডেটা বারবার না আনতে, এবং API-এর ঘণ্টায়-সীমা বাঁচাতে',
-      'pv.storage.tr3.what': 'শেষবার পাওয়া পাবলিক ডেটার স্ন্যাপশট (রিপো স্ট্যাট, রিলিজ, অফিসিয়াল বেসলাইন) ও কখন নেওয়া হয়েছিল',
+      'pv.storage.tr3.what': 'শেষবার পাওয়া পাবলিক ডেটার স্ন্যাপশট (রিপো স্ট্যাট, রিলিজ, অফিসিয়াল বেসলাইন, ব্লগ পোস্ট) ও কখন নেওয়া হয়েছিল',
       'pv.storage.tr3.why': 'GitHub API পরে সাড়া না দিলেও যেন আসল সংখ্যাগুলোই দেখানো যায় — সাইটের সঙ্গে দেওয়া স্ন্যাপশটের চেয়ে নতুন ডেটা',
       'pv.storage.tr4.what': 'আপনি যে ভাষা বেছেছেন — <code>en</code> অথবা <code>bn</code>',
       'pv.storage.tr4.why': 'পরের পেজ লোডেও আপনার বেছে নেওয়া ভাষাতেই দেখাতে',
@@ -503,7 +544,7 @@ window.AVRO_I18N = (function () {
       'pv.remove.li1': '<strong>Portable:</strong> ফোল্ডারটি মুছে ফেলুন, তারপরেই <code>HKCU\\Control Panel\\Desktop\\LowLevelHooksTimeout</code> এন্ট্রিটি মুছে দিন।',
       'pv.remove.li2': '<strong>Standard:</strong> আনইনস্টল করুন, তারপর <code>%ProgramData%\\Avro Keyboard\\</code> ফোল্ডার এবং <code>HKEY_CURRENT_USER\\Software\\OmicronLab\\Avro Keyboard</code> কী-টি মুছে দিন।',
       'pv.remove.li3': '<strong>আপডেট ফোল্ডার:</strong> অটো আপডেট ব্যবহার করলে ডাউনলোড করা প্যাকেজ ডেটা ফোল্ডারের ভেতরে থাকতে পারে — পুরো ডেটা ফোল্ডার মুছে দিলে সেটিও চলে যাবে।',
-      'pv.remove.li4': '<strong>এই ওয়েবসাইট:</strong> ব্রাউজার সেটিংস থেকে <code>avro-gh-v1</code>, <code>avro-snap-v1</code>, <code>avro-lang</code> ও <code>avro-theme</code> কীগুলো মুছে দিন, অথবা সাইটের ডেটা সাফ করুন।',
+      'pv.remove.li4': '<strong>এই ওয়েবসাইট:</strong> ব্রাউজার সেটিংস থেকে <code>avro-gh-v1</code>, <code>avro-snap-v2</code>, <code>avro-lang</code> ও <code>avro-theme</code> কীগুলো মুছে দিন, অথবা সাইটের ডেটা সাফ করুন।',
       'pv.remove.li5': '<strong>লগ:</strong> <code>AvroStartup.log</code> ও <code>AvroStartup.log.old</code> ফাইল দুটিও ডেটা ফোল্ডারে থাকে — সাথেই মুছে যাবে।',
       'pv.contact.h': '⓽ পরিবর্তন, যোগাযোগ ও লাইসেন্স',
       'pv.contact.p1': 'এই নীতিতে পরিবর্তন এলে এই পেজেই হালনাগাদ করা হবে এবং উপরের “সর্বশেষ আপডেট” তারিখ বদলে যাবে। এই সাইটটি কোনো ব্যক্তিগত তথ্য সংগ্রহ করে না, তাই কোনো তথ্য-অনুরোধের প্রক্রিয়াও নেই।',

@@ -91,6 +91,7 @@
       <a href="index.html#features" data-i18n="nav.features">Features</a>
       <a href="index.html#install" data-i18n="nav.install">Install</a>
       <a href="index.html#download" data-i18n="nav.download">Download</a>
+      <a href="blog.html" data-i18n="nav.blog">Blog</a>
       <a href="changelog.html" data-i18n="nav.changelog">Changelog</a>
     </nav>
     <div class="navright">
@@ -133,7 +134,7 @@
 
       <div class="doc">
         <p class="doc-meta" data-i18n="pv.meta.line">
-          <strong>Last updated:</strong> 16 October 2026 ·
+          <strong>Last updated:</strong> 18 October 2026 ·
           <strong>Applies to:</strong> this website and the Avro Keyboard Community Edition desktop build
         </p>
 
@@ -148,8 +149,9 @@
             </p>
           </div>
           <p data-i18n="pv.summary.p">
-            The only network traffic is from your own browser to GitHub's public API, and — in the
-            app — from GitHub Releases, at your own request, when you download resources or an update.
+            The only network traffic is from your own browser to GitHub's public API (for blog
+            posts, GitHub's <code>raw.githubusercontent.com</code>), and — in the app — from GitHub
+            Releases, at your own request, when you download resources or an update.
           </p>
         </section>
 
@@ -167,8 +169,9 @@
 
           <h3 data-i18n="pv.website.api.h">API calls for the live data</h3>
           <p data-i18n="pv.website.api.p">
-            To load the counters, release cards and changelog, <strong>your browser</strong> sends
-            requests straight to <code>api.github.com</code>. What that means:
+            To load the counters, release cards, changelog and blog posts, <strong>your browser</strong> sends
+            requests straight to <code>api.github.com</code>; blog post files come from GitHub's
+            <code>raw.githubusercontent.com</code> — both are GitHub services. What that means:
           </p>
           <ul>
             <li data-i18n="pv.website.api.li1">Your IP address reaches GitHub — exactly as it already did just by loading this site from GitHub Pages.</li>
@@ -205,8 +208,8 @@
                   <td data-i18n="pv.storage.tr2.why">So the same data is not fetched again and again, sparing the API's hourly limit</td>
                 </tr>
                 <tr>
-                  <td><code>avro-snap-v1</code></td>
-                  <td data-i18n="pv.storage.tr3.what">A snapshot of the last public data received (repository stats, releases, the official baseline) and when it was taken</td>
+                  <td><code>avro-snap-v2</code></td>
+                  <td data-i18n="pv.storage.tr3.what">A snapshot of the last public data received (repository stats, releases, the official baseline, blog posts) and when it was taken</td>
                   <td data-i18n="pv.storage.tr3.why">So the real numbers can still be shown if the GitHub API later stops responding — newer data than the snapshot bundled with the site</td>
                 </tr>
                 <tr>
@@ -345,7 +348,7 @@
             <li data-i18n="pv.remove.li1"><strong>Portable:</strong> delete the folder, then delete the <code>HKCU\Control Panel\Desktop\LowLevelHooksTimeout</code> entry.</li>
             <li data-i18n="pv.remove.li2"><strong>Standard:</strong> uninstall, then delete the <code>%ProgramData%\Avro Keyboard\</code> folder and the <code>HKEY_CURRENT_USER\Software\OmicronLab\Avro Keyboard</code> key.</li>
             <li data-i18n="pv.remove.li3"><strong>Update folder:</strong> if you used auto-update, downloaded packages may be inside the data folder — removing the whole data folder takes those with it.</li>
-            <li data-i18n="pv.remove.li4"><strong>This website:</strong> delete the <code>avro-gh-v1</code>, <code>avro-snap-v1</code>, <code>avro-lang</code> and <code>avro-theme</code> keys from your browser settings, or clear this site's data.</li>
+            <li data-i18n="pv.remove.li4"><strong>This website:</strong> delete the <code>avro-gh-v1</code>, <code>avro-snap-v2</code>, <code>avro-lang</code> and <code>avro-theme</code> keys from your browser settings, or clear this site's data.</li>
             <li data-i18n="pv.remove.li5"><strong>Logs:</strong> <code>AvroStartup.log</code> and <code>AvroStartup.log.old</code> also live in the data folder — they go with it.</li>
           </ul>
         </section>
@@ -395,6 +398,7 @@
       <a href="index.html#improvements" data-i18n="nav.improvements">Improvements</a>
       <a href="index.html#features" data-i18n="nav.features">Features</a>
       <a href="index.html#install" data-i18n="nav.install">Install</a>
+      <a href="blog.html" data-i18n="nav.blog">Blog</a>
       <a href="changelog.html" data-i18n="nav.changelog">Changelog</a>
       <a href="privacy.html" data-i18n="nav.privacy">Privacy</a>
       <a href="https://github.com/raselrahmanrocky/Avro-Keyboard/issues" target="_blank" rel="noopener noreferrer" data-i18n="footer.reportBug">Report a bug <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i></a>
