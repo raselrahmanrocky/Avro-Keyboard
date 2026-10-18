@@ -360,6 +360,11 @@ html[data-lang="bn"][data-i18n-pending] [data-i18n] { visibility: hidden; }
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+  /* Chrome mis-aligns the text mask of the 2nd fragment of a wrapped inline
+     box, shaving the tops off Bangla conjuncts. Cloning the box decoration
+     gives every fragment its own correctly sized background patch. */
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
 }
 [data-theme="dark"] .gradient { background: linear-gradient(100deg, #c79bff, #e0b6ff 55%, #b07cff); -webkit-background-clip: text; background-clip: text; }
 .hero p { max-width: 590px; color: var(--muted); font-size: 17px; }
@@ -411,6 +416,14 @@ html[data-lang="bn"][data-i18n-pending] [data-i18n] { visibility: hidden; }
 }
 .stat strong { display: block; font-size: 25px; line-height: 1.2; letter-spacing: -.7px; font-variant-numeric: tabular-nums; }
 .stat span { display: block; color: var(--muted); font-size: 14px; margin-top: 6px; }
+/* Icon chips reuse the .ico vocabulary (§8): theme token colours only, so
+   both palettes match without extra dark-theme rules. */
+.stat .ico { margin: 0 auto 12px; }
+.stat[data-stat="stars"] .ico { color: var(--amber); }
+.stat[data-stat="forks"] .ico { color: var(--pink); }
+.stat[data-stat="contributors"] .ico { color: var(--yes); }
+.stat[data-stat="ahead"] .ico { color: var(--purple2); }
+.stat[data-stat="pushed"] .ico { color: var(--muted); }
 .stat .src { display: none; }
 .stat[data-state="snapshot"] { border-style: dashed; }
 .stat[data-state="loading"] strong { color: var(--muted); }
@@ -504,7 +517,7 @@ html[data-lang="bn"][data-i18n-pending] [data-i18n] { visibility: hidden; }
 .audit dt { color: var(--muted); }
 .audit dd { margin: 0; font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
 
-.compare-wrap { overflow: auto; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); box-shadow: var(--shadow); }
+.compare-wrap { overflow-x: auto;  overflow-y: hidden; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); box-shadow: var(--shadow); }
 table { border-collapse: collapse; width: 100%; min-width: 620px; text-align: left; }
 /* Row separators live on the cells as inset shadows, not collapsed borders:
    a collapsed border is painted by the table, so it would survive (and stay

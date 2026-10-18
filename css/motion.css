@@ -165,6 +165,32 @@ main, .footer { position: relative; z-index: 1; }
 [data-theme="dark"] .hero-particles { opacity: .5; }
 .hero > .wrap { position: relative; z-index: 1; }
 
+/* 7b. Hero showcase float ================================================= */
+/* The splash screenshot and its badge keep drifting while the page is open:
+   a clear vertical bob plus a slight tilt sway for the splash, a smaller
+   counter-phase bob for the badge. Full-cycle keyframes (0/50/100) give a
+   continuous, always-moving rhythm instead of a stall at each turn, and
+   will-change keeps both on their own compositor layer so the motion stays
+   smooth even while the hero canvas repaints. */
+@keyframes splash-float {
+  0%, 100% { transform: rotate(1.2deg) translateY(0); }
+  50% { transform: rotate(.3deg) translateY(-14px); }
+}
+@keyframes tag-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-9px); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .splash {
+    will-change: transform;
+    animation: splash-float 5.6s ease-in-out infinite;
+  }
+  .float-tag {
+    will-change: transform;
+    animation: tag-float 4.4s ease-in-out -2.2s infinite;
+  }
+}
+
 /* 8. Marquee ============================================================== */
 .marquee {
   position: relative;
@@ -236,6 +262,8 @@ main, .footer { position: relative; z-index: 1; }
   .marquee-track,
   .glow i,
   .gradient,
+  .splash,
+  .float-tag,
   .to-top::before,
   .to-top .ic { animation: none !important; }
   .type-caret { display: none; }
