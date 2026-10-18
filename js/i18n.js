@@ -390,13 +390,12 @@ window.AVRO_I18N = (function () {
       'install.kicker': 'শুরু করা',
       'install.h2': 'তিন ধাপে বাংলা টাইপিং',
       'install.lead': 'ডাউনলোড থেকে বাংলা লেখা — ইনস্টলার অথবা পোর্টেবল, যেটা আপনার সুবিধা।',
-      'install.s1.title': 'সঠিক ফাইল নামান',
-      'install.s1.body': 'নিচের কার্ড আপনার Windows-এর আর্কিটেকচার বুঝে নিজেই সঠিক ইনস্টলার বা পোর্টেবল ZIP বেছে দেয়।',
+      'install.s1.title': 'আমাদের কমিউনিটি সংস্করণ ডাউনলোড করুন',
+      'install.s1.body': 'নিচের কার্ডগুলো থেকে আপনার উইন্ডোজ আর্কিটেকচার অনুযায়ী সঠিক ইনস্টলার অথবা পোর্টেবল জিপ (ZIP) ফাইলটি বেছে নিন।',
       'install.s2.title': 'ইনস্টল বা extract করুন',
-      'install.s2.body': 'Setup চালান, অথবা ZIP extract করে ফোল্ডার থেকেই ব্যবহার করুন — পোর্টেবলে ইনস্টলের দরকার নেই।',
+      'install.s2.body': 'ইনস্টল করতে চাইলে সেটআপ ফাইলটি চালান; অন্যথায় জিপ (ZIP) ফাইলটি এক্সট্র্যাক্ট করে সরাসরি ফোল্ডার থেকেই ব্যবহার করুন — পোর্টেবল সংস্করণের জন্য কোনো ইনস্টলেশনের প্রয়োজন নেই।',
       'install.s3.title': 'বাংলা টাইপ শুরু করুন',
-      'install.s3.body': 'ট্রে আইকন থেকে Avro Phonetic নির্বাচন করুন। টেক্সট কনভার্টার দরকার হলে <strong>Ctrl+Alt+T</strong>।',
-      'install.s2.code': 'Settings.xml ← exe-এর পাশে',
+      'install.s3.body': 'ট্রে আইকন থেকে Avro Phonetic নির্বাচন করুন। এরপর ডিকশনারি মোড (dictionary mode) সিলেক্ট করুন। তারপর <strong>MS Word বা Notepad</strong> খুলুন।',
 
       'download.kicker': 'ডাউনলোড ও আর্কাইভ',
       'download.h2': 'Avro Keyboard রিলিজ',
@@ -661,11 +660,17 @@ window.AVRO_I18N = (function () {
   }
 
   function paintSwitcher() {
-    var buttons = document.querySelectorAll('[data-lang-set]');
-    for (var i = 0; i < buttons.length; i++) {
-      var active = buttons[i].getAttribute('data-lang-set') === current;
-      buttons[i].setAttribute('aria-pressed', active ? 'true' : 'false');
-      buttons[i].setAttribute('title', LABELS[buttons[i].getAttribute('data-lang-set')].native);
+    var toggles = document.querySelectorAll('[data-lang-toggle]');
+    for (var i = 0; i < toggles.length; i++) {
+      var codes = toggles[i].querySelectorAll('[data-lang-code]');
+      for (var j = 0; j < codes.length; j++) {
+        var active = codes[j].getAttribute('data-lang-code') === current;
+        codes[j].setAttribute('data-active', active ? 'true' : 'false');
+      }
+      /* The pill announces the language a click will switch to. */
+      var target = current === 'bn' ? 'en' : 'bn';
+      toggles[i].setAttribute('title', LABELS[target].native);
+      toggles[i].setAttribute('aria-label', LABELS[target].native);
     }
   }
 
@@ -722,10 +727,10 @@ window.AVRO_I18N = (function () {
 
   /* One delegated listener covers every page's switcher. */
   document.addEventListener('click', function (event) {
-    var button = event.target.closest ? event.target.closest('[data-lang-set]') : null;
-    if (!button) return;
+    var toggle = event.target.closest ? event.target.closest('[data-lang-toggle]') : null;
+    if (!toggle) return;
     event.preventDefault();
-    setLocale(button.getAttribute('data-lang-set'));
+    setLocale(current === 'bn' ? 'en' : 'bn');
   });
 
   return {

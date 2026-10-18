@@ -161,9 +161,8 @@ img { max-width: 100%; height: auto; }
 .navlinks a:hover { color: var(--purple); }
 .navright { display: flex; gap: 10px; align-items: center; }
 
-/* Language switcher — a compact segmented pair. Both labels are always
-   visible: a two-way language choice is clearer as an explicit pair than as a
-   toggle. */
+/* Language switcher — one pill, two labels. The active language is the filled
+   segment; a click anywhere on the pill swaps the two. */
 .langswitch {
   display: inline-flex;
   align-items: center;
@@ -172,22 +171,22 @@ img { max-width: 100%; height: auto; }
   border: 1px solid var(--line);
   background: var(--surface);
   border-radius: 14px;
-}
-.langswitch button {
-  border: 0;
-  background: transparent;
-  color: var(--muted);
   font: inherit;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+.langswitch span {
+  color: var(--muted);
   font-size: 14px;
   font-weight: 800;
   letter-spacing: .02em;
   padding: 8px 9px;
   border-radius: 11px;
   line-height: 1;
-  cursor: pointer;
 }
-.langswitch button:hover { color: var(--text); }
-.langswitch button[aria-pressed="true"] {
+.langswitch:hover { border-color: var(--purple); }
+.langswitch:hover span { color: var(--text); }
+.langswitch span[data-active="true"] {
   background: linear-gradient(115deg, #7426d6, #a13bec);
   color: #fff;
 }
@@ -936,7 +935,7 @@ tbody td:nth-child(3) { font-weight: 650; }
   /* Keeping the edition line in the brand costs width; trim the surrounding
      gaps so the bar still holds a single row down to ~541px. */
   .nav { gap: 12px; }
-  .langswitch button { padding: 8px 7px; }
+  .langswitch span { padding: 8px 7px; }
   /* Absolute corner ribbons would sit on top of the card titles on narrow
      cards; let them flow above the heading instead. (Audit stamps sit inline
      in their card header now, so they are unaffected either way.) */
@@ -962,7 +961,7 @@ tbody td:nth-child(3) { font-weight: 650; }
   .ce-tag { font-size: 14px; letter-spacing: .2px; margin-top: 0; }
   .navright { gap: 6px; margin-left: auto; }
   .langswitch { padding: 2px; }
-  .langswitch button { padding: 7px 5px; font-size: 14px; }
+  .langswitch span { padding: 7px 5px; font-size: 14px; }
   .theme { width: 34px; height: 34px; font-size: 16px; border-radius: 11px; }
   /* The sticky header would otherwise take a second row and hold ~100px of a
      phone screen permanently. The hero's own download button sits directly
