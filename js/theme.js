@@ -37,7 +37,8 @@
       dark ? 'Switch to light theme' : 'Switch to dark theme'
     );
 
-    btn.textContent = dark ? '\u2600' : '\u263E';
+    var icon = btn.querySelector('i');
+    if (icon) icon.className = dark ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
     btn.setAttribute('aria-pressed', dark ? 'true' : 'false');
     btn.setAttribute('aria-label', text);
     btn.setAttribute('title', text);

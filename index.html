@@ -30,6 +30,9 @@
 
 <link rel="preload" href="fonts/hind-siliguri-bengali-400.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="fonts/manrope-latin-variable.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="css/vendor/fontawesome/webfonts/fa-solid-900.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="css/vendor/fontawesome/webfonts/fa-brands-400.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="css/vendor/fontawesome/css/all.min.css">
 <link rel="stylesheet" href="css/fonts.css">
 <link rel="stylesheet" href="css/style.css">
 <link rel="stylesheet" href="css/pages.css">
@@ -93,30 +96,8 @@
 <!-- Floating back to top: hidden until js/motion.js sees the page scrolled
      past a screen, then it fades in and glides home on click. -->
 <button class="to-top" data-to-top type="button" aria-label="Back to top" title="Back to top" data-i18n-aria-label="nav.toTop" data-i18n-title="nav.toTop">
-  <svg class="ic" aria-hidden="true"><use href="#i-arrow-up"></use></svg>
+  <i class="fa-solid fa-arrow-up ic" aria-hidden="true"></i>
 </button>
-
-<!-- Icon sprite. Kept inline so `currentColor` resolves against the element
-     that uses it, and so no extra request is needed. -->
-<svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true" focusable="false">
-  <symbol id="i-keyboard" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6.2" width="19" height="11.6" rx="2.4"/><path d="M6 9.6h.01M9.4 9.6h.01M12.8 9.6h.01M16.2 9.6h.01M6.6 12.6h.01M10 12.6h.01M13.4 12.6h.01M16.8 12.6h.01M8 15.2h8"/></symbol>
-  <symbol id="i-package" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.8 20.4 7v10L12 21.2 3.6 17V7z"/><path d="M3.6 7 12 11.4 20.4 7M12 11.4v9.8"/></symbol>
-  <symbol id="i-archive" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.4" width="18" height="4" rx="1.2"/><path d="M4.6 8.4v9.8a1.4 1.4 0 0 0 1.4 1.4h12a1.4 1.4 0 0 0 1.4-1.4V8.4"/><path d="M9.6 12.2h4.8"/></symbol>
-  <symbol id="i-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5v10.2M8 10l4 3.7 4-3.7"/><path d="M4.5 17.5v1.6a1.4 1.4 0 0 0 1.4 1.4h12.2a1.4 1.4 0 0 0 1.4-1.4v-1.6"/></symbol>
-  <symbol id="i-info" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.6"/><path d="M12 11v5.2M12 8.1h.01"/></symbol>
-  <symbol id="i-star" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.6l2.6 5.3 5.8.85-4.2 4.1 1 5.8-5.2-2.75-5.2 2.75 1-5.8-4.2-4.1 5.8-.85z"/></symbol>
-  <symbol id="i-fork" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="6.5" cy="5" r="2.4"/><circle cx="17.5" cy="5" r="2.4"/><circle cx="12" cy="19" r="2.4"/><path d="M6.5 7.4v2.9a2 2 0 0 0 2 2h7a2 2 0 0 0 2-2V7.4M12 12.4v4.2"/></symbol>
-  <symbol id="i-commit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.4"/><path d="M12 2.6v6M12 15.4v6"/></symbol>
-  <symbol id="i-users" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9.2" cy="8" r="3.3"/><path d="M2.9 20a6.3 6.3 0 0 1 12.6 0"/><path d="M16.4 5.6a3.3 3.3 0 0 1 0 6.4M17.6 14.6A6.3 6.3 0 0 1 21.1 20"/></symbol>
-  <symbol id="i-bolt" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M13.3 2.6 4.9 13.4h5.9l-1.3 8 8.4-10.8h-5.9z"/></symbol>
-  <symbol id="i-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 19 5.8v5.6c0 4.3-2.9 7.6-7 9.6-4.1-2-7-5.3-7-9.6V5.8z"/><path d="M9.2 12.1l2 2 3.6-3.9"/></symbol>
-  <symbol id="i-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11.6a8 8 0 1 1-2.5-5.4"/><path d="M20.2 3.9v4.7h-4.7"/></symbol>
-  <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4.6 12.6l5 5 9.8-11"/></symbol>
-  <symbol id="i-external" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M13.6 4.2h6.2v6.2"/><path d="M19.8 4.2 11.2 12.8"/><path d="M17.8 14.2v4.2a1.4 1.4 0 0 1-1.4 1.4H5.6a1.4 1.4 0 0 1-1.4-1.4V7.6a1.4 1.4 0 0 1 1.4-1.4h4.2"/></symbol>
-  <symbol id="i-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3.9 12a8.1 8.1 0 1 0 2.5-5.9"/><path d="M3.6 3.6v4.6h4.6"/><path d="M12 7.6V12l2.9 1.8"/></symbol>
-  <symbol id="i-code" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 7.5 4.2 12 9 16.5M15 7.5 19.8 12 15 16.5"/></symbol>
-  <symbol id="i-arrow-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 18.6V5.8M5.9 11.9 12 5.8l6.1 6.1"/></symbol>
-</svg>
 
 <a class="skip-link" href="#main" data-i18n="nav.skip">Skip to main content</a>
 
@@ -138,8 +119,8 @@
         <button type="button" data-lang-set="en" data-i18n="lang.en" data-i18n-aria-label="lang.enFull" data-i18n-title="lang.enFull" aria-pressed="false" aria-label="English" title="English">EN</button>
         <button type="button" data-lang-set="bn" data-i18n="lang.bn" data-i18n-aria-label="lang.bnFull" data-i18n-title="lang.bnFull" aria-pressed="false" aria-label="বাংলা" title="বাংলা">বাং</button>
       </div>
-      <button class="theme" id="themeBtn" type="button" aria-pressed="false" aria-label="Switch to dark theme" title="Switch to dark theme">☾</button>
-      <a class="btn btn-primary" href="#download"><span data-i18n="actions.download">Download</span> <span aria-hidden="true">↓</span></a>
+      <button class="theme" id="themeBtn" type="button" aria-pressed="false" aria-label="Switch to dark theme" title="Switch to dark theme"><i class="fa-solid fa-moon" aria-hidden="true"></i></button>
+      <a class="btn btn-primary" href="#download"><span data-i18n="actions.download">Download</span> <i class="fa-solid fa-download" aria-hidden="true"></i></a>
     </div>
   </div>
 </header>
@@ -156,10 +137,15 @@
           Avro Keyboard Community Edition brings a faster, safer, and reliable Bangla typing experience for modern Windows. Engineered with a fresh 64-bit architecture, it features async persistence, grapheme-based backspace, and silent error recovery. Powered by an advanced Qt-based text converter, it bridges legacy reliability with modern performance. Built by the community, fully open-source, and strictly telemetry-free.
         </p>
         <div class="actions">
-          <a class="btn btn-primary magnetic" href="#download" data-i18n="hero.ctaDownload">Download the latest build <span aria-hidden="true">↓</span></a>
-          <a class="btn btn-ghost magnetic" href="https://github.com/raselrahmanrocky/Avro-Keyboard" target="_blank" rel="noopener noreferrer" data-i18n="hero.ctaSource">View the source code ↗</a>
+          <a class="btn btn-primary magnetic" href="#download" data-i18n="hero.ctaDownload"><i class="fa-solid fa-download" aria-hidden="true"></i> Download the latest build</a>
+          <a class="btn btn-ghost magnetic" href="https://github.com/raselrahmanrocky/Avro-Keyboard" target="_blank" rel="noopener noreferrer" data-i18n="hero.ctaSource"><i class="fa-brands fa-github" aria-hidden="true"></i> View the source code <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i></a>
         </div>
-        <p class="micro" data-i18n="hero.micro">Free · Open source · MPL-2.0 · Not affiliated with OmicronLab</p>
+        <ul class="hero-tech">
+          <li><i class="fa-solid fa-code" aria-hidden="true"></i> <span data-i18n="hero.tech1">Delphi 12 / C++</span></li>
+          <li><i class="fa-solid fa-bolt" aria-hidden="true"></i> <span data-i18n="hero.tech2">Qt 6 Core</span></li>
+          <li><i class="fa-solid fa-microchip" aria-hidden="true"></i> <span data-i18n="hero.tech3">x64 / x86 Native</span></li>
+          <li><i class="fa-solid fa-shield-halved" aria-hidden="true"></i> <span data-i18n="hero.tech4">Atomic File I/O</span></li>
+        </ul>
       </div>
       <div class="showcase">
         <picture>
@@ -167,7 +153,7 @@
           <img class="splash" src="img/splash-screen.jpg" width="1534" height="1025"
                data-i18n-alt="hero.alt" alt="The Avro Keyboard splash screen — the Avro logo on a purple background" fetchpriority="high" decoding="async">
         </picture>
-        <div class="float-tag" data-i18n="hero.floatTag">✦ <b>Language should be open</b><br>Community Edition</div>
+        <div class="float-tag" data-i18n="hero.floatTag"><svg class="spark" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12 1.8c.6 5.6 4.6 9.6 10.2 10.2-5.6.6-9.6 4.6-10.2 10.2-.6-5.6-4.6-9.6-10.2-10.2 5.6-.6 9.6-4.6 10.2-10.2z"/></svg> <b>Language should be open</b><br>Community Edition</div>
       </div>
     </div>
   </section>
@@ -175,19 +161,19 @@
   <div class="marquee" aria-hidden="true">
     <div class="marquee-track" data-marquee>
       <div class="marquee-half">
-        <span>Open source</span><i>✦</i><span>MPL-2.0</span><i>✦</i><span>Native 64/32-bit</span><i>✦</i><span>Portable</span><i>✦</i><span>SHA-256 verified</span><i>✦</i><span>Auto-update</span><i>✦</i><span>No telemetry</span><i>✦</i><span>ভুল কমুক</span><i>✦</i><span>বাংলা ছড়িয়ে পড়ুক</span><i>✦</i>
+        <span>Open source</span><svg class="spark" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12 1.8c.6 5.6 4.6 9.6 10.2 10.2-5.6.6-9.6 4.6-10.2 10.2-.6-5.6-4.6-9.6-10.2-10.2 5.6-.6 9.6-4.6 10.2-10.2z"/></svg><span>MPL-2.0</span><svg class="spark" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12 1.8c.6 5.6 4.6 9.6 10.2 10.2-5.6.6-9.6 4.6-10.2 10.2-.6-5.6-4.6-9.6-10.2-10.2 5.6-.6 9.6-4.6 10.2-10.2z"/></svg><span>Native 64/32-bit</span><svg class="spark" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12 1.8c.6 5.6 4.6 9.6 10.2 10.2-5.6.6-9.6 4.6-10.2 10.2-.6-5.6-4.6-9.6-10.2-10.2 5.6-.6 9.6-4.6 10.2-10.2z"/></svg><span>Portable</span><svg class="spark" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12 1.8c.6 5.6 4.6 9.6 10.2 10.2-5.6.6-9.6 4.6-10.2 10.2-.6-5.6-4.6-9.6-10.2-10.2 5.6-.6 9.6-4.6 10.2-10.2z"/></svg><span>SHA-256 verified</span><svg class="spark" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12 1.8c.6 5.6 4.6 9.6 10.2 10.2-5.6.6-9.6 4.6-10.2 10.2-.6-5.6-4.6-9.6-10.2-10.2 5.6-.6 9.6-4.6 10.2-10.2z"/></svg><span>Auto-update</span><svg class="spark" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12 1.8c.6 5.6 4.6 9.6 10.2 10.2-5.6.6-9.6 4.6-10.2 10.2-.6-5.6-4.6-9.6-10.2-10.2 5.6-.6 9.6-4.6 10.2-10.2z"/></svg><span>No telemetry</span><svg class="spark" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12 1.8c.6 5.6 4.6 9.6 10.2 10.2-5.6.6-9.6 4.6-10.2 10.2-.6-5.6-4.6-9.6-10.2-10.2 5.6-.6 9.6-4.6 10.2-10.2z"/></svg><span>ভুল কমুক</span><svg class="spark" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12 1.8c.6 5.6 4.6 9.6 10.2 10.2-5.6.6-9.6 4.6-10.2 10.2-.6-5.6-4.6-9.6-10.2-10.2 5.6-.6 9.6-4.6 10.2-10.2z"/></svg><span>বাংলা ছড়িয়ে পড়ুক</span><svg class="spark" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12 1.8c.6 5.6 4.6 9.6 10.2 10.2-5.6.6-9.6 4.6-10.2 10.2-.6-5.6-4.6-9.6-10.2-10.2 5.6-.6 9.6-4.6 10.2-10.2z"/></svg>
       </div>
     </div>
   </div>
 
   <div class="wrap">
     <div class="stats" role="group" data-i18n-aria-label="stats.group" aria-label="Live project statistics">
-      <div class="stat" data-stat="commits"><div class="ico"><svg class="ic" aria-hidden="true"><use href="#i-commit"></use></svg></div><strong data-value>—</strong><span data-i18n="stat.commits">Total git commits</span></div>
-      <div class="stat" data-stat="stars"><div class="ico"><svg class="ic" aria-hidden="true"><use href="#i-star"></use></svg></div><strong data-value>—</strong><span data-i18n="stat.stars">GitHub stars</span></div>
-      <div class="stat" data-stat="forks"><div class="ico"><svg class="ic" aria-hidden="true"><use href="#i-fork"></use></svg></div><strong data-value>—</strong><span data-i18n="stat.forks">Forks</span></div>
-      <div class="stat" data-stat="contributors"><div class="ico"><svg class="ic" aria-hidden="true"><use href="#i-users"></use></svg></div><strong data-value>—</strong><span data-i18n="stat.contributors">Contributors (full history)</span></div>
-      <div class="stat" data-stat="ahead"><div class="ico"><svg class="ic" aria-hidden="true"><use href="#i-bolt"></use></svg></div><strong data-value>—</strong><span data-i18n="stat.ahead">Commits ahead of the official baseline</span></div>
-      <div class="stat" data-stat="pushed"><div class="ico"><svg class="ic" aria-hidden="true"><use href="#i-clock"></use></svg></div><strong data-value>—</strong><span data-i18n="stat.pushed">Last push</span></div>
+      <div class="stat" data-stat="commits"><div class="ico"><i class="fa-solid fa-code-commit ic" aria-hidden="true"></i></div><strong data-value>—</strong><span data-i18n="stat.commits">Total git commits</span></div>
+      <div class="stat" data-stat="stars"><div class="ico"><i class="fa-solid fa-star ic" aria-hidden="true"></i></div><strong data-value>—</strong><span data-i18n="stat.stars">GitHub stars</span></div>
+      <div class="stat" data-stat="forks"><div class="ico"><i class="fa-solid fa-code-fork ic" aria-hidden="true"></i></div><strong data-value>—</strong><span data-i18n="stat.forks">Forks</span></div>
+      <div class="stat" data-stat="contributors"><div class="ico"><i class="fa-solid fa-users ic" aria-hidden="true"></i></div><strong data-value>—</strong><span data-i18n="stat.contributors">Contributors (full history)</span></div>
+      <div class="stat" data-stat="ahead"><div class="ico"><i class="fa-solid fa-bolt ic" aria-hidden="true"></i></div><strong data-value>—</strong><span data-i18n="stat.ahead">Commits ahead of the official baseline</span></div>
+      <div class="stat" data-stat="pushed"><div class="ico"><i class="fa-solid fa-clock ic" aria-hidden="true"></i></div><strong data-value>—</strong><span data-i18n="stat.pushed">Last push</span></div>
     </div>
     <p class="status-note" data-state="loading" id="statsStatus">
       <span class="dot" data-live-dot data-state="loading"></span>
@@ -233,7 +219,7 @@
             </div>
             <p class="audit-desc" data-i18n="audit.ce.desc">Well past the official baseline — every commit fixes a real, reported problem.</p>
             <a class="audit-cta" href="https://github.com/raselrahmanrocky/Avro-Keyboard" target="_blank" rel="noopener noreferrer">
-              <span data-i18n="audit.ce.cta">Repository</span> <span aria-hidden="true">↗</span>
+              <span data-i18n="audit.ce.cta">Repository</span> <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i>
             </a>
           </div>
           <div class="audit-body">
@@ -274,7 +260,7 @@
             </div>
             <p class="audit-desc" data-i18n="audit.official.desc">Frozen at 5.6.0 since 2019 — the published baseline this continuation is measured against.</p>
             <a class="audit-cta" href="https://github.com/mugli/Avro-Keyboard" target="_blank" rel="noopener noreferrer">
-              <span data-i18n="audit.official.cta">Repository</span> <span aria-hidden="true">↗</span>
+              <span data-i18n="audit.official.cta">Repository</span> <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i>
             </a>
           </div>
           <div class="audit-body">
@@ -310,44 +296,44 @@
 
           <tbody>
             <tr class="group-row reveal"><th colspan="3" scope="colgroup" data-i18n="cmp.g1">Maintenance and distribution</th></tr>
-            <tr class="reveal"><td data-i18n="cmp.g1.r1.t">Active updates</td><td data-i18n="cmp.g1.r1.o">Last release 27 August 2019; source repo archived</td><td data-i18n="cmp.g1.r1.c"><span class="yes">✓</span>Continuous maintenance with tagged releases</td></tr>
-            <tr class="reveal"><td data-i18n="cmp.g1.r2.t">Installers</td><td data-i18n="cmp.g1.r2.o">A single 32-bit installer</td><td data-i18n="cmp.g1.r2.c"><span class="yes">✓</span>Installer and portable — 64- and 32-bit, four files in total</td></tr>
-            <tr class="reveal"><td data-i18n="cmp.g1.r3.t">Code signing</td><td data-i18n="cmp.g1.r3.o">5.6.0 was signed</td><td data-i18n="cmp.g1.r3.c"><span class="no">✗</span>Not signed yet — verify the SHA-256 yourself</td></tr>
+            <tr class="reveal"><td data-i18n="cmp.g1.r1.t">Active updates</td><td data-i18n="cmp.g1.r1.o">Last release 27 August 2019; source repo archived</td><td data-i18n="cmp.g1.r1.c"><span class="yes"><i class="fa-solid fa-check" aria-hidden="true"></i></span>Continuous maintenance with tagged releases</td></tr>
+            <tr class="reveal"><td data-i18n="cmp.g1.r2.t">Installers</td><td data-i18n="cmp.g1.r2.o">A single 32-bit installer</td><td data-i18n="cmp.g1.r2.c"><span class="yes"><i class="fa-solid fa-check" aria-hidden="true"></i></span>Installer and portable — 64- and 32-bit, four files in total</td></tr>
+            <tr class="reveal"><td data-i18n="cmp.g1.r3.t">Code signing</td><td data-i18n="cmp.g1.r3.o">5.6.0 was signed</td><td data-i18n="cmp.g1.r3.c"><span class="no"><i class="fa-solid fa-xmark" aria-hidden="true"></i></span>Not signed yet — verify the SHA-256 yourself</td></tr>
           </tbody>
 
           <tbody>
             <tr class="group-row reveal"><th colspan="3" scope="colgroup" data-i18n="cmp.g2">Engine and conversion</th></tr>
-            <tr class="reveal"><td data-i18n="cmp.g2.r1.t">ANSI / Bijoy mapping</td><td data-i18n="cmp.g2.r1.o">One hardcoded mapping</td><td data-i18n="cmp.g2.r1.c"><span class="yes">✓</span>Every V1–V5 encoding is file-based</td></tr>
-            <tr class="reveal"><td data-i18n="cmp.g2.r2.t">First use</td><td data-i18n="cmp.g2.r2.o">Cold engine — stutters on first use</td><td data-i18n="cmp.g2.r2.c"><span class="yes">✓</span>Engine is already warm; switching versions allocates nothing</td></tr>
-            <tr class="reveal"><td data-i18n="cmp.g2.r3.t">Backspace</td><td data-i18n="cmp.g2.r3.o">Breaks a compound character and leaves a stray vowel sign</td><td data-i18n="cmp.g2.r3.c"><span class="yes">✓</span>Deletes the whole grapheme</td></tr>
-            <tr class="reveal"><td data-i18n="cmp.g2.r4.t">Conjunction</td><td data-i18n="cmp.g2.r4.o">Some wrong glyphs</td><td data-i18n="cmp.g2.r4.c"><span class="yes">✓</span>Mapping tables updated</td></tr>
-            <tr class="reveal"><td data-i18n="cmp.g2.r5.t">Cache restart</td><td data-i18n="cmp.g2.r5.o">—</td><td data-i18n="cmp.g2.r5.c"><span class="yes">✓</span>The encoding setting survives a cache restart</td></tr>
+            <tr class="reveal"><td data-i18n="cmp.g2.r1.t">ANSI / Bijoy mapping</td><td data-i18n="cmp.g2.r1.o">One hardcoded mapping</td><td data-i18n="cmp.g2.r1.c"><span class="yes"><i class="fa-solid fa-check" aria-hidden="true"></i></span>Every V1–V5 encoding is file-based</td></tr>
+            <tr class="reveal"><td data-i18n="cmp.g2.r2.t">First use</td><td data-i18n="cmp.g2.r2.o">Cold engine — stutters on first use</td><td data-i18n="cmp.g2.r2.c"><span class="yes"><i class="fa-solid fa-check" aria-hidden="true"></i></span>Engine is already warm; switching versions allocates nothing</td></tr>
+            <tr class="reveal"><td data-i18n="cmp.g2.r3.t">Backspace</td><td data-i18n="cmp.g2.r3.o">Breaks a compound character and leaves a stray vowel sign</td><td data-i18n="cmp.g2.r3.c"><span class="yes"><i class="fa-solid fa-check" aria-hidden="true"></i></span>Deletes the whole grapheme</td></tr>
+            <tr class="reveal"><td data-i18n="cmp.g2.r4.t">Conjunction</td><td data-i18n="cmp.g2.r4.o">Some wrong glyphs</td><td data-i18n="cmp.g2.r4.c"><span class="yes"><i class="fa-solid fa-check" aria-hidden="true"></i></span>Mapping tables updated</td></tr>
+            <tr class="reveal"><td data-i18n="cmp.g2.r5.t">Cache restart</td><td data-i18n="cmp.g2.r5.o">—</td><td data-i18n="cmp.g2.r5.c"><span class="yes"><i class="fa-solid fa-check" aria-hidden="true"></i></span>The encoding setting survives a cache restart</td></tr>
           </tbody>
 
           <tbody>
             <tr class="group-row reveal"><th colspan="3" scope="colgroup" data-i18n="cmp.g3">Interface</th></tr>
-            <tr class="reveal"><td data-i18n="cmp.g3.r1.t">Theme</td><td data-i18n="cmp.g3.r1.o">Limited</td><td data-i18n="cmp.g3.r1.c"><span class="yes">✓</span>App-wide theme and palette system</td></tr>
-            <tr class="reveal"><td data-i18n="cmp.g3.r2.t">Encoding selection</td><td data-i18n="cmp.g3.r2.o">A separate picker</td><td data-i18n="cmp.g3.r2.c"><span class="yes">✓</span>“Select ANSI Encoding” in the tray, kept in sync with every picker</td></tr>
-            <tr class="reveal"><td data-i18n="cmp.g3.r3.t">List sorting</td><td data-i18n="cmp.g3.r3.o">Plain sort</td><td data-i18n="cmp.g3.r3.c"><span class="yes">✓</span>Natural sort from V1 → V5</td></tr>
-            <tr class="reveal"><td data-i18n="cmp.g3.r4.t">Icons</td><td data-i18n="cmp.g3.r4.o">Plain</td><td data-i18n="cmp.g3.r4.c"><span class="yes">✓</span>Layout-aware icons</td></tr>
-            <tr class="reveal"><td data-i18n="cmp.g3.r5.t">Global hotkey</td><td data-i18n="cmp.g3.r5.o">Limited</td><td data-i18n="cmp.g3.r5.c"><span class="yes">✓</span>Set your own custom hotkey in app; catches key conflicts before you save</td></tr>
+            <tr class="reveal"><td data-i18n="cmp.g3.r1.t">Theme</td><td data-i18n="cmp.g3.r1.o">Limited</td><td data-i18n="cmp.g3.r1.c"><span class="yes"><i class="fa-solid fa-check" aria-hidden="true"></i></span>App-wide theme and palette system</td></tr>
+            <tr class="reveal"><td data-i18n="cmp.g3.r2.t">Encoding selection</td><td data-i18n="cmp.g3.r2.o">A separate picker</td><td data-i18n="cmp.g3.r2.c"><span class="yes"><i class="fa-solid fa-check" aria-hidden="true"></i></span>“Select ANSI Encoding” in the tray, kept in sync with every picker</td></tr>
+            <tr class="reveal"><td data-i18n="cmp.g3.r3.t">List sorting</td><td data-i18n="cmp.g3.r3.o">Plain sort</td><td data-i18n="cmp.g3.r3.c"><span class="yes"><i class="fa-solid fa-check" aria-hidden="true"></i></span>Natural sort from V1 → V5</td></tr>
+            <tr class="reveal"><td data-i18n="cmp.g3.r4.t">Icons</td><td data-i18n="cmp.g3.r4.o">Plain</td><td data-i18n="cmp.g3.r4.c"><span class="yes"><i class="fa-solid fa-check" aria-hidden="true"></i></span>Layout-aware icons</td></tr>
+            <tr class="reveal"><td data-i18n="cmp.g3.r5.t">Global hotkey</td><td data-i18n="cmp.g3.r5.o">Limited</td><td data-i18n="cmp.g3.r5.c"><span class="yes"><i class="fa-solid fa-check" aria-hidden="true"></i></span>Set your own custom hotkey in app; catches key conflicts before you save</td></tr>
           </tbody>
 
           <tbody>
             <tr class="group-row reveal"><th colspan="3" scope="colgroup" data-i18n="cmp.g4">Reliability</th></tr>
-            <tr class="reveal"><td data-i18n="cmp.g4.r1.t">Startup failure</td><td data-i18n="cmp.g4.r1.o">Bad settings, a locked registry, missing fonts or a corrupt Database.db3 shut it down silently</td><td data-i18n="cmp.g4.r1.c"><span class="yes">✓</span>Every step guarded, with a visible report</td></tr>
-            <tr class="reveal"><td data-i18n="cmp.g4.r2.t">Diagnostic log</td><td data-i18n="cmp.g4.r2.o">None</td><td data-i18n="cmp.g4.r2.c"><span class="yes">✓</span>AvroStartup.log — never records a keystroke</td></tr>
-            <tr class="reveal"><td data-i18n="cmp.g4.r3.t">New layout / skin</td><td data-i18n="cmp.g4.r3.o">Needed an app restart to take effect</td><td data-i18n="cmp.g4.r3.c"><span class="yes">✓</span>The menu refreshes itself as soon as the file lands</td></tr>
-            <tr class="reveal"><td data-i18n="cmp.g4.r4.t">Resource downloads</td><td data-i18n="cmp.g4.r4.o">Manually, from a separate site</td><td data-i18n="cmp.g4.r4.c"><span class="yes">✓</span>In-app browser, installed only after SHA-256 verification</td></tr>
-            <tr class="reveal"><td data-i18n="cmp.g4.r5.t">Updates</td><td data-i18n="cmp.g4.r5.o">You had to find and download them yourself</td><td data-i18n="cmp.g4.r5.c"><span class="yes">✓</span>In-app auto-update — correct architecture, beta channel toggle</td></tr>
+            <tr class="reveal"><td data-i18n="cmp.g4.r1.t">Startup failure</td><td data-i18n="cmp.g4.r1.o">Bad settings, a locked registry, missing fonts or a corrupt Database.db3 shut it down silently</td><td data-i18n="cmp.g4.r1.c"><span class="yes"><i class="fa-solid fa-check" aria-hidden="true"></i></span>Every step guarded, with a visible report</td></tr>
+            <tr class="reveal"><td data-i18n="cmp.g4.r2.t">Diagnostic log</td><td data-i18n="cmp.g4.r2.o">None</td><td data-i18n="cmp.g4.r2.c"><span class="yes"><i class="fa-solid fa-check" aria-hidden="true"></i></span>AvroStartup.log — never records a keystroke</td></tr>
+            <tr class="reveal"><td data-i18n="cmp.g4.r3.t">New layout / skin</td><td data-i18n="cmp.g4.r3.o">Needed an app restart to take effect</td><td data-i18n="cmp.g4.r3.c"><span class="yes"><i class="fa-solid fa-check" aria-hidden="true"></i></span>The menu refreshes itself as soon as the file lands</td></tr>
+            <tr class="reveal"><td data-i18n="cmp.g4.r4.t">Resource downloads</td><td data-i18n="cmp.g4.r4.o">Manually, from a separate site</td><td data-i18n="cmp.g4.r4.c"><span class="yes"><i class="fa-solid fa-check" aria-hidden="true"></i></span>In-app browser, installed only after SHA-256 verification</td></tr>
+            <tr class="reveal"><td data-i18n="cmp.g4.r5.t">Updates</td><td data-i18n="cmp.g4.r5.o">You had to find and download them yourself</td><td data-i18n="cmp.g4.r5.c"><span class="yes"><i class="fa-solid fa-check" aria-hidden="true"></i></span>In-app auto-update — correct architecture, beta channel toggle</td></tr>
           </tbody>
 
           <tbody>
             <tr class="group-row reveal"><th colspan="3" scope="colgroup" data-i18n="cmp.g5">Converter, build and licence</th></tr>
-            <tr class="reveal"><td data-i18n="cmp.g5.r1.t">Text Converter</td><td data-i18n="cmp.g5.r1.o">It hangs if there are too many words.</td><td data-i18n="cmp.g5.r1.c"><span class="yes">✓</span>Built into the app, and it does not freeze on large text</td></tr>
-            <tr class="reveal"><td data-i18n="cmp.g5.r2.t">Qt converter</td><td data-i18n="cmp.g5.r2.o">Did not exist</td><td data-i18n="cmp.g5.r2.c"><span class="yes">✓</span>A Qt 6 C++ port, with a <code>--mapping-dir</code> switch</td></tr>
-            <tr class="reveal"><td data-i18n="cmp.g5.r3.t">Build setup</td><td data-i18n="cmp.g5.r3.o">Delphi 2010 plus proprietary DISQLite3, ICS, JVCL/JCL</td><td data-i18n="cmp.g5.r3.c"><span class="yes">✓</span>Delphi 12 Community Edition, with no third-party dependency</td></tr>
-            <tr class="reveal"><td data-i18n="cmp.g5.r4.t">Licence</td><td data-i18n="cmp.g5.r4.o">MPL-1.1 (official source)</td><td data-i18n="cmp.g5.r4.c"><span class="yes">✓</span>MPL-2.0, with Qt's LGPLv3 terms documented</td></tr>
+            <tr class="reveal"><td data-i18n="cmp.g5.r1.t">Text Converter</td><td data-i18n="cmp.g5.r1.o">It hangs if there are too many words.</td><td data-i18n="cmp.g5.r1.c"><span class="yes"><i class="fa-solid fa-check" aria-hidden="true"></i></span>Built into the app, and it does not freeze on large text</td></tr>
+            <tr class="reveal"><td data-i18n="cmp.g5.r2.t">Qt converter</td><td data-i18n="cmp.g5.r2.o">Did not exist</td><td data-i18n="cmp.g5.r2.c"><span class="yes"><i class="fa-solid fa-check" aria-hidden="true"></i></span>A Qt 6 C++ port, with a <code>--mapping-dir</code> switch</td></tr>
+            <tr class="reveal"><td data-i18n="cmp.g5.r3.t">Build setup</td><td data-i18n="cmp.g5.r3.o">Delphi 2010 plus proprietary DISQLite3, ICS, JVCL/JCL</td><td data-i18n="cmp.g5.r3.c"><span class="yes"><i class="fa-solid fa-check" aria-hidden="true"></i></span>Delphi 12 Community Edition, with no third-party dependency</td></tr>
+            <tr class="reveal"><td data-i18n="cmp.g5.r4.t">Licence</td><td data-i18n="cmp.g5.r4.o">MPL-1.1 (official source)</td><td data-i18n="cmp.g5.r4.c"><span class="yes"><i class="fa-solid fa-check" aria-hidden="true"></i></span>MPL-2.0, with Qt's LGPLv3 terms documented</td></tr>
           </tbody>
         </table>
       </div>
@@ -451,32 +437,32 @@
       </div>
       <div class="feature-grid">
         <article class="feature reveal">
-          <div class="ico"><svg class="ic" aria-hidden="true"><use href="#i-keyboard"></use></svg></div>
+          <div class="ico"><i class="fa-solid fa-keyboard ic" aria-hidden="true"></i></div>
           <h3 data-i18n="feature.1.title">Native 64- and 32-bit</h3>
           <p data-i18n="feature.1.body">Separate builds for both architectures. The 64-bit build is steadier on large documents and long sessions.</p>
         </article>
         <article class="feature reveal">
-          <div class="ico"><svg class="ic" aria-hidden="true"><use href="#i-package"></use></svg></div>
+          <div class="ico"><i class="fa-solid fa-box ic" aria-hidden="true"></i></div>
           <h3 data-i18n="feature.2.title">Genuinely portable</h3>
           <p data-i18n="feature.2.body">Settings sit beside the exe, inside the data folder. Run it from a USB stick, delete the folder when you are done.</p>
         </article>
         <article class="feature reveal">
-          <div class="ico"><svg class="ic" aria-hidden="true"><use href="#i-bolt"></use></svg></div>
+          <div class="ico"><i class="fa-solid fa-bolt ic" aria-hidden="true"></i></div>
           <h3 data-i18n="feature.3.title">A file-based ANSI engine</h3>
           <p data-i18n="feature.3.body">Every V1–V5 encoding loads from its own file — no hardcoded mapping is left.</p>
         </article>
         <article class="feature reveal">
-          <div class="ico"><svg class="ic" aria-hidden="true"><use href="#i-shield"></use></svg></div>
+          <div class="ico"><i class="fa-solid fa-shield-halved ic" aria-hidden="true"></i></div>
           <h3 data-i18n="feature.4.title">Startup never fails silently</h3>
           <p data-i18n="feature.4.body">Every step is guarded, with a visible report and <code>AvroStartup.log</code>.</p>
         </article>
         <article class="feature reveal">
-          <div class="ico"><svg class="ic" aria-hidden="true"><use href="#i-refresh"></use></svg></div>
+          <div class="ico"><i class="fa-solid fa-arrows-rotate ic" aria-hidden="true"></i></div>
           <h3 data-i18n="feature.5.title">Downloads verified with SHA-256</h3>
           <p data-i18n="feature.5.body">Resources and updates alike only install once the file hash matches.</p>
         </article>
         <article class="feature reveal">
-          <div class="ico"><svg class="ic" aria-hidden="true"><use href="#i-check"></use></svg></div>
+          <div class="ico"><i class="fa-solid fa-check ic" aria-hidden="true"></i></div>
           <h3 data-i18n="feature.6.title">Grapheme-aware backspace</h3>
           <p data-i18n="feature.6.body">A compound character no longer breaks leaving a stray vowel sign behind — the whole grapheme goes at once.</p>
         </article>
@@ -558,7 +544,7 @@
           <h2 data-i18n="cta.h2">Language should be open.</h2>
           <p data-i18n="cta.body">Report a bug, contribute code, or just join the community — all of it is welcome.</p>
         </div>
-        <a class="btn magnetic" href="https://github.com/raselrahmanrocky/Avro-Keyboard" target="_blank" rel="noopener noreferrer" data-i18n="cta.button">View the repo on GitHub ↗</a>
+        <a class="btn magnetic" href="https://github.com/raselrahmanrocky/Avro-Keyboard" target="_blank" rel="noopener noreferrer" data-i18n="cta.button"><i class="fa-brands fa-github" aria-hidden="true"></i> View the repo on GitHub <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i></a>
       </div>
     </div>
   </section>
@@ -584,7 +570,7 @@
       <a href="#install" data-i18n="nav.install">Install</a>
       <a href="changelog.html" data-i18n="nav.changelog">Changelog</a>
       <a href="privacy.html" data-i18n="nav.privacy">Privacy</a>
-      <a href="https://github.com/raselrahmanrocky/Avro-Keyboard/issues" target="_blank" rel="noopener noreferrer" data-i18n="footer.reportBug">Report a bug ↗</a>
+      <a href="https://github.com/raselrahmanrocky/Avro-Keyboard/issues" target="_blank" rel="noopener noreferrer" data-i18n="footer.reportBug">Report a bug <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i></a>
     </nav>
   </div>
 </footer>

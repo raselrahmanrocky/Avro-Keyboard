@@ -29,6 +29,8 @@
 
 <link rel="preload" href="fonts/hind-siliguri-bengali-400.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="fonts/manrope-latin-variable.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="css/vendor/fontawesome/webfonts/fa-solid-900.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="css/vendor/fontawesome/css/all.min.css">
 <link rel="stylesheet" href="css/fonts.css">
 <link rel="stylesheet" href="css/style.css">
 <link rel="stylesheet" href="css/pages.css">
@@ -73,13 +75,8 @@
 <!-- Floating back to top: hidden until js/motion.js sees the page scrolled
      past a screen, then it fades in and glides home on click. -->
 <button class="to-top" data-to-top type="button" aria-label="Back to top" title="Back to top" data-i18n-aria-label="nav.toTop" data-i18n-title="nav.toTop">
-  <svg class="ic" aria-hidden="true"><use href="#i-arrow-up"></use></svg>
+  <i class="fa-solid fa-arrow-up ic" aria-hidden="true"></i>
 </button>
-
-<svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true" focusable="false">
-  <symbol id="i-external" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M13.6 4.2h6.2v6.2"/><path d="M19.8 4.2 11.2 12.8"/><path d="M17.8 14.2v4.2a1.4 1.4 0 0 1-1.4 1.4H5.6a1.4 1.4 0 0 1-1.4-1.4V7.6a1.4 1.4 0 0 1 1.4-1.4h4.2"/></symbol>
-  <symbol id="i-arrow-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 18.6V5.8M5.9 11.9 12 5.8l6.1 6.1"/></symbol>
-</svg>
 
 <a class="skip-link" href="#main" data-i18n="nav.skip">Skip to main content</a>
 
@@ -101,8 +98,8 @@
         <button type="button" data-lang-set="en" data-i18n="lang.en" data-i18n-aria-label="lang.enFull" data-i18n-title="lang.enFull" aria-pressed="false" aria-label="English" title="English">EN</button>
         <button type="button" data-lang-set="bn" data-i18n="lang.bn" data-i18n-aria-label="lang.bnFull" data-i18n-title="lang.bnFull" aria-pressed="false" aria-label="বাংলা" title="বাংলা">বাং</button>
       </div>
-      <button class="theme" id="themeBtn" type="button" aria-pressed="false" aria-label="Switch to dark theme" title="Switch to dark theme">☾</button>
-      <a class="btn btn-primary" href="index.html#download"><span data-i18n="actions.download">Download</span> <span aria-hidden="true">↓</span></a>
+      <button class="theme" id="themeBtn" type="button" aria-pressed="false" aria-label="Switch to dark theme" title="Switch to dark theme"><i class="fa-solid fa-moon" aria-hidden="true"></i></button>
+      <a class="btn btn-primary" href="index.html#download"><span data-i18n="actions.download">Download</span> <i class="fa-solid fa-download" aria-hidden="true"></i></a>
     </div>
   </div>
 </header>
@@ -365,7 +362,7 @@
           </p>
           <p data-i18n="pv.contact.p2">
             For any question, correction or concern, open a GitHub issue:
-            <a href="https://github.com/raselrahmanrocky/Avro-Keyboard/issues" target="_blank" rel="noopener noreferrer">raselrahmanrocky/Avro-Keyboard/issues ↗</a>
+            <a href="https://github.com/raselrahmanrocky/Avro-Keyboard/issues" target="_blank" rel="noopener noreferrer">raselrahmanrocky/Avro-Keyboard/issues <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i></a>
           </p>
           <p data-i18n="pv.contact.p3">
             Avro Keyboard Community Edition is an independent continuation — built from Avro
@@ -403,7 +400,7 @@
       <a href="index.html#install" data-i18n="nav.install">Install</a>
       <a href="changelog.html" data-i18n="nav.changelog">Changelog</a>
       <a href="privacy.html" data-i18n="nav.privacy">Privacy</a>
-      <a href="https://github.com/raselrahmanrocky/Avro-Keyboard/issues" target="_blank" rel="noopener noreferrer" data-i18n="footer.reportBug">Report a bug ↗</a>
+      <a href="https://github.com/raselrahmanrocky/Avro-Keyboard/issues" target="_blank" rel="noopener noreferrer" data-i18n="footer.reportBug">Report a bug <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i></a>
     </nav>
   </div>
 </footer>

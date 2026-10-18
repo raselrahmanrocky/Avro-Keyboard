@@ -43,8 +43,10 @@
       .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 
+  var ICONS = { download: 'fa-download', package: 'fa-box', external: 'fa-arrow-up-right-from-square' };
+
   function icon(id) {
-    return '<svg class="ic" aria-hidden="true" focusable="false"><use href="#i-' + id + '"></use></svg>';
+    return '<i class="fa-solid ' + (ICONS[id] || 'fa-circle-info') + ' ic" aria-hidden="true"></i>';
   }
 
   /* ------------------------------------------------------------ markdown -- */

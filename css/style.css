@@ -10,7 +10,7 @@
   color-scheme: light;
   --bg: #faf7ff;
   --surface: #fff;
-  --surface2: #f2eaff;
+  --surface2: #f9f5ff;
   --text: #24123d;
   --muted: #6c5b81;
   --line: #e7d9fb;
@@ -280,7 +280,7 @@ html[data-lang="bn"][data-i18n-pending] [data-i18n] { visibility: hidden; }
   visibility: hidden;
   pointer-events: none;
 }
-.to-top .ic { width: 20px; height: 20px; }
+.to-top .ic { font-size: 20px; }
 .to-top.is-shown { opacity: 1; visibility: visible; pointer-events: auto; }
 @media (max-width: 600px) {
   .to-top { right: 16px; bottom: 16px; width: 44px; height: 44px; }
@@ -371,7 +371,19 @@ html[data-lang="bn"][data-i18n-pending] [data-i18n] { visibility: hidden; }
 [data-theme="dark"] .gradient { background: linear-gradient(100deg, #c79bff, #e0b6ff 55%, #b07cff); -webkit-background-clip: text; background-clip: text; }
 .hero p { max-width: 590px; color: var(--muted); font-size: 17px; }
 .actions { display: flex; flex-wrap: wrap; gap: 12px; }
-.micro { font-size: 14px; color: var(--muted); margin-top: 16px; }
+.hero-tech {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px 24px;
+  margin-top: 18px;
+  padding: 0;
+  list-style: none;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--muted);
+}
+.hero-tech li { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
+.hero-tech i { color: var(--purple); font-size: 14px; }
 
 .showcase { position: relative; }
 .splash {
@@ -396,6 +408,7 @@ html[data-lang="bn"][data-i18n-pending] [data-i18n] { visibility: hidden; }
   font-weight: 700;
 }
 .float-tag b { color: var(--purple); }
+.float-tag .spark { width: 13px; height: 13px; color: var(--purple); vertical-align: -2px; }
 
 /* 6. Live stats ============================================================ */
 .stats {
@@ -477,7 +490,7 @@ html[data-lang="bn"][data-i18n-pending] [data-i18n] { visibility: hidden; }
   font-weight: 800;
   margin-bottom: 16px;
 }
-.ico svg { width: 22px; height: 22px; }
+.ico i { font-size: 22px; line-height: 1; }
 .feature h3 { margin: 0 0 7px; font-size: 18px; line-height: 1.35; }
 .feature p { margin: 0; color: var(--muted); font-size: 14px; }
 /* Serial number in the top-right corner, centred against the icon chip. */
@@ -819,10 +832,9 @@ tbody td:nth-child(3) { font-weight: 650; }
   color: var(--purple);
   border: 1px solid var(--line);
 }
-.rc-icon svg { width: 24px; height: 24px; }
-.ic { width: 1.05em; height: 1.05em; display: block; flex: 0 0 auto; }
-.rc-icon .ic, .rc-actions .ic { width: 20px; height: 20px; }
-.btn-icon .ic { width: 19px; height: 19px; }
+.ic { font-size: 1.05em; line-height: 1; display: inline-block; flex: 0 0 auto; }
+.rc-icon .ic, .rc-actions .ic { font-size: 20px; }
+.btn-icon .ic { font-size: 19px; }
 .rc-head h3 { margin: 0; font-size: 19.5px; letter-spacing: -.5px; }
 .rc-head .when { margin: 2px 0 0; color: var(--muted); font-size: 14px; }
 

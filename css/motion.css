@@ -221,7 +221,7 @@ main, .footer { position: relative; z-index: 1; }
   text-transform: uppercase;
   white-space: nowrap;
 }
-.marquee-half i { color: var(--purple); font-style: normal; font-size: 14px; }
+.marquee-half svg { width: 13px; height: 13px; color: var(--purple); flex: 0 0 auto; }
 /* The loop itself is driven from js/motion.js: inside the wide-screen
    "body { zoom: 1.25 }" Chrome moves transform animations to the main
    thread and snaps them to the device grid, which reads as judder. The

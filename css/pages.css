@@ -94,8 +94,15 @@ details.assets summary {
   list-style: none;
 }
 details.assets summary::-webkit-details-marker { display: none; }
-details.assets summary::before { content: "▸ "; color: var(--purple); font-weight: 850; }
-details.assets[open] summary::before { content: "▾ "; }
+details.assets summary::before {
+  content: "\f054";
+  font-family: "Font Awesome 6 Free";
+  font-weight: 900;
+  font-size: .82em;
+  margin-right: 8px;
+  color: var(--purple);
+}
+details.assets[open] summary::before { content: "\f078"; }
 details.assets[open] summary { border-bottom: 1px solid var(--line); }
 
 .asset-list { list-style: none; margin: 0; padding: 6px 18px 14px; }

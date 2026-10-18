@@ -1,0 +1,11 @@
+Font Awesome Free 6.5.1 — https://fontawesome.com
+Copyright 2024 Fonticons, Inc.
+
+Licences:
+- Icons: CC BY 4.0 — https://creativecommons.org/licenses/by/4.0/
+- Fonts (webfonts/*.woff2): SIL OFL 1.1 — https://scripts.sil.org/OFL
+- Code (all.min.css): MIT — https://opensource.org/licenses/MIT
+
+Vendored locally so the site keeps loading every resource from its own
+origin (see privacy.html “No third parties”). The full licence text is
+also embedded in the header of all.min.css.

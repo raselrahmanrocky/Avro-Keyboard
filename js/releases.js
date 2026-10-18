@@ -48,8 +48,16 @@
       .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 
+  var ICONS = {
+    download: 'fa-download',
+    info: 'fa-circle-info',
+    keyboard: 'fa-keyboard',
+    package: 'fa-box',
+    archive: 'fa-box-archive'
+  };
+
   function icon(id) {
-    return '<svg class="ic" aria-hidden="true" focusable="false"><use href="#i-' + id + '"></use></svg>';
+    return '<i class="fa-solid ' + (ICONS[id] || 'fa-circle-info') + ' ic" aria-hidden="true"></i>';
   }
 
   function specRow(label, value) {
@@ -66,7 +74,7 @@
       primary = '<a class="btn btn-primary" href="' + esc(card.primary.href) + '"' +
         (card.primary.external ? ' target="_blank" rel="noopener noreferrer"' : '') + '>' +
         icon('download') + esc(card.primary.label) +
-        (card.primary.external ? ' <span aria-hidden="true">↗</span>' : '') + '</a>';
+        (card.primary.external ? ' <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i>' : '') + '</a>';
     } else {
       primary = '<span class="btn" aria-disabled="true">' + esc(t('releases.noFile')) + '</span>';
     }

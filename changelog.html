@@ -28,6 +28,8 @@
 
 <link rel="preload" href="fonts/hind-siliguri-bengali-400.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="fonts/manrope-latin-variable.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="css/vendor/fontawesome/webfonts/fa-solid-900.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="css/vendor/fontawesome/css/all.min.css">
 <link rel="stylesheet" href="css/fonts.css">
 <link rel="stylesheet" href="css/style.css">
 <link rel="stylesheet" href="css/pages.css">
@@ -72,17 +74,8 @@
 <!-- Floating back to top: hidden until js/motion.js sees the page scrolled
      past a screen, then it fades in and glides home on click. -->
 <button class="to-top" data-to-top type="button" aria-label="Back to top" title="Back to top" data-i18n-aria-label="nav.toTop" data-i18n-title="nav.toTop">
-  <svg class="ic" aria-hidden="true"><use href="#i-arrow-up"></use></svg>
+  <i class="fa-solid fa-arrow-up ic" aria-hidden="true"></i>
 </button>
-
-<svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true" focusable="false">
-  <symbol id="i-keyboard" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6.2" width="19" height="11.6" rx="2.4"/><path d="M6 9.6h.01M9.4 9.6h.01M12.8 9.6h.01M16.2 9.6h.01M6.6 12.6h.01M10 12.6h.01M13.4 12.6h.01M16.8 12.6h.01M8 15.2h8"/></symbol>
-  <symbol id="i-package" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.8 20.4 7v10L12 21.2 3.6 17V7z"/><path d="M3.6 7 12 11.4 20.4 7M12 11.4v9.8"/></symbol>
-  <symbol id="i-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5v10.2M8 10l4 3.7 4-3.7"/><path d="M4.5 17.5v1.6a1.4 1.4 0 0 0 1.4 1.4h12.2a1.4 1.4 0 0 0 1.4-1.4v-1.6"/></symbol>
-  <symbol id="i-external" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M13.6 4.2h6.2v6.2"/><path d="M19.8 4.2 11.2 12.8"/><path d="M17.8 14.2v4.2a1.4 1.4 0 0 1-1.4 1.4H5.6a1.4 1.4 0 0 1-1.4-1.4V7.6a1.4 1.4 0 0 1 1.4-1.4h4.2"/></symbol>
-  <symbol id="i-archive" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.4" width="18" height="4" rx="1.2"/><path d="M4.6 8.4v9.8a1.4 1.4 0 0 0 1.4 1.4h12a1.4 1.4 0 0 0 1.4-1.4V8.4"/><path d="M9.6 12.2h4.8"/></symbol>
-  <symbol id="i-arrow-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 18.6V5.8M5.9 11.9 12 5.8l6.1 6.1"/></symbol>
-</svg>
 
 <a class="skip-link" href="#main" data-i18n="nav.skip">Skip to main content</a>
 
@@ -104,8 +97,8 @@
         <button type="button" data-lang-set="en" data-i18n="lang.en" data-i18n-aria-label="lang.enFull" data-i18n-title="lang.enFull" aria-pressed="false" aria-label="English" title="English">EN</button>
         <button type="button" data-lang-set="bn" data-i18n="lang.bn" data-i18n-aria-label="lang.bnFull" data-i18n-title="lang.bnFull" aria-pressed="false" aria-label="বাংলা" title="বাংলা">বাং</button>
       </div>
-      <button class="theme" id="themeBtn" type="button" aria-pressed="false" aria-label="Switch to dark theme" title="Switch to dark theme">☾</button>
-      <a class="btn btn-primary" href="index.html#download"><span data-i18n="actions.download">Download</span> <span aria-hidden="true">↓</span></a>
+      <button class="theme" id="themeBtn" type="button" aria-pressed="false" aria-label="Switch to dark theme" title="Switch to dark theme"><i class="fa-solid fa-moon" aria-hidden="true"></i></button>
+      <a class="btn btn-primary" href="index.html#download"><span data-i18n="actions.download">Download</span> <i class="fa-solid fa-download" aria-hidden="true"></i></a>
     </div>
   </div>
 </header>
@@ -163,7 +156,7 @@
       <a href="index.html#install" data-i18n="nav.install">Install</a>
       <a href="changelog.html" data-i18n="nav.changelog">Changelog</a>
       <a href="privacy.html" data-i18n="nav.privacy">Privacy</a>
-      <a href="https://github.com/raselrahmanrocky/Avro-Keyboard/issues" target="_blank" rel="noopener noreferrer" data-i18n="footer.reportBug">Report a bug ↗</a>
+      <a href="https://github.com/raselrahmanrocky/Avro-Keyboard/issues" target="_blank" rel="noopener noreferrer" data-i18n="footer.reportBug">Report a bug <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i></a>
     </nav>
   </div>
 </footer>
