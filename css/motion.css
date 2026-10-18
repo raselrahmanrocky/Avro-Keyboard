@@ -37,22 +37,31 @@
 }
 
 /* 3. H1 typing caret ====================================================== */
+/* Zero-width advance (border box 3px canceled by the negative margin): the
+   caret can never be pushed onto a new line when a phrase fills the line
+   edge to edge, so the headline keeps its natural line count. */
 .type-caret {
+  position: relative;
+  left: .06em;
   display: inline-block;
-  width: 3px;
+  width: 0;
   height: .82em;
-  margin-left: .06em;
-  vertical-align: -.06em;
+  border-left: 3px solid var(--purple);
+  margin-right: -3px;
   border-radius: 2px;
-  background: var(--purple);
+  vertical-align: -.06em;
 }
-[data-theme="dark"] .type-caret { background: #c79bff; }
+[data-theme="dark"] .type-caret { border-left-color: #c79bff; }
 @keyframes caret-blink {
   0%, 49% { opacity: 1; }
   50%, 100% { opacity: 0; }
 }
 @media (prefers-reduced-motion: no-preference) {
   .type-caret { animation: caret-blink 1.05s steps(2, jump-none) infinite; }
+  /* Ease the headline box between phrase heights during the empty gap that
+     precedes typing, so the copy below glides without the typewriter ever
+     nudging it. The duration matches GAP_MS in js/motion.js. */
+  html.js .hero h1 { transition: min-height .45s cubic-bezier(.22, .61, .36, 1); }
 }
 
 /* 4. Gradient shimmer ===================================================== */
@@ -213,11 +222,16 @@ main, .footer { position: relative; z-index: 1; }
   white-space: nowrap;
 }
 .marquee-half i { color: var(--purple); font-style: normal; font-size: 14px; }
-@keyframes marquee {
-  to { transform: translateX(-50%); }
-}
+/* The loop itself is driven from js/motion.js: inside the wide-screen
+   "body { zoom: 1.25 }" Chrome moves transform animations to the main
+   thread and snaps them to the device grid, which reads as judder. The
+   script advances by elapsed time and lands on exact device pixels. */
 @media (prefers-reduced-motion: no-preference) {
-  html.js .marquee-track { animation: marquee 34s linear infinite; }
+  html.js .marquee-track {
+    will-change: transform;
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+  }
 }
 
 /* 8b. Back to top ========================================================= */

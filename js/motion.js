@@ -1,7 +1,8 @@
 /* ==========================================================================
    Motion layer: scroll progress, reveal-on-scroll, the looping hero h1
-   typewriter, hero particles, the marquee clone, magnetic buttons, card
-   tilt and the floating back-to-top control.
+   typewriter, hero particles (pointerdown spawns settling glyphs), the
+   marquee clone, magnetic buttons, card tilt and the floating back-to-top
+   control.
 
    Every effect here is decorative and opt-out friendly: reduced motion skips
    all of it, a missing IntersectionObserver restores the reveal content, and
@@ -152,6 +153,7 @@
     var DELETE_MS = 24;
 
     var phrases = [];
+    var phraseHeights = [];
     var caret = null;
     var reduced = reduceMotion();
     var state = {
@@ -243,18 +245,25 @@
       return caret;
     }
 
-    /* The tallest phrase wins, so nothing below the headline ever shifts as
-       phrases of different lengths come and go. */
+    /* Each phrase reserves exactly its own settled height, so the headline
+       box is never taller than what it shows (no stray blank line) while a
+       phrase in progress never lets the space below it jump. The caret is
+       part of the measured DOM and the reading stays fractional (and
+       zoom-normalised): an integer, caret-less height sits a fraction below
+       the real typed line box, and that fraction pops the copy below it. */
     function measure() {
       var previous = h1.innerHTML;
-      var max = 0;
+      var heights = [];
+      var zoom = parseFloat(window.getComputedStyle(doc.body).zoom) || 1;
+      h1.style.minHeight = '';
       for (var i = 0; i < phrases.length; i++) {
         renderStatic(h1, phrases[i]);
-        var height = h1.offsetHeight;
-        if (height > max) max = height;
+        h1.appendChild(caretEl());
+        var box = h1.getBoundingClientRect().height / zoom;
+        heights.push(Math.ceil(box * 1000) / 1000);
       }
       h1.innerHTML = previous;
-      h1.style.minHeight = max ? max + 'px' : '';
+      phraseHeights = heights;
     }
 
     function staticRender() {
@@ -317,6 +326,7 @@
         total += state.ops[i].chars ? state.ops[i].chars.length : 0;
       }
       state.step = Math.min(46, Math.max(18, Math.round(1700 / Math.max(total, 1))));
+      h1.style.minHeight = phraseHeights[state.index] ? phraseHeights[state.index] + 'px' : '';
       while (h1.firstChild) h1.removeChild(h1.firstChild);
       h1.appendChild(caretEl());
       setPhase('type');
@@ -377,6 +387,15 @@
       var seg = state.stack[state.stack.length - 1];
       if (!seg) {
         setPhase('gap');
+        if (stale) {
+          stale = false;
+          measure();
+        }
+        /* Reserve the incoming phrase's height during the empty pause, so the
+           box eases to it before any characters appear: typing then happens
+           in a settled box and never nudges the copy below. */
+        var upcoming = (state.index + 1) % phrases.length;
+        h1.style.minHeight = phraseHeights[upcoming] ? phraseHeights[upcoming] + 'px' : '';
         schedule(nextPhrase, GAP_MS);
         return;
       }
@@ -435,6 +454,11 @@
        the phrase the loop is on, in the fresh language. The cycle position is
        never reset to 0; only a page load (or reload) starts over. */
     var booted = false;
+    /* A resize re-wraps the phrases and the stored heights go stale; they
+       are re-measured in the next empty gap, because measuring mid-typing
+       would rebuild the live typed nodes and break the running phrase. */
+    var stale = false;
+    window.addEventListener('resize', function () { stale = true; }, { passive: true });
     doc.addEventListener('avro:locale', function () {
       stopWait();
       booted = true;
@@ -464,9 +488,19 @@
     var ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    var GLYPHS = ['অ', 'আ', 'ই', 'ঈ', 'ক', 'খ', 'গ', 'ঘ', 'ব', 'ভ', 'ম', 'য', 'শ', 'প', 'ন', 'দ',];
+    var GLYPHS = [
+      'অ', 'আ', 'ই', 'ঈ', 'উ', 'ঊ', 'ঋ', 'এ', 'ঐ', 'ও', 'ঔ',
+      'ক', 'খ', 'গ', 'ঘ', 'ঙ', 'চ', 'ছ', 'জ', 'ঝ', 'ঞ',
+      'ট', 'ঠ', 'ড', 'ঢ', 'ণ', 'ত', 'থ', 'দ', 'ধ', 'ন',
+      'প', 'ফ', 'ব', 'ভ', 'ম', 'য', 'র', 'ল', 'শ', 'ষ',
+      'স', 'হ', 'ড়', 'ঢ়', 'য়'
+    ];
     var COLORS = ['rgba(190, 145, 246, 0.79)', 'rgba(150, 37, 255, 0.79)', 'rgba(154, 75, 6, 0.65)', 'rgb(122, 79, 252)'];
     var DPR = Math.min(window.devicePixelRatio || 1, 2);
+    var MAX_PARTICLES = 160;
+    var SPAWN_MIN = 6;
+    var SPAWN_MAX = 8;
+    var BURST_FRICTION = 0.98;
     var W = 1;
     var H = 1;
     var parts = [];
@@ -474,6 +508,12 @@
     var raf = null;
     var mouseX = -9999;
     var mouseY = -9999;
+    var lastMX = -9999;
+    var lastMY = -9999;
+
+    function drift() {
+      return (Math.random() - .5) * .22 * DPR;
+    }
 
     function resize() {
       W = Math.max(1, Math.round(canvas.offsetWidth * DPR));
@@ -482,12 +522,15 @@
       canvas.height = H;
     }
 
-    function make() {
+    function make(x, y) {
       return {
-        x: Math.random() * W,
-        y: Math.random() * H,
-        vx: (Math.random() - .5) * .22 * DPR,
-        vy: (Math.random() - .5) * .22 * DPR,
+        x: x === undefined ? Math.random() * W : x,
+        y: y === undefined ? Math.random() * H : y,
+        vx: drift(),
+        vy: drift(),
+        bx: 0,
+        by: 0,
+        sp: false,
         s: (16 + Math.random() * 22) * DPR,
         g: GLYPHS[Math.random() * GLYPHS.length | 0],
         c: COLORS[Math.random() * COLORS.length | 0],
@@ -497,33 +540,88 @@
       };
     }
 
+    function spawn(cx, cy) {
+      var count = SPAWN_MIN + (Math.random() * (SPAWN_MAX - SPAWN_MIN + 1) | 0);
+      for (var i = 0; i < count; i++) {
+        var p = make(cx, cy);
+        var angle = Math.random() * Math.PI * 2;
+        var speed = (2 + Math.random() * 4) * DPR;
+        p.bx = Math.cos(angle) * speed;
+        p.by = Math.sin(angle) * speed;
+        p.sp = true;
+        parts.push(p);
+      }
+      trim();
+    }
+
+    /* Cap enforcement drops only click-spawned glyphs, oldest first; the
+       ambient field seeded at boot is never removed. */
+    function trim() {
+      var over = parts.length - MAX_PARTICLES;
+      for (var i = 0; i < parts.length && over > 0; i++) {
+        if (parts[i].sp) {
+          parts.splice(i, 1);
+          i--;
+          over--;
+        }
+      }
+    }
+
     function frame() {
       if (!running) return;
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, W, H);
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      var mdx = mouseX - lastMX;
+      var mdy = mouseY - lastMY;
+      lastMX = mouseX;
+      lastMY = mouseY;
+      var mMove = Math.sqrt(mdx * mdx + mdy * mdy) / DPR;
       for (var i = 0; i < parts.length; i++) {
         var p = parts[i];
-        p.x += p.vx;
-        p.y += p.vy;
+        var bursting = p.bx !== 0 || p.by !== 0;
+        if (bursting) {
+          p.bx *= BURST_FRICTION;
+          p.by *= BURST_FRICTION;
+          if (Math.sqrt(p.bx * p.bx + p.by * p.by) < .1 * DPR) {
+            p.bx = 0;
+            p.by = 0;
+            bursting = false;
+          }
+        }
+        p.x += p.vx + p.bx;
+        p.y += p.vy + p.by;
         p.r += p.vr;
-        if (p.x < -80) p.x = W + 60; else if (p.x > W + 80) p.x = -60;
-        if (p.y < -80) p.y = H + 60; else if (p.y > H + 80) p.y = -60;
+        if (bursting) {
+          if (p.x < 0) { p.x = 0; p.bx = -p.bx; p.vx = -p.vx; }
+          else if (p.x > W) { p.x = W; p.bx = -p.bx; p.vx = -p.vx; }
+          if (p.y < 0) { p.y = 0; p.by = -p.by; p.vy = -p.vy; }
+          else if (p.y > H) { p.y = H; p.by = -p.by; p.vy = -p.vy; }
+        } else {
+          if (p.x < -80) p.x = W + 60; else if (p.x > W + 80) p.x = -60;
+          if (p.y < -80) p.y = H + 60; else if (p.y > H + 80) p.y = -60;
+        }
         var dx = p.x - mouseX;
         var dy = p.y - mouseY;
         var d = Math.sqrt(dx * dx + dy * dy);
         if (d < 150 * DPR && d > 0) {
-          p.x += (dx / d) * 1.3;
-          p.y += (dy / d) * 1.3;
+          /* Repel only while the pointer is actually travelling: a resting
+             cursor stops pinning glyphs into a fixed ring around itself and
+             the cloud keeps drifting through unharmed. */
+          var push = 1.3 * Math.min(1, mMove / 6);
+          p.x += (dx / d) * push;
+          p.y += (dy / d) * push;
         }
-        ctx.save();
-        ctx.translate(p.x, p.y);
-        ctx.rotate(p.r);
+        /* One setTransform replaces save/translate/rotate/restore; the
+           alignment pair is set once per frame instead of per glyph. */
+        var cos = Math.cos(p.r);
+        var sin = Math.sin(p.r);
+        ctx.setTransform(cos, sin, -sin, cos, p.x, p.y);
         ctx.font = '600 ' + p.s.toFixed(1) + 'px "Hind Siliguri", sans-serif';
         ctx.globalAlpha = p.a;
         ctx.fillStyle = p.c;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
         ctx.fillText(p.g, 0, 0);
-        ctx.restore();
       }
       raf = requestAnimationFrame(frame);
     }
@@ -541,7 +639,7 @@
     }
 
     resize();
-    for (var i = 0; i < 34; i++) parts.push(make());
+    for (var i = 0; i < 60; i++) parts.push(make());
 
     window.addEventListener('resize', function () {
       resize();
@@ -551,12 +649,34 @@
       }
     }, { passive: true });
 
+    /* Map a viewport point onto the canvas bitmap by scaling against the
+       element's rendered rect instead of DPR alone — getBoundingClientRect
+       and clientX live in visual space, while offsetWidth (and the bitmap)
+       stay in layout space, and the wide-desktop "body { zoom: 1.25 }"
+       makes the two differ by exactly that factor. */
+    function pointIn(e) {
+      var b = canvas.getBoundingClientRect();
+      if (!b.width || !b.height) return null;
+      return {
+        x: (e.clientX - b.left) * (W / b.width),
+        y: (e.clientY - b.top) * (H / b.height)
+      };
+    }
+
+    window.addEventListener('pointerdown', function (e) {
+      if (e.button > 0) return;
+      var pt = pointIn(e);
+      if (!pt || pt.x < 0 || pt.y < 0 || pt.x > W || pt.y > H) return;
+      spawn(pt.x, pt.y);
+    }, { passive: true });
+
     if (finePointer()) {
       var hero = canvas.parentElement;
       hero.addEventListener('mousemove', function (e) {
-        var b = canvas.getBoundingClientRect();
-        mouseX = (e.clientX - b.left) * DPR;
-        mouseY = (e.clientY - b.top) * DPR;
+        var pt = pointIn(e);
+        if (!pt) return;
+        mouseX = pt.x;
+        mouseY = pt.y;
       }, { passive: true });
       hero.addEventListener('mouseleave', function () { mouseX = mouseY = -9999; }, { passive: true });
     }
@@ -574,12 +694,82 @@
   }
 
   /* --------------------------------------------------------------- marquee -- */
+  /* Driven here rather than by a CSS animation: inside the wide-screen
+     "body { zoom: 1.25 }" Chrome moves transform animations to the main
+     thread and snaps them to the device grid, which reads as judder. The
+     loop advances by elapsed time (true speed across dropped frames) and
+     snaps to whole device pixels (zoom x DPR) so the text cannot shimmer. */
   function initMarquee() {
     var track = doc.querySelector('[data-marquee]');
     if (!track) return;
     var half = track.firstElementChild;
     if (!half) return;
     track.appendChild(half.cloneNode(true));
+    if (reduceMotion()) return;
+
+    var offset = 0;
+    var width = 1;
+    var scale = 1;
+    var last = 0;
+    var rafId = null;
+    var running = false;
+
+    function layout() {
+      width = half.offsetWidth || track.offsetWidth / 2 || 1;
+      var zoom = parseFloat(window.getComputedStyle(doc.body).zoom) || 1;
+      scale = zoom * (window.devicePixelRatio || 1);
+    }
+
+    function step(now) {
+      if (!running) return;
+      var dt = last ? Math.min(now - last, 100) : 0;
+      last = now;
+      offset += dt * width / 34000;
+      if (offset >= width) {
+        offset -= width;
+        layout();
+      }
+      track.style.transform = 'translate3d(' + (-(Math.round(offset * scale) / scale)) + 'px,0,0)';
+      rafId = requestAnimationFrame(step);
+    }
+
+    function play() {
+      if (running || doc.hidden) return;
+      running = true;
+      last = 0;
+      rafId = requestAnimationFrame(step);
+    }
+
+    function pause() {
+      running = false;
+      if (rafId) cancelAnimationFrame(rafId);
+      rafId = null;
+    }
+
+    var hidden = !!doc.hidden;
+    var offscreen = false;
+
+    function sync() {
+      if (hidden || offscreen) pause();
+      else play();
+    }
+
+    layout();
+    if (doc.fonts && doc.fonts.ready && doc.fonts.ready.then) {
+      doc.fonts.ready.then(function () { layout(); });
+    }
+    window.addEventListener('resize', layout, { passive: true });
+    doc.addEventListener('visibilitychange', function () { hidden = !!doc.hidden; sync(); }, { passive: true });
+
+    if ('IntersectionObserver' in window) {
+      offscreen = true;
+      new IntersectionObserver(function (entries) {
+        for (var i = 0; i < entries.length; i++) offscreen = !entries[i].isIntersecting;
+        sync();
+      }, { threshold: 0 }).observe(track);
+    } else {
+      sync();
+    }
   }
 
   /* ---------------------------------------------------- magnetic buttons -- */
