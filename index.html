@@ -550,27 +550,47 @@
 
 <footer class="footer">
   <div class="wrap">
-    <p class="legal" data-i18n="footer.legal">
-      Avro Keyboard Community Edition brings a faster, safer, and reliable Bangla typing experience for modern Windows. Engineered with a fresh 64-bit architecture, it features async persistence, grapheme-based backspace, and silent error recovery. Powered by an advanced Qt-based text converter, it bridges legacy reliability with modern performance. Built by the community, fully open-source, and strictly telemetry-free.
-    </p>
-  </div>
-  <div class="wrap footrow">
-    <div class="footbrand">
-      <span class="logo-sweep"><img src="img/logo.jpg" width="34" height="34" alt="" loading="lazy" decoding="async"></span>
-      <span>
-        <strong>Avro Keyboard Community Edition</strong><br>
-        <span data-i18n="footer.ahead"><span data-ahead-note>—</span> commits ahead of the official baseline · MPL-2.0</span>
-      </span>
+    <div class="footer-grid">
+      <div class="footer-col">
+        <div class="footer-brandrow">
+          <span class="logo-sweep"><img src="img/logo.jpg" width="42" height="42" alt="" loading="lazy" decoding="async"></span>
+          <b data-i18n="brand.name">Avro Keyboard<span class="ce-tag">Community Edition</span></b>
+        </div>
+        <p class="footer-desc" data-i18n="footer.desc">Community-driven open-source Bangla input method editor (IME).</p>
+        <p class="footer-meta" data-i18n="footer.ahead"><span data-ahead-note>—</span> commits ahead of the official baseline · MPL-2.0</p>
+      </div>
+      <nav class="footer-col" data-i18n-aria-label="nav.footer" aria-label="Footer links">
+        <h3 data-i18n="footer.quickLinks">Quick links</h3>
+        <ul class="footer-list">
+          <li><a href="#home" data-i18n="nav.home">Home</a></li>
+          <li><a href="#improvements" data-i18n="nav.improvements">Improvements</a></li>
+          <li><a href="#features" data-i18n="nav.features">Features</a></li>
+          <li><a href="#install" data-i18n="nav.install">Install</a></li>
+          <li><a href="#download" data-i18n="nav.download">Download</a></li>
+        </ul>
+      </nav>
+      <div class="footer-col footer-col--credits">
+        <h3 data-i18n="footer.creditsTitle">Credits &amp; licence</h3>
+        <p class="footer-credits" data-i18n="footer.credits">Independent continuation of Avro Keyboard under <strong>MPL-2.0</strong>. Originally created by <strong>OmicronLab (Mehdi Hasan Khan)</strong>. <strong>Not affiliated with OmicronLab.</strong></p>
+      </div>
+      <div class="footer-col footer-col--repo">
+        <h3 data-i18n="footer.repoTitle">GitHub repo</h3>
+        <a class="repo-card mono" href="https://github.com/raselrahmanrocky/Avro-Keyboard" target="_blank" rel="noopener noreferrer">
+          <i class="fa-brands fa-github" aria-hidden="true"></i>
+          <span>raselrahmanrocky / Avro-Keyboard</span>
+        </a>
+        <a class="footer-mini" href="https://github.com/raselrahmanrocky/Avro-Keyboard/issues" target="_blank" rel="noopener noreferrer" data-i18n="footer.reportBug">Report a bug <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i></a>
+      </div>
     </div>
-    <nav class="footer-links" data-i18n-aria-label="nav.footer" aria-label="Footer links">
-      <a href="#improvements" data-i18n="nav.improvements">Improvements</a>
-      <a href="#features" data-i18n="nav.features">Features</a>
-      <a href="#install" data-i18n="nav.install">Install</a>
-      <a href="blog.html" data-i18n="nav.blog">Blog</a>
-      <a href="changelog.html" data-i18n="nav.changelog">Changelog</a>
-      <a href="privacy.html" data-i18n="nav.privacy">Privacy</a>
-      <a href="https://github.com/raselrahmanrocky/Avro-Keyboard/issues" target="_blank" rel="noopener noreferrer" data-i18n="footer.reportBug">Report a bug <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i></a>
-    </nav>
+    <div class="footer-bottom">
+      <div>© 2026 Avro Keyboard Community Edition.</div>
+      <nav class="footer-pages" data-i18n-aria-label="nav.footerPages" aria-label="Footer pages">
+        <a href="blog.html" data-i18n="nav.blog">Blog</a>
+        <a href="changelog.html" data-i18n="nav.changelog">Changelog</a>
+        <a href="privacy.html" data-i18n="nav.privacy">Privacy</a>
+      </nav>
+      <div class="footer-made" data-i18n="footer.designedBy">Designed with <i class="footer-heart fa-solid fa-heart" aria-hidden="true"></i> for Bengali Community</div>
+    </div>
   </div>
 </footer>
 

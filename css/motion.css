@@ -106,7 +106,7 @@
 @media (prefers-reduced-motion: no-preference) {
   .logo-sweep::after { animation: logo-sweep 4.6s ease-in-out infinite; }
 }
-.footbrand .logo-sweep { border-radius: 10px; box-shadow: none; }
+.footer-brandrow .logo-sweep { border-radius: 10px; box-shadow: none; }
 
 /* 6. Floating glow ======================================================== */
 .glow {
