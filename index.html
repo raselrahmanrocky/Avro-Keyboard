@@ -213,33 +213,85 @@
 
       <div class="audit-grid">
         <article class="audit audit--ce reveal" id="auditCe" data-state="snapshot">
-          <span class="stamp stamp--live" data-i18n="audit.ce.stamp">Active</span>
-          <h3 data-i18n="audit.ce.title">Avro Keyboard Community Edition</h3>
-          <p class="sub" data-i18n="audit.ce.sub">This repository · Actively maintained</p>
-          <dl>
-            <dt data-i18n="audit.ce.latest">Latest tag</dt><dd data-audit="latest">v6.0.2-beta</dd>
-            <dt data-i18n="audit.ce.when">Released</dt><dd data-audit="when">16 October 2026</dd>
-            <dt data-i18n="audit.ce.commits">Total commits</dt><dd data-audit="commits">—</dd>
-            <dt data-i18n="audit.ce.ahead">Ahead of the baseline</dt><dd data-audit="ahead">—</dd>
-            <dt data-i18n="audit.ce.contributors">Contributors</dt><dd data-audit="contributors">—</dd>
-            <dt data-i18n="audit.ce.language">Language / licence</dt><dd data-audit="language">Pascal</dd>
-          </dl>
-          <p class="note" data-audit="freshness"></p>
+          <div class="audit-head">
+            <div class="audit-top">
+              <div class="audit-brand">
+                <span class="audit-logo" aria-hidden="true">অ</span>
+                <div>
+                  <h3 data-i18n="audit.ce.title">Avro Keyboard Community Edition</h3>
+                  <p class="sub" data-i18n="audit.ce.sub">This repository · Actively maintained</p>
+                </div>
+              </div>
+              <span class="stamp stamp--live" data-i18n="audit.ce.stamp">Active</span>
+            </div>
+            <div class="audit-stats">
+              <div class="audit-stat">
+                <span class="audit-num" data-audit="commits">—</span>
+                <span class="audit-label" data-i18n="audit.ce.commits">Total commits</span>
+              </div>
+              <div class="audit-stat">
+                <span class="audit-num" data-audit="ahead">—</span>
+                <span class="audit-label" data-i18n="audit.ce.ahead">Ahead of the baseline</span>
+              </div>
+            </div>
+            <p class="audit-desc" data-i18n="audit.ce.desc">Well past the official baseline — every commit fixes a real, reported problem.</p>
+            <a class="audit-cta" href="https://github.com/raselrahmanrocky/Avro-Keyboard" target="_blank" rel="noopener noreferrer">
+              <span data-i18n="audit.ce.cta">Repository</span> <span aria-hidden="true">↗</span>
+            </a>
+          </div>
+          <div class="audit-body">
+            <dl class="audit-rows">
+              <dt data-i18n="audit.row.stars">Stars</dt><dd data-audit="stars">10</dd>
+              <dt data-i18n="audit.row.forks">Forks</dt><dd data-audit="forks">5</dd>
+              <dt data-i18n="audit.row.contributors">Contributors</dt><dd data-audit="contributors">5</dd>
+              <dt data-i18n="audit.row.language">Language</dt><dd data-audit="language">Pascal</dd>
+              <dt data-i18n="audit.row.latest">Latest Tag</dt><dd><span class="audit-tag" data-audit="latest">v6.0.2-beta</span></dd>
+              <dt data-i18n="audit.row.released">Release Date</dt><dd data-audit="when">16 October 2026</dd>
+              <dt data-i18n="audit.row.updated">Last Update</dt><dd data-audit="freshness">—</dd>
+              <dt data-i18n="audit.row.license">License</dt><dd data-audit="licence">MPL-2.0</dd>
+            </dl>
+          </div>
         </article>
 
         <article class="audit audit--official reveal" id="auditOfficial" data-state="snapshot">
-          <span class="stamp stamp--archived" data-i18n="audit.official.stamp">Archived</span>
-          <h3 data-i18n="audit.official.title">The official Avro Keyboard</h3>
-          <p class="sub" data-i18n="audit.official.sub">OmicronLab · Baseline build</p>
-          <dl>
-            <dt data-i18n="audit.official.latestRelease">Latest software release</dt><dd data-audit="released">27 August 2019</dd>
-            <dt data-i18n="audit.official.sourceState">Source repository state</dt><dd data-audit="archived">Read-only (archived)</dd>
-            <dt data-i18n="audit.official.stars">GitHub stars</dt><dd data-audit="stars">—</dd>
-            <dt data-i18n="audit.official.forks">Forks</dt><dd data-audit="forks">—</dd>
-            <dt data-i18n="audit.official.issues">Open issues</dt><dd data-audit="issues">—</dd>
-            <dt data-i18n="audit.official.pushed">Last push</dt><dd data-audit="pushed">—</dd>
-          </dl>
-          <p class="note" data-audit="freshness"></p>
+          <div class="audit-head">
+            <div class="audit-top">
+              <div class="audit-brand">
+                <span class="audit-logo" aria-hidden="true">O</span>
+                <div>
+                  <h3 data-i18n="audit.official.title">The official Avro Keyboard</h3>
+                  <p class="sub" data-i18n="audit.official.sub">OmicronLab · Baseline build</p>
+                </div>
+              </div>
+              <span class="stamp stamp--archived" data-i18n="audit.official.stamp">Archived</span>
+            </div>
+            <div class="audit-stats">
+              <div class="audit-stat">
+                <span class="audit-num" data-audit="stars">—</span>
+                <span class="audit-label" data-i18n="audit.official.stars">GitHub stars</span>
+              </div>
+              <div class="audit-stat">
+                <span class="audit-num" data-audit="forks">—</span>
+                <span class="audit-label" data-i18n="audit.official.forks">Forks</span>
+              </div>
+            </div>
+            <p class="audit-desc" data-i18n="audit.official.desc">Frozen at 5.6.0 since 2019 — the published baseline this continuation is measured against.</p>
+            <a class="audit-cta" href="https://github.com/mugli/Avro-Keyboard" target="_blank" rel="noopener noreferrer">
+              <span data-i18n="audit.official.cta">Repository</span> <span aria-hidden="true">↗</span>
+            </a>
+          </div>
+          <div class="audit-body">
+            <dl class="audit-rows">
+              <dt data-i18n="audit.row.stars">Stars</dt><dd data-audit="stars">255</dd>
+              <dt data-i18n="audit.row.forks">Forks</dt><dd data-audit="forks">75</dd>
+              <dt data-i18n="audit.row.contributors">Contributors</dt><dd data-audit="contributors">4</dd>
+              <dt data-i18n="audit.row.language">Language</dt><dd data-audit="language">Pascal</dd>
+              <dt data-i18n="audit.row.latest">Latest Tag</dt><dd><span class="audit-tag">5.6.0</span></dd>
+              <dt data-i18n="audit.row.released">Release Date</dt><dd data-audit="released">27 August 2019</dd>
+              <dt data-i18n="audit.row.updated">Last Update</dt><dd data-audit="freshness">—</dd>
+              <dt data-i18n="audit.row.license">License</dt><dd data-audit="licence">MPL-2.0</dd>
+            </dl>
+          </div>
         </article>
       </div>
 
@@ -268,10 +320,10 @@
 
           <tbody>
             <tr class="group-row reveal"><th colspan="3" scope="colgroup" data-i18n="cmp.g2">Engine and conversion</th></tr>
-            <tr class="reveal"><td data-i18n="cmp.g2.r1.t">ANSI / Bijoy mapping</td><td data-i18n="cmp.g2.r1.o">One hardcoded mapping</td><td data-i18n="cmp.g2.r1.c"><span class="yes">✓</span>Every V1–V4 encoding is file-based</td></tr>
+            <tr class="reveal"><td data-i18n="cmp.g2.r1.t">ANSI / Bijoy mapping</td><td data-i18n="cmp.g2.r1.o">One hardcoded mapping</td><td data-i18n="cmp.g2.r1.c"><span class="yes">✓</span>Every V1–V5 encoding is file-based</td></tr>
             <tr class="reveal"><td data-i18n="cmp.g2.r2.t">First use</td><td data-i18n="cmp.g2.r2.o">Cold engine — stutters on first use</td><td data-i18n="cmp.g2.r2.c"><span class="yes">✓</span>Engine is already warm; switching versions allocates nothing</td></tr>
             <tr class="reveal"><td data-i18n="cmp.g2.r3.t">Backspace</td><td data-i18n="cmp.g2.r3.o">Breaks a compound character and leaves a stray vowel sign</td><td data-i18n="cmp.g2.r3.c"><span class="yes">✓</span>Deletes the whole grapheme</td></tr>
-            <tr class="reveal"><td data-i18n="cmp.g2.r4.t">V3 / V4 glyphs</td><td data-i18n="cmp.g2.r4.o">Some wrong glyphs</td><td data-i18n="cmp.g2.r4.c"><span class="yes">✓</span>Mapping tables updated</td></tr>
+            <tr class="reveal"><td data-i18n="cmp.g2.r4.t">Conjunction</td><td data-i18n="cmp.g2.r4.o">Some wrong glyphs</td><td data-i18n="cmp.g2.r4.c"><span class="yes">✓</span>Mapping tables updated</td></tr>
             <tr class="reveal"><td data-i18n="cmp.g2.r5.t">Cache restart</td><td data-i18n="cmp.g2.r5.o">—</td><td data-i18n="cmp.g2.r5.c"><span class="yes">✓</span>The encoding setting survives a cache restart</td></tr>
           </tbody>
 
@@ -281,7 +333,7 @@
             <tr class="reveal"><td data-i18n="cmp.g3.r2.t">Encoding selection</td><td data-i18n="cmp.g3.r2.o">A separate picker</td><td data-i18n="cmp.g3.r2.c"><span class="yes">✓</span>“Select ANSI Encoding” in the tray, kept in sync with every picker</td></tr>
             <tr class="reveal"><td data-i18n="cmp.g3.r3.t">List sorting</td><td data-i18n="cmp.g3.r3.o">Plain sort</td><td data-i18n="cmp.g3.r3.c"><span class="yes">✓</span>Natural sort from V1 → V5</td></tr>
             <tr class="reveal"><td data-i18n="cmp.g3.r4.t">Icons</td><td data-i18n="cmp.g3.r4.o">Plain</td><td data-i18n="cmp.g3.r4.c"><span class="yes">✓</span>Layout-aware icons</td></tr>
-            <tr class="reveal"><td data-i18n="cmp.g3.r5.t">Global hotkey</td><td data-i18n="cmp.g3.r5.o">Limited</td><td data-i18n="cmp.g3.r5.c"><span class="yes">✓</span>Works in any app; catches key conflicts before you save</td></tr>
+            <tr class="reveal"><td data-i18n="cmp.g3.r5.t">Global hotkey</td><td data-i18n="cmp.g3.r5.o">Limited</td><td data-i18n="cmp.g3.r5.c"><span class="yes">✓</span>Set your own custom hotkey in app; catches key conflicts before you save</td></tr>
           </tbody>
 
           <tbody>
@@ -295,7 +347,7 @@
 
           <tbody>
             <tr class="group-row reveal"><th colspan="3" scope="colgroup" data-i18n="cmp.g5">Converter, build and licence</th></tr>
-            <tr class="reveal"><td data-i18n="cmp.g5.r1.t">Text Converter</td><td data-i18n="cmp.g5.r1.o">Needed a separate install</td><td data-i18n="cmp.g5.r1.c"><span class="yes">✓</span>Built into the app — Ctrl+Alt+T, and it does not freeze on large text</td></tr>
+            <tr class="reveal"><td data-i18n="cmp.g5.r1.t">Text Converter</td><td data-i18n="cmp.g5.r1.o">It hangs if there are too many words.</td><td data-i18n="cmp.g5.r1.c"><span class="yes">✓</span>Built into the app, and it does not freeze on large text</td></tr>
             <tr class="reveal"><td data-i18n="cmp.g5.r2.t">Qt converter</td><td data-i18n="cmp.g5.r2.o">Did not exist</td><td data-i18n="cmp.g5.r2.c"><span class="yes">✓</span>A Qt 6 C++ port, with a <code>--mapping-dir</code> switch</td></tr>
             <tr class="reveal"><td data-i18n="cmp.g5.r3.t">Build setup</td><td data-i18n="cmp.g5.r3.o">Delphi 2010 plus proprietary DISQLite3, ICS, JVCL/JCL</td><td data-i18n="cmp.g5.r3.c"><span class="yes">✓</span>Delphi 12 Community Edition, with no third-party dependency</td></tr>
             <tr class="reveal"><td data-i18n="cmp.g5.r4.t">Licence</td><td data-i18n="cmp.g5.r4.o">MPL-1.1 (official source)</td><td data-i18n="cmp.g5.r4.c"><span class="yes">✓</span>MPL-2.0, with Qt's LGPLv3 terms documented</td></tr>
@@ -312,7 +364,7 @@
         <article class="detail reveal">
           <span class="tag">Engine</span>
           <h4 data-i18n="detail.1.title">A new ANSI/Bijoy conversion engine</h4>
-          <p data-i18n="detail.1.body">The single hardcoded mapping inside has been removed so every V1–V4 encoding is file-based. The engine is pre-warmed, switching versions allocates nothing, and the setting survives a cache restart.</p>
+          <p data-i18n="detail.1.body">The single hardcoded mapping inside has been removed so every V1–V5 encoding is file-based. The engine is pre-warmed, switching versions allocates nothing, and the setting survives a cache restart.</p>
         </article>
         <article class="detail reveal">
           <span class="tag">Converter</span>
@@ -414,7 +466,7 @@
         <article class="feature reveal">
           <div class="ico"><svg class="ic" aria-hidden="true"><use href="#i-bolt"></use></svg></div>
           <h3 data-i18n="feature.3.title">A file-based ANSI engine</h3>
-          <p data-i18n="feature.3.body">Every V1–V4 encoding loads from its own file — no hardcoded mapping is left.</p>
+          <p data-i18n="feature.3.body">Every V1–V5 encoding loads from its own file — no hardcoded mapping is left.</p>
         </article>
         <article class="feature reveal">
           <div class="ico"><svg class="ic" aria-hidden="true"><use href="#i-shield"></use></svg></div>

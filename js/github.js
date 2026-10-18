@@ -50,6 +50,7 @@ window.AVRO_GH = (function () {
     compare: BASE + '/repos/' + SLUG + '/compare/' + SRC.baseline + '...' + SRC.branch,
     releases: BASE + '/repos/' + SLUG + '/releases?per_page=10',
     official: BASE + '/repos/' + OFF.owner + '/' + OFF.repo,
+    officialContributors: BASE + '/repos/' + OFF.owner + '/' + OFF.repo + '/contributors?per_page=100',
     commitsFor: function (tag) {
       return BASE + '/repos/' + SLUG + '/commits?sha=' + encodeURIComponent(tag) + '&per_page=100';
     },
@@ -522,8 +523,15 @@ window.AVRO_GH = (function () {
         forks: r.data.forks_count,
         issues: r.data.open_issues_count,
         pushed: r.data.pushed_at,
+        language: r.data.language || null,
         licence: (r.data.license || {}).spdx_id || null
       };
+      /* The contributor count lives on its own endpoint; if it fails the
+         cards fall back to the saved snapshot figure. */
+      try {
+        var c = await get(U.officialContributors);
+        if (Array.isArray(c.data)) live.contributors = c.data.length;
+      } catch (e2) { /* keep going without it */ }
       if (SNAP) SNAP.write('official', live);
       return { data: Object.assign({}, base, live), live: true, source: 'live', captured: null };
     } catch (e) { /* fall through */ }

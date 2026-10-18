@@ -17,10 +17,6 @@
   var ourCard = document.getElementById('auditCe');
   if (!officialCard && !ourCard) return;
 
-  function t(key, vars) {
-    return I18N ? I18N.t(key, vars) : key;
-  }
-
   function pick(value) {
     return I18N ? I18N.pick(value) : (typeof value === 'string' ? value : '');
   }
@@ -54,9 +50,8 @@
       released: fmtDate(o.released || cfg.official.released),
       stars: typeof o.stars === 'number' ? GH.fmt.num(o.stars) : undefined,
       forks: typeof o.forks === 'number' ? GH.fmt.num(o.forks) : undefined,
-      issues: typeof o.issues === 'number' ? GH.fmt.num(o.issues) : undefined,
-      archived: o.archived ? t('audit.archived') : t('audit.active'),
-      pushed: fmtDate(o.pushed),
+      contributors: typeof o.contributors === 'number' ? GH.fmt.num(o.contributors) : undefined,
+      language: o.language || null,
       licence: o.licence || pick(cfg.official.licence)
     };
   }
@@ -73,11 +68,14 @@
     };
   }
 
-  /** Freshness line shared by both cards. */
+  /** "Last Update" row: relative time, with the full date on hover. */
   function freshness(root, iso) {
     if (!root || !iso) return;
     var el = root.querySelector('[data-audit="freshness"]');
-    if (el) el.textContent = t('audit.freshness', { when: GH.fmt.relative(iso) });
+    if (el) {
+      el.textContent = GH.fmt.relative(iso);
+      el.title = GH.fmt.longDate(iso);
+    }
   }
 
   function render() {
