@@ -263,6 +263,7 @@ window.AVRO_I18N = (function () {
       'nav.skip': 'মূল কনটেন্টে যান',
       'nav.toTop': 'উপরে ফিরুন',
       'nav.main': 'প্রধান নেভিগেশন',
+      'nav.menu': 'মেনু',
       'nav.footer': 'ফুটার লিংক',
       'nav.footerPages': 'ফুটার পেজ',
       'nav.variants': 'সংস্করণ তালিকা',

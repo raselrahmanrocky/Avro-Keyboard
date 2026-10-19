@@ -28,6 +28,10 @@
   function paint(mode) {
     root.setAttribute('data-theme', mode);
 
+    /* Announced the same way i18n.js announces a language switch, so canvas
+       layers (the hero particles) can re-read their CSS colour tokens. */
+    document.dispatchEvent(new CustomEvent('avro:theme', { detail: { theme: mode } }));
+
     var btn = document.getElementById('themeBtn');
     if (!btn) return;
 

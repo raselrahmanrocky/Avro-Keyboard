@@ -86,18 +86,20 @@
       <span class="logo-sweep"><img src="img/logo.jpg" width="44" height="44" alt=""></span>
       <span><b data-i18n="brand.name">Avro Keyboard<span class="ce-tag">Community Edition</span></b><small data-i18n="brand.tagline">Open source · MPL-2.0</small></span>
     </a>
-    <nav class="navlinks" data-i18n-aria-label="nav.main" aria-label="Main navigation">
+    <nav class="navlinks" id="mainNav" data-i18n-aria-label="nav.main" aria-label="Main navigation">
       <a href="index.html#improvements" data-i18n="nav.improvements">Improvements</a>
       <a href="index.html#features" data-i18n="nav.features">Features</a>
       <a href="index.html#install" data-i18n="nav.install">Install</a>
       <a href="index.html#download" data-i18n="nav.download">Download</a>
       <a href="blog.html" data-i18n="nav.blog">Blog</a>
       <a href="changelog.html" data-i18n="nav.changelog">Changelog</a>
+      <a class="btn btn-primary menu-cta" href="index.html#download"><span data-i18n="actions.download">Download</span> <i class="fa-solid fa-download" aria-hidden="true"></i></a>
     </nav>
     <div class="navright">
       <button class="langswitch" type="button" data-lang-toggle aria-label="বাংলা" title="বাংলা"><span data-lang-code="en" data-active="true">EN</span><span data-lang-code="bn" data-active="false">বাং</span></button>
       <button class="theme" id="themeBtn" type="button" aria-pressed="false" aria-label="Switch to dark theme" title="Switch to dark theme"><i class="fa-solid fa-moon" aria-hidden="true"></i></button>
       <a class="btn btn-primary" href="index.html#download"><span data-i18n="actions.download">Download</span> <i class="fa-solid fa-download" aria-hidden="true"></i></a>
+      <button class="navbtn" type="button" data-menu-toggle aria-expanded="false" aria-controls="mainNav" aria-label="Menu" title="Menu" data-i18n-aria-label="nav.menu" data-i18n-title="nav.menu"><i class="fa-solid fa-bars" aria-hidden="true"></i></button>
     </div>
   </div>
 </header>
@@ -406,7 +408,7 @@
         <h3 data-i18n="footer.repoTitle">GitHub repo</h3>
         <a class="repo-card mono" href="https://github.com/raselrahmanrocky/Avro-Keyboard" target="_blank" rel="noopener noreferrer">
           <i class="fa-brands fa-github" aria-hidden="true"></i>
-          <span>raselrahmanrocky / Avro-Keyboard</span>
+          <span>Avro-Keyboard</span>
         </a>
         <a class="footer-mini" href="https://github.com/raselrahmanrocky/Avro-Keyboard/issues" target="_blank" rel="noopener noreferrer" data-i18n="footer.reportBug">Report a bug <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i></a>
       </div>
@@ -432,5 +434,6 @@
 <script src="js/ahead-note.js" defer></script>
 <script src="js/privacy.js" defer></script>
 <script src="js/motion.js" defer></script>
+<script src="js/nav.js" defer></script>
 </body>
 </html>

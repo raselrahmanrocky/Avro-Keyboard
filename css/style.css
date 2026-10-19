@@ -161,6 +161,26 @@ img { max-width: 100%; height: auto; }
 .navlinks a:hover { color: var(--purple); }
 .navright { display: flex; gap: 10px; align-items: center; }
 
+/* The burger and the panel's Download call to action only exist below the
+   desktop breakpoint; the ≤1159px block turns them on. */
+.navbtn {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--text);
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+.navbtn:hover { border-color: var(--purple); color: var(--purple); }
+.navlinks .menu-cta { display: none; }
+
 /* Language switcher — one pill, two labels. The active language is the filled
    segment; a click anywhere on the pill swaps the two. */
 .langswitch {
@@ -925,10 +945,63 @@ tbody td:nth-child(3) { font-weight: 650; }
 
 /* With the 14px floor in place, the brand + navlinks + controls row needs
    the full 1120px container (viewport ≥ 1160). Below that the bar keeps its
-   single sticky row by dropping the links; they stay reachable from the
-   footer on every page. */
+   single sticky row by dropping the links; the burger button opens them as
+   a panel under the bar instead. */
 @media (max-width: 1159px) {
   .navlinks { display: none; }
+  .navbtn { display: inline-flex; }
+
+  /* Open state (html.menu-open, written by js/nav.js, which also sets --navh
+     to the measured bar height). The panel is a compact drop-down card, inset
+     from the edges like the approved mobile mockup: the bar's backdrop-filter
+     makes it the containing block, so it stays glued under the sticky bar at
+     any breakpoint. Links are full-width rows and the Download CTA closes the
+     card as a pill. */
+  html.menu-open .navlinks {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 2px;
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 16px;
+    right: 16px;
+    max-height: calc(100vh - var(--navh, 77px) - 30px);
+    max-height: calc(100dvh - var(--navh, 77px) - 30px);
+    padding: 8px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--r);
+    box-shadow: var(--shadow);
+    color: var(--text);
+    font-size: 16px;
+    animation: menu-in .18s ease-out;
+  }
+  html.menu-open .navlinks a {
+    padding: 14px 12px;
+    border-radius: 12px;
+    font-weight: 600;
+  }
+  html.menu-open .navlinks a:not(.menu-cta):hover {
+    background: color-mix(in srgb, var(--purple) 10%, transparent);
+  }
+  html.menu-open .navlinks a[aria-current="page"] { color: var(--purple); }
+  html.menu-open .navlinks .menu-cta {
+    display: inline-flex;
+    justify-content: center;
+    margin: 10px 4px 4px;
+    padding-block: 15px;
+    border-radius: 999px;
+  }
+  html.menu-open .navbtn { color: var(--purple); border-color: var(--purple); }
+  html.menu-open .to-top { display: none; }
+}
+
+@keyframes menu-in {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: none; }
 }
 
 @media (max-width: 850px) {
@@ -971,11 +1044,13 @@ tbody td:nth-child(3) { font-weight: 650; }
      it but keep the edition line under the name (narrower type keeps the
      sticky bar on one row next to the language switcher). */
   .brand small { display: none; }
-  .ce-tag { font-size: 14px; letter-spacing: .2px; margin-top: 0; }
+  .ce-tag { font-size: 13px; letter-spacing: .2px; margin-top: 0; }
   .navright { gap: 6px; margin-left: auto; }
   .langswitch { padding: 2px; }
   .langswitch span { padding: 7px 5px; font-size: 14px; }
   .theme { width: 34px; height: 34px; font-size: 16px; border-radius: 11px; }
+  .navbtn { width: 34px; height: 34px; font-size: 16px; border-radius: 11px; }
+  html.menu-open .navlinks { left: 12px; right: 12px; }
   /* The sticky header would otherwise take a second row and hold ~100px of a
      phone screen permanently. The hero's own download button sits directly
      below on the first screen, so this copy is the redundant one. */

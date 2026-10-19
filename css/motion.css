@@ -161,6 +161,22 @@
 main, .footer { position: relative; z-index: 1; }
 
 /* 7. Hero particles ======================================================= */
+/* The four glyph colours live in custom properties so each theme carries its
+   own palette; js/motion.js reads them at boot and re-reads after a theme
+   switch (avro:theme), while its constants remain a no-stylesheet fallback.
+   Light = deep saturated brand hues on the pale hero, dark = luminous. */
+:root {
+  --particle-1: rgba(118, 40, 217, 0.85);
+  --particle-2: rgba(168, 85, 247, 0.85);
+  --particle-3: rgba(180, 83, 9, 0.85);
+  --particle-4: rgba(79, 70, 229, 0.85);
+}
+[data-theme="dark"] {
+  --particle-1: rgba(199, 155, 255, 0.9);
+  --particle-2: rgba(193, 113, 255, 0.9);
+  --particle-3: rgba(255, 198, 108, 0.9);
+  --particle-4: rgba(159, 140, 255, 0.9);
+}
 .hero { position: relative; }
 .hero-particles {
   position: absolute;
@@ -169,9 +185,9 @@ main, .footer { position: relative; z-index: 1; }
   height: 100%;
   z-index: 0;
   pointer-events: none;
-  opacity: .55;
+  opacity: .7;
 }
-[data-theme="dark"] .hero-particles { opacity: .5; }
+[data-theme="dark"] .hero-particles { opacity: .65; }
 .hero > .wrap { position: relative; z-index: 1; }
 
 /* 7b. Hero showcase float ================================================= */

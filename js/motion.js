@@ -495,7 +495,24 @@
       'প', 'ফ', 'ব', 'ভ', 'ম', 'য', 'র', 'ল', 'শ', 'ষ',
       'স', 'হ', 'ড়', 'ঢ়', 'য়'
     ];
-    var COLORS = ['rgba(190, 145, 246, 0.79)', 'rgba(150, 37, 255, 0.79)', 'rgba(154, 75, 6, 0.65)', 'rgb(122, 79, 252)'];
+    /* The palette lives in the --particle-* custom properties (motion.css)
+       so light and dark each carry their own colours; the constants below
+       are only the no-stylesheet fallback. Glyphs store a palette slot and
+       resolve the colour at draw time, so a theme switch repaints every
+       glyph on the next frame. */
+    var FALLBACK_COLORS = ['rgba(118, 40, 217, 0.85)', 'rgba(168, 85, 247, 0.85)', 'rgba(180, 83, 9, 0.85)', 'rgba(79, 70, 229, 0.85)'];
+
+    function readColors() {
+      var cs = window.getComputedStyle(root);
+      var out = [];
+      for (var i = 0; i < FALLBACK_COLORS.length; i++) {
+        var value = cs.getPropertyValue('--particle-' + (i + 1)).trim();
+        out.push(value || FALLBACK_COLORS[i]);
+      }
+      return out;
+    }
+
+    var COLORS = readColors();
     var DPR = Math.min(window.devicePixelRatio || 1, 2);
     var MAX_PARTICLES = 160;
     var SPAWN_MIN = 6;
@@ -533,8 +550,8 @@
         sp: false,
         s: (16 + Math.random() * 22) * DPR,
         g: GLYPHS[Math.random() * GLYPHS.length | 0],
-        c: COLORS[Math.random() * COLORS.length | 0],
-        a: .25 + Math.random() * .45,
+        ci: Math.random() * COLORS.length | 0,
+        a: .35 + Math.random() * .5,
         r: Math.random() * Math.PI * 2,
         vr: (Math.random() - .5) * .003
       };
@@ -620,7 +637,7 @@
         ctx.setTransform(cos, sin, -sin, cos, p.x, p.y);
         ctx.font = '600 ' + p.s.toFixed(1) + 'px "Hind Siliguri", sans-serif';
         ctx.globalAlpha = p.a;
-        ctx.fillStyle = p.c;
+        ctx.fillStyle = COLORS[p.ci];
         ctx.fillText(p.g, 0, 0);
       }
       raf = requestAnimationFrame(frame);
@@ -640,6 +657,10 @@
 
     resize();
     for (var i = 0; i < 60; i++) parts.push(make());
+
+    /* A theme switch swaps the palette in place; every glyph keeps its slot
+       and picks the new colour up on the next frame. */
+    doc.addEventListener('avro:theme', function () { COLORS = readColors(); });
 
     window.addEventListener('resize', function () {
       resize();
