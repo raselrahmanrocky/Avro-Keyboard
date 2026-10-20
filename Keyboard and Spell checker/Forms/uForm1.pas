@@ -1680,7 +1680,7 @@ begin
     begin
       try
         repeat
-          if (SR.Name <> '.') and (SR.Name <> '..') then
+          if (SR.Name <> '.') and (SR.Name <> '..') and IsAnsiMappingFileName(SR.Name) then
             NameList.Add(Lowercase(SR.Name));
         until FindNext(SR) <> 0;
       finally
@@ -1692,7 +1692,7 @@ begin
     begin
       try
         repeat
-          if (SR.Name <> '.') and (SR.Name <> '..') then
+          if (SR.Name <> '.') and (SR.Name <> '..') and IsAnsiMappingFileName(SR.Name) then
             NameList.Add(Lowercase(SR.Name));
         until FindNext(SR) <> 0;
       finally

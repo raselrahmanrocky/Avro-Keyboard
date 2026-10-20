@@ -66,6 +66,9 @@ function GetEncoDisplayName(const AFilePath: string): string;
 { True for any protected mapping container (.AvroEnco extension; both the
   legacy CBC and the Shield container format live under this extension). }
 function IsEncoFile(const AFilePath: string): Boolean;
+{ True for files the ANSI mapping catalog may list: .AvroEnco containers and
+  .json mappings. settings.json and *.meta.json sidecars are not mappings. }
+function IsAnsiMappingFileName(const AFileName: string): Boolean;
 { ============================================================================== }
 { Per-layout icon carried inside the mapping payload }
 { ============================================================================== }
@@ -329,6 +332,21 @@ begin
   Result := SameText(ExtractFileExt(AFilePath), '.AvroEnco');
 end;
 
+function IsAnsiMappingFileName(const AFileName: string): Boolean;
+var
+  Name: string;
+begin
+  Name := ExtractFileName(AFileName);
+  Result := SameText(ExtractFileExt(Name), '.AvroEnco') or
+            SameText(ExtractFileExt(Name), '.json');
+  if not Result then
+    Exit;
+  if SameText(Name, 'settings.json') then
+    Exit(False);
+  if SameText(ExtractFileExt(ChangeFileExt(Name, '')), '.meta') then
+    Exit(False);
+end;
+
 procedure ScanDirHelper(const ADir: string);
 var
   SR:                     TSearchRec;
@@ -343,7 +361,7 @@ begin
   begin
     try
       repeat
-        if (SR.Name <> '.') and (SR.Name <> '..') then
+        if (SR.Name <> '.') and (SR.Name <> '..') and IsAnsiMappingFileName(SR.Name) then
         begin
           FoundPath := ADir + SR.Name;
           DisplayName := ChangeFileExt(SR.Name, '');
@@ -364,7 +382,7 @@ begin
   begin
     try
       repeat
-        if (SR.Name <> '.') and (SR.Name <> '..') then
+        if (SR.Name <> '.') and (SR.Name <> '..') and IsAnsiMappingFileName(SR.Name) then
         begin
           DisplayName := ChangeFileExt(SR.Name, '');
           if not AvroEncoFiles.ContainsKey(LowerCase(DisplayName)) then
@@ -386,7 +404,6 @@ end;
 
 procedure ScanAvroEncoFiles(const ADirectory: string);
 var
-  AppDir:  string;
   OldKeys: TList<string>;
   Key:     string;
 begin
@@ -401,16 +418,9 @@ begin
 
     AvroEncoFiles.Clear;
 
-    AppDir := ExtractFilePath(ParamStr(0));
-
-    // 1. Scan Primary Directory
+    // The configured mapping directory is the sole catalog source. Bundled
+    // mappings beside the executable must never shadow the user's files.
     ScanDirHelper(ADirectory);
-
-    // 2. Scan assets/ folder
-    ScanDirHelper(AppDir + 'assets\');
-
-    // 3. Scan AnsiMapping/ folder
-    ScanDirHelper(AppDir + 'AnsiMapping\');
 
     // Remove icon entries for files that no longer exist on disk (renamed or
     // deleted).  This prevents stale icon badges lingering in the menu.
@@ -752,8 +762,7 @@ end;
 
 function GetActiveEncoFilePath(const ADisplayName: string; const ADirectory: string): string;
 var
-  Info:   TAvroEncoFileInfo;
-  AppDir: string;
+  Info: TAvroEncoFileInfo;
 begin
   Result := '';
   // 1. Check dictionary cache first
@@ -763,42 +772,24 @@ begin
       Exit(Info.FilePath);
   end;
 
-  AppDir := ExtractFilePath(ParamStr(0));
-
-  // 2. Check .AvroEnco in all directories (covers both the legacy CBC and
-  // the Shield container format), then .json.
+  // 2. Fall back to the configured directory only. Mappings beside the
+  // executable must never override the user's copy.
   if FileExists(ADirectory + ADisplayName + '.AvroEnco') then
     Exit(ADirectory + ADisplayName + '.AvroEnco');
-  if FileExists(AppDir + 'assets\' + ADisplayName + '.AvroEnco') then
-    Exit(AppDir + 'assets\' + ADisplayName + '.AvroEnco');
-  if FileExists(AppDir + 'AnsiMapping\' + ADisplayName + '.AvroEnco') then
-    Exit(AppDir + 'AnsiMapping\' + ADisplayName + '.AvroEnco');
-  if (AppDir <> ADirectory) and FileExists(AppDir + ADisplayName + '.AvroEnco') then
-    Exit(AppDir + ADisplayName + '.AvroEnco');
-  // 3. Fallback to .json files
   if FileExists(ADirectory + ADisplayName + '.json') then
     Exit(ADirectory + ADisplayName + '.json');
-  if FileExists(AppDir + 'assets\' + ADisplayName + '.json') then
-    Exit(AppDir + 'assets\' + ADisplayName + '.json');
 end;
 
-{ Returns the first existing, same-named .json for ADisplayName, used as a
+{ Returns the same-named .json in the configured mapping directory, used as a
   Metadata source when an old .AvroEnco file (encrypted before Metadata
   existed) decrypts to JSON without a Metadata block. }
 function FindMetadataJsonPath(const ADisplayName: string; const ADirectory: string): string;
-var
-  AppDir: string;
 begin
   Result := '';
-  if ADisplayName = '' then
+  if (ADisplayName = '') or (ADirectory = '') then
     Exit;
-  AppDir := ExtractFilePath(ParamStr(0));
-  if (ADirectory <> '') and FileExists(ADirectory + ADisplayName + '.json') then
+  if FileExists(ADirectory + ADisplayName + '.json') then
     Exit(ADirectory + ADisplayName + '.json');
-  if FileExists(AppDir + 'assets\' + ADisplayName + '.json') then
-    Exit(AppDir + 'assets\' + ADisplayName + '.json');
-  if FileExists(AppDir + 'AnsiMapping\' + ADisplayName + '.json') then
-    Exit(AppDir + 'AnsiMapping\' + ADisplayName + '.json');
 end;
 
 { ============================================================================== }

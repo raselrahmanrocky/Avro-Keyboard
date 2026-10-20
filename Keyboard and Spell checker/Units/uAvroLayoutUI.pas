@@ -273,7 +273,7 @@ begin
   if (MetaText = '') and IsEncoFile(SourcePath) then
   begin
     // .AvroEnco files created before Metadata existed decrypt to JSON without
-    // one; fall back to the same-named .json (mapping folder or assets) so the
+    // one; fall back to the same-named .json in the mapping directory so the
     // description card still shows the Metadata from the JSON file.
     JsonPath := FindMetadataJsonPath(AMapName, AnsiMappingDir);
     if JsonPath <> '' then

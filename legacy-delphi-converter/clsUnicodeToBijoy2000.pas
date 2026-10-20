@@ -5189,9 +5189,10 @@ begin
   Result := False;
   ErrorMessage := '';
 
-  // Resolve file path using multi-directory resolver. There is no compiled-in
-  // Default shortcut - a name is only valid when a file resolves (including
-  // a file the user happens to have named Default.json / Default.AvroEnco).
+  // Resolve the file in the configured mapping directory. There is no
+  // compiled-in Default shortcut - a name is only valid when a file resolves
+  // (including a file the user happens to have named Default.json /
+  // Default.AvroEnco).
   FilePath := GetActiveEncoFilePath(NewVersion, AnsiMappingDir);
   if FilePath = '' then
   begin
