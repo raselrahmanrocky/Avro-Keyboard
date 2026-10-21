@@ -97,6 +97,9 @@ Standard edition/
 
 
 *.json
+# The canonical rollout exclusion data is source, not generated data. It must
+# be tracked so the exporter, scrubber, reset and publish paths cannot drift.
+!tools/rollout/exclusions.json
 decrypted/
 # Exactly three key files are TRACKED: the container IKM, the comment IKM and
 # the Ed25519 manifest signing key - they are what lets this repository build
