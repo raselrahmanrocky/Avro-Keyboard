@@ -430,8 +430,12 @@ else {
 Write-Step "Upload assets ($releaseId)"
 $existingAssets = @()
 for ($attempt = 1; $attempt -le 4; $attempt++) {
-    try { $rawAssets = Invoke-GitHubApi -Uri "https://api.github.com/repos/$Repo/releases/$releaseId/assets?per_page=100" }
+    try { $assetRaw = Invoke-GitHubApi -Uri "https://api.github.com/repos/$Repo/releases/$releaseId/assets?per_page=100" }
     catch { Write-Fail $_.Exception.Message; exit 1 }
+    # PowerShell 5.1 can hand a JSON array back as ONE nested element, so the
+    # list is flattened explicitly before it is filtered.
+    $rawAssets = @()
+    foreach ($a in $assetRaw) { $rawAssets += $a }
     $existingAssets = @($rawAssets | Where-Object { $_ -and $_.PSObject.Properties['name'] })
     if ($existingAssets.Count -gt 0 -or $attempt -eq 4) { break }
     Write-Warn "the asset list came back empty (attempt $attempt); retrying in 5s"
