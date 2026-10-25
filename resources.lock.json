@@ -1,7 +1,7 @@
 {
   "lockVersion": 1,
   "keyId": "ed25519-2026-2",
-  "generated": "2026-10-15T10:57:23Z",
-  "signature": "uRkuJlcaLFrRc+w7993nhKexNabeeGJNI/CiATeZo83ufXATHmWo5NbRo14c0vRSl/xh/rqdsbK53TMq+sZ2CQ==",
-  "payload": "avro-lock-v1\ngenerated=2026-10-15T10:57:23Z\nkeyid=ed25519-2026-2\nkeyepoch=2\nresource\tansi-v1\tAnsi V1.AvroEnco\t1.2\t3\t68329\t941aef1462fa229e91c546003b8a0f1a276fae44003ea937ff33eea65a8cc371\t2\nresource\tansi-v2\tAnsi V2.AvroEnco\t2.1\t3\t68631\ta1afb8a78d60d5a88bb8744653b84197cd5d3e59517df2c8031db02ffd53da97\t2\nresource\tansi-v3\tAnsi V3.AvroEnco\t1.1\t3\t107321\t291740311bebec8f91ea6862b33ce19815a48e2736fa65755967db152be4454a\t2\nresource\tansi-v4\tAnsi V4.AvroEnco\t1.1\t3\t69251\t9b148409dc63fd3f38f824293ba26b238facb3ddc38030a1a85fbca6b42100bd\t2\n"
+  "generated": "2026-10-25T19:03:48Z",
+  "signature": "PlV8lz4RuimhGjPNWUKpiZJEkFc9TyanmqWDILxUfsAOnanzfFm2xD2uuCjPW/u6GFw9a7pQQBoNsbv+FFvGAg==",
+  "payload": "avro-lock-v1\ngenerated=2026-10-25T19:03:48Z\nkeyid=ed25519-2026-2\nkeyepoch=2\nresource\tansi-v1\tAnsi V1.AvroEnco\t1.2\t3\t68779\t7db97a8e536793519b5df6762a4358d88921ec383781fbe3a75771b34e1f90a1\t2\nresource\tansi-v2\tAnsi V2.AvroEnco\t2.1\t3\t68529\t808ee0712dec51fac90ec9b4e5662aeb8279e7f718665b5f0444a0ec4435b54f\t2\nresource\tansi-v3\tAnsi V3.AvroEnco\t1.1\t3\t108011\t354a37b753f2a80b0984a6a0adf5ea6c691041e32040979fac3e8c2c7e7ff3f1\t2\nresource\tansi-v4\tAnsi V4.AvroEnco\t1.1\t3\t68918\t5ef71be27cf38c62e49bb5b169480bedda22e654950d2a1f594a8768ca8ace0c\t2\nresource\tansi-v5\tAnsi V5.AvroEnco\t1.4\t3\t68407\tc26bf4d79b106afa3a5d0d0bdad374a60851b59318540206ad6b939a43e3db88\t2\n"
 }
