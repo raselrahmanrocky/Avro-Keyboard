@@ -315,6 +315,9 @@ type
       procedure RefreshLayoutMenuItems;
       procedure RefreshAnsiMappingNames;
       procedure IgnoreCapsLockClick(Sender: TObject);
+      procedure SwitchingModeGlobalClick(Sender: TObject);
+      procedure SwitchingModeWindowClick(Sender: TObject);
+      procedure SyncSwitchingModeMenus;
       procedure PopupToolsPopup(Sender: TObject);
       procedure PopupTrayPopup(Sender: TObject);
       procedure TrackedMenusPopup(Sender: TObject);
@@ -343,6 +346,12 @@ type
       AnsiMappingNames: TStringList;
       IgnoreCapsLock1:  TMenuItem;
       IgnoreCapsLock2:  TMenuItem;
+      { The "Keyboard mode switching" submenu, one per Tools menu: the tray's
+        ools1 and the Top Bar's Popup_Tools (the same two surfaces that carry
+        Ignore Caps Lock). Both hold the same two radio items, and
+        SyncSwitchingModeMenus keeps both in step with SwitchingMode. }
+      mnuSwitchingModeTray:   TMenuItem;
+      mnuSwitchingModeTopBar: TMenuItem;
       procedure AnsiVersionMenuClick(Sender: TObject);
       procedure ReadAnsiDescriptionClick(Sender: TObject);
       procedure ExportSpecificMappingClick(Sender: TObject);
@@ -907,6 +916,8 @@ end;
 { =============================================================================== }
 
 procedure TAvroMainForm1.Initmenu;
+var
+  M: TMenuItem;
 begin
   RefreshLayoutMenuItems;
 
@@ -929,6 +940,40 @@ begin
   IgnoreCapsLock2.Checked := (IgnoreCapsLock = 'YES');
   IgnoreCapsLock2.OnClick := IgnoreCapsLockClick;
   ools1.Insert(OutputasANSIAreyousure2.MenuIndex + 1, IgnoreCapsLock2);
+
+  { "Keyboard mode switching" - one setting, offered in both Tools menus: the
+    tray icon is hidden while the Top Bar is the chosen UI, so a menu-only
+    setting must live on both surfaces.  Radio items rather than a check box so
+    the two choices read exactly as they do in Options. }
+  mnuSwitchingModeTopBar := TMenuItem.Create(Popup_Tools);
+  mnuSwitchingModeTopBar.Caption := 'Keyboard mode switching';
+  M := TMenuItem.Create(mnuSwitchingModeTopBar);
+  M.Caption := 'Global (All Windows)';
+  M.RadioItem := True;
+  M.OnClick := SwitchingModeGlobalClick;
+  mnuSwitchingModeTopBar.Add(M);
+  M := TMenuItem.Create(mnuSwitchingModeTopBar);
+  M.Caption := 'Per Application/Window';
+  M.RadioItem := True;
+  M.OnClick := SwitchingModeWindowClick;
+  mnuSwitchingModeTopBar.Add(M);
+  Popup_Tools.Items.Insert(IgnoreCapsLock1.MenuIndex + 1, mnuSwitchingModeTopBar);
+
+  mnuSwitchingModeTray := TMenuItem.Create(ools1);
+  mnuSwitchingModeTray.Caption := 'Keyboard mode switching';
+  M := TMenuItem.Create(mnuSwitchingModeTray);
+  M.Caption := 'Global (All Windows)';
+  M.RadioItem := True;
+  M.OnClick := SwitchingModeGlobalClick;
+  mnuSwitchingModeTray.Add(M);
+  M := TMenuItem.Create(mnuSwitchingModeTray);
+  M.Caption := 'Per Application/Window';
+  M.RadioItem := True;
+  M.OnClick := SwitchingModeWindowClick;
+  mnuSwitchingModeTray.Add(M);
+  ools1.Insert(IgnoreCapsLock2.MenuIndex + 1, mnuSwitchingModeTray);
+
+  SyncSwitchingModeMenus;
 end;
 
 { Adds an entry for every .avrolayout on disk to the tray's "Select keyboard
@@ -1129,6 +1174,20 @@ begin
     it removes transparency }
   if CurrentMode <> MyCurrentKeyboardMode then
     KeyboardModeChanged := True;
+
+  { GLOBAL: one state for every window.  Nothing is recorded per window, and
+    the mode the user just chose stays in force when the foreground window
+    changes.  Every entry path lands here - the mode hotkey, both menus and the
+    toggle / bn / sys WM_COPYDATA commands - so the scope is applied once. }
+  if SwitchingMode = SWITCHING_MODE_GLOBAL then
+  begin
+    if CurrentMode = bangla then
+      MyCurrentKeyboardMode := bangla
+    else
+      MyCurrentKeyboardMode := SysDefault;
+    UpdateTrayIcon;
+    Exit;
+  end;
   hforewnd := GetForegroundWindow;
 
   if hforewnd = 0 then
@@ -2043,6 +2102,14 @@ begin
     PostMessage(Handle, WM_APP + 11, 0, 0);
     Exit;
   end;
+
+  { The scope of mode switching.  Leaving per-window records behind while
+    GLOBAL is in force would resurrect them the moment the user switched back,
+    so they are dropped as soon as the scope is global; the two menus show the
+    active scope (the Options dialog reads the setting directly when it loads). }
+  if Assigned(WindowDict) and (SwitchingMode = SWITCHING_MODE_GLOBAL) then
+    WindowDict.Clear;
+  SyncSwitchingModeMenus;
 
   // Mirror the Global Hotkeys settings onto every menu item that performs the
   // same action.  HotkeyStringToShortCut (not Vcl.Menus.TextToShortCut) reads
@@ -3556,17 +3623,24 @@ begin
     TOPMOST(Topbar.Handle);
   // ==================================
 
-  if not WindowDict.TryGetValue(hforewnd, WindoRecord) then
+  { The per-window memory only applies while the user asked for it.  In GLOBAL
+    the mode is one state for the whole desktop, so a window change must not
+    restore or reset it.  The dead key and the last-window bookkeeping run in
+    both scopes: a half-typed dead key must never cross a window boundary. }
+  if SwitchingMode <> SWITCHING_MODE_GLOBAL then
   begin
-    if KeyLayout.KeyboardMode <> SysDefault then
-      KeyLayout.KeyboardMode := SysDefault;
-  end
-  else
-  begin
-    if (WindoRecord.Mode = 'B') and (KeyLayout.KeyboardMode = SysDefault) then
-      KeyLayout.KeyboardMode := bangla;
-    if (WindoRecord.Mode = 'S') and (KeyLayout.KeyboardMode = bangla) then
-      KeyLayout.KeyboardMode := SysDefault;
+    if not WindowDict.TryGetValue(hforewnd, WindoRecord) then
+    begin
+      if KeyLayout.KeyboardMode <> SysDefault then
+        KeyLayout.KeyboardMode := SysDefault;
+    end
+    else
+    begin
+      if (WindoRecord.Mode = 'B') and (KeyLayout.KeyboardMode = SysDefault) then
+        KeyLayout.KeyboardMode := bangla;
+      if (WindoRecord.Mode = 'S') and (KeyLayout.KeyboardMode = bangla) then
+        KeyLayout.KeyboardMode := SysDefault;
+    end;
   end;
   KeyLayout.ResetDeadKey;
   LastWindow := hforewnd;
@@ -3995,6 +4069,39 @@ begin
   IgnoreCapsLock1.Checked := Item.Checked;
   IgnoreCapsLock2.Checked := Item.Checked;
   SaveSettings;
+end;
+
+procedure TAvroMainForm1.SwitchingModeGlobalClick(Sender: TObject);
+begin
+  SwitchingMode := SWITCHING_MODE_GLOBAL;
+  SaveSettings;
+  RefreshSettings;
+end;
+
+procedure TAvroMainForm1.SwitchingModeWindowClick(Sender: TObject);
+begin
+  SwitchingMode := SWITCHING_MODE_WINDOW;
+  SaveSettings;
+  RefreshSettings;
+end;
+
+{ Checks the radio item that matches SwitchingMode in both menus.  The setting
+  is the only source of truth, so this also corrects whatever check state a
+  click left behind before the handler ran.  Both menus are guarded: this is
+  called from RefreshSettings, which can run before Initmenu on a fresh start. }
+procedure TAvroMainForm1.SyncSwitchingModeMenus;
+
+  procedure SyncOne(ASub: TMenuItem);
+  begin
+    if (not Assigned(ASub)) or (ASub.Count <> 2) then
+      Exit;
+    ASub.Items[0].Checked := (SwitchingMode = SWITCHING_MODE_GLOBAL);
+    ASub.Items[1].Checked := (SwitchingMode <> SWITCHING_MODE_GLOBAL);
+  end;
+
+begin
+  SyncOne(mnuSwitchingModeTopBar);
+  SyncOne(mnuSwitchingModeTray);
 end;
 
 procedure TAvroMainForm1.CleanupDuplicateMappings;

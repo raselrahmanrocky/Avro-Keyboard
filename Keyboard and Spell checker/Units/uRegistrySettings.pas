@@ -25,6 +25,12 @@ uses
 const
   NumberOfVisibleHints: Integer = 2;
 
+  { How far a keyboard mode switch reaches. WINDOW is the historical behaviour -
+    each window keeps its own Bangla / system-default state; GLOBAL is one state
+    for the whole desktop. Persisted as a string, like every other setting here. }
+  SWITCHING_MODE_GLOBAL = 'GLOBAL';
+  SWITCHING_MODE_WINDOW = 'WINDOW';
+
 var
   DontShowComplexLNotification: string;
   DontShowStartupWizard:        string;
@@ -62,6 +68,8 @@ var
   ShowLayoutSwitchNotification: string;
   AnsiVersionSwitchKey:         string;
   ShowAnsiSwitchNotification:   string;
+  { GLOBAL = one mode for every window; WINDOW = the per-window memory (default). }
+  SwitchingMode:                string;
 
   // Avro Mouse Settings
   AvroMousePosX: string;
@@ -255,6 +263,7 @@ begin
   ShowLayoutSwitchNotification := UpperCase(XML.GetValue('ShowLayoutSwitchNotification', 'YES'));
   AnsiVersionSwitchKey := UpperCase(XML.GetValue('AnsiVersionSwitchKey', 'F12'));
   ShowAnsiSwitchNotification := UpperCase(XML.GetValue('ShowAnsiSwitchNotification', 'YES'));
+  SwitchingMode := UpperCase(XML.GetValue('SwitchingMode', SWITCHING_MODE_WINDOW));
 
   // Avro Mouse Settings
   AvroMousePosX := UpperCase(XML.GetValue('AvroMousePosX', '0'));
@@ -348,6 +357,7 @@ begin
   XML.SetValue('ShowLayoutSwitchNotification', ShowLayoutSwitchNotification);
   XML.SetValue('AnsiVersionSwitchKey', AnsiVersionSwitchKey);
   XML.SetValue('ShowAnsiSwitchNotification', ShowAnsiSwitchNotification);
+  XML.SetValue('SwitchingMode', SwitchingMode);
 
   // Avro Mouse Settings
   XML.SetValue('AvroMousePosX', AvroMousePosX);
@@ -455,6 +465,7 @@ begin
         ShowLayoutSwitchNotification := UpperCase(Reg.ReadStringDef('ShowLayoutSwitchNotification', 'YES'));
         AnsiVersionSwitchKey := UpperCase(Reg.ReadStringDef('AnsiVersionSwitchKey', 'F12'));
         ShowAnsiSwitchNotification := UpperCase(Reg.ReadStringDef('ShowAnsiSwitchNotification', 'YES'));
+        SwitchingMode := UpperCase(Reg.ReadStringDef('SwitchingMode', SWITCHING_MODE_WINDOW));
 
         // Avro Mouse Settings
         AvroMousePosX := UpperCase(Reg.ReadStringDef('AvroMousePosX', '0'));
@@ -559,6 +570,7 @@ begin
     Reg.WriteString('ShowLayoutSwitchNotification', ShowLayoutSwitchNotification);
     Reg.WriteString('AnsiVersionSwitchKey', AnsiVersionSwitchKey);
     Reg.WriteString('ShowAnsiSwitchNotification', ShowAnsiSwitchNotification);
+    Reg.WriteString('SwitchingMode', SwitchingMode);
 
     // Avro Mouse Settings
     Reg.WriteString('AvroMousePosX', AvroMousePosX);
@@ -712,6 +724,7 @@ begin
   Need(DontShowStartupWizard, 'NO');
   Need(ShowLayoutSwitchNotification, 'YES');
   Need(ShowAnsiSwitchNotification, 'YES');
+  Need(SwitchingMode, SWITCHING_MODE_WINDOW);
   Need(ModeSwitchKey, 'F12');
   Need(ToggleOutputModeKey, 'F12');
   Need(SpellerLauncherKey, 'F7');
@@ -795,6 +808,12 @@ begin
     ShowLayoutSwitchNotification := 'YES';
   if not((ShowAnsiSwitchNotification = 'YES') or (ShowAnsiSwitchNotification = 'NO')) then
     ShowAnsiSwitchNotification := 'YES';
+  { One of exactly two values, whatever the settings file or registry held:
+    anything that is not GLOBAL is the per-window behaviour this build always
+    had. Compared case-insensitively because the value round-trips through a
+    hand-editable XML file. }
+  if UpperCase(SwitchingMode) <> SWITCHING_MODE_GLOBAL then
+    SwitchingMode := SWITCHING_MODE_WINDOW;
 
   // Avro Mouse Settings
   if StrToIntDef(AvroMousePosX, 0) <= 0 then

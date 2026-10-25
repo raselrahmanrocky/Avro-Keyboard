@@ -148,6 +148,9 @@ type
     GroupBox11: TGroupBox;
     CheckShowLayoutSwitchNotification: TCheckBox;
     GroupBox12: TGroupBox;
+    GroupBox13: TGroupBox;
+    Label_SwitchingMode: TLabel;
+    cboSwitchingMode: TComboBox;
 
     edtModeSwitch: TEdit;
     edtOutputMode: TEdit;
@@ -625,6 +628,55 @@ begin
   FixedLayout_Panel.BevelKind := bknone { bkTile };
   GlobalOutput_Panel.BevelKind := bknone;
 
+  // =======================================================
+  // Keyboard mode switching scope (runtime-created, Global output page)
+  // Right under the output-mode radios: the scope of the Bangla /
+  // system-default state - one state for the whole desktop, or the per-window
+  // memory this build has always had.  The same two choices are in each Tools
+  // menu (the tray's and the Top Bar's); all three read and write the one
+  // SwitchingMode setting.
+  //
+  // This control is created after the form has loaded and scaled its own
+  // controls (this is a 144-DPI design and the form is 96 DPI here), so its
+  // geometry has to be measured from the controls that WERE scaled: the top
+  // from the ANSI radio, and the settings below it are moved by the group's
+  // own height rather than by a fixed .dfm value.  Fixed Top values in the
+  // .dfm put this group on top of those settings once already.
+  GroupBox13 := TGroupBox.Create(GlobalOutput_Panel);
+  GroupBox13.Parent := GlobalOutput_Panel;
+  GroupBox13.Left := 24;
+  GroupBox13.Top := optOutputANSI.Top + optOutputANSI.Height + GROUP_SPACING;
+  GroupBox13.Width := GlobalOutput_Panel.Width - 60;
+  GroupBox13.Height := GROUP_HEIGHT;
+  GroupBox13.Caption := 'Keyboard Mode Switching';
+
+  Label_SwitchingMode := TLabel.Create(GroupBox13);
+  Label_SwitchingMode.Parent := GroupBox13;
+  Label_SwitchingMode.Left := LEFT_MARGIN;
+  Label_SwitchingMode.Top := 16;
+  Label_SwitchingMode.Caption := 'Switching Mode:';
+
+  cboSwitchingMode := TComboBox.Create(GroupBox13);
+  cboSwitchingMode.Parent := GroupBox13;
+  cboSwitchingMode.Left := LEFT_MARGIN;
+  cboSwitchingMode.Top := 35;
+  cboSwitchingMode.Width := 220;
+  cboSwitchingMode.Style := csDropDownList;
+  cboSwitchingMode.Items.Add('Global (All Windows)');
+  cboSwitchingMode.Items.Add('Per Application/Window');
+
+  { Nothing on the page may end up under the new group, whatever its height
+    turns out to be: the settings below it move down by exactly that height. }
+  I := GroupBox13.Height + GROUP_SPACING;
+  CheckShowMenuShortcuts.Top := CheckShowMenuShortcuts.Top + I;
+  CheckWarningAnsi.Top := CheckWarningAnsi.Top + I;
+  CheckUnicodeToggleShortcut.Top := CheckUnicodeToggleShortcut.Top + I;
+  CheckANSIToggleShortcut.Top := CheckANSIToggleShortcut.Top + I;
+  CheckIgnoreCapsLockShortcut.Top := CheckIgnoreCapsLockShortcut.Top + I;
+  Label20.Top := Label20.Top + I;
+  LabelGlobalHotkeysLink.Top := LabelGlobalHotkeysLink.Top + I;
+  GlobalOutput_Panel.Height := GlobalOutput_Panel.Height + I;
+
   { The Avro Phonetic page lives in its own form (ufrmPhoneticOptions). Its
     check boxes and radio buttons used to carry StyleElements = [] so the style
     engine left their painting to Windows (TStyleHook.AcceptMessage refuses
@@ -1067,6 +1119,14 @@ begin
 
   CheckShowAnsiSwitchNotification.Checked := (ShowAnsiSwitchNotification = 'YES');
 
+  { Item 0 is Global (All Windows), item 1 is Per Application/Window; anything
+    that is not GLOBAL is the per-window behaviour, exactly as the settings
+    unit normalises it. }
+  if SwitchingMode = SWITCHING_MODE_GLOBAL then
+    cboSwitchingMode.ItemIndex := 0
+  else
+    cboSwitchingMode.ItemIndex := 1;
+
   // =========================================================
   // Avro Phonetic Options
   if PhoneticAutoCorrect = 'YES' then
@@ -1356,6 +1416,11 @@ begin
     ShowAnsiSwitchNotification := 'YES'
   else
     ShowAnsiSwitchNotification := 'NO';
+
+  if cboSwitchingMode.ItemIndex = 0 then
+    SwitchingMode := SWITCHING_MODE_GLOBAL
+  else
+    SwitchingMode := SWITCHING_MODE_WINDOW;
 
   // =========================================================
   // Avro Phonetic Options

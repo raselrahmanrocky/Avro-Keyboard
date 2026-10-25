@@ -34,7 +34,15 @@
 
 .PARAMETER Tag
     Release tag, e.g. v6.0.2 or v6.0.2-beta. Must equal the version embedded in
-    build\Avro Keyboard.exe.
+    build\Avro Keyboard.exe. Required unless -SourceOnly is given; with
+    -SourceOnly it is optional and only labels the snapshot (default: today).
+
+.PARAMETER SourceOnly
+    Append the verified SOURCE snapshot to the public main without cutting a
+    release: no tag, no release, no asset, no feed regeneration. The asset gate
+    does not run because no asset is built or uploaded; every other gate runs
+    unchanged (snapshot export, leak gate, tree scan, main-scoped history scan),
+    and the push is still a fast-forward.
 
 .PARAMETER Repo
     Public repository (owner/name). Default: raselrahmanrocky/Avro-Keyboard.
@@ -85,6 +93,9 @@
 .EXAMPLE
     release\publish.ps1 -Tag v6.0.2-beta -WhatIfOnly
 
+.EXAMPLE
+    release\publish.ps1 -SourceOnly
+
 .NOTES
     Exit codes: 0 done, 1 a step failed, 2 a precondition could not be
     satisfied ("could not check", never a pass). Nothing is ever force-pushed
@@ -92,7 +103,7 @@
 #>
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory = $true)]
+    [Parameter(Mandatory = $false)]
     [ValidatePattern('^v\d+\.\d+\.\d+(-beta)?$')]
     [string] $Tag,
 
@@ -106,6 +117,7 @@ param(
     [switch] $SkipBuild,
     [switch] $SkipCreate,
     [switch] $AllowDroppedAssets,
+    [switch] $SourceOnly,
     [switch] $NoPush,
     [switch] $WhatIfOnly
 )
@@ -122,8 +134,16 @@ function Write-Fail { param([string]$m) Write-Host "   x   $m" -ForegroundColor 
 
 function Invoke-Git {
     param([string]$RepoPath, [string[]]$GitArgs)
+    # git writes its progress to STDERR ("Cloning into ...", "To <url>"), and
+    # with $ErrorActionPreference = 'Stop' a redirected stderr line becomes a
+    # TERMINATING error - which kills a publish that actually succeeded. The
+    # preference is lowered for the call and restored afterwards.
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
     $out = & git -C $RepoPath @GitArgs 2>&1
-    return [pscustomobject]@{ Output = @($out); Code = $LASTEXITCODE }
+    $code = $LASTEXITCODE
+    $ErrorActionPreference = $previous
+    return [pscustomobject]@{ Output = @($out); Code = $code }
 }
 
 function Get-GitHubToken {
@@ -135,19 +155,57 @@ function Get-GitHubToken {
     return ''
 }
 
+function Get-DroppedAssetsSection {
+    # The release body is what a client reads before it clicks. An asset the
+    # asset gate dropped is not uploaded, so its download URL does not exist -
+    # and a body that does not say so sends the client to a 404 it cannot
+    # explain. The section is therefore appended automatically, never left to
+    # the maintainer to remember, and it names every dropped file and the
+    # reason the gate gave.
+    param($Dropped)
+    if (-not $Dropped -or @($Dropped).Count -eq 0) { return '' }
+    $lines = @()
+    $lines += ''
+    $lines += '---'
+    $lines += ''
+    $lines += '## Dropped assets (not uploaded)'
+    $lines += ''
+    $lines += 'The asset gate rejected the files below, so they are **not** attached to this release. Their download URLs do not exist.'
+    $lines += ''
+    foreach ($d in @($Dropped)) {
+        $reasons = @($d.reasons | Where-Object { $_ })
+        if ($reasons.Count -eq 0) { $reasons = @('rejected by the asset gate') }
+        $lines += ('- `{0}` - {1}' -f $d.name, ($reasons -join '; '))
+    }
+    return ($lines -join "`n")
+}
+
 $RepoRoot   = Split-Path -Parent $PSScriptRoot
 $Exporter   = Join-Path $RepoRoot 'tools\rollout\export_fresh_repo.ps1'
 $AssetGate  = Join-Path $RepoRoot 'tools\rollout\check_release_assets.ps1'
 $GenManifest = Join-Path $PSScriptRoot 'gen_manifest.ps1'
 $Gate       = Join-Path $RepoRoot 'tools\secrets\check-no-secret-bytes.ps1'
-$assetVer   = $Tag.Substring(1)
+
+# A release is named by its tag; a source-only append has no tag to carry, so
+# it falls back to today's date, which labels the snapshot and the public
+# commit. Nothing downstream treats that label as a version: the asset names
+# and the release body are only built when -SourceOnly is absent.
+$label      = $Tag
+if (-not $label) {
+    if (-not $SourceOnly) {
+        Write-Fail '-Tag is required unless -SourceOnly is given.'
+        exit 2
+    }
+    $label = Get-Date -Format 'yyyy-MM-dd'
+}
+$assetVer   = if ($label -match '^v') { $label.Substring(1) } else { '' }
 if (-not $AssetsDir) { $AssetsDir = Join-Path $RepoRoot 'Output' }
 $scratch    = Join-Path (Split-Path -Parent $RepoRoot) 'Avro-Keyboard-Publish'
 if (-not $ExportDir) { $ExportDir = Join-Path $scratch 'export' }
 if (-not $PublicDir) { $PublicDir = Join-Path $scratch 'public' }
 $ExportDir  = [System.IO.Path]::GetFullPath($ExportDir)
 $PublicDir  = [System.IO.Path]::GetFullPath($PublicDir)
-$isBeta     = $Tag -like '*-beta'
+$isBeta     = $label -like '*-beta'
 $remoteUrl  = "https://github.com/$Repo.git"
 
 # ---------------------------------------------------------------------------
@@ -175,73 +233,136 @@ if ($headBranch -ne 'dev') {
 $sourceHead = (& git -C $RepoRoot rev-parse HEAD).Trim()
 Write-Ok "dev working tree is clean at $sourceHead"
 
-$exe = Join-Path $RepoRoot 'build\Avro Keyboard.exe'
-if (-not (Test-Path -LiteralPath $exe)) {
-    Write-Fail "the built executable is missing: $exe"
-    Write-Fail 'Build the release first (tools\release\build-installers.ps1).'
-    exit 2
+$prereleaseFlag = $false
+$notesBody = ''
+if ($SourceOnly) {
+    # A source-only append has no executable and no asset to check: the run
+    # publishes the committed tree and nothing else, so the release-shaped
+    # preconditions would only refuse a release the run is not cutting.
+    $assetVer = ''
+    Write-Ok "source snapshot    $label (no release, no asset)"
 }
-$vi = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($exe)
-$exeVer = "$($vi.FileMajorPart).$($vi.FileMinorPart).$($vi.FileBuildPart)"
-$tagVer = ($Tag.Substring(1) -split '-')[0]
-if ($exeVer -ne $tagVer) {
-    Write-Fail "tag $Tag does not match the built executable version $exeVer."
-    exit 1
-}
-Write-Ok "executable version  $exeVer (matches $Tag)"
+else {
+    $exe = Join-Path $RepoRoot 'build\Avro Keyboard.exe'
+    if (-not (Test-Path -LiteralPath $exe)) {
+        Write-Fail "the built executable is missing: $exe"
+        Write-Fail 'Build the release first (tools\release\build-installers.ps1).'
+        exit 2
+    }
+    $vi = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($exe)
+    $exeVer = "$($vi.FileMajorPart).$($vi.FileMinorPart).$($vi.FileBuildPart)"
+    $tagVer = ($Tag.Substring(1) -split '-')[0]
+    if ($exeVer -ne $tagVer) {
+        Write-Fail "tag $Tag does not match the built executable version $exeVer."
+        exit 1
+    }
+    Write-Ok "executable version  $exeVer (matches $Tag)"
 
-$assets = @(
-    "AvroKeyboard-$assetVer-win32-setup.exe",
-    "AvroKeyboard-$assetVer-win64-setup.exe",
-    "AvroKeyboard-$assetVer-win32-portable.zip",
-    "AvroKeyboard-$assetVer-win64-portable.zip"
-)
-$assetPaths = @{}
-$assetProblem = $false
-foreach ($name in $assets) {
-    $path = Join-Path $AssetsDir $name
-    if (-not (Test-Path -LiteralPath $path)) { Write-Fail "missing asset: $path"; $assetProblem = $true; continue }
-    $size = (Get-Item -LiteralPath $path).Length
-    if ($size -le 0) { Write-Fail "asset is empty: $path"; $assetProblem = $true; continue }
-    $assetPaths[$name] = $path
-    Write-Ok ("asset {0} ({1:N1} MB)" -f $name, ($size / 1MB))
-}
-if ($assetProblem) {
-    Write-Fail "expected the four assets in $AssetsDir (built by build-installers.ps1)."
-    exit 2
-}
+    $assets = @(
+        "AvroKeyboard-$assetVer-win32-setup.exe",
+        "AvroKeyboard-$assetVer-win64-setup.exe",
+        "AvroKeyboard-$assetVer-win32-portable.zip",
+        "AvroKeyboard-$assetVer-win64-portable.zip"
+    )
+    $assetPaths = @{}
+    $assetProblem = $false
+    foreach ($name in $assets) {
+        $path = Join-Path $AssetsDir $name
+        if (-not (Test-Path -LiteralPath $path)) { Write-Fail "missing asset: $path"; $assetProblem = $true; continue }
+        $size = (Get-Item -LiteralPath $path).Length
+        if ($size -le 0) { Write-Fail "asset is empty: $path"; $assetProblem = $true; continue }
+        $assetPaths[$name] = $path
+        Write-Ok ("asset {0} ({1:N1} MB)" -f $name, ($size / 1MB))
+    }
+    if ($assetProblem) {
+        Write-Fail "expected the four assets in $AssetsDir (built by build-installers.ps1)."
+        exit 2
+    }
 
-$notesBody = $Notes
-if ($NotesFile) {
-    if (-not (Test-Path -LiteralPath $NotesFile)) { Write-Fail "-NotesFile not found: $NotesFile"; exit 2 }
-    $notesBody = [System.IO.File]::ReadAllText((Resolve-Path -LiteralPath $NotesFile).Path)
+    $notesBody = $Notes
+    if ($NotesFile) {
+        if (-not (Test-Path -LiteralPath $NotesFile)) { Write-Fail "-NotesFile not found: $NotesFile"; exit 2 }
+        $notesBody = [System.IO.File]::ReadAllText((Resolve-Path -LiteralPath $NotesFile).Path)
+    }
+    if (-not $notesBody) {
+        $notesBody = "Avro Keyboard $tagVer release. Installers and portable builds are attached below; the updater feeds are served from this same repository."
+    }
+    $prereleaseFlag = $isBeta
+    Write-Ok "release            $Tag -> https://github.com/$Repo ($(if ($isBeta) { 'prerelease' } else { 'stable' }))"
 }
-if (-not $notesBody) {
-    $notesBody = "Avro Keyboard $tagVer release. Installers and portable builds are attached below; the updater feeds are served from this same repository."
-}
-$prereleaseFlag = $isBeta
-Write-Ok "release            $Tag -> https://github.com/$Repo ($(if ($isBeta) { 'prerelease' } else { 'stable' }))"
 
 # ---------------------------------------------------------------------------
 # 2. The asset gate. Nothing is uploaded that has not passed it.
 # ---------------------------------------------------------------------------
-Write-Step 'Asset gate'
-$gateArgs = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $AssetGate, '-ReleaseDir', $AssetsDir)
-foreach ($name in $assets) { $gateArgs += @('-Assets', $assetPaths[$name]) }
-if ($InnoExtract) { $gateArgs += @('-InnoExtract', $InnoExtract) }
-& powershell @gateArgs
-$gateRc = $LASTEXITCODE
-if ($gateRc -eq 2) { Write-Fail 'the asset gate could not run; "could not check" is never a pass.'; exit 2 }
-if ($gateRc -eq 1) {
-    if (-not $AllowDroppedAssets) {
-        Write-Fail 'the asset gate dropped an asset. Fix it, or re-run with -AllowDroppedAssets'
-        Write-Fail 'to release without it - and know that the clients are told about a download'
-        Write-Fail 'that will not exist.'
-        exit 1
-    }
-    Write-Warn 'continuing with the PASS assets only (-AllowDroppedAssets)'
+if ($SourceOnly) {
+    # No asset is built and none is uploaded, so there is nothing for the asset
+    # gate to extract or scan. The two sets stay empty rather than unset: the
+    # plan print below reads them, and an unset variable is a failed gate in
+    # everything but name.
+    $droppedAssets = @()
+    $shippingAssets = @()
+    $droppedSection = ''
+    $releaseBody = ''
+    Write-Ok 'asset gate          skipped (nothing is uploaded)'
 }
-else { Write-Ok 'every asset passed the gate' }
+else {
+    Write-Step 'Asset gate'
+    $gateReport = Join-Path $scratch 'asset-gate.json'
+    $gateArgs = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $AssetGate, '-ReleaseDir', $AssetsDir)
+    # The names, comma-joined, resolved against -ReleaseDir by the gate. Passing the
+    # same parameter once per asset does not bind: PowerShell refuses a repeated
+    # argument even for a [string[]].
+    $gateArgs += @('-AssetList', ($assets -join ','))
+    if ($InnoExtract) { $gateArgs += @('-InnoExtract', $InnoExtract) }
+    $gateArgs += @('-ReportPath', $gateReport)
+    & powershell @gateArgs
+    $gateRc = $LASTEXITCODE
+    if ($gateRc -eq 2) { Write-Fail 'the asset gate could not run; "could not check" is never a pass.'; exit 2 }
+    $droppedAssets = @()
+    if ($gateRc -eq 1) {
+        if (Test-Path -LiteralPath $gateReport) {
+            $verdict = Get-Content -LiteralPath $gateReport -Raw | ConvertFrom-Json
+            $droppedAssets = @($verdict.assets | Where-Object { $_.status -ne 'PASS' })
+        }
+        foreach ($d in $droppedAssets) {
+            $why = @($d.reasons | Where-Object { $_ })
+            if ($why.Count -eq 0) { $why = @('rejected by the asset gate') }
+            Write-Warn ("dropped: {0} ({1})" -f $d.name, ($why -join '; '))
+        }
+        if (-not $AllowDroppedAssets) {
+            Write-Fail 'the asset gate dropped an asset. Fix it, or re-run with -AllowDroppedAssets'
+            Write-Fail 'to release without it - and know that the clients are told about a download'
+            Write-Fail 'that will not exist.'
+            exit 1
+        }
+        Write-Warn 'continuing with the PASS assets only (-AllowDroppedAssets)'
+        Write-Warn 'the release body will say which assets were dropped and why.'
+    }
+    else { Write-Ok 'every asset passed the gate' }
+
+    # A dropped asset is NOT SHIPPED. It is removed from the set that is uploaded
+    # and from the set whose URLs are verified: a dropped asset's URL is expected
+    # NOT to exist, so verifying it would fail a release that is behaving exactly
+    # as it should, and uploading it would publish the very file the gate
+    # rejected. The gate is the authority on what ships.
+    foreach ($d in $droppedAssets) { $assetPaths.Remove($d.name) }
+    $shippingAssets = @($assets | Where-Object { $assetPaths.ContainsKey($_) })
+    Write-Ok "will upload ($($shippingAssets.Count)): $(if ($shippingAssets.Count) { $shippingAssets -join ', ' } else { '(none)' })"
+    foreach ($d in $droppedAssets) {
+        $why = @($d.reasons | Where-Object { $_ })
+        if ($why.Count -eq 0) { $why = @('rejected by the asset gate') }
+        Write-Warn ("withheld (dropped): {0} - {1}" -f $d.name, ($why -join '; '))
+    }
+
+    # The body the release will carry. When an asset was dropped, the body says so
+    # - automatically, with the gate's own reason - so the client is never pointed
+    # at a download that does not exist.
+    $droppedSection = Get-DroppedAssetsSection -Dropped $droppedAssets
+    $releaseBody = $notesBody
+    if ($droppedSection) {
+        $releaseBody = ($notesBody | Out-String).TrimEnd() + $droppedSection
+    }
+}
 
 # ---------------------------------------------------------------------------
 # 3. The verified snapshot.
@@ -251,7 +372,7 @@ if (Test-Path -LiteralPath $ExportDir) { Remove-Item -LiteralPath $ExportDir -Re
 $exportEvidence = Join-Path $scratch 'export.json'
 $exportArgs = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $Exporter,
                  '-OutDir', $ExportDir, '-Force', '-Branch', 'main',
-                 '-ReleaseLabel', $Tag, '-EvidencePath', $exportEvidence)
+                 '-ReleaseLabel', $label, '-EvidencePath', $exportEvidence)
 if ($SkipBuild) { $exportArgs += '-SkipBuild' }
 & powershell @exportArgs
 $exportRc = $LASTEXITCODE
@@ -294,7 +415,25 @@ if ($readTree.Code -ne 0) {
     exit 1
 }
 
-$message = @"
+if ($SourceOnly) {
+    # The public history is permanent and it leaves this repository, so the
+    # message says exactly what the run did: a source append, and nothing else.
+    $message = @"
+Source snapshot $label - export of Avro-Dev@$snapshotSource; tree $snapshotTree; gates: leak=PASS history=PASS build=$buildStatus
+
+This run appends a verified snapshot of the private Avro-Keyboard source tree
+to the public repository, and nothing else: it created no tag, no release and
+no release asset, and it left the update feeds untouched. The maintainer-only
+paths listed in the private tools\rollout\exclusions.json are withheld and
+remain in the private repository only. The snapshot was produced from the
+committed tree and gated there; the public tree is gated again before the
+push.
+
+append-to=$oldPublicMain
+"@
+}
+else {
+    $message = @"
 Release $Tag - export of Avro-Dev@$snapshotSource; tree $snapshotTree; gates: leak=PASS history=PASS build=$buildStatus
 
 This release appends a verified snapshot of the private Avro-Keyboard tree to
@@ -305,6 +444,7 @@ there; the public tree is gated again before the push.
 
 append-to=$oldPublicMain
 "@
+}
 $commit = Invoke-Git -RepoPath $PublicDir -GitArgs @('commit', '--quiet', '-m', $message)
 if ($commit.Code -ne 0) {
     Write-Fail "the public commit failed (exit $($commit.Code)):"
@@ -336,10 +476,33 @@ if ($WhatIfOnly) {
     Write-Step 'Plan (-WhatIfOnly - every local gate ran; nothing was pushed, created or uploaded)'
     Write-Info "  1. push the append to main (fast-forward):"
     Write-Info "       git -C `"$PublicDir`" push origin main:main"
-    Write-Info "  2. create the release $Tag at $newPublicSha and upload the gated assets"
-    Write-Info "  3. HEAD-verify the four public download URLs"
-    Write-Info "  4. regenerate updates\versioninfo*.xml from the live releases and commit them"
-    Write-Info "     to the public main and to dev"
+    if ($SourceOnly) {
+        Write-Info "  2. nothing else: no tag, no release, no asset, no feed change"
+    }
+    else {
+        Write-Info "  2. create the release $Tag at $newPublicSha and upload the gated assets"
+        Write-Info "  3. HEAD-verify the public download URLs of the assets that were uploaded"
+        Write-Info "  4. regenerate updates\versioninfo*.xml from the live releases and commit them"
+        Write-Info "     to the public main and to dev"
+        Write-Info "  will upload:"
+        if ($shippingAssets.Count -gt 0) {
+            foreach ($n in $shippingAssets) { Write-Info "    $n" }
+        }
+        else { Write-Info "    (none)" }
+        Write-Info "  withheld (dropped):"
+        if ($droppedAssets.Count -gt 0) {
+            foreach ($d in $droppedAssets) {
+                $why = @($d.reasons | Where-Object { $_ })
+                if ($why.Count -eq 0) { $why = @('rejected by the asset gate') }
+                Write-Info "    $($d.name) - $($why -join '; ')"
+            }
+        }
+        else { Write-Info "    (none)" }
+        if ($droppedSection) {
+            Write-Info "  release body (dropped-assets section):"
+            foreach ($line in ($droppedSection -split "`n")) { Write-Info "    $line" }
+        }
+    }
     exit 0
 }
 
@@ -363,6 +526,14 @@ if ($push.Code -ne 0) {
     exit 1
 }
 Write-Ok "main now at $newPublicSha"
+
+if ($SourceOnly) {
+    Write-Step 'Source appended (no release was cut: -SourceOnly)'
+    Write-Info "  main      $newPublicSha"
+    Write-Info "  snapshot  $snapshotSha (tree $snapshotTree)"
+    Write-Info '  tags      unchanged; no release created; feeds untouched'
+    exit 0
+}
 
 # ---------------------------------------------------------------------------
 # 6. The release, at the new public commit, with the gated assets.
@@ -395,6 +566,13 @@ if ($SkipCreate) {
         $existing = Invoke-GitHubApi -Uri "https://api.github.com/repos/$Repo/releases/tags/$Tag"
         $releaseId = $existing.id
         Write-Ok "using the existing release $releaseId"
+        if ($droppedSection) {
+            # A resumed run owes the release the same body the first run would
+            # have written: the dropped assets are named, or the client is
+            # pointed at a download that does not exist.
+            Invoke-GitHubApi -Uri "https://api.github.com/repos/$Repo/releases/$releaseId" -Method 'PATCH' -Body (@{ body = $releaseBody } | ConvertTo-Json -Depth 4) | Out-Null
+            Write-Ok 'the release body now names the dropped assets'
+        }
     }
     catch { Write-Fail "could not resolve the existing release $Tag`: $($_.Exception.Message)"; exit 1 }
 }
@@ -403,7 +581,7 @@ else {
         tag_name         = $Tag
         target_commitish = $newPublicSha
         name             = "Avro Keyboard $assetVer"
-        body             = $notesBody
+        body             = $releaseBody
         draft            = $false
         prerelease       = $prereleaseFlag
     }
@@ -443,7 +621,7 @@ for ($attempt = 1; $attempt -le 4; $attempt++) {
 }
 $existingNames = @($existingAssets | ForEach-Object { $_.name })
 $uploadFailed = $false
-foreach ($name in $assets) {
+foreach ($name in $shippingAssets) {
     if ($existingNames -contains $name) { Write-Warn "asset already on the release, skipping: $name"; continue }
     $path = $assetPaths[$name]
     try {
@@ -462,7 +640,7 @@ if ($uploadFailed) { Write-Fail 'Not every asset is on the release. Resume with 
 
 Write-Step 'Verify public download URLs'
 $verifyFailed = $false
-foreach ($name in $assets) {
+foreach ($name in $shippingAssets) {
     $url = "https://github.com/$Repo/releases/download/$Tag/$name"
     $ok = $false
     for ($attempt = 1; $attempt -le 6; $attempt++) {
@@ -481,8 +659,28 @@ if ($verifyFailed) { Write-Fail 'The release exists but some downloads do not an
 # 7. The feed follow-up. The clients read the feeds from the public main.
 # ---------------------------------------------------------------------------
 Write-Step 'Update feeds (updates\versioninfo*.xml)'
-& powershell -NoProfile -ExecutionPolicy Bypass -File $GenManifest -Repo $Repo
+$feedSkipReport = Join-Path $scratch 'feed-skips.json'
+& powershell -NoProfile -ExecutionPolicy Bypass -File $GenManifest -Repo $Repo -SkipReportPath $feedSkipReport
 if ($LASTEXITCODE -ne 0) { Write-Fail "gen_manifest.ps1 failed (exit $LASTEXITCODE)."; exit $LASTEXITCODE }
+
+# The feed only advertises assets the release it points at actually carries.
+# When it skips one, the commit says so: a reader of the history can see that
+# the feed stopped offering a file, and why, without having to diff the XML.
+$feedSkips = @()
+if (Test-Path -LiteralPath $feedSkipReport) {
+    $skipReport = Get-Content -LiteralPath $feedSkipReport -Raw | ConvertFrom-Json
+    $feedSkips = @($skipReport.skipped)
+}
+$feedCommitMessage = "chore(release): write $Tag update manifests"
+if ($feedSkips.Count -gt 0) {
+    $lines = @($feedCommitMessage, '')
+    $lines += 'The feed does not advertise these assets, because the release it points at does not carry them:'
+    foreach ($s in $feedSkips) {
+        $lines += ('- {0}: {1} ({2})' -f $s.slot, $s.asset, $s.reason)
+    }
+    $feedCommitMessage = $lines -join "`n"
+    foreach ($s in $feedSkips) { Write-Warn ("feed skipped {0}: {1} ({2})" -f $s.slot, $s.asset, $s.reason) }
+}
 
 $feedFiles = @('updates/versioninfo.xml', 'updates/versioninfo_beta.xml')
 $publicAdd = Invoke-Git -RepoPath $PublicDir -GitArgs (@('add', '--') + $feedFiles)
@@ -492,7 +690,7 @@ if ($publicStaged.Code -eq 0) {
     Write-Warn 'the feeds already match the live releases; nothing to commit'
 }
 else {
-    $publicCommit = Invoke-Git -RepoPath $PublicDir -GitArgs @('commit', '--quiet', '-m', "chore(release): write $Tag update manifests")
+    $publicCommit = Invoke-Git -RepoPath $PublicDir -GitArgs @('commit', '--quiet', '-m', $feedCommitMessage)
     if ($publicCommit.Code -ne 0) { Write-Fail 'the feed commit in the public clone failed.'; exit 1 }
     $feedPush = Invoke-Git -RepoPath $PublicDir -GitArgs @('push', 'origin', 'main:main')
     if ($feedPush.Code -ne 0) { Write-Fail 'the feed commit could not be pushed.'; exit 1 }
@@ -505,7 +703,7 @@ $devAdd = Invoke-Git -RepoPath $RepoRoot -GitArgs (@('add', '--') + $feedFiles)
 if ($devAdd.Code -eq 0) {
     $devStaged = Invoke-Git -RepoPath $RepoRoot -GitArgs @('diff', '--cached', '--quiet')
     if ($devStaged.Code -ne 0) {
-        $devCommit = Invoke-Git -RepoPath $RepoRoot -GitArgs @('commit', '--quiet', '-m', "chore(release): write $Tag update manifests")
+        $devCommit = Invoke-Git -RepoPath $RepoRoot -GitArgs @('commit', '--quiet', '-m', $feedCommitMessage)
         if ($devCommit.Code -eq 0) { Write-Ok 'feeds committed to dev' }
         else { Write-Warn 'the feed commit on dev failed; the public main is already correct.' }
     }

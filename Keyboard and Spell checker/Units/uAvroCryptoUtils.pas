@@ -103,7 +103,7 @@ procedure FillRandomBytes(var ABuf: TBytes; const ACount: Integer);
 implementation
 
 uses
-  uAvroShieldSecret;
+  uResourceDataProvider;
 
 type
   TBlock          = array [0 .. 15] of Byte;
@@ -801,8 +801,8 @@ end;
 { =============================================================================
   Default application secret + CSPRNG entropy source
 
-  The secret no longer lives in this unit. It is decoded by uAvroShieldSecret
-  from a single keystream-masked blob (xorshift32 keystream, rotl-indexed), and
+  The secret no longer lives in this unit. It is supplied by uResourceDataProvider
+  from three XOR shares recombined at runtime, and
   the two accessors below are thin re-exports so existing callers keep working:
 
   uAvroShield (Shield v2 KDF)  - GetAvroEncoSecretIKM     (raw bytes)
@@ -813,18 +813,18 @@ end;
   64-byte arrays whose XOR is the plaintext, and the plaintext was ALSO written
   out in a source comment next to them. That made recovery a five-line script
   for anyone reading the file. Recovering it now means reproducing the
-  keystream generator in uAvroShieldSecret, which protected builds wrap in
+  resource provider in uResourceDataProvider, which protected builds wrap in
   VMProtectBeginUltra.
   ============================================================================= }
 
 function GetAvroEncoSecretIKM: TBytes;
 begin
-  Result := AvroShieldSecretIKM;
+  Result := LoadResourceBlock;
 end;
 
 function GetAvroEncoDefaultSecret: string;
 begin
-  Result := AvroShieldSecretString;
+  Result := LoadResourceBlockText;
 end;
 
 { RtlGenRandom is undocumented but stable since Windows 2000 and present in

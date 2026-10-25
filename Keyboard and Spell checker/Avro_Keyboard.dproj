@@ -73,7 +73,7 @@
     <!-- Vendored VCL Styles Utils (third_party\vcl-styles-utils). One path for
          both platforms so a future unit of the library resolves without a
          project edit. -->
-    <DCC_UnitSearchPath>..\third_party\vcl-styles-utils\Common;$(DCC_UnitSearchPath)</DCC_UnitSearchPath>
+    <DCC_UnitSearchPath>..\Secrets;..\third_party\vcl-styles-utils\Common;$(DCC_UnitSearchPath)</DCC_UnitSearchPath>
     <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
     <VerInfo_Locale>1033</VerInfo_Locale>
     <VerInfo_Keys>CompanyName=OmicronLab;FileDescription=Avro Keyboard - UNICODE compliant Open source Bangla typing software for Windows;FileVersion=6.0.2.0;InternalName=Avro Keyboard;LegalCopyright=© OmicronLab. All rights reserved.;LegalTrademarks=Avro Keyboard;OriginalFilename=Avro Keyboard.exe;ProductName=Avro Keyboard;ProductVersion=6.0.2.0;Comments=Avro Keyboard - UNICODE compliant Open source Bangla typing software for Windows</VerInfo_Keys>
@@ -114,8 +114,8 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Cfg_1_Win32)'!=''">
     <BT_BuildType>Debug</BT_BuildType>
-    <VerInfo_Build>20</VerInfo_Build>
-    <VerInfo_Keys>CompanyName=OmicronLab;FileDescription=Avro Keyboard - UNICODE compliant Open source Bangla typing software for Windows;FileVersion=6.0.2.20;InternalName=Avro Keyboard;LegalCopyright=© OmicronLab. All rights reserved.;LegalTrademarks=Avro Keyboard;OriginalFilename=Avro Keyboard.exe;ProductName=Avro Keyboard;ProductVersion=6.0.2.0;Comments=Avro Keyboard - UNICODE compliant Open source Bangla typing software for Windows</VerInfo_Keys>
+    <VerInfo_Build>21</VerInfo_Build>
+    <VerInfo_Keys>CompanyName=OmicronLab;FileDescription=Avro Keyboard - UNICODE compliant Open source Bangla typing software for Windows;FileVersion=6.0.2.21;InternalName=Avro Keyboard;LegalCopyright=© OmicronLab. All rights reserved.;LegalTrademarks=Avro Keyboard;OriginalFilename=Avro Keyboard.exe;ProductName=Avro Keyboard;ProductVersion=6.0.2.0;Comments=Avro Keyboard - UNICODE compliant Open source Bangla typing software for Windows</VerInfo_Keys>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Cfg_1_Win64)'!=''">
     <VerInfo_Build>5</VerInfo_Build>
@@ -133,6 +133,8 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Cfg_2_Win32)'!=''">
     <BT_BuildType>Debug</BT_BuildType>
+    <VerInfo_Build>2</VerInfo_Build>
+    <VerInfo_Keys>CompanyName=OmicronLab;FileDescription=Avro Keyboard - UNICODE compliant Open source Bangla typing software for Windows;FileVersion=6.0.2.2;InternalName=Avro Keyboard;LegalCopyright=© OmicronLab. All rights reserved.;LegalTrademarks=Avro Keyboard;OriginalFilename=Avro Keyboard.exe;ProductName=Avro Keyboard;ProductVersion=6.0.2.0;Comments=Avro Keyboard - UNICODE compliant Open source Bangla typing software for Windows</VerInfo_Keys>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Cfg_2_Win64)'!=''">
     <BT_BuildType>Debug</BT_BuildType>
@@ -232,7 +234,14 @@
     <DCCReference Include="..\legacy-delphi-converter\clsAnsiSequenceLookup.pas" />
     <DCCReference Include="Units\uAvroEncoCrypto.pas" />
     <DCCReference Include="Units\uAvroSecureMem.pas" />
-    <DCCReference Include="Units\Private\uAvroShieldSecret.pas" />
+    <DCCReference Include="Units\uAvroShieldTypes.pas" />
+    <DCCReference Include="Units\uEncoReader.pas" />
+    <DCCReference Include="Units\uKeyBuilder.pas" />
+    <DCCReference Include="Units\uBufferTransform.pas" />
+    <DCCReference Include="Units\uDataStream.pas" />
+    <DCCReference Include="Units\uAvroShieldCodec.pas" />
+    <DCCReference Include="Units\uResourceDataProvider.pas" />
+    <DCCReference Include="Units\uAvroShield.pas" />
     <DCCReference Include="Units\uAvroShieldVM.pas" />
     <DCCReference Include="Units\uAnsiPersistentCache.pas" />
     <DCCReference Include="Units\uAnsiEngineManager.pas" />

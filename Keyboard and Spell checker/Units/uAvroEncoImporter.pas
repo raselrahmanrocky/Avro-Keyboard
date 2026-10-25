@@ -248,7 +248,7 @@ begin
       // here: a build WITHOUT the secret extension cannot open a default-key
       // container at all, and calling such a file "invalid or corrupted" sends
       // the user hunting for a broken download that is in fact intact. That
-      // helper branches on IsRealSecretUnit (plus the protection flag) and
+      // helper branches on ResourceBlockAvailable (plus the protection flag) and
       // names the real cause and the fix; a genuinely damaged container in a
       // real build keeps the plain failure wording. The version picker and the
       // layout UI already report through the same helper, so all three sites

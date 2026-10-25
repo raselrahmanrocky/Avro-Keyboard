@@ -100,6 +100,10 @@ Standard edition/
 # The canonical rollout exclusion data is source, not generated data. It must
 # be tracked so the exporter, scrubber, reset and publish paths cannot drift.
 !tools/rollout/exclusions.json
+# The rollback records are the evidence of what a public reset replaced: the
+# old and new tag shas, the old and new release ids, the old..new range. They
+# are written by the reset orchestrator and must survive in the history.
+!docs/reset-*-rollback.json
 decrypted/
 # Exactly three key files are TRACKED: the container IKM, the comment IKM and
 # the Ed25519 manifest signing key - they are what lets this repository build
@@ -150,16 +154,24 @@ assets/*.json
 # are committed, so any ANSI version stays reproducible from a clean clone.
 !assets/Ansi V*.json
 
-# The secret-bearing root-secret unit. The public repository tracks ONLY the
-# stub at this path; the real unit is fetched by
-# tools\secrets\fetch_secrets.ps1, which overwrites the tracked path in place
-# and marks it skip-worktree so it can never be committed by accident.
-#
-# The negation is what keeps the stub itself tracked. Git ignores the CONTENTS
-# of the directory but not the directory itself, so the exception is reachable;
-# writing 'Units/Private/' would exclude the directory and silence it.
-Keyboard and Spell checker/Units/Private/*
-!Keyboard and Spell checker/Units/Private/uAvroShieldSecret.pas
+# The encrypted ANSI mapping containers are BUILD ARTIFACTS: they are produced
+# by AvroEncoEngine\tools\AvroEncoBuilder\build_avroenco.bat and published
+# through the resource repository, not through this one (the public export
+# withholds them in tools\rollout\exclusions.json). They carry no key material
+# - the static-leak gate proves that - but committing them would ship the
+# whole shipped mapping set, and the authored sources beside them are the
+# record that is meant to stay private.
+assets/*.AvroEnco
+
+# The same mappings keyed for the Qt converter instead of the root IKM (see
+# tools\secrets\derive_converter_key.py). Same rule as above: build artifacts
+# written by build_avroenco.bat from assets\Ansi V*.json, withheld from the
+# public export, never committed.
+assets/converter/*.AvroEnco
+
+# The public provider is tracked. The production provider is installed over it
+# by tools\secrets\fetch_secrets.ps1 and marked skip-worktree so it cannot be
+# committed by accident.
 
 # Windows Explorer folder artefact: it is written into assets/icons whenever the
 # shell rewrites a file name there (the layout icons are regenerated at

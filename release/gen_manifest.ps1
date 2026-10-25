@@ -39,6 +39,12 @@
     from this script's location so the result does not depend on the current
     directory. (Relative custom values resolve against the current directory.)
 
+.PARAMETER SkipReportPath
+    Write a JSON report of the assets a feed did NOT advertise, because the
+    release it points at does not carry them. The publish flow reads it to
+    name the skips in the feed commit message, so a client is never told to
+    download a file the release does not have.
+
 .PARAMETER WhatIfOnly
     Fetch and compute, print both manifests, write nothing.
 
@@ -56,6 +62,7 @@
 param(
     [string] $Repo = 'raselrahmanrocky/Avro-Keyboard',
     [string] $OutDir = '',
+    [string] $SkipReportPath = '',
     [switch] $WhatIfOnly
 )
 
@@ -106,6 +113,11 @@ function Invoke-GitHubApi {
         throw "GitHub API $Method $Uri failed ($status): $($_.Exception.Message)"
     }
 }
+
+# Every asset a feed does not advertise is recorded here, with the reason.
+# The feed is generated from the live release, so a skip is a fact about that
+# release - usually an asset the asset gate dropped and never uploaded.
+$script:SkippedAssets = @()
 
 Write-Step 'Fetch releases'
 # The list endpoint can lag behind a release that was JUST created (observed:
@@ -216,6 +228,55 @@ function Generate-ManifestXml {
     $portable32 = $assets | Where-Object { $_.name -like '*portable*.zip' -and ($_.name -like '*win32*' -or $_.name -like '*x86*') } | Select-Object -First 1
     $portable64 = $assets | Where-Object { $_.name -like '*portable*.zip' -and ($_.name -like '*win64*' -or $_.name -like '*x64*') } | Select-Object -First 1
 
+    $cleanVer = $tag.TrimStart('v').TrimStart('V')
+
+    # A feed may only advertise an asset THE RELEASE CARRIES. The candidates
+    # above are chosen from the release's own asset list, and this pass checks
+    # that again before anything is linked: an advertised name that is absent
+    # is a 404 the client finds out about at download time, not before.
+    # An empty slot is recorded too - that is the case the asset gate creates
+    # when an asset is dropped and never uploaded.
+    $present = @{}
+    foreach ($a in $assets) { $present[[string]$a.name] = $true }
+    $slots = [ordered]@{
+        setup32    = @{ asset = $setup32;    expected = "AvroKeyboard-$cleanVer-win32-setup.exe" }
+        setup64    = @{ asset = $setup64;    expected = "AvroKeyboard-$cleanVer-win64-setup.exe" }
+        portable32 = @{ asset = $portable32; expected = "AvroKeyboard-$cleanVer-win32-portable.zip" }
+        portable64 = @{ asset = $portable64; expected = "AvroKeyboard-$cleanVer-win64-portable.zip" }
+    }
+    foreach ($key in $slots.Keys) {
+        $slot = $slots[$key]
+        if (-not $slot.asset) {
+            $script:SkippedAssets += [pscustomobject]@{
+                release = $tag; slot = $key; asset = $slot.expected
+                reason = 'not carried by this release'
+            }
+            continue
+        }
+        if (-not $present.ContainsKey([string]$slot.asset.name)) {
+            $script:SkippedAssets += [pscustomobject]@{
+                release = $tag; slot = $key; asset = [string]$slot.asset.name
+                reason = 'not present in the release''s asset list'
+            }
+            $slot.asset = $null
+        }
+    }
+    $setup32 = $slots['setup32'].asset
+    $setup64 = $slots['setup64'].asset
+    $portable32 = $slots['portable32'].asset
+    $portable64 = $slots['portable64'].asset
+
+    # The main download URL falls back to any .exe the release carries. That is
+    # a real asset, so it is not a 404 - but if the expected win64 setup is the
+    # thing that is missing, the fallback is the reason the feed is not
+    # offering what a client would expect, and it is recorded.
+    if (-not $setup64 -and $legacy) {
+        $script:SkippedAssets += [pscustomobject]@{
+            release = $tag; slot = 'downloadurl'; asset = [string]$legacy.name
+            reason = 'the release does not carry the expected win64 setup; the feed falls back to this asset for the main download URL'
+        }
+    }
+
     $downloadUrl = if ($setup64) { "https://github.com/$Repo/releases/download/$tag/$($setup64.name)" }
     elseif ($legacy) { "https://github.com/$Repo/releases/download/$tag/$($legacy.name)" }
     else { "https://github.com/$Repo/releases/tag/$tag" }
@@ -224,7 +285,6 @@ function Generate-ManifestXml {
     $portableUrl32 = if ($portable32) { "https://github.com/$Repo/releases/download/$tag/$($portable32.name)" } else { $null }
     $portableUrl64 = if ($portable64) { "https://github.com/$Repo/releases/download/$tag/$($portable64.name)" } else { $null }
 
-    $cleanVer = $tag.TrimStart('v').TrimStart('V')
     $numOnly = ($cleanVer -split '-')[0]
     $parts = $numOnly.Split('.')
     $major = if ($parts.Length -gt 0 -and $parts[0] -ne '') { $parts[0] } else { '6' }
@@ -269,4 +329,42 @@ Write-Ok "stable feed <- $($stableRel.tag_name)"
 Write-Ok "beta feed   <- $($betaRel.tag_name)"
 Write-ManifestFile -Name 'versioninfo.xml' -Content $stableXml
 Write-ManifestFile -Name 'versioninfo_beta.xml' -Content $betaXml
+
+if ($script:SkippedAssets.Count -gt 0) {
+    Write-Warn ("{0} asset(s) are not advertised by the feed(s):" -f $script:SkippedAssets.Count)
+    foreach ($s in $script:SkippedAssets) {
+        Write-Warn ("  {0}: {1} ({2})" -f $s.slot, $s.asset, $s.reason)
+    }
+}
+else {
+    Write-Ok 'every advertised asset is present in the release it points at'
+}
+
+if ($SkipReportPath) {
+    $reportFull = [System.IO.Path]::GetFullPath($SkipReportPath)
+    $reportDir = Split-Path -Parent $reportFull
+    if ($reportDir -and -not (Test-Path -LiteralPath $reportDir)) {
+        New-Item -ItemType Directory -Path $reportDir -Force | Out-Null
+    }
+    # The beta feed falls back to the stable release when there is no beta, so
+    # the same skip can be reached twice. Report each one once.
+    $unique = @()
+    foreach ($s in @($script:SkippedAssets)) {
+        $key = "$($s.release)|$($s.slot)|$($s.asset)"
+        if (-not ($unique | Where-Object { $_.'key' -eq $key })) {
+            $unique += [pscustomobject]@{ key = $key; entry = $s }
+        }
+    }
+    $skippedOut = @($unique | ForEach-Object { $_.entry })
+    $payload = [ordered]@{
+        release = $Repo
+        skipped = $skippedOut
+        count   = $skippedOut.Count
+    }
+    $payload | ConvertTo-Json -Depth 5 | ForEach-Object {
+        [System.IO.File]::WriteAllText($reportFull, $_, (New-Object System.Text.UTF8Encoding($false)))
+    }
+    Write-Ok "skip report      $reportFull"
+}
+
 exit 0

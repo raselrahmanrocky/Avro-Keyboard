@@ -135,7 +135,7 @@ implementation
 uses
   uAvroCryptoUtils,
   uAvroShield,
-  uAvroShieldSecret,
+  uResourceDataProvider,
   DebugLog;
 
 type
@@ -434,11 +434,11 @@ begin
   // Only a readable DEFAULT-KEY container can be blamed on the missing secret:
   // a password container never needed it, and flag $FF means the header could
   // not even be read, which the user cannot fix by rebuilding.
-  if (not IsRealSecretUnit) and
+  if (not ResourceBlockAvailable) and
      (GetAvroEncoProtectionFlag(AFilePath) = AVROENCO_FLAG_DEFAULT_KEY) then
     Result := 'This build has no secret extension, so it cannot open default-key ' +
       'containers.' + sLineBreak + sLineBreak +
-      'Rebuild it with tools\secrets\fetch_secrets.ps1 and AVRO_SECRETS_TOKEN. ' +
+      'Rebuild it with tools\secrets\fetch_secrets.ps1. ' +
       'See SECRETS_SETUP.md.'
   else
     Result := 'Failed to decrypt mapping. Password may be incorrect.';

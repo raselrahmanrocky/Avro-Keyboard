@@ -47,8 +47,17 @@ Delphi Community Edition doesn't come with a command-line compiler. In order to 
 2. Or, open `WholeProject.groupproj` in Delphi IDE and run `Build All` from the project group.  
 3. Built and renamed files will be under the `build` directory.
 
+**Building the installer**  
+`avro-setup.iss` (root) is the Inno Setup 6 script. Build the projects first, then compile the installer from the command line:
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\release\build-installer.ps1
+```
+It compiles both editions (win32 into Program Files (x86), win64 into Program Files) into `Output\`, takes the installer version from the built executable, and accepts either build layout (the renamed `build\Avro Keyboard.exe` or the plain msbuild `build\Avro_Keyboard.exe`). Options: `-Arch x86|x64|both`, `-Beta`, `-IncludeConverter`.
+
+The compile is retried when the antivirus scanner holds the freshly written `setup.exe` (Inno Setup's `Resource update error: EndUpdateResource failed [110]`) - the lock is transient, so a retry recovers; exclude `Output\` from real-time protection to make it impossible.
+
 **The public build**
-`Keyboard and Spell checker/Units/Private/uAvroShieldSecret.pas` is checked in as a public stub, so a clone of this repository builds and runs offline with no extra file to fetch. The credential that the official build uses is not part of this repository, and a release gate fails the build if anything sensitive is ever added to the stub.
+`Keyboard and Spell checker/Units/uResourceDataProvider.pas` is checked in as a public provider that reports no resource, so a clone of this repository builds and runs offline with no extra file to fetch. The production resource is split into three share units under `Secrets/`; a release gate fails if any key material appears outside that home.
 
 ### Where Avro keeps its data
 | Edition | Settings | Data (database, mappings, layouts, skins, logs) |
