@@ -5,7 +5,7 @@
   file, You can obtain one at https://mozilla.org/MPL/2.0/.
   =============================================================================
 
-  "Avro Mouse - Click 'n' Type".
+  "On Screen Keyboard".
 
   The Bangla keys are captions, not pictures: each button's character is set as its
   Caption in the first Bangla face the machine can draw (uMouseKeyFace), and the VCL

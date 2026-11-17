@@ -76,9 +76,11 @@ const
   MaxWarmEngines = 1;
 
 type
-  { One cached engine: the parked parser state plus the file it was parsed
-    from and its last write time (used to detect external file changes so the
-    directory watcher can re-parse just that engine).
+  { One cached engine: the parked parser state plus the exact file it was
+    parsed from, its legacy base name, its size and its last write time (used to
+    detect external file changes so the directory watcher can re-parse just that
+    engine). A same-base sibling is a different slot: the exact file name is the
+    cache identity.
 
     LastUseStamp is a per-process sequence number assigned whenever this slot
     is parked or restored, and it drives LRU eviction: a parked engine can be
@@ -93,9 +95,11 @@ type
     always the one dropped. }
   TEngineSlot = class
     public
-      DisplayName:   string;
+      FileName:      string; // exact file name; '' for the embedded baseline
+      BaseName:      string; // legacy AnsiVersion base name
       FilePath:      string;
       LastWriteTime: TDateTime;
+      FileSize:      Int64;
       LastUseStamp:  Cardinal;
       State:         TAnsiEngineState;
       destructor Destroy; override;
@@ -106,7 +110,8 @@ type
     computer (persisted per-file password cache) - those decrypt silently
     with the cached password, never prompting. }
   TPreloadItem = record
-    DisplayName: string;
+    FileName: string;
+    BaseName: string;
     FilePath: string;
     Password: AnsiString;
   end;
@@ -116,7 +121,8 @@ type
     start miss - e.g. Ansi V3 after a full %AppData% cache wipe - is
     diagnosable instead of a bare "decryption" line. }
   TPreloadResult = record
-    DisplayName: string;
+    FileName: string;
+    BaseName: string;
     FilePath: string;
     JSON: string;
     OK: Boolean;
@@ -125,11 +131,13 @@ type
 
   TAnsiEngineManager = class
     private
-      FCache:      TDictionary<string, TEngineSlot>; // key: Lowercase(DisplayName)
+      FCache:      TDictionary<string, TEngineSlot>; // key: Lowercase(FileName)
       FCurrentKey: string;
       FLock:       TCriticalSection; // serializes every engine-state mutation
       { Last value handed out by NextUseStamp; see TEngineSlot.LastUseStamp. }
       FUseStamp: Cardinal;
+      { GetTickCount of the last RepairSelectedEngine attempt; 0 = never. }
+      FLastRepairTick: Cardinal;
       { Hands out the next unique LRU stamp. Caller must hold FLock (every caller
         is already inside it). }
       function NextUseStamp: Cardinal;
@@ -145,56 +153,76 @@ type
         with empty globals this is a no-op. Returns True when it parked
         something. Caller must hold FLock. }
       function ParkLive: Boolean;
-      { Restores AKey's parked state into the globals. False for a missing or
-        hollow slot - the caller then treats it as a cache MISS instead of
-        serving an engine that cannot render. Publishes no version name. }
+      { Restores AKey's parked state into the globals and publishes both
+        selection globals from that slot. False for a missing or hollow slot -
+        the caller then treats it as a cache MISS instead of serving an engine
+        that cannot render. }
       function RestoreSlotState(const AKey: string): Boolean;
-      { RestoreSlotState + publishes AName as the active display name; False when
-        the slot is hollow. }
-      function TryRestoreSlot(const AKey, AName: string): Boolean;
       { True when AName's parked state is missing or hollow. }
       function IsSlotHollow(const AKey: string): Boolean;
       { Fail-closed safety net: when the globals hold no engine, restore the
-        active or last-used parked FILE slot, else parse one file mapping from
-        disk. Never builds a compiled-in engine and never changes AnsiVersion -
-        callers that genuinely switch publish the name themselves. With zero
-        usable files it only logs and leaves the globals empty (Unicode still
-        works). }
-      procedure EnsureLiveEngine;
+        active or last-used parked FILE slot, else (when AAllowDiskFallback)
+        parse one exact file mapping from disk. Never builds a compiled-in
+        engine. Every successful repair publishes the restored slot's exact
+        selection. With zero usable files it only logs and leaves the globals
+        empty (Unicode still works). A caller that must fail without changing
+        the selection passes False: an explicit exact-file switch that missed
+        may not quietly activate some other mapping. }
+      procedure EnsureLiveEngine(AAllowDiskFallback: Boolean = True);
       { Puts a live engine the caller just parked by hand back in place after a
         failed parse. }
       procedure RestoreParkedEngine(const AParked: Boolean);
       { Parses AJSON into the globals and parks the result in a new slot added
-        to FCache. AFilePath is stored on the slot for the directory watcher.
-        Password-protected containers are decrypted by the CALLER (version
-        picker / menu / preload thread) before this is reached, so this never
-        prompts. Returns False (and fills ErrorLog) when the JSON contains no
-        usable mapping rules. Caller must hold FLock. }
-      function ParseJSONIntoSlot(const AName, AFilePath, AJSON: string; ErrorLog: TStringList = nil): Boolean;
+        to FCache. AFileName is the exact file name ('' for the embedded
+        baseline), ABaseName is the legacy AnsiVersion value, and AFilePath is
+        stored on the slot for the directory watcher. Password-protected
+        containers are decrypted by the CALLER (version picker / menu / preload
+        thread) before this is reached, so this never prompts. Returns False
+        (and fills ErrorLog) when the JSON contains no usable mapping rules.
+        Caller must hold FLock. }
+      function ParseJSONIntoSlot(const AFileName, ABaseName, AFilePath, AJSON: string; ErrorLog: TStringList = nil): Boolean;
       { Decrypts AFilePath (Shield/legacy container with APassword, or reads
-        plain .json) and parks the parsed result. AFilePath must be a real
-        file path - empty is not an engine and returns False. Caller must
-        hold FLock. }
-      function ParseIntoSlot(const AName, AFilePath: string; ErrorLog: TStringList = nil; const APassword: AnsiString = ''): Boolean;
+        plain .json) and parks the parsed result under the exact file identity.
+        AFilePath must be a real file path - empty is not an engine and returns
+        False. Caller must hold FLock. }
+      function ParseIntoSlot(const AFileName, ABaseName, AFilePath: string; ErrorLog: TStringList = nil; const APassword: AnsiString = ''): Boolean;
       { Moves the currently active engine's globals back into its parked slot.
         Caller must hold FLock. }
       procedure ParkCurrent;
       { Frees and removes a NON-ACTIVE cached engine. Caller must hold FLock. }
       procedure DropSlot(const AKey: string);
       { Lock-free core of InvalidateEngine. Caller must hold FLock. }
-      procedure DoInvalidateEngine(const AName: string);
+      procedure DoInvalidateEngine(const AFileName: string);
       { Stamps AKey's slot as used now. Every park/restore path calls this, so LRU
         eviction reflects what the user actually switched between. }
       procedure TouchSlot(const AKey: string);
     public
       constructor Create;
       destructor Destroy; override;
+      { Lowercase exact file name of the live engine; the baseline key when the
+        embedded baseline is active. }
       property CurrentEngineName: string read FCurrentKey;
       { True while the active engine is really usable - the UI/tests can use this
         instead of trusting CurrentEngineName alone. }
       function LiveEngineReady: Boolean;
-      { True when AName's parked engine is complete (cached and not hollow). }
-      function CachedEngineReady(const AName: string): Boolean;
+      { True only when the globals hold a REAL parsed engine. LiveEngineReady
+        is not enough for that: the unit starts with the compiled-in canvas
+        (registry + A_* initial values) and ResetAnsiToDefaults rebuilds it
+        before every parse, so a parse that never ran - or a cold start whose
+        activation failed on a locked container - leaves a registry with no
+        rule tables at all. Typing through that canvas is what emits the
+        built-in Avro/V1 glyphs while the menu shows the user's version, so
+        every caller that converts must test THIS instead. }
+      function EnginePrepared: Boolean;
+      { Puts the persisted selection back in place when the globals do not hold
+        a real engine (the cold-start failure above). A no-op while an engine
+        is prepared, and throttled so a mapping that stays unreadable is not
+        re-decrypted on every keystroke. Returns True when a real engine is
+        live afterwards. Must be called on the thread that owns the globals. }
+      function RepairSelectedEngine: Boolean;
+      { True when AFileName's parked engine is complete (cached and not
+        hollow). }
+      function CachedEngineReady(const AFileName: string): Boolean;
       { Snapshots the file mappings that can unlock without user interaction
         (default-key containers, plain .json mappings and password-protected
         containers with a persisted password). Call on the main thread BEFORE
@@ -202,12 +230,12 @@ type
         the AvroEncoFiles dictionary, which the folder-change timers clear/
         refill while the worker runs. }
       function CapturePreloadList: TArray<TPreloadItem>;
-      { Same snapshot, narrowed to ONE mapping: zero items when it is already
-        cached, is not a known file, or is a password container that was never
-        unlocked. This is what an explicit single-layout action (unlock in the
-        picker, import) warms before the user clicks it - warming the whole
+      { Same snapshot, narrowed to ONE exact mapping file: zero items when it is
+        already cached, is not a known file, or is a password container that was
+        never unlocked. This is what an explicit single-layout action (unlock in
+        the picker, import) warms before the user clicks it - warming the whole
         folder for one unlock is the eager behaviour the cache no longer does. }
-      function CapturePreloadItem(const AName: string): TArray<TPreloadItem>;
+      function CapturePreloadItem(const AFileName: string): TArray<TPreloadItem>;
       { Parses every decrypted snapshot result into the cache. Runs on the
         preload thread; takes FLock, so it can never interleave with a
         main-thread switch. Returns the number of engines committed.
@@ -219,11 +247,13 @@ type
         CapturePreloadItem is what it snapshots with). The next switch or the
         idle release then trims whatever is left over. }
       function CommitPreload(const AResults: TArray<TPreloadResult>): Integer;
-      { Makes AName the active engine. For cached engines this is O(1) pointer
-        moves with zero disk/crypto/parse work. Uncached engines (password
-        protected, never unlocked before) are parsed once here. Returns False
-        on failure - the previously active engine stays untouched. }
-      function SwitchEngine(const AName: string; ErrorLog: TStringList = nil): Boolean;
+      { Makes AFileName the active engine. For cached engines this is O(1)
+        pointer moves with zero disk/crypto/parse work. Uncached engines
+        (password protected, never unlocked before) are parsed once here. The
+        exact file name and its base name are published together on success.
+        Returns False on failure - the previously active engine stays
+        untouched. }
+      function SwitchEngine(const AFileName: string; ErrorLog: TStringList = nil): Boolean;
       { LAST-RESORT activation of the compiled-in baseline mapping (uAvroBaseline).
 
         Used only when NOTHING on disk can serve as an engine - a fresh, wiped or
@@ -239,19 +269,19 @@ type
       function ActivateEmbeddedBaseline(ErrorLog: TStringList = nil): Boolean;
       { UI-safe fast path. Never reads/decrypts/parses files and never waits for
         the preload/refresh lock. Returns False immediately if busy/not cached. }
-      function TrySwitchCached(const AName: string): Boolean;
+      function TrySwitchCached(const AFileName: string): Boolean;
       procedure WarmAllEngines(const AReturnTo: string);
-      { Re-parses one cached engine from its file (directory watcher /
+      { Re-parses one cached engine from its exact file (directory watcher /
         auto-refresh on file change / import). If the engine is active it is
         re-activated in place; on re-parse failure EnsureLiveEngine repairs
         from another file mapping or leaves Unicode-only mode. }
-      procedure InvalidateEngine(const AName: string);
-      { Reconciles the cache with the file system: drops engines whose files
-        disappeared (never the active one), re-parses default-key engines whose
-        last write time changed, and preloads newly added ones. }
+      procedure InvalidateEngine(const AFileName: string);
+      { Reconciles the cache with the file system: drops engines whose exact
+        files disappeared (never the active one), re-parses default-key engines
+        whose size or last write time changed, and preloads newly added ones. }
       procedure RefreshFromDisk;
       { Removes a non-active engine from the cache (mapping deleted by user). }
-      procedure RemoveEngine(const AName: string);
+      procedure RemoveEngine(const AFileName: string);
       { Parked engines currently held in RAM (the live one does not count). }
       function WarmEngineCount: Integer;
       { Drops least-recently-used parked engines until at most ALimit remain.
@@ -450,6 +480,48 @@ begin
   Result := GlobalsHoldEngine;
 end;
 
+function TAnsiEngineManager.EnginePrepared: Boolean;
+begin
+  Result := GlobalsHoldEngine and ((Length(VowelRules) > 0) or (Length(RfolaRules) > 0) or (Length(CustomFullForms) > 0) or
+    (Length(CustomPreReplacements) > 0) or (Length(CustomPostReplacements) > 0) or ((AnsiOverrides <> nil) and (AnsiOverrides.Count > 0)));
+end;
+
+function TAnsiEngineManager.RepairSelectedEngine: Boolean;
+const
+  REPAIR_THROTTLE_MS = 2000;
+var
+  FileName, Path: string;
+begin
+  Result := EnginePrepared;
+  if Result then
+    Exit;
+
+  if (FLastRepairTick <> 0) and (GetTickCount - FLastRepairTick < REPAIR_THROTTLE_MS) then
+    Exit;
+  FLastRepairTick := GetTickCount;
+
+  // The selection - never a different file: repair must not change which
+  // encoding the user chose, so there is no fallback to another mapping here.
+  FileName := AnsiVersionFileName;
+  if FileName = '' then
+    Exit;
+  Path := GetExactEncoFilePath(FileName, AnsiMappingDir);
+  if Path = '' then
+  begin
+    Log('Engine repair: selected mapping file is missing: ' + FileName);
+    Exit;
+  end;
+
+  if not SwitchEngine(FileName) then
+  begin
+    Log('Engine repair: could not activate "' + FileName + '"');
+    Exit;
+  end;
+
+  Log('Engine repair: activated "' + FileName + '" on first use (startup activation had not run)');
+  Result := EnginePrepared;
+end;
+
 function TAnsiEngineManager.IsSlotHollow(const AKey: string): Boolean;
 var
   Slot: TEngineSlot;
@@ -459,9 +531,9 @@ begin
     Result := IsEngineStateHollow(Slot.State);
 end;
 
-function TAnsiEngineManager.CachedEngineReady(const AName: string): Boolean;
+function TAnsiEngineManager.CachedEngineReady(const AFileName: string): Boolean;
 begin
-  Result := not IsSlotHollow(SlotKey(AName));
+  Result := not IsSlotHollow(SlotKey(AFileName));
 end;
 
 function TAnsiEngineManager.ParkLive: Boolean;
@@ -507,16 +579,11 @@ begin
   RestoreEngineState(Slot.State);
   FCurrentKey := AKey;
   Slot.LastUseStamp := NextUseStamp;
+  // The slot that becomes live is the only authority for the selection: publish
+  // the exact file and its base name together, so no path can leave a stale
+  // companion behind. The baseline publishes ('', AVRO_BASELINE_NAME).
+  PublishActiveSelection(Slot.FileName, Slot.BaseName);
   Result := True;
-end;
-
-function TAnsiEngineManager.TryRestoreSlot(const AKey, AName: string): Boolean;
-begin
-  Result := RestoreSlotState(AKey);
-  if not Result then
-    Exit;
-  if AName <> '' then
-    AnsiVersion := AName;
 end;
 
 procedure TAnsiEngineManager.RestoreParkedEngine(const AParked: Boolean);
@@ -528,12 +595,12 @@ begin
   Log('Engine state: parse failed - kept active engine "' + FCurrentKey + '"');
 end;
 
-procedure TAnsiEngineManager.EnsureLiveEngine;
+procedure TAnsiEngineManager.EnsureLiveEngine(AAllowDiskFallback: Boolean = True);
 var
-  PrevKey, BestKey, FallbackName, Path: string;
-  BestStamp:                            Cardinal;
-  Key:                                  string;
-  Slot:                                 TEngineSlot;
+  PrevKey, BestKey, FallbackFileName, Path: string;
+  BestStamp:                                Cardinal;
+  Key:                                      string;
+  Slot:                                     TEngineSlot;
 begin
   if GlobalsHoldEngine then
     Exit;
@@ -546,7 +613,8 @@ begin
   end;
 
   // Restore any non-hollow parked FILE slot, preferring the last-used stamp
-  // so the layout the user just left comes back first.
+  // so the layout the user just left comes back first. RestoreSlotState
+  // publishes that slot's exact selection.
   BestKey := '';
   BestStamp := 0;
   for Key in FCache.Keys do
@@ -566,31 +634,40 @@ begin
     Exit;
   end;
 
-  // Nothing parked: parse ONE file mapping from disk (natural-sort first
-  // usable name). Never a compiled-in Default - with zero files the app stays
-  // on Unicode output.
-  FallbackName := FirstAvailableMappingName;
-  if FallbackName <> '' then
+  // Nothing parked: parse ONE exact file mapping from disk (natural-sort first
+  // usable file). Never a compiled-in Default - with zero files the app stays
+  // on Unicode output. Explicit exact-file switches opt out: a failed selection
+  // must not silently activate a different mapping.
+  if AAllowDiskFallback then
   begin
-    Path := GetActiveEncoFilePath(FallbackName, AnsiMappingDir);
-    if (Path <> '') and ParseIntoSlot(FallbackName, Path, nil) and RestoreSlotState(SlotKey(FallbackName)) then
+    FallbackFileName := FirstAvailableMappingFileName;
+    if FallbackFileName <> '' then
     begin
-      Log('Engine state repaired: parsed file mapping "' + FallbackName + '"');
-      Exit;
+      Path := GetExactEncoFilePath(FallbackFileName, AnsiMappingDir);
+      if (Path <> '') and ParseIntoSlot(FallbackFileName, ChangeFileExt(FallbackFileName, ''), Path, nil) and
+        RestoreSlotState(SlotKey(FallbackFileName)) then
+      begin
+        Log('Engine state repaired: parsed file mapping "' + FallbackFileName + '"');
+        Exit;
+      end;
     end;
   end;
 
   Log('WARNING: no usable ANSI engine available');
 end;
 
-function TAnsiEngineManager.ParseJSONIntoSlot(const AName, AFilePath, AJSON: string; ErrorLog: TStringList = nil): Boolean;
+function TAnsiEngineManager.ParseJSONIntoSlot(const AFileName, ABaseName, AFilePath, AJSON: string; ErrorLog: TStringList = nil): Boolean;
 var
   JSON:       string;
   Slot:       TEngineSlot;
   LiveParked: Boolean;
+  Key, LabelText: string;
 begin
   Result := False;
   JSON := AJSON;
+  LabelText := AFileName;
+  if LabelText = '' then
+    LabelText := ABaseName;
 
   // LoadAnsiMappingFromJSON starts with ResetAnsiToDefaults, which frees the
   // globals' containers. While an engine is ACTIVE those containers belong to
@@ -605,7 +682,7 @@ begin
   if Trim(JSON) = '' then
   begin
     if Assigned(ErrorLog) then
-      ErrorLog.Add('Error: Mapping file is empty: ' + AName);
+      ErrorLog.Add('Error: Mapping file is empty: ' + LabelText);
     RestoreParkedEngine(LiveParked);
     Exit;
   end;
@@ -628,7 +705,7 @@ begin
   if (AnsiRegistry = nil) or (AnsiRegistry.Count = 0) then
   begin
     if Assigned(ErrorLog) then
-      ErrorLog.Add('Error: mapping parse produced no engine for ' + AName);
+      ErrorLog.Add('Error: mapping parse produced no engine for ' + LabelText);
     RestoreParkedEngine(LiveParked);
     Exit;
   end;
@@ -637,49 +714,74 @@ begin
   then
   begin
     if Assigned(ErrorLog) then
-      ErrorLog.Add('Error: mapping contains no usable rules for ' + AName);
+      ErrorLog.Add('Error: mapping contains no usable rules for ' + LabelText);
     RestoreParkedEngine(LiveParked);
     Exit;
   end;
 
   Slot := TEngineSlot.Create;
-  Slot.DisplayName := AName;
+  Slot.FileName := AFileName;
+  Slot.BaseName := ABaseName;
+  if Slot.BaseName = '' then
+    Slot.BaseName := ChangeFileExt(AFileName, '');
   Slot.FilePath := AFilePath;
   Slot.LastWriteTime := 0;
+  Slot.FileSize := 0;
   Slot.LastUseStamp := NextUseStamp;
   if AFilePath <> '' then
     try
       Slot.LastWriteTime := TFile.GetLastWriteTime(AFilePath);
+      Slot.FileSize := TFile.GetSize(AFilePath);
     except
       Slot.LastWriteTime := 0;
+      Slot.FileSize := 0;
     end;
   CaptureEngineState(Slot.State);
   // CaptureEngineState stamps the CURRENT AnsiVersion, which is the name of the
   // engine we just parked (or the one still being requested). The parsed file's
-  // own name is authoritative for the slot and for every later restore.
-  Slot.State.DisplayName := AName;
+  // own base name is authoritative for the slot and for every later restore.
+  Slot.State.DisplayName := Slot.BaseName;
+  // A file slot is keyed by its exact file name; the embedded baseline has no
+  // file and keeps the legacy baseline key.
+  Key := SlotKey(AFileName);
+  if (Key = '') and (Slot.BaseName <> '') then
+    Key := SlotKey(Slot.BaseName);
   // Never replace a slot that still owns containers: dropping first keeps the
   // one-owner rule (a blind AddOrSetValue would leak the old engine).
-  if FCache.ContainsKey(SlotKey(AName)) then
-    DropSlot(SlotKey(AName));
-  FCache.Add(SlotKey(AName), Slot);
+  if (Key <> '') and FCache.ContainsKey(Key) then
+    DropSlot(Key);
+  if Key <> '' then
+    FCache.Add(Key, Slot)
+  else
+  begin
+    Slot.Free;
+    if Assigned(ErrorLog) then
+      ErrorLog.Add('Error: mapping has no identity: ' + LabelText);
+    RestoreParkedEngine(LiveParked);
+    Exit;
+  end;
 
   // The per-layout icon a container carries rides inside the payload, so it is
   // refreshed here - the one place every parse path goes through: the startup
   // preload, the directory watcher's re-parse, an on-demand switch and an
   // import. The cached icon therefore stays in step with the file exactly like
   // the engine's own rules do, and a legacy container simply clears its entry.
-  StoreMappingIcon(AName, ExtractIconSection(JSON));
+  if AFilePath <> '' then
+    StoreMappingIcon(ExtractFileName(AFilePath), ExtractIconSection(JSON));
 
   Result := True;
 end;
 
-function TAnsiEngineManager.ParseIntoSlot(const AName, AFilePath: string; ErrorLog: TStringList = nil; const APassword: AnsiString = ''): Boolean;
+function TAnsiEngineManager.ParseIntoSlot(const AFileName, ABaseName, AFilePath: string; ErrorLog: TStringList = nil; const APassword: AnsiString = ''): Boolean;
 var
   JSON:        string;
   UsePassword: AnsiString;
+  LabelText:   string;
 begin
   Result := False;
+  LabelText := AFileName;
+  if LabelText = '' then
+    LabelText := ABaseName;
 
   // Empty path is not an engine: every successful parse goes through a real
   // .json / .AvroEnco file (the compiled glyph canvas is only the scratch
@@ -687,7 +789,7 @@ begin
   if AFilePath = '' then
   begin
     if Assigned(ErrorLog) then
-      ErrorLog.Add('Error: Mapping file path is empty for ' + AName);
+      ErrorLog.Add('Error: Mapping file path is empty for ' + LabelText);
     Exit;
   end;
 
@@ -706,7 +808,7 @@ begin
     if (JSON = '') or (JSON[1] <> '{') then
     begin
       if Assigned(ErrorLog) then
-        ErrorLog.Add('Error: Decryption failed for ' + AName);
+        ErrorLog.Add('Error: Decryption failed for ' + LabelText);
       Exit;
     end;
   end
@@ -731,7 +833,7 @@ begin
     end;
   end;
 
-  Result := ParseJSONIntoSlot(AName, AFilePath, JSON, ErrorLog);
+  Result := ParseJSONIntoSlot(AFileName, ABaseName, AFilePath, JSON, ErrorLog);
 end;
 
 procedure TAnsiEngineManager.ParkCurrent;
@@ -766,9 +868,10 @@ begin
       if Assigned(AvroEncoFiles) then
         for Info in AvroEncoFiles.Values do
         begin
-          if FCache.ContainsKey(SlotKey(Info.DisplayName)) then
+          if FCache.ContainsKey(SlotKey(Info.FileName)) then
             Continue;
-          Item.DisplayName := Info.DisplayName;
+          Item.FileName := Info.FileName;
+          Item.BaseName := Info.BaseName;
           Item.FilePath := Info.FilePath;
           Item.Password := '';
           if Info.IsEncoFile then
@@ -794,27 +897,28 @@ begin
   end;
 end;
 
-function TAnsiEngineManager.CapturePreloadItem(const AName: string): TArray<TPreloadItem>;
+function TAnsiEngineManager.CapturePreloadItem(const AFileName: string): TArray<TPreloadItem>;
 var
   Info: TAvroEncoFileInfo;
   Item: TPreloadItem;
   Flag: Byte;
 begin
   SetLength(Result, 0);
-  if AName = '' then
+  if AFileName = '' then
     Exit;
 
   FLock.Enter;
   try
-    if FCache.ContainsKey(SlotKey(AName)) then
+    if FCache.ContainsKey(SlotKey(AFileName)) then
       Exit; // already cached: nothing to warm
-    if (not Assigned(AvroEncoFiles)) or (not AvroEncoFiles.TryGetValue(SlotKey(AName), Info)) then
+    if (not Assigned(AvroEncoFiles)) or (not AvroEncoFiles.TryGetValue(SlotKey(AFileName), Info)) then
       Exit; // not a mapping this process knows about
   finally
     FLock.Leave;
   end;
 
-  Item.DisplayName := Info.DisplayName;
+  Item.FileName := Info.FileName;
+  Item.BaseName := Info.BaseName;
   Item.FilePath := Info.FilePath;
   Item.Password := '';
   if Info.IsEncoFile then
@@ -850,21 +954,21 @@ begin
         if not R.OK then
         begin
           if R.ErrorMsg <> '' then
-            Log('Engine preload failed: ' + R.DisplayName + ' - ' + R.ErrorMsg)
+            Log('Engine preload failed: ' + R.FileName + ' - ' + R.ErrorMsg)
           else
-            Log('Engine preload failed: ' + R.DisplayName + ' - decryption');
+            Log('Engine preload failed: ' + R.FileName + ' - decryption');
           Continue;
         end;
-        if FCache.ContainsKey(SlotKey(R.DisplayName)) then
+        if FCache.ContainsKey(SlotKey(R.FileName)) then
           Continue;
         Err.Clear;
-        if ParseJSONIntoSlot(R.DisplayName, R.FilePath, R.JSON, Err) then
+        if ParseJSONIntoSlot(R.FileName, R.BaseName, R.FilePath, R.JSON, Err) then
         begin
           Inc(Result);
-          Log('Engine preloaded: ' + R.DisplayName);
+          Log('Engine preloaded: ' + R.FileName);
         end
         else
-          Log('Engine preload failed: ' + R.DisplayName + ' - ' + Err.Text);
+          Log('Engine preload failed: ' + R.FileName + ' - ' + Err.Text);
       end;
       EnsureLiveEngine;
     finally
@@ -883,6 +987,15 @@ var
   Key, Err: string;
 begin
   Result := False;
+
+  // Defense in depth for the asynchronous migration runner and future callers:
+  // the baseline is only for a completely empty catalog. Locked, corrupt or
+  // unreadable files still count as rows, so they block it exactly as required.
+  if Assigned(AvroEncoFiles) and (AvroEncoFiles.Count > 0) then
+  begin
+    Log('Baseline: not activated - mapping catalog is not empty (' + IntToStr(AvroEncoFiles.Count) + ' file(s))');
+    Exit;
+  end;
 
   // Read + decrypt OUTSIDE the lock: AvroBaselineLoad does AES-GCM and zlib
   // work, and holding FLock across it would stall a concurrent switch/repair.
@@ -914,7 +1027,7 @@ begin
       // so there is nothing for the directory watcher to re-parse and nothing to
       // invalidate. A later import of a real "Ansi V1" simply replaces the slot.
       DropSlot(Key);
-      if not ParseJSONIntoSlot(AVRO_BASELINE_NAME, '', JSON, ErrorLog) then
+      if not ParseJSONIntoSlot('', AVRO_BASELINE_NAME, '', JSON, ErrorLog) then
       begin
         // ParseJSONIntoSlot restores whatever was parked, so a failure here
         // cannot cost the app an engine it already had.
@@ -922,7 +1035,7 @@ begin
         Exit;
       end;
       ParkCurrent;
-      if not TryRestoreSlot(Key, AVRO_BASELINE_NAME) then
+      if not RestoreSlotState(Key) then
       begin
         Log('Baseline: state is hollow after parse');
         EnsureLiveEngine;
@@ -942,23 +1055,23 @@ begin
   end;
 end;
 
-function TAnsiEngineManager.SwitchEngine(const AName: string; ErrorLog: TStringList = nil): Boolean;
+function TAnsiEngineManager.SwitchEngine(const AFileName: string; ErrorLog: TStringList = nil): Boolean;
 var
-  Key, Path, PrevKey: string;
-  OwnErr:             Boolean;
+  Key, Path, BaseName: string;
+  Slot: TEngineSlot;
+  OwnErr: Boolean;
 begin
   Result := False;
-  Key := SlotKey(AName);
+  Key := SlotKey(AFileName);
   if Key = '' then
     Exit;
+  BaseName := ChangeFileExt(AFileName, '');
 
   OwnErr := not Assigned(ErrorLog);
   if OwnErr then
     ErrorLog := TStringList.Create;
   FLock.Enter;
   try
-    PrevKey := FCurrentKey;
-
     // Idempotent: already active AND the globals really hold its state. The
     // ContainsKey check alone used to be a lie: when something had parsed over
     // the live engine the slot stayed in place but empty, so every later click
@@ -966,15 +1079,20 @@ begin
     if (Key = FCurrentKey) and FCache.ContainsKey(Key) then
     begin
       if GlobalsHoldEngine then
+      begin
+        // Republish from the live slot so both selection values are always the
+        // exact pair of the engine that is actually active.
+        Slot := FCache[Key];
+        PublishActiveSelection(Slot.FileName, Slot.BaseName);
         Exit(True);
+      end;
       if RestoreSlotState(Key) then
       begin
-        AnsiVersion := AName;
-        Log('Engine switch: repaired active engine "' + AName + '"');
+        Log('Engine switch: repaired active engine "' + AFileName + '"');
         Exit(True);
       end;
       DropSlot(Key); // hollow: rebuild it from disk below
-      Log('Engine switch: hollow state for "' + AName + '" - re-parsing from disk');
+      Log('Engine switch: hollow state for "' + AFileName + '" - re-parsing from disk');
     end;
 
     // Load on demand (password-protected engine, file added at runtime, or the
@@ -983,18 +1101,20 @@ begin
     // way (fail-closed). Empty path is never an engine - no compiled Default.
     if (not FCache.ContainsKey(Key)) or IsSlotHollow(Key) then
     begin
-      Path := GetActiveEncoFilePath(AName, AnsiMappingDir);
+      Path := GetExactEncoFilePath(AFileName, AnsiMappingDir);
       if Path = '' then
       begin
         if Assigned(ErrorLog) then
-          ErrorLog.Add('Mapping file not found: ' + AName);
-        EnsureLiveEngine;
+          ErrorLog.Add('Mapping file not found: ' + AFileName);
+        // An explicit exact-file switch that missed must not activate a
+        // different mapping: repair only what was already live/parked.
+        EnsureLiveEngine(False);
         Exit;
       end;
       DropSlot(Key);
-      if not ParseIntoSlot(AName, Path, ErrorLog) then
+      if not ParseIntoSlot(AFileName, BaseName, Path, ErrorLog) then
       begin
-        EnsureLiveEngine;
+        EnsureLiveEngine(False);
         Exit;
       end;
     end;
@@ -1002,10 +1122,10 @@ begin
     // O(1) engine swap: park current (a no-op right after a parse, which
     // already parked it), then restore the target - never a hollow state.
     ParkCurrent;
-    if not TryRestoreSlot(Key, AName) then
+    if not RestoreSlotState(Key) then
     begin
-      Log('Engine switch failed: "' + AName + '" state is hollow');
-      EnsureLiveEngine;
+      Log('Engine switch failed: "' + AFileName + '" state is hollow');
+      EnsureLiveEngine(False);
       Exit;
     end;
     Result := True;
@@ -1028,12 +1148,13 @@ begin
   // and a few ms without it.
 end;
 
-function TAnsiEngineManager.TrySwitchCached(const AName: string): Boolean;
+function TAnsiEngineManager.TrySwitchCached(const AFileName: string): Boolean;
 var
   Key: string;
+  Slot: TEngineSlot;
 begin
   Result := False;
-  Key := SlotKey(AName);
+  Key := SlotKey(AFileName);
   if Key = '' then
     Exit;
 
@@ -1049,7 +1170,11 @@ begin
     // own its containers while it runs), so IsSlotHollow is true here even in
     // the healthy case.
     if (Key = FCurrentKey) and GlobalsHoldEngine then
+    begin
+      Slot := FCache[Key];
+      PublishActiveSelection(Slot.FileName, Slot.BaseName);
       Exit(True);
+    end;
 
     if Key = FCurrentKey then
     begin
@@ -1057,11 +1182,10 @@ begin
       // it in place) or hollow (caller must repair from disk).
       if RestoreSlotState(Key) then
       begin
-        AnsiVersion := AName;
-        Log('Engine switch (fast path): repaired active engine "' + AName + '"');
+        Log('Engine switch (fast path): repaired active engine "' + AFileName + '"');
         Exit(True);
       end;
-      Log('Engine switch (fast path): active engine "' + AName + '" is hollow - repair required');
+      Log('Engine switch (fast path): active engine "' + AFileName + '" is hollow - repair required');
       Exit;
     end;
 
@@ -1069,14 +1193,14 @@ begin
     // every rule/lookup table and silently leave typing broken.
     if IsSlotHollow(Key) then
     begin
-      Log('Engine switch (fast path): "' + AName + '" is hollow - repair required');
+      Log('Engine switch (fast path): "' + AFileName + '" is hollow - repair required');
       Exit;
     end;
 
     ParkCurrent;
-    if not TryRestoreSlot(Key, AName) then
+    if not RestoreSlotState(Key) then
     begin
-      Log('Engine switch (fast path) failed: "' + AName + '"');
+      Log('Engine switch (fast path) failed: "' + AFileName + '"');
       Exit;
     end;
     Result := True;
@@ -1102,7 +1226,8 @@ begin
       Warmed := 0;
       // Exercise every park/restore path before the keyboard hook starts.
       // Hollow slots are skipped: they cannot be restored and would only
-      // waste the warm pass (and make it end on a broken engine).
+      // waste the warm pass (and make it end on a broken engine). Each restore
+      // publishes its slot's exact selection.
       for Key in Keys do
         if (Key <> FCurrentKey) and (not IsSlotHollow(Key)) then
         begin
@@ -1116,13 +1241,11 @@ begin
         RestoreSlotState(ReturnKey);
       end;
 
-      if GlobalsHoldEngine and (FCurrentKey = ReturnKey) then
-        AnsiVersion := AReturnTo
-      else
+      if not (GlobalsHoldEngine and (FCurrentKey = ReturnKey)) then
       begin
         // The requested engine could not be restored (hollow or missing).
         // Never advertise it while another engine is live - the next switch
-        // repairs it from disk.
+        // repairs it from disk. EnsureLiveEngine publishes whatever it repairs.
         EnsureLiveEngine;
         Log('WARNING: warm pass could not activate "' + AReturnTo + '" - active engine is "' + FCurrentKey + '"');
       end;
@@ -1135,19 +1258,22 @@ begin
   end;
 end;
 
-procedure TAnsiEngineManager.DoInvalidateEngine(const AName: string);
+procedure TAnsiEngineManager.DoInvalidateEngine(const AFileName: string);
 var
-  Key, Path: string;
+  Key, Path, BaseName: string;
   WasActive: Boolean;
   Err:       TStringList;
 begin
-  Key := SlotKey(AName);
+  Key := SlotKey(AFileName);
   if not FCache.ContainsKey(Key) then
     Exit;
   Path := FCache[Key].FilePath;
-  if (Path <> '') and (not FileExists(Path)) then
+  if Path = '' then
+    Exit; // embedded baseline: no file to re-parse
+  if not FileExists(Path) then
     Exit; // file is gone - RefreshFromDisk / delete flow handles removal
 
+  BaseName := ChangeFileExt(AFileName, '');
   WasActive := (Key = FCurrentKey);
   if WasActive then
     ParkCurrent; // globals -> slot, then drop the old engine
@@ -1155,9 +1281,9 @@ begin
 
   Err := TStringList.Create;
   try
-    if not ParseIntoSlot(AName, Path, Err) then
+    if not ParseIntoSlot(AFileName, BaseName, Path, Err) then
     begin
-      Log('InvalidateEngine failed for ' + AName + ': ' + Err.Text);
+      Log('InvalidateEngine failed for ' + AFileName + ': ' + Err.Text);
       // Repair from another file mapping or leave Unicode-only - never a
       // silent fall back to a compiled-in engine.
       EnsureLiveEngine;
@@ -1166,9 +1292,9 @@ begin
 
     if WasActive then
     begin
-      if not TryRestoreSlot(Key, AName) then
+      if not RestoreSlotState(Key) then
         EnsureLiveEngine;
-      Log('Engine invalidated (active): ' + AName);
+      Log('Engine invalidated (active): ' + AFileName);
     end
     else
     begin
@@ -1176,18 +1302,18 @@ begin
       // of the live engine and destroy it. The parse is quarantined now, so
       // the running engine only has to be put back to work.
       EnsureLiveEngine;
-      Log('Engine invalidated (background): ' + AName);
+      Log('Engine invalidated (background): ' + AFileName);
     end;
   finally
     Err.Free;
   end;
 end;
 
-procedure TAnsiEngineManager.InvalidateEngine(const AName: string);
+procedure TAnsiEngineManager.InvalidateEngine(const AFileName: string);
 begin
   FLock.Enter;
   try
-    DoInvalidateEngine(AName);
+    DoInvalidateEngine(AFileName);
   finally
     FLock.Leave;
   end;
@@ -1198,13 +1324,15 @@ var
   Key:     string;
   Slot:    TEngineSlot;
   Info:    TAvroEncoFileInfo;
-  Name:    string;
+  FileName: string;
   NewTime: TDateTime;
+  NewSize: Int64;
   Keys:    TList<string>;
 begin
   FLock.Enter;
   try
-    // 1. Drop cached engines whose file disappeared (never the active one).
+    // 1. Drop cached engines whose exact file disappeared (never the active
+    // one). A same-base sibling is never treated as the same engine.
     Keys := TList<string>.Create;
     try
       for Key in FCache.Keys do
@@ -1223,28 +1351,31 @@ begin
     end;
 
     // 2. Re-parse changed engines, preload newly added ones (default-key /
-    // plain .json only; password engines stay lazy).
+    // plain .json only; password engines stay lazy). Identity is the exact
+    // file name, so one.json and one.AvroEnco are independent engines.
     if Assigned(AvroEncoFiles) then
       for Info in AvroEncoFiles.Values do
       begin
         if Info.IsEncoFile and (GetAvroEncoProtectionFlag(Info.FilePath) <> AVROENCO_FLAG_DEFAULT_KEY) then
           Continue;
-        name := Info.DisplayName;
-        Key := SlotKey(name);
+        FileName := Info.FileName;
+        Key := SlotKey(FileName);
         if FCache.TryGetValue(Key, Slot) then
         begin
           try
             NewTime := TFile.GetLastWriteTime(Info.FilePath);
+            NewSize := TFile.GetSize(Info.FilePath);
           except
             NewTime := 0;
+            NewSize := 0;
           end;
-          if Abs(NewTime - Slot.LastWriteTime) > 0.000001 then
-            DoInvalidateEngine(name);
+          if (Abs(NewTime - Slot.LastWriteTime) > 0.000001) or (NewSize <> Slot.FileSize) then
+            DoInvalidateEngine(FileName);
         end
         else
         begin
-          Log('Engine added while running: ' + name);
-          ParseIntoSlot(name, Info.FilePath, nil);
+          Log('Engine added while running: ' + FileName);
+          ParseIntoSlot(FileName, Info.BaseName, Info.FilePath, nil);
         end;
       end;
 
@@ -1255,11 +1386,11 @@ begin
   end;
 end;
 
-procedure TAnsiEngineManager.RemoveEngine(const AName: string);
+procedure TAnsiEngineManager.RemoveEngine(const AFileName: string);
 var
   Key: string;
 begin
-  Key := SlotKey(AName);
+  Key := SlotKey(AFileName);
   if Key = FCurrentKey then
     Exit; // caller must switch away first (picker does this)
   FLock.Enter;
@@ -1297,7 +1428,8 @@ var
   Item: TPreloadItem;
 begin
   Item := FItems[index];
-  R.DisplayName := Item.DisplayName;
+  R.FileName := Item.FileName;
+  R.BaseName := Item.BaseName;
   R.FilePath := Item.FilePath;
   R.JSON := '';
   R.OK := False;

@@ -89,6 +89,7 @@ type
       function ProcessVKeyDown(const KeyCode: Integer; var Block: Boolean): string;
       procedure ProcessVKeyUP(const KeyCode: Integer; var Block: Boolean);
       procedure ResetDeadKey;
+      procedure ResetAnsiTypingState;
 
       property OnRawEmit: TModernHostEditEvent read FOnRawEmit write FOnRawEmit;
       procedure SetKeyboardModeOverride(const Enabled: Boolean; const Mode: Integer);
@@ -1150,6 +1151,12 @@ procedure TGenericLayoutModern.ResetDeadKey;
 begin
   DeadKey := True;
   ResetLastChar;
+  Bijoy.ResetTransientState;
+end;
+
+procedure TGenericLayoutModern.ResetAnsiTypingState;
+begin
+  ResetDeadKey;
 end;
 
 { =============================================================================== }

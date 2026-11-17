@@ -4,7 +4,7 @@ object frmResourceBrowser: TfrmResourceBrowser
   BorderIcons = [biSystemMenu]
   BorderStyle = bsDialog
   Caption = 'Resources Management'
-  ClientHeight = 432
+  ClientHeight = 450
   ClientWidth = 676
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
@@ -32,16 +32,18 @@ object frmResourceBrowser: TfrmResourceBrowser
   end
   object lblDestination: TLabel
     Left = 8
-    Top = 409
+    Top = 427
     Width = 660
     Height = 13
     AutoSize = False
     Caption = ''
+    EllipsisPosition = epPathEllipsis
+    ParentShowHint = False
   end
   object lblItemDesc: TLabel
-    Left = 184
+    Left = 8
     Top = 326
-    Width = 484
+    Width = 660
     Height = 46
     AutoSize = False
     Caption = ''
@@ -49,14 +51,14 @@ object frmResourceBrowser: TfrmResourceBrowser
   end
   object lblStatus: TLabel
     Left = 8
-    Top = 326
-    Width = 168
-    Height = 46
+    Top = 376
+    Width = 660
+    Height = 15
     AutoSize = False
     Caption = ''
+    EllipsisPosition = epEndEllipsis
     ParentShowHint = False
     ShowHint = True
-    WordWrap = True
     OnMouseEnter = lblStatusMouseEnter
   end
   object lstCategories: TListBox
@@ -109,17 +111,17 @@ object frmResourceBrowser: TfrmResourceBrowser
     OnSelectItem = lvItemsSelectItem
   end
   object pbProgress: TProgressBar
-    Left = 282
-    Top = 385
-    Width = 306
+    Left = 104
+    Top = 401
+    Width = 484
     Height = 15
     Max = 100
     TabOrder = 2
     Visible = False
   end
   object btnDownload: TButton
-    Left = 184
-    Top = 380
+    Left = 8
+    Top = 396
     Width = 90
     Height = 25
     Caption = '&Download'
@@ -128,7 +130,7 @@ object frmResourceBrowser: TfrmResourceBrowser
   end
   object btnClose: TButton
     Left = 596
-    Top = 380
+    Top = 396
     Width = 72
     Height = 25
     Cancel = True

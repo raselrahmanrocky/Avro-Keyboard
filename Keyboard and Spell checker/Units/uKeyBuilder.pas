@@ -7,20 +7,32 @@ interface
 uses
   System.SysUtils,
   System.Hash,
-  uAvroShieldTypes;
+  uAvroShieldTypes,
+  uEncoReader;
 
 const
   ShieldMasterLen = 32;
   ShieldHkdfInfoDefault = 'AvroShield-v2/hkdf-sha256/default-key';
+  { One HKDF info string per key domain.  The info string IS the domain
+    separator: the same IKM under a different info yields a different master, so
+    a mapping-key leak cannot open the keyboard's protected resources. }
+  ShieldHkdfInfoAnsiMapping = 'AvroShield-v2/hkdf-sha256/ansi-mapping/v1';
+  ShieldHkdfInfoKeyboardRes = 'AvroShield-v2/hkdf-sha256/keyboard-resources/v1';
   ShieldPbkdf2Iterations = 100000;
 
+function ShieldHkdfInfoFor(ADomain: TEncoDomain): string;
 function HkdfExtractSha256(const ASalt, AIKM: TBytes): TBytes;
 function HkdfExpandSha256(const APRK, AInfo: TBytes; ALen: Integer): TBytes;
 function HkdfSha256(const ASalt, AIKM, AInfo: TBytes; ALen: Integer): TBytes;
 function Pbkdf2HmacSha256(const APassword, ASalt: TBytes; AIterations, ADkLen: Integer): TBytes;
 function Hash512Of(const AData: TBytes): TBytes;
 function HostTag: TBytes;
-function BuildSessionKeys(const ASecret, ASalt: TBytes; ADefaultKey: Boolean; AFlags: Byte; out AMaster, AEncKey, AMacKey: TBytes): Boolean;
+function BuildSessionKeys(const ASecret, ASalt: TBytes; ADefaultKey: Boolean; ADomain: TEncoDomain; AFlags: Byte;
+  out AMaster, AEncKey, AMacKey: TBytes): Boolean; overload;
+{ Kept so existing call sites keep compiling; always means edLegacy.  New code
+  passes the container's domain explicitly. }
+function BuildSessionKeys(const ASecret, ASalt: TBytes; ADefaultKey: Boolean; AFlags: Byte;
+  out AMaster, AEncKey, AMacKey: TBytes): Boolean; overload; deprecated 'pass the container key domain (TEncoDomain)';
 
 implementation
 
@@ -28,7 +40,6 @@ uses
   Winapi.Windows,
   Winapi.IpHlpApi,
   Winapi.IpTypes,
-  uEncoReader,
   uAvroSecureMem,
   uAvroShieldVM;
 
@@ -228,7 +239,8 @@ begin
   end;
 end;
 
-function BuildSessionKeys(const ASecret, ASalt: TBytes; ADefaultKey: Boolean; AFlags: Byte; out AMaster, AEncKey, AMacKey: TBytes): Boolean;
+function BuildSessionKeys(const ASecret, ASalt: TBytes; ADefaultKey: Boolean; ADomain: TEncoDomain; AFlags: Byte;
+  out AMaster, AEncKey, AMacKey: TBytes): Boolean;
 var
   FinalKey, Raw, MachineF, HardwareF, Info: TBytes;
   Tag: TBytes;
@@ -239,7 +251,7 @@ begin
   try
     if ADefaultKey then
     begin
-      Info := TEncoding.UTF8.GetBytes(ShieldHkdfInfoDefault);
+      Info := TEncoding.UTF8.GetBytes(ShieldHkdfInfoFor(ADomain));
       AMaster := HkdfSha256(ASalt, ASecret, Info, ShieldMasterLen);
     end
     else
@@ -279,6 +291,24 @@ begin
     AvroWipeAndRelease(HardwareF);
     AvroWipeAndRelease(Info);
   end;
+end;
+
+function ShieldHkdfInfoFor(ADomain: TEncoDomain): string;
+begin
+  case ADomain of
+    edAnsiMapping:
+      Result := ShieldHkdfInfoAnsiMapping;
+    edKeyboardRes:
+      Result := ShieldHkdfInfoKeyboardRes;
+  else
+    Result := ShieldHkdfInfoDefault;
+  end;
+end;
+
+function BuildSessionKeys(const ASecret, ASalt: TBytes; ADefaultKey: Boolean; AFlags: Byte;
+  out AMaster, AEncKey, AMacKey: TBytes): Boolean;
+begin
+  Result := BuildSessionKeys(ASecret, ASalt, ADefaultKey, edLegacy, AFlags, AMaster, AEncKey, AMacKey);
 end;
 
 end.

@@ -8,7 +8,8 @@ interface
 
 uses
   System.SysUtils,
-  uAvroShieldTypes;
+  uAvroShieldTypes,
+  uEncoReader;
 
 type
   TAvroShieldResult = uAvroShieldTypes.TAvroShieldResult;
@@ -67,13 +68,13 @@ function HkdfExtractSHA256(const ASalt, AIKM: TBytes): TBytes;
 function HkdfExpandSHA256(const APRK, AInfo: TBytes; ALen: Integer): TBytes;
 function Pbkdf2HMACSHA256(const APassword, ASalt: TBytes; AIterations, ADkLen: Integer): TBytes;
 function AvroShieldBuildFromJson(const AJSONText, APassword: string; const ADefaultKey, ABindToMachine, AUseHardwareFactor: Boolean; out AOutBytes: TBytes;
-  const ADefaultSecretIKM: TBytes = nil; const ACommentsIKM: TBytes = nil; const ATargetVersion: Byte = 3): TAvroShieldResult;
+  const ADefaultSecretIKM: TBytes = nil; const ACommentsIKM: TBytes = nil; const ATargetVersion: Byte = 3;
+  const ADomain: TEncoDomain = edLegacy): TAvroShieldResult;
 
 implementation
 
 uses
   System.Classes,
-  uEncoReader,
   uKeyBuilder,
   uBufferTransform,
   uDataStream,
@@ -121,7 +122,8 @@ begin
       else
         Secret := TEncoding.UTF8.GetBytes(APassword);
 
-      if not BuildSessionKeys(Secret, Envelope.Salt, (Flags and EncoFlagDefaultKey) <> 0, Flags, Master, EncKey, MacKey) then
+      if not BuildSessionKeys(Secret, Envelope.Salt, (Flags and EncoFlagDefaultKey) <> 0, Envelope.Domain,
+        Flags, Master, EncKey, MacKey) then
         Exit(asrUnknown);
 
       Result := OpenAuthenticated(Envelope, EncKey, MacKey, Compressed);
@@ -341,7 +343,8 @@ begin
 end;
 
 function AvroShieldBuildFromJson(const AJSONText, APassword: string; const ADefaultKey, ABindToMachine, AUseHardwareFactor: Boolean; out AOutBytes: TBytes;
-  const ADefaultSecretIKM: TBytes = nil; const ACommentsIKM: TBytes = nil; const ATargetVersion: Byte = 3): TAvroShieldResult;
+  const ADefaultSecretIKM: TBytes = nil; const ACommentsIKM: TBytes = nil; const ATargetVersion: Byte = 3;
+  const ADomain: TEncoDomain = edLegacy): TAvroShieldResult;
 var
   Salt, IV, Machine, Secret, Master, EncKey, MacKey, Compressed, Bytecode, Sealed, Header, HmacData, Hmac: TBytes;
   Flags: Byte;
@@ -352,11 +355,16 @@ begin
     Exit(asrEmptyPassword);
   if (ATargetVersion <> EncoVersionV2) and (ATargetVersion <> EncoVersionV3) then
     Exit(asrBadVersion);
+  // A key domain only exists for the default-key family: a password container
+  // derives with PBKDF2 and has no HKDF info to select.  Refusing the pair
+  // keeps the flag byte honest instead of recording a domain nothing reads.
+  if (not ADefaultKey) and (ADomain <> edLegacy) then
+    Exit(asrBadVersion);
 
   FillRandomBytes(Salt, 16);
   Flags := EncoFlagPassword or EncoFlagBytecodeV1;
   if ADefaultKey then
-    Flags := Flags or EncoFlagDefaultKey;
+    Flags := Flags or EncoFlagDefaultKey or EncoDomainFlags(ADomain);
   if ABindToMachine then
     Flags := Flags or EncoFlagMachineBind;
   if AUseHardwareFactor then
@@ -374,7 +382,7 @@ begin
       else
         Secret := TEncoding.UTF8.GetBytes(APassword);
 
-      if not BuildSessionKeys(Secret, Salt, ADefaultKey, Flags, Master, EncKey, MacKey) then
+      if not BuildSessionKeys(Secret, Salt, ADefaultKey, ADomain, Flags, Master, EncKey, MacKey) then
         Exit(asrUnknown);
 
       Result := uAvroShieldCodec.EncodeJsonToBytecode(AJSONText, Master, ACommentsIKM, ATargetVersion, Bytecode);

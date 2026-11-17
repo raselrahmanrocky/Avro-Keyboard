@@ -4,6 +4,10 @@
 # Resource files are binaries containing manifest, project icon and version info.
 # They can not be viewed as text or compared by diff-tools. Consider replacing them with .rc files.
 *.res
+!Keyboard and Spell checker/Forms/AvroAboutArtwork.res
+!Keyboard and Spell checker/Forms/AvroSplashArtwork.res
+!Keyboard and Spell checker/Forms/AvroAboutIcon.res
+# These artwork resources are linked into Avro_Keyboard.exe from the .dpr.
 *.otares
 #
 # Type library file (binary). In old Delphi versions it should be stored.
@@ -96,7 +100,7 @@ Source Archive/
 Standard edition/
 
 
-*.json
+!assets/V*.json
 # The canonical rollout exclusion data is source, not generated data. It must
 # be tracked so the exporter, scrubber, reset and publish paths cannot drift.
 !tools/rollout/exclusions.json
@@ -137,8 +141,8 @@ keys/*
 !resources.lock.json
 !AvroEncoEngine/tools/AvroShieldSelfTest/fixtures/*.json
 
-# The '*.res' guard above is for compiled leftovers. Three .res files are the
-# opposite: they are real inputs, force-added long before this file was tidied.
+# The '*.res' guard above is for compiled leftovers. Some .res files are real
+# inputs, force-added long before this file was tidied.
 #   Layout\Internal_Layout.res, Skin\Internal_Skin.res - the built-in skin and
 #   layout, linked by their loader units.
 #   Layout\AvroBaseline.res - the embedded ANSI baseline, linked by
@@ -147,12 +151,14 @@ keys/*
 #   or a fresh clone (which deliberately has no plaintext) would fail.
 !Keyboard and Spell checker/Layout/AvroBaseline.res
 
-# Maintainer-only plaintext sources, restored by
-# tools/resource-sync/fetch_sources.ps1 for a build and never committed.
-assets/*.json
-# Exception: the ANSI version mapping tables (Ansi V1.json .. Ansi V100.json)
-# are committed, so any ANSI version stays reproducible from a clean clone.
-!assets/Ansi V*.json
+#   Icons\AssocIcons.res - the two file-association icons, carried inside Avro
+#   Keyboard.exe as RT_GROUP_ICON resources 101 (.avrolayout) and 102
+#   (.avroskin) and addressed by resource id from the installer's DefaultIcon
+#   values. Its source is Icons\AssocIcons.rc, which needs only the committed
+#   assets\icons\*.ico files - so a build links the committed .res without
+#   running brcc32, and the install folder carries no loose .ico.
+!Keyboard and Spell checker/Icons/AssocIcons.res
+
 
 # The encrypted ANSI mapping containers are BUILD ARTIFACTS: they are produced
 # by AvroEncoEngine\tools\AvroEncoBuilder\build_avroenco.bat and published

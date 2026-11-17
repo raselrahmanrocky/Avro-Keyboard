@@ -61,6 +61,7 @@ var
   HookContextDepth: Integer = 0;
 
 const
+  LLKHF_EXTENDED = $01;
   LLKHF_INJECTED = $10;
 
 implementation
@@ -150,52 +151,117 @@ end;
 
 { =============================================================================== }
 
-// Matches a hotkey setting using a combination of manual tracker state and
-// hardware-level GetAsyncKeyState. The OR logic ensures modifier tracking
-// is handled by the tracked state, while GetAsyncKeyState acts as an
-// auto-recovery failsafe for stuck trackers.
-function MatchesHotkeySettingTracked(const Setting: string; vkCode: Integer): Boolean;
+// Shift overrides NumLock on the numeric keypad: Shift+Num7 is reported as the
+// navigation key VK_HOME.  To do that, Windows synthesizes a Shift key-up
+// immediately before the key and puts Shift back with a Shift key-down after
+// it.  Both events reach a low-level hook like real ones; the synthetic ones
+// carry a scan code above $FF (e.g. $22A for left Shift).  If that synthetic
+// release cleared TrackedShift, "Shift + Num 7" would be recorded (and matched)
+// as "Num 7" - exactly the combination this hook has to support - so only a
+// real release may clear the tracker.
+function IsSyntheticModifierEvent(const Kbd: pKBDLLHOOKSTRUCT): Boolean;
+begin
+  Result := (Kbd.scancode and $FF00) <> 0;
+end;
+
+{ =============================================================================== }
+
+// Build the current modifier mask from the manual tracker plus the hardware
+// state.  The OR keeps a missed keydown from losing a modifier, while the
+// tracker keeps a modifier that GetAsyncKeyState has not caught up with yet.
+// Do not clear the tracker from GetAsyncKeyState here: inside a low-level hook
+// the async state can lag the event that just set the tracker, and clearing it
+// would make fast Shift+Numpad combinations fail.
+function CurrentModifierMask: Byte;
 var
-  NeedMods:                              Byte;
-  NeedKey:                               Integer;
-  CurrentMods:                           Byte;
   RealCtrl, RealShift, RealAlt, RealWin: Boolean;
 begin
-  Result := False;
-  if (Setting = '') or (Setting = 'NONE') then
-    Exit;
-
-  NeedMods := HotkeyStringToModifiers(Setting);
-  NeedKey := HotkeyStringToKey(Setting);
-
-  // Failsafe: Query physical hardware states
   RealCtrl := (GetAsyncKeyState(VK_CONTROL) and $8000) <> 0;
   RealShift := (GetAsyncKeyState(VK_SHIFT) and $8000) <> 0;
   RealAlt := (GetAsyncKeyState(VK_MENU) and $8000) <> 0;
   RealWin := ((GetAsyncKeyState(VK_LWIN) and $8000) <> 0) or ((GetAsyncKeyState(VK_RWIN) and $8000) <> 0);
 
-  // Auto-recovery: If key is physically up, force-reset stuck manual trackers
-  if not RealCtrl then
-    TrackedCtrl := False;
-  if not RealShift then
-    TrackedShift := False;
-  if not RealAlt then
-    TrackedAlt := False;
-  if not RealWin then
-    TrackedWin := False;
-
-  // Build current modifier mask from both sources (OR = belt-and-suspenders)
-  CurrentMods := 0;
+  Result := 0;
   if TrackedCtrl or RealCtrl then
-    CurrentMods := CurrentMods or MOD_CTRL;
+    Result := Result or MOD_CTRL;
   if TrackedShift or RealShift then
-    CurrentMods := CurrentMods or MOD_SHIFT;
+    Result := Result or MOD_SHIFT;
   if TrackedAlt or RealAlt then
-    CurrentMods := CurrentMods or MOD_ALT;
+    Result := Result or MOD_ALT;
   if TrackedWin or RealWin then
-    CurrentMods := CurrentMods or MOD_WIN;
+    Result := Result or MOD_WIN;
+end;
 
-  Result := (NeedMods = CurrentMods) and (NeedKey = vkCode);
+{ =============================================================================== }
+
+// Matches a hotkey setting using the tracked/hardware modifier mask.
+function MatchesHotkeySettingTracked(const Setting: string; vkCode: Integer): Boolean;
+begin
+  Result := False;
+  if (Setting = '') or (Setting = 'NONE') then
+    Exit;
+
+  Result := HotkeySettingMatchesVk(Setting, vkCode, CurrentModifierMask);
+end;
+
+{ =============================================================================== }
+
+type
+  THotkeyAction = (haNone, haModeSwitch, haOutputMode, haSpeller, haConverter, haAnsiVersion, haLayoutSwitch);
+
+function MatchConfiguredHotkey(AKey: Integer): THotkeyAction;
+begin
+  if MatchesHotkeySettingTracked(ModeSwitchKey, AKey) then
+    Exit(haModeSwitch);
+  if MatchesHotkeySettingTracked(ToggleOutputModeKey, AKey) then
+    Exit(haOutputMode);
+  if MatchesHotkeySettingTracked(SpellerLauncherKey, AKey) then
+    Exit(haSpeller);
+  if MatchesHotkeySettingTracked(ConverterLauncherKey, AKey) then
+    Exit(haConverter);
+  if MatchesHotkeySettingTracked(AnsiVersionSwitchKey, AKey) then
+    Exit(haAnsiVersion);
+  if MatchesHotkeySettingTracked(LayoutSwitchKey, AKey) then
+    Exit(haLayoutSwitch);
+  Result := haNone;
+end;
+
+function ConfiguredHotkeySetting(Action: THotkeyAction): string;
+begin
+  case Action of
+    haModeSwitch: Result := ModeSwitchKey;
+    haOutputMode: Result := ToggleOutputModeKey;
+    haSpeller: Result := SpellerLauncherKey;
+    haConverter: Result := ConverterLauncherKey;
+    haAnsiVersion: Result := AnsiVersionSwitchKey;
+    haLayoutSwitch: Result := LayoutSwitchKey;
+  else
+    Result := '';
+  end;
+end;
+
+procedure ExecuteConfiguredHotkey(Action: THotkeyAction);
+begin
+  case Action of
+    haModeSwitch:
+      AvroMainForm1.ToggleMode;
+    haOutputMode:
+      AvroMainForm1.ToggleOutputEncoding;
+    haSpeller:
+      AvroMainForm1.Spellcheck1Click(nil);
+    haConverter:
+      PostMessage(AvroMainForm1.Handle, WM_APP + 7, 0, 0);
+    haAnsiVersion:
+      PostMessage(AvroMainForm1.Handle, WM_APP + 1, 0, 0);
+    haLayoutSwitch:
+      PostMessage(AvroMainForm1.Handle, WM_APP + 3, 0, 0);
+  end;
+
+  if SettingUsesWinModifier(ConfiguredHotkeySetting(Action)) then
+  begin
+    SendInput_Down(VK_MENU_MASK);
+    SendInput_UP(VK_MENU_MASK);
+  end;
 end;
 
 { =============================================================================== }
@@ -206,10 +272,12 @@ var
   ShouldBlock:     Boolean;
   T:               string;
   ShortcutText:    string;
-  ConflictIdx:     Integer;
   IsModifier:      Boolean;
   PickerOpen:      Boolean;
   CommandModifier: Boolean;
+  HotkeyVk:        Integer;
+  HadModifier:     Boolean;
+  Action:          THotkeyAction;
 label
   ExitHere;
 
@@ -252,22 +320,13 @@ begin
       goto ExitHere;
 
     // ----------------------------------------------
-    // Clean state reset: After a hotkey was finalized, reset all tracked
-    // modifiers on the NEXT KeyDown so the new recording starts fresh.
-    // Must run BEFORE the modifier tracking section below.
-    // ----------------------------------------------
-    if RecordingFinalized and ((wParam = 256) or (wParam = 260)) then
-    begin
-      TrackedCtrl := False;
-      TrackedShift := False;
-      TrackedAlt := False;
-      TrackedWin := False;
-      RecordingFinalized := False;
-    end;
-
-    // ----------------------------------------------
     // Track modifier key state manually (reliable even when hook blocks key events)
     // ----------------------------------------------
+    { State before this event: used to tell a real modifier press that starts a
+      new combination from the synthetic Shift restore Windows sends around a
+      numpad key. }
+    HadModifier := TrackedCtrl or TrackedShift or TrackedAlt or TrackedWin;
+
     if (wParam = 256) or (wParam = 260) then // KeyDown
     begin
       if kbdllhs.vkCode in [VK_CONTROL, VK_LCONTROL, VK_RCONTROL] then
@@ -281,47 +340,54 @@ begin
     end
     else if (wParam = 257) or (wParam = 261) then // KeyUp
     begin
-      if kbdllhs.vkCode in [VK_CONTROL, VK_LCONTROL, VK_RCONTROL] then
-        TrackedCtrl := False
-      else if kbdllhs.vkCode in [VK_SHIFT, VK_LSHIFT, VK_RSHIFT] then
-        TrackedShift := False
-      else if kbdllhs.vkCode in [VK_MENU, VK_LMENU, VK_RMENU] then
-        TrackedAlt := False
-      else if kbdllhs.vkCode in [VK_LWIN, VK_RWIN] then
-        TrackedWin := False;
-    end;
-
-    // ----------------------------------------------
-    // Block F10 syskey if it's a configured hotkey
-    // (prevents WM_SYSCOMMAND/SC_KEYMENU menu bar activation)
-    // ----------------------------------------------
-    if (kbdllhs.vkCode = VK_F10) and ((wParam = 260) or (wParam = 261)) then
-    begin
-      if MatchesHotkeySettingTracked(ModeSwitchKey, kbdllhs.vkCode) or MatchesHotkeySettingTracked(ToggleOutputModeKey, kbdllhs.vkCode) or
-        MatchesHotkeySettingTracked(SpellerLauncherKey, kbdllhs.vkCode) or MatchesHotkeySettingTracked(ConverterLauncherKey, kbdllhs.vkCode) or
-        MatchesHotkeySettingTracked(AnsiVersionSwitchKey, kbdllhs.vkCode) then
+      { Shift overriding NumLock produces a synthetic Shift release (see
+        IsSyntheticModifierEvent); it is not the user letting go of Shift. }
+      if not IsSyntheticModifierEvent(kbdllhs) then
       begin
-        Result := 1;
-        Exit;
+        if kbdllhs.vkCode in [VK_CONTROL, VK_LCONTROL, VK_RCONTROL] then
+          TrackedCtrl := False
+        else if kbdllhs.vkCode in [VK_SHIFT, VK_LSHIFT, VK_RSHIFT] then
+          TrackedShift := False
+        else if kbdllhs.vkCode in [VK_MENU, VK_LMENU, VK_RMENU] then
+          TrackedAlt := False
+        else if kbdllhs.vkCode in [VK_LWIN, VK_RWIN] then
+          TrackedWin := False;
       end;
     end;
 
-    // ----------------------------------------------
-    // Hotkey Recording Mode (with live preview)
-    //
-    // While recording, the recorder OWNS the keyboard: every key the recorder
-    // itself processes (CASE A/B/C below, and the two paths that end or reject a
-    // recording) is swallowed with "Result := 1" and never handed on to whatever
-    // window has the focus.  Forwarding them - which is what those paths used to
-    // do - meant the shortcut the user just typed was also typed into the editor
-    // or field behind the Options dialog, and contradicted CASE B's own comment.
-    // ----------------------------------------------
-    if IsRecordingHotkey and ((wParam = 256) or (wParam = 257) or (wParam = 260) or (wParam = 261)) then
-    begin
-      // Determine if current key is a modifier
-      IsModifier := kbdllhs.vkCode in [VK_CONTROL, VK_LCONTROL, VK_RCONTROL, VK_SHIFT, VK_LSHIFT, VK_RSHIFT, VK_MENU, VK_LMENU, VK_RMENU, VK_LWIN, VK_RWIN];
+    // Numpad keys are recorded as "Num 7", but with NumLock off Windows reports
+    // them as their navigation VK (VK_END, VK_NEXT, ...).  Normalize only for
+    // hotkey capture/matching; the layout engine keeps the VK it already gets.
+    HotkeyVk := NormalizeHotkeyVk(kbdllhs.vkCode, kbdllhs.scancode,
+      (kbdllhs.flags and LLKHF_EXTENDED) <> 0);
 
-      // Build preview string from tracked modifier state
+    // Hotkey capture
+    //
+    // The Options dialog shows a THotKey per global hotkey, but a THotKey can
+    // not be the recorder: the Win32 hot-key control knows only Ctrl/Shift/Alt
+    // and refuses Enter/Tab/Space/Del/Esc/Backspace, while Avro has to record
+    // any key - the Windows key included - and this hook already sees them all.
+    // So the hook still owns capture and reproduces the THotKey choreography:
+    //
+    //   * every key-down starts a fresh combination.  A modifier key-down
+    //     drops the previous value and previews the held modifiers
+    //     ("Ctrl + Alt + "), exactly like the native control;
+    //   * a main key-down completes the combination and commits it at once,
+    //     so it is already set while the keys are held and survives their
+    //     release;
+    //   * releasing all modifiers without a main key ends on "None" - no
+    //     combination was formed;
+    //   * Esc alone restores the value from before the field was focused,
+    //     Backspace/Delete alone clear it.
+    //
+    // Every key of the session is swallowed: nothing lands in the dialog
+    // behind the field, and the Start menu never opens on Win.
+    // ----------------------------------------------
+    if HotkeyCaptureActive and ((wParam = 256) or (wParam = 257) or (wParam = 260) or (wParam = 261)) then
+    begin
+      IsModifier := HotkeyVk in [VK_CONTROL, VK_LCONTROL, VK_RCONTROL, VK_SHIFT, VK_LSHIFT, VK_RSHIFT, VK_MENU, VK_LMENU, VK_RMENU, VK_LWIN, VK_RWIN];
+
+      // Live modifier text, built from the state the tracking block just updated
       ShortcutText := '';
       if TrackedCtrl then
         ShortcutText := ShortcutText + 'Ctrl + ';
@@ -332,93 +398,55 @@ begin
       if TrackedWin then
         ShortcutText := ShortcutText + 'Win + ';
 
-      // CASE A: KeyDown of non-modifier = finalize recording
-      if ((wParam = 256) or (wParam = 260)) and (not IsModifier) then
+      if ((wParam = 256) or (wParam = 260)) and IsModifier then
       begin
-        // Append the final key to the shortcut
-        ShortcutText := ShortcutText + VirtualKeyToStr(kbdllhs.vkCode);
-
-        // Treat bare modifier-only or empty as "None"
-        if (Trim(ShortcutText) = '') or (ShortcutText = 'None') then
-          ShortcutText := 'None';
-
-        // Validate: non-F keys require at least one modifier
-        if (not TrackedCtrl) and (not TrackedShift) and (not TrackedAlt) and (not TrackedWin) and ((kbdllhs.vkCode < $70) or (kbdllhs.vkCode > $7B)) then
+        { A modifier starts a new combination: the old value is replaced by
+          the pressed modifiers, and releasing without a main key gives None.
+          The exception is the synthetic Shift restore Windows sends right
+          after a numpad key (Shift overrides NumLock): the numpad key has
+          already committed, and the restore must not replace that value with
+          a bare "Shift + ". }
+        if not (HotkeyCaptureCommitted and HadModifier) then
         begin
-          // Reject this keypress but keep recording session alive.  The key is
-          // still swallowed: a combination that is refused as a shortcut must
-          // not land in the application underneath either.
-          Result := 1;
-          Exit;
+          HotkeyCaptureCommitted := False;
+          if Assigned(HotkeyCapturePreview) then
+            HotkeyCapturePreview(ShortcutText);
         end;
-
-        // Conflict detection
-        ConflictIdx := FindConflictingFeature(ShortcutText, RecordingTargetEdit);
-        if ConflictIdx >= 0 then
-        begin
-          if not ResolveHotkeyConflict(ShortcutText, ConflictIdx) then
-          begin
-            // User cancelled - restore old text, stop recording
-            if Assigned(RecordingTargetEdit) then
-            begin
-              RecordingTargetEdit.Text := RecordingOldText;
-              RecordingTargetEdit.Color := clWindow;
-            end;
-            IsRecordingHotkey := False;
-            RecordingTargetEdit := nil;
-            RecordingFinalized := False;
-            // The recording is over, but this very keypress was consumed by the
-            // recorder (it is what cancelled the conflict dialog): swallow it too.
-            Result := 1;
-            Exit;
-          end;
-          ClearConflictByIndex(ConflictIdx);
-        end;
-
-        // Update the TEdit with final shortcut (keep yellow to show recording is still active)
-        if Assigned(RecordingTargetEdit) then
-          RecordingTargetEdit.Text := ShortcutText;
-
-        // Keep recording active for continuous reconfiguration
-        RecordingOldText := ShortcutText;
-        RecordingFinalized := True;
-        // Do NOT set IsRecordingHotkey := False
-        // Do NOT set RecordingTargetEdit := nil
       end
-      // CASE B: KeyUp of any key = block but do NOT update display if just finalized
-      else if ((wParam = 257) or (wParam = 261)) then
+      else if ((wParam = 257) or (wParam = 261)) and IsModifier then
       begin
-        if not RecordingFinalized then
-        begin
-          // Normal live preview during initial recording
-          if Assigned(RecordingTargetEdit) then
-          begin
-            if ShortcutText = '' then
-              RecordingTargetEdit.Text := 'None'
-            else
-              RecordingTargetEdit.Text := ShortcutText;
-          end;
-        end;
-        // When RecordingFinalized is True: silently block the KeyUp,
-        // keep showing the previously finalized shortcut text
-      end
-      // CASE C: KeyDown of modifier = show live preview (new recording cycle)
-      else if ((wParam = 256) or (wParam = 260)) and IsModifier then
-      begin
-        // Clear finalized flag since user started a new combination
-        RecordingFinalized := False;
-
-        if Assigned(RecordingTargetEdit) then
+        // After a completed combination the stored hotkey stays painted while
+        // the modifiers are released; only an unfinished one changes.
+        if not HotkeyCaptureCommitted then
         begin
           if ShortcutText = '' then
-            RecordingTargetEdit.Text := 'None'
-          else
-            RecordingTargetEdit.Text := ShortcutText;
+          begin
+            if Assigned(HotkeyCaptureCommit) then
+              HotkeyCaptureCommit('None');
+          end;
+          if Assigned(HotkeyCapturePreview) then
+            HotkeyCapturePreview(ShortcutText);
         end;
+      end
+      else if ((wParam = 256) or (wParam = 260)) and (not IsModifier) then
+      begin
+        if (ShortcutText = '') and (HotkeyVk = VK_ESCAPE) then
+          // Esc alone: give up and restore the value from before the capture
+          ShortcutText := ''
+        else if (ShortcutText = '') and ((HotkeyVk = VK_BACK) or (HotkeyVk = VK_DELETE)) then
+          ShortcutText := 'None'
+        else if (ShortcutText = '') and (not IsBareHotkeyKey(HotkeyVk)) then
+          // No modifier and not a key that may stand alone: no combination
+          ShortcutText := 'None'
+        else
+          ShortcutText := ShortcutText + VirtualKeyToStr(HotkeyVk);
+
+        if Assigned(HotkeyCaptureCommit) then
+          HotkeyCaptureCommit(ShortcutText);
+        HotkeyCaptureCommitted := True;
       end;
 
-      // CASE A (finalize), CASE B (key up) and CASE C (modifier preview) all
-      // end here: the key was part of the recording session, so it is blocked.
+      // Modifier down/up, main key up and refused keys all end here.
       Result := 1;
       Exit;
     end;
@@ -433,6 +461,86 @@ begin
     end;
 
     {$ENDREGION}
+
+    // Configured global hotkeys must be checked before the layout engine and the
+    // picker.  A layout engine can consume an arrow/numpad key (or a picker can
+    // route it), which used to make a hotkey such as Shift+Up or Ctrl+Shift+Num3
+    // never reach the hotkey code below.
+    if ((wParam = 256) or (wParam = 260)) then
+    begin // KeyDown
+      Action := MatchConfiguredHotkey(HotkeyVk);
+      if Action <> haNone then
+      begin
+        ExecuteConfiguredHotkey(Action);
+        ShouldBlock := True;
+        goto ExitHere;
+      end;
+
+      if UnicodeToggleShortcut = 'YES' then
+      begin
+        if (IsTrueShift = False) and IsControl and IsAlter and (HotkeyVk = Ord('V')) then
+        begin
+          AvroMainForm1.SetBengaliUnicodeMode;
+          ShouldBlock := True;
+          goto ExitHere;
+        end;
+      end;
+      if ANSIToggleShortcut = 'YES' then
+      begin
+        if (IsTrueShift = False) and IsControl and IsAlter and (HotkeyVk = Ord('B')) then
+        begin
+          PostMessage(AvroMainForm1.Handle, WM_APP + 12, 0, 0);
+          ShouldBlock := True;
+          goto ExitHere;
+        end;
+      end;
+
+      T := '';
+      if MatchUserHotkeyWithMods(HotkeyVk, CurrentModifierMask, T) then
+      begin
+        SendKey_Char(T);
+        if TrackedWin then
+        begin
+          SendInput_Down(VK_MENU_MASK);
+          SendInput_UP(VK_MENU_MASK);
+        end;
+        ShouldBlock := True;
+        goto ExitHere;
+      end;
+    end
+    else if ((wParam = 257) or (wParam = 261)) then
+    begin // KeyUp
+      if MatchConfiguredHotkey(HotkeyVk) <> haNone then
+      begin
+        ShouldBlock := True;
+        goto ExitHere;
+      end;
+
+      if UnicodeToggleShortcut = 'YES' then
+      begin
+        if (IsTrueShift = False) and IsControl and IsAlter and (HotkeyVk = Ord('V')) then
+        begin
+          ShouldBlock := True;
+          goto ExitHere;
+        end;
+      end;
+      if ANSIToggleShortcut = 'YES' then
+      begin
+        if (IsTrueShift = False) and IsControl and IsAlter and (HotkeyVk = Ord('B')) then
+        begin
+          ShouldBlock := True;
+          goto ExitHere;
+        end;
+      end;
+
+      T := '';
+      if MatchUserHotkeyWithMods(HotkeyVk, CurrentModifierMask, T) then
+      begin
+        ShouldBlock := True;
+        goto ExitHere;
+      end;
+    end;
+
     {$REGION 'Keyboard layout management'}
     // A visible picker owns the keyboard: it is the only surface the user is
     // meant to be typing into, so neither the Bangla engine nor the application
@@ -468,8 +576,8 @@ begin
         the popup can not receive it through the window manager as well.
 
         Keys pressed with Ctrl/Alt/Win are deliberately left alone - they are
-        application shortcuts or the configured hotkeys, which the region below
-        still handles, and that is what keeps the very hotkey that opened the
+        application shortcuts or configured hotkeys, which are handled before
+        this region, and that is what keeps the very hotkey that opened the
         popup working as the toggle that closes it. Shift is allowed, so `B`
         and `b` both reach the first-letter shortcut. }
       CommandModifier := TrackedCtrl or TrackedAlt or TrackedWin or ((GetAsyncKeyState(VK_CONTROL) and $8000) <> 0) or
@@ -493,176 +601,6 @@ begin
       end;
     end;
 
-    {$ENDREGION}
-    {$REGION 'Keyboard mode management'}
-    if ((wParam = 256) or (wParam = 260)) then
-    begin // Keydown
-      // Mode Switch
-      if MatchesHotkeySettingTracked(ModeSwitchKey, kbdllhs.vkCode) then
-      begin
-        AvroMainForm1.ToggleMode;
-        if SettingUsesWinModifier(ModeSwitchKey) then
-        begin
-          SendInput_Down(VK_MENU_MASK);
-          SendInput_UP(VK_MENU_MASK);
-        end;
-        ShouldBlock := True;
-        goto ExitHere;
-      end;
-      // Output Mode Toggle
-      if MatchesHotkeySettingTracked(ToggleOutputModeKey, kbdllhs.vkCode) then
-      begin
-        AvroMainForm1.ToggleOutputEncoding;
-        if SettingUsesWinModifier(ToggleOutputModeKey) then
-        begin
-          SendInput_Down(VK_MENU_MASK);
-          SendInput_UP(VK_MENU_MASK);
-        end;
-        ShouldBlock := True;
-        goto ExitHere;
-      end;
-      // Speller Launcher
-      if MatchesHotkeySettingTracked(SpellerLauncherKey, kbdllhs.vkCode) then
-      begin
-        AvroMainForm1.Spellcheck1Click(nil);
-        if SettingUsesWinModifier(SpellerLauncherKey) then
-        begin
-          SendInput_Down(VK_MENU_MASK);
-          SendInput_UP(VK_MENU_MASK);
-        end;
-        ShouldBlock := True;
-        goto ExitHere;
-      end;
-      // Text Converter Launcher
-      if MatchesHotkeySettingTracked(ConverterLauncherKey, kbdllhs.vkCode) then
-      begin
-        // Posted, not called: LaunchAvroTextConverter answers a missing exe
-        // with a modal MessageDlg, and a modal loop inside the hook callback
-        // would blow LowLevelHooksTimeout and get the hook removed silently.
-        PostMessage(AvroMainForm1.Handle, WM_APP + 7, 0, 0);
-        if SettingUsesWinModifier(ConverterLauncherKey) then
-        begin
-          SendInput_Down(VK_MENU_MASK);
-          SendInput_UP(VK_MENU_MASK);
-        end;
-        ShouldBlock := True;
-        goto ExitHere;
-      end;
-      // ANSI Version Switch
-      if MatchesHotkeySettingTracked(AnsiVersionSwitchKey, kbdllhs.vkCode) then
-      begin
-        PostMessage(AvroMainForm1.Handle, WM_APP + 1, 0, 0);
-        if SettingUsesWinModifier(AnsiVersionSwitchKey) then
-        begin
-          SendInput_Down(VK_MENU_MASK);
-          SendInput_UP(VK_MENU_MASK);
-        end;
-        ShouldBlock := True;
-        goto ExitHere;
-      end;
-      // Layout Switch
-      if MatchesHotkeySettingTracked(LayoutSwitchKey, kbdllhs.vkCode) then
-      begin
-        PostMessage(AvroMainForm1.Handle, WM_APP + 3, 0, 0);
-        if SettingUsesWinModifier(LayoutSwitchKey) then
-        begin
-          SendInput_Down(VK_MENU_MASK);
-          SendInput_UP(VK_MENU_MASK);
-        end;
-        ShouldBlock := True;
-        goto ExitHere;
-      end;
-      // Unicode/ANSI Toggle Shortcuts
-      if UnicodeToggleShortcut = 'YES' then
-      begin
-        if (IsTrueShift = False) and IsControl and IsAlter and (kbdllhs.vkCode = Ord('V')) then
-        begin
-          AvroMainForm1.SetBengaliUnicodeMode;
-          ShouldBlock := True;
-          goto ExitHere;
-        end;
-      end;
-      if ANSIToggleShortcut = 'YES' then
-      begin
-        if (IsTrueShift = False) and IsControl and IsAlter and (kbdllhs.vkCode = Ord('B')) then
-        begin
-          AvroMainForm1.SetBengaliANSIMode;
-          ShouldBlock := True;
-          goto ExitHere;
-        end;
-      end;
-      // Custom user hotkey check
-      if MatchUserHotkey(kbdllhs.vkCode, T) then
-      begin
-        SendKey_Char(T);
-        if TrackedWin then
-        begin
-          SendInput_Down(VK_MENU_MASK);
-          SendInput_UP(VK_MENU_MASK);
-        end;
-        ShouldBlock := True;
-        goto ExitHere;
-      end;
-    end
-
-    else if ((wParam = 257) or (wParam = 261)) then
-    begin // Keyup
-      // Block KeyUp for all hotkeys
-      if MatchesHotkeySettingTracked(ModeSwitchKey, kbdllhs.vkCode) then
-      begin
-        ShouldBlock := True;
-        goto ExitHere;
-      end;
-      if MatchesHotkeySettingTracked(ToggleOutputModeKey, kbdllhs.vkCode) then
-      begin
-        ShouldBlock := True;
-        goto ExitHere;
-      end;
-      if MatchesHotkeySettingTracked(SpellerLauncherKey, kbdllhs.vkCode) then
-      begin
-        ShouldBlock := True;
-        goto ExitHere;
-      end;
-      if MatchesHotkeySettingTracked(ConverterLauncherKey, kbdllhs.vkCode) then
-      begin
-        ShouldBlock := True;
-        goto ExitHere;
-      end;
-      if MatchesHotkeySettingTracked(AnsiVersionSwitchKey, kbdllhs.vkCode) then
-      begin
-        ShouldBlock := True;
-        goto ExitHere;
-      end;
-      if MatchesHotkeySettingTracked(LayoutSwitchKey, kbdllhs.vkCode) then
-      begin
-        ShouldBlock := True;
-        goto ExitHere;
-      end;
-      // Unicode/ANSI Toggle Shortcuts
-      if UnicodeToggleShortcut = 'YES' then
-      begin
-        if (IsTrueShift = False) and IsControl and IsAlter and (kbdllhs.vkCode = Ord('V')) then
-        begin
-          ShouldBlock := True;
-          goto ExitHere;
-        end;
-      end;
-      if ANSIToggleShortcut = 'YES' then
-      begin
-        if (IsTrueShift = False) and IsControl and IsAlter and (kbdllhs.vkCode = Ord('B')) then
-        begin
-          ShouldBlock := True;
-          goto ExitHere;
-        end;
-      end;
-      // Block KeyUp for custom hotkeys
-      T := '';
-      if MatchUserHotkey(kbdllhs.vkCode, T) then
-      begin
-        ShouldBlock := True;
-        goto ExitHere;
-      end;
-    end;
     {$ENDREGION}
   end; { nCode = HC_ACTION }
 

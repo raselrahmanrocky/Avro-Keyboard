@@ -226,6 +226,7 @@ type
       function ProcessVKeyDown(const KeyCode: Integer; var Block: Boolean): string;
       procedure ProcessVKeyUP(const KeyCode: Integer; var Block: Boolean);
       procedure ResetDeadKey;
+      procedure ResetAnsiTypingState;
       procedure FlushEmit;
 
       { TEST / EMBEDDING HOOKS - see the field comments above. Assigning one
@@ -2570,6 +2571,14 @@ end;
 procedure TGenericLayoutOld.ResetDeadKey;
 begin
   ResetLastChar;
+  Bijoy.ResetTransientState;
+  FConvSrc := '';
+  FConvAnsi := '';
+end;
+
+procedure TGenericLayoutOld.ResetAnsiTypingState;
+begin
+  ResetDeadKey;
 end;
 
 { =============================================================================== }

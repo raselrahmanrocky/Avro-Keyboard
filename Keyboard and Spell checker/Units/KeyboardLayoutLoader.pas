@@ -662,11 +662,15 @@ begin
 
       if FileExists(GetAvroDataDir + 'Keyboard Layouts\' + FileName) then
       begin
-        if Application.MessageBox(pchar('Keyboard layout "' + FileName + '" is already installed.' + #10 + 'Do you want to overwrite it?'), 'Avro Keyboard',
-          MB_YESNO + MB_ICONQUESTION + MB_DEFBUTTON2 + MB_SYSTEMMODAL) = ID_YES then
-          Overwrite := True
+        case Application.MessageBox(pchar('Keyboard layout "' + FileName + '" is already installed.' + #10 + 'Do you want to overwrite it?'), 'Avro Keyboard',
+          MB_YESNOCANCEL + MB_ICONQUESTION + MB_DEFBUTTON2 + MB_SYSTEMMODAL) of
+          ID_YES:
+            Overwrite := True;
+          ID_NO, ID_CANCEL:
+            Exit;
         else
-          Overwrite := False;
+          Exit;
+        end;
       end;
 
       if MyCopyFile(LayoutPath, GetAvroDataDir + 'Keyboard Layouts\' + FileName, Overwrite) then

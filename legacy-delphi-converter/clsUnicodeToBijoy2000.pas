@@ -99,6 +99,7 @@ type
     public
       destructor Destroy; override;
       function Convert(const UniText: string): string;
+      procedure ResetTransientState;
       // Toggle state accessors (needed by layout engines for isolated modifier handling)
       function GetToggleState(const Context, Key: string; OccurrenceIndex: Integer): Boolean;
       procedure SetToggleState(const Context, Key: string; OccurrenceIndex: Integer; Value: Boolean);
@@ -1232,6 +1233,19 @@ procedure TUnicodeToBijoy2000.EnsureIsoConverter;
 begin
   if fIsoConverter = nil then
     fIsoConverter := TUnicodeToBijoy2000.Create;
+end;
+
+{ =============================================================================== }
+
+procedure TUnicodeToBijoy2000.ResetTransientState;
+begin
+  fUniText := '';
+  fConvertedText := '';
+  fLastUniText := '';
+  if fToggleStates <> nil then
+    fToggleStates.Clear;
+  if fIsoConverter <> nil then
+    fIsoConverter.ResetTransientState;
 end;
 
 { =============================================================================== }

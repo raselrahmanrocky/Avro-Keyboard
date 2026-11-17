@@ -35,6 +35,11 @@ const
   m_BlendingStep: Integer  = 51; { 255/51=5 step }
   m_TimerInterval: Integer = 30; { 5 step in 30*5=150 milisecond }
 
+  { Lifetime of a TopBar balloon.  Kept here (and written into
+    BalloonHint1.HideAfter when the balloon is shown) so the bookkeeping in
+    SuspendBalloon/ResumeBalloon expires together with the real balloon. }
+  cBalloonHideAfter: Integer = 5000;
+
 type
   TTopBar = class(TForm)
     ImgMain: TImage;
@@ -130,6 +135,22 @@ type
       FDragging:  Boolean;
       FDragMoved: Boolean;
       FDragOffset: TPoint;
+      FHoverHintTarget: TControl;
+      FHoverHintTimer: TTimer;
+      FHoverHintWindow: THintWindow;
+      FHoverHintVisible: Boolean;
+
+      { The balloon last shown through ShowBalloon.  A TBalloonHint is
+        positioned once, on the control's screen rect at the moment it is
+        shown, so a TopBar that is dragged afterwards used to leave it
+        stranded where the window used to be - usually underneath the window's
+        new position, where it could no longer be seen.  These fields let a
+        move take the balloon down and put it back on the new position
+        (SuspendBalloon / ResumeBalloon). }
+      FShownBalloonTitle:    string;
+      FShownBalloonTarget:   TControl;
+      FShownBalloonExpiry:   UInt64;
+      FBalloonReshowPending: Boolean;
 
       PrevSkin: string;
 
@@ -199,6 +220,14 @@ type
       procedure WMDROPFILES(var msg: TWMDropFiles); message WM_DROPFILES;
       procedure WMDpiChanged(var Message: TWMDpi); message WM_DPICHANGED;
 
+      procedure SuspendBalloon;
+      procedure ResumeBalloon;
+      procedure PoseBalloon;
+      function BalloonOnScreen: Boolean;
+      procedure ArmHoverHint(AControl: TControl);
+      procedure CancelHoverHint(AControl: TControl = nil);
+      procedure HoverHintTimerTimer(Sender: TObject);
+
     public
       { Public declarations }
       BMP_AppIcon:      TBitmap;
@@ -251,6 +280,10 @@ type
       procedure SetButtonModeState(ST: ButtonState);
       procedure UpdateAnsiState;
       procedure InitHints;
+      { Shows the TopBar's balloon - the one entry point every caller uses, so
+        a drag can find and re-anchor whatever is on screen.  ATarget nil means
+        the mode button, the control this balloon has always pointed at. }
+      procedure ShowBalloon(const ATitle: string; ATarget: TControl = nil);
     protected
       procedure CreateParams(var Params: TCreateParams); override;
 
@@ -331,6 +364,8 @@ end;
 
 procedure TTopBar.FormClose(Sender: TObject; var Action: TCloseAction);
 begin
+  CancelHoverHint;
+  FreeAndNil(FHoverHintWindow);
 
   SaveUISettings;
 
@@ -445,6 +480,14 @@ begin
   // Init Hints
   InitHints;
 
+  FHoverHintTarget := nil;
+  FHoverHintVisible := False;
+  FHoverHintWindow := nil;
+  FHoverHintTimer := TTimer.Create(Self);
+  FHoverHintTimer.Enabled := False;
+  FHoverHintTimer.Interval := Application.HintPause;
+  FHoverHintTimer.OnTimer := HoverHintTimerTimer;
+
   DragAcceptFiles(Handle, True);
 
   Self.Top := 0;
@@ -453,7 +496,11 @@ end;
 
 procedure TTopBar.FormHide(Sender: TObject);
 begin
+  CancelHoverHint;
   TransparencyTimer.Enabled := False;
+  // The balloon has no meaning without the window it points at.
+  FBalloonReshowPending := False;
+  BalloonHint1.HideHint;
   if not ApplicationClosing then
     SaveUISettings;
 end;
@@ -486,11 +533,122 @@ begin
   begin
     if StrToInt(TopHintShowTimes) < NumberOfVisibleHints then
     begin
-      BalloonHint1.Title := 'Click here to start Bangla typing' + #13 + 'or Press ' + ModeSwitchKey;
-      BalloonHint1.ShowHint(ImgButtonMode);
+      ShowBalloon('Click here to start Bangla typing' + #13 + 'or Press ' + ModeSwitchKey);
       TopHintShowTimes := IntToStr(StrToInt(TopHintShowTimes) + 1);
     end;
   end;
+end;
+
+{ =============================================================================== }
+
+procedure TTopBar.ShowBalloon(const ATitle: string; ATarget: TControl);
+begin
+  if ATarget = nil then
+    ATarget := ImgButtonMode;
+
+  FShownBalloonTitle  := ATitle;
+  FShownBalloonTarget := ATarget;
+  FShownBalloonExpiry := GetTickCount64 + UInt64(cBalloonHideAfter);
+
+  PoseBalloon;
+end;
+
+{ =============================================================================== }
+
+{ True while the balloon shown by ShowBalloon should still be on screen.  The
+  hint window itself is owned by the RTL's animation thread and is not
+  queryable, so the lifetime is tracked here. }
+function TTopBar.BalloonOnScreen: Boolean;
+begin
+  Result := Assigned(FShownBalloonTarget) and (GetTickCount64 < FShownBalloonExpiry);
+end;
+
+{ =============================================================================== }
+
+{ Takes the balloon down before the window moves: its position was computed
+  from the old screen rect, so leaving it up is what made it look stuck.  The
+  remaining lifetime is kept, so ResumeBalloon puts it back for the rest of its
+  original time - not for a fresh one. }
+procedure TTopBar.SuspendBalloon;
+begin
+  if FBalloonReshowPending or (not BalloonOnScreen) then
+    Exit;
+  FBalloonReshowPending := True;
+  BalloonHint1.HideHint;
+end;
+
+{ =============================================================================== }
+
+{ Puts the balloon just outside the bar, tail first: below it when there is
+  room on the screen, above it otherwise.  The hint is anchored to a zero-height
+  rect on the bar's edge instead of to FShownBalloonTarget, because
+  TBalloonHint.ShowHint(Control) anchors on the control's bottom edge - which
+  lies inside the 30px bar, so the bar ended up covering the tail and the first
+  strip of the balloon ("the balloon is there but I cannot see it"). }
+procedure TTopBar.PoseBalloon;
+const
+  { Generous estimate of the tallest balloon we show; only used to pick the
+    side of the bar that has room for it. }
+  cBalloonReserve = 150;
+var
+  P: TPoint;
+  Area: TRect;
+  Mon: TMonitor;
+  BarTop, BarBottom: Integer;
+  Remaining: UInt64;
+begin
+  if not Assigned(FShownBalloonTarget) then
+    Exit;
+
+  { Re-showing after a drag must not restart the clock: the balloon keeps the
+    time it had left, as tracked in FShownBalloonExpiry. }
+  if FShownBalloonExpiry > GetTickCount64 then
+    Remaining := FShownBalloonExpiry - GetTickCount64
+  else
+    Exit;
+
+  BalloonHint1.Title := FShownBalloonTitle;
+  BalloonHint1.HideAfter := Integer(Remaining);
+
+  { Horizontally centred on the control the balloon points at. }
+  P := FShownBalloonTarget.ClientToScreen(Point(FShownBalloonTarget.Width div 2, 0));
+
+  Mon := Screen.MonitorFromWindow(Handle);
+  if Assigned(Mon) then
+    Area := Mon.WorkareaRect
+  else
+    Area := Screen.WorkareaRect;
+
+  BarTop    := Self.Top;
+  BarBottom := Self.Top + Self.Height;
+
+  if BarBottom + cBalloonReserve <= Area.Bottom then
+  begin
+    BalloonHint1.Position := hpBelow;
+    BalloonHint1.ShowHint(Rect(P.X, BarBottom, P.X, BarBottom));
+  end
+  else
+  begin
+    BalloonHint1.Position := hpAbove;
+    BalloonHint1.ShowHint(Rect(P.X, BarTop, P.X, BarTop));
+  end;
+end;
+
+{ =============================================================================== }
+
+{ Re-shows the suspended balloon on the bar's NEW position.  A fresh hint
+  window is created by the RTL for every ShowHint, and PoseBalloon anchors that
+  window on the bar's current edge, so nothing is left behind where the window
+  used to be. }
+procedure TTopBar.ResumeBalloon;
+begin
+  if not FBalloonReshowPending then
+    Exit;
+  FBalloonReshowPending := False;
+  if not BalloonOnScreen then
+    Exit;
+
+  PoseBalloon;
 end;
 
 { =============================================================================== }
@@ -525,7 +683,12 @@ begin
     NewTop := 0;
 
   if (NewLeft <> Self.Left) or (NewTop <> Self.Top) then
+  begin
     FDragMoved := True;
+    // The balloon's position was computed from the old rect - take it down so
+    // it cannot be left behind (FormMouseUp puts it back on the new place).
+    SuspendBalloon;
+  end;
 
   Self.SetBounds(NewLeft, NewTop, Self.Width, Self.Height);
 end;
@@ -547,7 +710,12 @@ begin
   begin
     // Form wasn't moved. Show menu
     if not FDragMoved then
-      AvroMainForm1.Popup_Main.Popup(ImgAppIcon.Left + Left, ImgAppIcon.Top + ImgAppIcon.Height + Top);
+      AvroMainForm1.Popup_Main.Popup(ImgAppIcon.Left + Left, ImgAppIcon.Top + ImgAppIcon.Height + Top)
+    else
+      // Dropped somewhere else: the balloon goes back on the new position for
+      // whatever is left of its lifetime, instead of staying where the TopBar
+      // used to be.
+      ResumeBalloon;
   end;
 end;
 
@@ -557,6 +725,7 @@ procedure TTopBar.ImgAppIconMouseDown(Sender: TObject; Button: TMouseButton; Shi
 var
   P: TPoint;
 begin
+  CancelHoverHint(Sender as TControl);
   AppIcon_MouseDown := True;
   AppIcon_DrawState;
 
@@ -564,6 +733,11 @@ begin
   begin
     FDragging := True;
     FDragMoved := False;
+
+    // A drag is about to start (or the menu is about to open): either way the
+    // balloon has to leave the screen, because its position belongs to the old
+    // window rect.  FormMouseUp brings it back if the window really moved.
+    SuspendBalloon;
 
     P.X := X;
     P.Y := Y;
@@ -690,6 +864,106 @@ begin
   ImgButtonWWW.Hint := 'Check for update or visit OmicronLab';
   ImgButtonHelp.Hint := 'Help menu';
   ImgButtonMinimize.Hint := 'Minimize or exit Avro Keyboard';
+
+  ImgAppIcon.ShowHint := False;
+  ImgButtonMode.ShowHint := False;
+  ImgButtonLayoutDown.ShowHint := False;
+  ImgButtonLayout.ShowHint := False;
+  ImgButtonMouse.ShowHint := False;
+  ImgButtonTools.ShowHint := False;
+  ImgButtonWWW.ShowHint := False;
+  ImgButtonHelp.ShowHint := False;
+  ImgButtonMinimize.ShowHint := False;
+end;
+
+procedure TTopBar.ArmHoverHint(AControl: TControl);
+begin
+  CancelHoverHint;
+  if (AControl = nil) or not AControl.Visible or (GetShortHint(AControl.Hint) = '') then
+    Exit;
+
+  FHoverHintTarget := AControl;
+  FHoverHintTimer.Interval := Application.HintPause;
+  if FHoverHintTimer.Interval <= 0 then
+    FHoverHintTimer.Interval := 1;
+  FHoverHintTimer.Enabled := True;
+end;
+
+procedure TTopBar.CancelHoverHint(AControl: TControl);
+begin
+  if (AControl <> nil) and (FHoverHintTarget <> AControl) then
+    Exit;
+
+  if Assigned(FHoverHintTimer) then
+    FHoverHintTimer.Enabled := False;
+  FHoverHintTarget := nil;
+  if FHoverHintVisible and Assigned(FHoverHintWindow) then
+  begin
+    ShowWindow(FHoverHintWindow.Handle, SW_HIDE);
+    FHoverHintWindow.Visible := False;
+    FHoverHintVisible := False;
+  end;
+end;
+
+procedure TTopBar.HoverHintTimerTimer(Sender: TObject);
+var
+  CursorPos: TPoint;
+  ControlRect: TRect;
+  HintRect: TRect;
+  HintText: string;
+  Monitor: TMonitor;
+begin
+  FHoverHintTimer.Enabled := False;
+
+  if FHoverHintVisible then
+  begin
+    CancelHoverHint;
+    Exit;
+  end;
+
+  if (FHoverHintTarget = nil) or not FHoverHintTarget.Visible then
+  begin
+    CancelHoverHint;
+    Exit;
+  end;
+
+  GetCursorPos(CursorPos);
+  ControlRect.TopLeft := FHoverHintTarget.ClientToScreen(FHoverHintTarget.ClientRect.TopLeft);
+  ControlRect.BottomRight := FHoverHintTarget.ClientToScreen(FHoverHintTarget.ClientRect.BottomRight);
+  if not PtInRect(ControlRect, CursorPos) then
+  begin
+    CancelHoverHint;
+    Exit;
+  end;
+
+  HintText := GetShortHint(FHoverHintTarget.Hint);
+  if HintText = '' then
+  begin
+    CancelHoverHint;
+    Exit;
+  end;
+
+  if FHoverHintWindow = nil then
+  begin
+    if Assigned(HintWindowClass) then
+      FHoverHintWindow := HintWindowClass.Create(Self)
+    else
+      FHoverHintWindow := THintWindow.Create(Self);
+  end;
+
+  Monitor := Screen.MonitorFromPoint(CursorPos);
+  Inc(CursorPos.Y, MulDiv(Screen.CursorHeightMargin, Monitor.PixelsPerInch, Screen.PixelsPerInch));
+  FHoverHintWindow.BiDiMode := FHoverHintTarget.BiDiMode;
+  FHoverHintWindow.Color := Application.HintColor;
+  HintRect := FHoverHintWindow.CalcHintRect(Monitor.Width, HintText, nil);
+  OffsetRect(HintRect, CursorPos.X, CursorPos.Y);
+  FHoverHintWindow.ActivateHint(HintRect, HintText);
+
+  FHoverHintVisible := True;
+  FHoverHintTimer.Interval := Application.HintHidePause;
+  if FHoverHintTimer.Interval <= 0 then
+    FHoverHintTimer.Interval := 1;
+  FHoverHintTimer.Enabled := True;
 end;
 
 procedure TTopBar.DrawAnsiTextOnBitmap(BMP: TBitmap);
@@ -1374,6 +1648,7 @@ end;
 
 procedure TTopBar.ImgAppIconMouseEnter(Sender: TObject);
 begin
+  ArmHoverHint(Sender as TControl);
   AppIcon_MouseIn := True;
   AppIcon_TranparentValue := 0;
   if m_GlowEffect = True then
@@ -1390,6 +1665,7 @@ end;
 
 procedure TTopBar.ImgAppIconMouseLeave(Sender: TObject);
 begin
+  CancelHoverHint(Sender as TControl);
   AppIcon_MouseIn := False;
   AppIcon_MouseDown := False;
   AppIcon_TranparentValue := 0;
@@ -1415,6 +1691,7 @@ end;
 
 procedure TTopBar.ImgButtonHelpMouseDown(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
 begin
+  CancelHoverHint(Sender as TControl);
   ButtonHelp_MouseDown := True;
   ButtonHelp_DrawState;
 end;
@@ -1423,6 +1700,7 @@ end;
 
 procedure TTopBar.ImgButtonHelpMouseEnter(Sender: TObject);
 begin
+  ArmHoverHint(Sender as TControl);
   ButtonHelp_MouseIn := True;
   ButtonHelp_TranparentValue := 0;
   if m_GlowEffect = True then
@@ -1439,6 +1717,7 @@ end;
 
 procedure TTopBar.ImgButtonHelpMouseLeave(Sender: TObject);
 begin
+  CancelHoverHint(Sender as TControl);
   ButtonHelp_MouseIn := False;
   ButtonHelp_MouseDown := False;
   ButtonHelp_TranparentValue := 0;
@@ -1472,6 +1751,7 @@ end;
 
 procedure TTopBar.ImgButtonLayoutDownMouseDown(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
 begin
+  CancelHoverHint(Sender as TControl);
   ButtonLayoutDown_MouseDown := True;
   ButtonLayoutDown_DrawState;
 end;
@@ -1480,6 +1760,7 @@ end;
 
 procedure TTopBar.ImgButtonLayoutDownMouseEnter(Sender: TObject);
 begin
+  ArmHoverHint(Sender as TControl);
   ButtonLayoutDown_MouseIn := True;
   ButtonLayoutDown_TranparentValue := 0;
   if m_GlowEffect = True then
@@ -1496,6 +1777,7 @@ end;
 
 procedure TTopBar.ImgButtonLayoutDownMouseLeave(Sender: TObject);
 begin
+  CancelHoverHint(Sender as TControl);
   ButtonLayoutDown_MouseIn := False;
   ButtonLayoutDown_MouseDown := False;
   ButtonLayoutDown_TranparentValue := 0;
@@ -1513,6 +1795,7 @@ end;
 
 procedure TTopBar.ImgButtonLayoutMouseDown(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
 begin
+  CancelHoverHint(Sender as TControl);
   ButtonLayout_MouseDown := True;
   ButtonLayout_DrawState;
 end;
@@ -1521,6 +1804,7 @@ end;
 
 procedure TTopBar.ImgButtonLayoutMouseEnter(Sender: TObject);
 begin
+  ArmHoverHint(Sender as TControl);
   ButtonLayout_MouseIn := True;
   ButtonLayout_TranparentValue := 0;
   if m_GlowEffect = True then
@@ -1537,6 +1821,7 @@ end;
 
 procedure TTopBar.ImgButtonLayoutMouseLeave(Sender: TObject);
 begin
+  CancelHoverHint(Sender as TControl);
   ButtonLayout_MouseIn := False;
   ButtonLayout_MouseDown := False;
   ButtonLayout_TranparentValue := 0;
@@ -1562,6 +1847,7 @@ end;
 
 procedure TTopBar.ImgButtonMinimizeMouseDown(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
 begin
+  CancelHoverHint(Sender as TControl);
   ButtonMinimize_MouseDown := True;
   ButtonMinimize_DrawState;
 end;
@@ -1570,6 +1856,7 @@ end;
 
 procedure TTopBar.ImgButtonMinimizeMouseEnter(Sender: TObject);
 begin
+  ArmHoverHint(Sender as TControl);
   ButtonMinimize_MouseIn := True;
   ButtonMinimize_TranparentValue := 0;
   if m_GlowEffect = True then
@@ -1586,6 +1873,7 @@ end;
 
 procedure TTopBar.ImgButtonMinimizeMouseLeave(Sender: TObject);
 begin
+  CancelHoverHint(Sender as TControl);
   ButtonMinimize_MouseIn := False;
   ButtonMinimize_MouseDown := False;
   ButtonMinimize_TranparentValue := 0;
@@ -1611,6 +1899,7 @@ end;
 
 procedure TTopBar.ImgButtonModeMouseDown(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
 begin
+  CancelHoverHint(Sender as TControl);
   ButtonMode_MouseDown := True;
   ButtonMode_DrawState;
 end;
@@ -1619,6 +1908,7 @@ end;
 
 procedure TTopBar.ImgButtonModeMouseEnter(Sender: TObject);
 begin
+  ArmHoverHint(Sender as TControl);
   ButtonMode_MouseIn := True;
   ButtonMode_TranparentValue := 0;
   if m_GlowEffect = True then
@@ -1635,6 +1925,7 @@ end;
 
 procedure TTopBar.ImgButtonModeMouseLeave(Sender: TObject);
 begin
+  CancelHoverHint(Sender as TControl);
   ButtonMode_MouseIn := False;
   ButtonMode_MouseDown := False;
   ButtonMode_TranparentValue := 0;
@@ -1660,6 +1951,7 @@ end;
 
 procedure TTopBar.ImgButtonMouseMouseDown(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
 begin
+  CancelHoverHint(Sender as TControl);
   ButtonMouse_MouseDown := True;
   ButtonMouse_DrawState;
 end;
@@ -1668,6 +1960,7 @@ end;
 
 procedure TTopBar.ImgButtonMouseMouseEnter(Sender: TObject);
 begin
+  ArmHoverHint(Sender as TControl);
   ButtonMouse_MouseIn := True;
   ButtonMouse_TranparentValue := 0;
   if m_GlowEffect = True then
@@ -1684,6 +1977,7 @@ end;
 
 procedure TTopBar.ImgButtonMouseMouseLeave(Sender: TObject);
 begin
+  CancelHoverHint(Sender as TControl);
   ButtonMouse_MouseIn := False;
   ButtonMouse_MouseDown := False;
   ButtonMouse_TranparentValue := 0;
@@ -1709,6 +2003,7 @@ end;
 
 procedure TTopBar.ImgButtonToolsMouseDown(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
 begin
+  CancelHoverHint(Sender as TControl);
   ButtonTools_MouseDown := True;
   ButtonTools_DrawState;
 end;
@@ -1717,6 +2012,7 @@ end;
 
 procedure TTopBar.ImgButtonToolsMouseEnter(Sender: TObject);
 begin
+  ArmHoverHint(Sender as TControl);
   ButtonTools_MouseIn := True;
   ButtonTools_TranparentValue := 0;
   if m_GlowEffect = True then
@@ -1733,6 +2029,7 @@ end;
 
 procedure TTopBar.ImgButtonToolsMouseLeave(Sender: TObject);
 begin
+  CancelHoverHint(Sender as TControl);
   ButtonTools_MouseIn := False;
   ButtonTools_MouseDown := False;
   ButtonTools_TranparentValue := 0;
@@ -1758,6 +2055,7 @@ end;
 
 procedure TTopBar.ImgButtonWWWMouseDown(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
 begin
+  CancelHoverHint(Sender as TControl);
   ButtonWWW_MouseDown := True;
   ButtonWWW_DrawState;
 end;
@@ -1766,6 +2064,7 @@ end;
 
 procedure TTopBar.ImgButtonWWWMouseEnter(Sender: TObject);
 begin
+  ArmHoverHint(Sender as TControl);
   ButtonWWW_MouseIn := True;
   ButtonWWW_TranparentValue := 0;
   if m_GlowEffect = True then
@@ -1782,6 +2081,7 @@ end;
 
 procedure TTopBar.ImgButtonWWWMouseLeave(Sender: TObject);
 begin
+  CancelHoverHint(Sender as TControl);
   ButtonWWW_MouseIn := False;
   ButtonWWW_MouseDown := False;
   ButtonWWW_TranparentValue := 0;

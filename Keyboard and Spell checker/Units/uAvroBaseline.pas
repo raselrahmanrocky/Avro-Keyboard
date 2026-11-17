@@ -121,7 +121,23 @@ begin
       Exit(False);
     end;
 
-    Res := AvroShieldLoadForRuntime(Container, '', AJsonUtf8, True);
+    { A public-provider build cannot unwrap this container at all: the key
+      material is deliberately absent, so the shield raises
+      EResourceUnavailable before it can even report a result. The contract of
+      this function is "False + AError, caller falls back to Unicode", so that
+      raise must not reach startup - it used to escape through RefreshSettings
+      and abort the rest of LoadApp with a startup-failure dialog. }
+    try
+      Res := AvroShieldLoadForRuntime(Container, '', AJsonUtf8, True);
+    except
+      on E: Exception do
+      begin
+        AJsonUtf8 := nil;
+        AError := 'embedded baseline unavailable (' + E.ClassName + ': ' +
+          E.Message + ')';
+        Exit(False);
+      end;
+    end;
     if Res <> asrOk then
     begin
       AJsonUtf8 := nil;

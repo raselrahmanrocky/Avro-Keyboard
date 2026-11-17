@@ -59,8 +59,12 @@ type
   end;
 
 type
+  TWindowInputMode = (wimEnglish, wimBanglaUnicode, wimBanglaANSI);
+  TWindowBanglaMode = (wbmUnicode, wbmANSI);
+
   TWindowRecord = record
-    Mode: string;
+    Mode: TWindowInputMode;
+    LastBanglaMode: TWindowBanglaMode;
   end;
 
 type
@@ -243,10 +247,16 @@ type
       LastWindow:                   HWND;
       PendingANSISwitch:            Boolean;
       PreviousModeBeforeANSISwitch: enumMode;
+      PreviousOutputBeforeANSISwitch: string;
+      PendingANSISwitchWindow:        HWND;
+      PendingANSISwitchRecord:        TWindowRecord;
+      PendingANSISwitchHadRecord:     Boolean;
+      PendingANSISwitchEnablesBangla: Boolean;
+      FApplyingWindowMode:            Boolean;
       FActiveMappingLastWriteTime:  TDateTime;
       FMappingCheckCountdown:       Integer; // throttles the ANSI mapping disk check
       FMappingListCheckCountdown:   Integer; // throttles the ANSI mapping folder-list poll
-      FAnsiMappingSnapshot:         string;  // last seen file-name list of AnsiMappingDir
+      FAnsiMappingSnapshot:         string;  // last seen file/size/time list of AnsiMappingDir
       FLayoutSnapshot:              string;  // last seen file-name list of the layouts folder
       FLayoutCheckCountdown:        Integer; // throttles the keyboard-layouts folder-list poll
       { >0 while a menu that carries dynamic items is being tracked by Windows:
@@ -276,19 +286,12 @@ type
         'name@size' - a DPI change then builds a second handle at the new size
         instead of handing the shell a stale one to rescale.
 
-        The two "Select ANSI Encoding" parent items need an ImageList1 slot
-        instead, and that slot is built at ImageList1's OWN metric rather than
-        at the DPI-scaled tray metric - a 20/24/32 px handle does not belong in
-        a 16x16 list, and the fallback it used to trigger is what drew the
-        generic icon. See AnsiRootIconSlot.
-
         Handles here are handed to the tray through CopyIcon, so the tray owns a
-        private copy and this cache stays valid across tray updates. Everything
-        is released by ReleaseAnsiIconCache. }
+        private copy and this cache stays valid across tray updates. The active
+        menu icon uses one reusable ImageList1 slot. }
       AnsiIconHandles:    TDictionary<string, HICON>;
-      FAnsiRootIconIndex: Integer; // ImageList1 slot appended for the active layout icon (-1 = none yet)
-      FAnsiRootIconName:  string;  // the layout whose artwork occupies that slot ('' = unused)
-
+      FAnsiRootIconIndex: Integer;
+      FAnsiRootIconName:  string;
       function AnsiRootIconSlot(const AName: string): Integer;
       procedure ReleaseAnsiIconCache;
       procedure ReplaceAnsiMenuParentIcon;
@@ -314,10 +317,12 @@ type
       function BuildLayoutFolderList: string;
       procedure RefreshLayoutMenuItems;
       procedure RefreshAnsiMappingNames;
+      { Resolves and activates the persisted ANSI selection with the startup
+        rules (baseline only for an empty catalog, exact companion first,
+        one-time legacy migration, missing exact file never falls back).
+        AContext is only used in the debug log. }
+      function ApplyPersistedAnsiSelection(const AContext: string): Boolean;
       procedure IgnoreCapsLockClick(Sender: TObject);
-      procedure SwitchingModeGlobalClick(Sender: TObject);
-      procedure SwitchingModeWindowClick(Sender: TObject);
-      procedure SyncSwitchingModeMenus;
       procedure PopupToolsPopup(Sender: TObject);
       procedure PopupTrayPopup(Sender: TObject);
       procedure TrackedMenusPopup(Sender: TObject);
@@ -333,6 +338,9 @@ type
       { RefreshSettings asked for from inside the keyboard hook (see its own
         comment): the work runs here, on the main loop, instead. }
       procedure WMDeferredRefresh(var Msg: TMessage); message WM_APP + 11;
+      { ANSI mode may open a warning form, so the hook posts this to the main
+        loop instead of creating UI inside the low-level callback. }
+      procedure WMSwitchToAnsiMode(var Msg: TMessage); message WM_APP + 12;
 
     public
       { Public declarations }
@@ -340,18 +348,15 @@ type
       KeyLayout:           TLayout;
       Updater:             TUpdateCheck;
       AnsiVersionSubmenu1: TMenuItem;
-      { Cached, sorted list of mapping display names (the full catalog from
-        GetSortedMappingDisplayNames), kept fresh by the directory watcher /
-        periodic poll. The ANSI picker opens from this list with zero disk I/O. }
+      { Cached, sorted list of mapping display names (labels), parallel to
+        AnsiMappingFileNames. Kept fresh by the directory watcher / periodic
+        poll. The ANSI picker opens from this list with zero disk I/O. }
       AnsiMappingNames: TStringList;
+      { Every exact mapping file name in the same order as AnsiMappingNames.
+        This - never a caption - is the menu and picker identity. }
+      AnsiMappingFileNames: TStringList;
       IgnoreCapsLock1:  TMenuItem;
       IgnoreCapsLock2:  TMenuItem;
-      { The "Keyboard mode switching" submenu, one per Tools menu: the tray's
-        ools1 and the Top Bar's Popup_Tools (the same two surfaces that carry
-        Ignore Caps Lock). Both hold the same two radio items, and
-        SyncSwitchingModeMenus keeps both in step with SwitchingMode. }
-      mnuSwitchingModeTray:   TMenuItem;
-      mnuSwitchingModeTopBar: TMenuItem;
       procedure AnsiVersionMenuClick(Sender: TObject);
       procedure ReadAnsiDescriptionClick(Sender: TObject);
       procedure ExportSpecificMappingClick(Sender: TObject);
@@ -375,35 +380,30 @@ type
         directory watcher (only AnsiMappingDir does), so nothing else would put a
         freshly downloaded layout into the menus before the next restart. }
       procedure RefreshLayoutList;
-      procedure DrawAnsiRowBadge(ACanvas: TCanvas; const AItemRect: TRect; AItem: TMenuItem);
-      { Hands the version rows of AMenu to the painter that is in force right
-        now (see uThemeManager.PopupMenusPaintedNatively): the plain native look
-        leaves the row to Vcl.Menus and to AnsiVersionItemAdvancedDrawItem below,
-        every theme leaves it to the popup style hook.  Called from the two popup
-        handlers, i.e. right before the rows are shown. }
-      procedure SyncAnsiVersionRowPaintMode(AMenu: TMenuItem);
-      procedure AnsiVersionItemAdvancedDrawItem(Sender: TObject; ACanvas: TCanvas; ARect: TRect; AState: TOwnerDrawState);
-      procedure AnsiVersionItemMeasureItem(Sender: TObject; ACanvas: TCanvas; var Width, Height: Integer);
       { The cached HICON for a mapping at the CURRENT small-icon metric, or 0
         when that mapping carries no icon (empty name, a legacy container, a
         plain .json, or one whose icon failed to decode).
 
         The handle is BORROWED: it belongs to the DPI-keyed cache filled by the
         startup preload and is freed by ReleaseAnsiIconCache, so a caller must
-        never destroy it. Public so the ANSI version picker can draw the very
-        same trailing badge the tray's "Select ANSI Encoding" submenu draws
-        (DrawAnsiRowBadge below). }
+        never destroy it. It supplies the active mapping's tray icon. }
       function GetAnsiTrayIcon(const AName: string): HICON;
 
       procedure BuildAnsiVersionMenus;
-      procedure UpdateAnsiVersionMenuChecks(const AName: string);
+      procedure UpdateAnsiVersionMenuChecks(const AFileName: string);
       procedure SyncAnsiVersionChecks(AMenu: TMenuItem);
-      procedure SyncActiveMappingTimestamp(const AName: string);
+      procedure SyncActiveMappingTimestamp(const AFileName: string);
       function GetMyCurrentKeyboardMode: enumMode;
       procedure ExitApp;
       function GetMyCurrentLayout: string;
       procedure RefreshSettings;
+      procedure SyncCurrentWindowMode;
       procedure UpdateTrayIcon;
+      function GetModeWindow: HWND;
+      procedure RecordCurrentWindowMode;
+      procedure SetCurrentWindowBanglaPreference(const IsAnsi: Boolean);
+      procedure ApplyWindowMode(const AWindow: HWND; const ARecord: TWindowRecord);
+      procedure BeginPendingANSISwitch(const EnablesBangla: Boolean);
 
       procedure RestoreFromTray;
       procedure OpenHelpFile(const HelpID: Integer);
@@ -428,8 +428,7 @@ type
       procedure Initmenu;
       procedure ToggleOutputEncoding;
       procedure ApplyPendingANSISwitchRevert;
-      procedure PendingANSISwitchClear;
-      procedure CleanupDuplicateMappings;
+      procedure CommitPendingANSISwitch;
       procedure LaunchAvroTextConverter;
     protected
       procedure CreateParams(var Params: TCreateParams); override;
@@ -678,6 +677,7 @@ begin
 
   FreeAndNil(WindowDict);
   FreeAndNil(AnsiMappingNames);
+  FreeAndNil(AnsiMappingFileNames);
   { Unhook BEFORE the engine goes: the callback dereferences KeyLayout
     (TransferKeyDown/Up), so a keystroke arriving in that window would land on a
     freed TLayout. RemoveHook is idempotent now, and TLayout.Destroy unhooks
@@ -755,7 +755,9 @@ begin
   Application.ProcessMessages;
 
   AnsiMappingNames := TStringList.Create;
+  AnsiMappingFileNames := TStringList.Create;
   AnsiIconHandles := TDictionary<string, HICON>.Create;
+  FAnsiRootIconIndex := -1;
 
   { Settings: a corrupted value used to raise out of ValidateSettings here,
     before any window existed. LoadSettings now repairs what it can
@@ -916,8 +918,6 @@ end;
 { =============================================================================== }
 
 procedure TAvroMainForm1.Initmenu;
-var
-  M: TMenuItem;
 begin
   RefreshLayoutMenuItems;
 
@@ -940,40 +940,6 @@ begin
   IgnoreCapsLock2.Checked := (IgnoreCapsLock = 'YES');
   IgnoreCapsLock2.OnClick := IgnoreCapsLockClick;
   ools1.Insert(OutputasANSIAreyousure2.MenuIndex + 1, IgnoreCapsLock2);
-
-  { "Keyboard mode switching" - one setting, offered in both Tools menus: the
-    tray icon is hidden while the Top Bar is the chosen UI, so a menu-only
-    setting must live on both surfaces.  Radio items rather than a check box so
-    the two choices read exactly as they do in Options. }
-  mnuSwitchingModeTopBar := TMenuItem.Create(Popup_Tools);
-  mnuSwitchingModeTopBar.Caption := 'Keyboard mode switching';
-  M := TMenuItem.Create(mnuSwitchingModeTopBar);
-  M.Caption := 'Global (All Windows)';
-  M.RadioItem := True;
-  M.OnClick := SwitchingModeGlobalClick;
-  mnuSwitchingModeTopBar.Add(M);
-  M := TMenuItem.Create(mnuSwitchingModeTopBar);
-  M.Caption := 'Per Application/Window';
-  M.RadioItem := True;
-  M.OnClick := SwitchingModeWindowClick;
-  mnuSwitchingModeTopBar.Add(M);
-  Popup_Tools.Items.Insert(IgnoreCapsLock1.MenuIndex + 1, mnuSwitchingModeTopBar);
-
-  mnuSwitchingModeTray := TMenuItem.Create(ools1);
-  mnuSwitchingModeTray.Caption := 'Keyboard mode switching';
-  M := TMenuItem.Create(mnuSwitchingModeTray);
-  M.Caption := 'Global (All Windows)';
-  M.RadioItem := True;
-  M.OnClick := SwitchingModeGlobalClick;
-  mnuSwitchingModeTray.Add(M);
-  M := TMenuItem.Create(mnuSwitchingModeTray);
-  M.Caption := 'Per Application/Window';
-  M.RadioItem := True;
-  M.OnClick := SwitchingModeWindowClick;
-  mnuSwitchingModeTray.Add(M);
-  ools1.Insert(IgnoreCapsLock2.MenuIndex + 1, mnuSwitchingModeTray);
-
-  SyncSwitchingModeMenus;
 end;
 
 { Adds an entry for every .avrolayout on disk to the tray's "Select keyboard
@@ -1165,10 +1131,177 @@ begin
   RefreshSettings;
 end;
 
+function TAvroMainForm1.GetModeWindow: HWND;
+begin
+  Result := GetForegroundWindow;
+  if (Result = 0) or not IsWindow(Result) then
+  begin
+    Result := 0;
+    Exit;
+  end;
+  if IgnorableWindow(Result) then
+    Result := LastWindow;
+  if (Result = 0) or not IsWindow(Result) then
+    Result := 0;
+end;
+
+procedure TAvroMainForm1.RecordCurrentWindowMode;
+var
+  ActiveWindow: HWND;
+  WindowRecord: TWindowRecord;
+  HasRecord: Boolean;
+begin
+  if (SwitchingMode = SWITCHING_MODE_GLOBAL) or FApplyingWindowMode or (not Assigned(WindowDict)) or (not Assigned(KeyLayout)) then
+    Exit;
+
+  ActiveWindow := GetModeWindow;
+  if ActiveWindow = 0 then
+    Exit;
+  if PendingANSISwitch and (PendingANSISwitchWindow = ActiveWindow) then
+    Exit;
+
+  HasRecord := WindowDict.TryGetValue(ActiveWindow, WindowRecord);
+  if not HasRecord then
+  begin
+    WindowRecord.Mode := wimEnglish;
+    WindowRecord.LastBanglaMode := wbmUnicode;
+  end;
+
+  if KeyLayout.KeyboardMode = bangla then
+  begin
+    if OutputIsBijoy = 'YES' then
+    begin
+      WindowRecord.Mode := wimBanglaANSI;
+      WindowRecord.LastBanglaMode := wbmANSI;
+    end
+    else
+    begin
+      WindowRecord.Mode := wimBanglaUnicode;
+      WindowRecord.LastBanglaMode := wbmUnicode;
+    end;
+  end
+  else
+  begin
+    WindowRecord.Mode := wimEnglish;
+    if HasRecord then
+    begin
+      if OutputIsBijoy = 'YES' then
+        WindowRecord.LastBanglaMode := wbmANSI
+      else
+        WindowRecord.LastBanglaMode := wbmUnicode;
+    end;
+  end;
+
+  WindowDict.AddOrSetValue(ActiveWindow, WindowRecord);
+end;
+
+procedure TAvroMainForm1.SetCurrentWindowBanglaPreference(const IsAnsi: Boolean);
+var
+  ActiveWindow: HWND;
+  WindowRecord: TWindowRecord;
+begin
+  if (SwitchingMode = SWITCHING_MODE_GLOBAL) or (not Assigned(WindowDict)) or (not Assigned(KeyLayout)) then
+    Exit;
+
+  ActiveWindow := GetModeWindow;
+  if ActiveWindow = 0 then
+    Exit;
+  if not WindowDict.TryGetValue(ActiveWindow, WindowRecord) then
+  begin
+    WindowRecord.Mode := wimEnglish;
+    WindowRecord.LastBanglaMode := wbmUnicode;
+  end;
+
+  if IsAnsi then
+    WindowRecord.LastBanglaMode := wbmANSI
+  else
+    WindowRecord.LastBanglaMode := wbmUnicode;
+
+  if KeyLayout.KeyboardMode = bangla then
+  begin
+    if IsAnsi then
+      WindowRecord.Mode := wimBanglaANSI
+    else
+      WindowRecord.Mode := wimBanglaUnicode;
+  end
+  else
+    WindowRecord.Mode := wimEnglish;
+
+  WindowDict.AddOrSetValue(ActiveWindow, WindowRecord);
+end;
+
+procedure TAvroMainForm1.SyncCurrentWindowMode;
+begin
+  RecordCurrentWindowMode;
+end;
+
+procedure TAvroMainForm1.ApplyWindowMode(const AWindow: HWND; const ARecord: TWindowRecord);
+var
+  DesiredMode: enumMode;
+  DesiredOutput: string;
+  OutputChanged: Boolean;
+begin
+  if (AWindow = 0) or not IsWindow(AWindow) or (not Assigned(KeyLayout)) then
+    Exit;
+
+  if ARecord.Mode = wimEnglish then
+    DesiredMode := SysDefault
+  else
+    DesiredMode := bangla;
+
+  if ARecord.Mode = wimBanglaANSI then
+    DesiredOutput := 'YES'
+  else if ARecord.Mode = wimBanglaUnicode then
+    DesiredOutput := 'NO'
+  else if ARecord.LastBanglaMode = wbmANSI then
+    DesiredOutput := 'YES'
+  else
+    DesiredOutput := 'NO';
+
+  OutputChanged := OutputIsBijoy <> DesiredOutput;
+  FApplyingWindowMode := True;
+  try
+    if OutputChanged then
+      OutputIsBijoy := DesiredOutput;
+    if KeyLayout.KeyboardMode <> DesiredMode then
+      KeyLayout.KeyboardMode := DesiredMode;
+    MyCurrentKeyboardMode := DesiredMode;
+  finally
+    FApplyingWindowMode := False;
+  end;
+
+  if OutputChanged then
+    RefreshSettings
+  else
+    UpdateTrayIcon;
+end;
+
+procedure TAvroMainForm1.BeginPendingANSISwitch(const EnablesBangla: Boolean);
+begin
+  if PendingANSISwitch then
+    Exit;
+
+  PreviousModeBeforeANSISwitch := KeyLayout.KeyboardMode;
+  PreviousOutputBeforeANSISwitch := OutputIsBijoy;
+  PendingANSISwitchWindow := GetModeWindow;
+  PendingANSISwitchEnablesBangla := EnablesBangla;
+  PendingANSISwitchHadRecord := False;
+  if (SwitchingMode <> SWITCHING_MODE_GLOBAL) and Assigned(WindowDict) and IsWindow(PendingANSISwitchWindow) then
+  begin
+    RecordCurrentWindowMode;
+    PendingANSISwitchHadRecord := WindowDict.TryGetValue(PendingANSISwitchWindow, PendingANSISwitchRecord);
+  end;
+  if not PendingANSISwitchHadRecord then
+  begin
+    PendingANSISwitchRecord.Mode := wimEnglish;
+    PendingANSISwitchRecord.LastBanglaMode := wbmUnicode;
+  end;
+  PendingANSISwitch := True;
+end;
+
 procedure TAvroMainForm1.KeyLayout_KeyboardModeChanged(CurrentMode: enumMode);
 var
-  hforewnd:                      Integer;
-  WindowRecord, NewWindowRecord: TWindowRecord;
+  hforewnd: HWND;
 begin
   { This is for Top Bar, when Keyboard Mode is changed,
     it removes transparency }
@@ -1188,55 +1321,11 @@ begin
     UpdateTrayIcon;
     Exit;
   end;
-  hforewnd := GetForegroundWindow;
-
-  if hforewnd = 0 then
-    Exit;
-  { Experimental use }
-  if IsWindow(hforewnd) = False then
-    Exit;
-
-  if IgnorableWindow(hforewnd) then
-  begin
-    hforewnd := LastWindow;
-  end;
-
-  if not WindowDict.TryGetValue(hforewnd, WindowRecord) then
-  begin
-
-    { This is a new window, so add it in Window collection
-      update/add process information }
-
-    if CurrentMode = bangla then
-    begin
-      NewWindowRecord.Mode := 'B';
-      WindowDict.AddOrSetValue(hforewnd, NewWindowRecord);
-      MyCurrentKeyboardMode := bangla;
-    end
-    else if CurrentMode = SysDefault then
-    begin
-      NewWindowRecord.Mode := 'S';
-      WindowDict.AddOrSetValue(hforewnd, NewWindowRecord);
-      MyCurrentKeyboardMode := SysDefault;
-    end;
-  end
-  else
-  begin
-    // The window already exist, so update information
-    if CurrentMode = bangla then
-    begin
-      NewWindowRecord.Mode := 'B';
-      WindowDict.AddOrSetValue(hforewnd, NewWindowRecord);
-      MyCurrentKeyboardMode := bangla;
-    end
-    else if CurrentMode = SysDefault then
-    begin
-      NewWindowRecord.Mode := 'S';
-      WindowDict.AddOrSetValue(hforewnd, NewWindowRecord);
-      MyCurrentKeyboardMode := SysDefault;
-      WindowDict.Remove(hforewnd);
-    end;
-  end;
+  MyCurrentKeyboardMode := CurrentMode;
+  hforewnd := GetModeWindow;
+  if (hforewnd <> 0) and (not FApplyingWindowMode) and
+    not (PendingANSISwitch and (PendingANSISwitchWindow = hforewnd)) then
+    RecordCurrentWindowMode;
 
   { Update user interface }
   UpdateTrayIcon;
@@ -1297,7 +1386,6 @@ procedure TAvroMainForm1.LoadApp;
 var
   tempLastUIMode: string;
   MappingPath:    string;
-  DesiredVersion: string;
 begin
   StartupLog('LoadApp: begin');
   Set_Process_Priority(HIGH_PRIORITY_CLASS);
@@ -1305,7 +1393,6 @@ begin
   // otherwise (it flips to LOW only when nothing has been touched for a while).
   SetAvroMemoryPriority(ampNormal);
   LogAvroMemStats('startup: before engine load');
-  FAnsiRootIconIndex := -1;
 
   // InitDict is deliberately NOT called here: the auto-correct dictionary is
   // loaded by the first phonetic keystroke that needs it (see
@@ -1416,20 +1503,25 @@ begin
   end;
 
   // --- Record initial file write time for auto-refresh ---
-  // Path-based, not name-based: any active name that resolves to a file
-  // (including a user file literally named Default) is watched.
-  if (AnsiMappingDir <> '') and (GetActiveEncoFilePath(AnsiVersion, AnsiMappingDir) <> '') then
+  // Exact-companion first; the base-name resolver is used only for a legacy
+  // value that has not migrated yet. No startup path resolves a companion by
+  // base name.
+  FActiveMappingLastWriteTime := 0;
+  if AnsiMappingDir <> '' then
   begin
-    FActiveMappingLastWriteTime := 0;
-    MappingPath := GetActiveEncoFilePath(AnsiVersion, AnsiMappingDir);
-    try
-      FActiveMappingLastWriteTime := TFile.GetLastWriteTime(MappingPath);
-    except
-      FActiveMappingLastWriteTime := 0;
-    end;
-  end
-  else
-    FActiveMappingLastWriteTime := 0;
+    if AnsiVersionFileName <> '' then
+      MappingPath := GetExactEncoFilePath(AnsiVersionFileName, AnsiMappingDir)
+    else if AnsiVersion <> '' then
+      MappingPath := GetActiveEncoFilePath(AnsiVersion, AnsiMappingDir)
+    else
+      MappingPath := '';
+    if MappingPath <> '' then
+      try
+        FActiveMappingLastWriteTime := TFile.GetLastWriteTime(MappingPath);
+      except
+        FActiveMappingLastWriteTime := 0;
+      end;
+  end;
 
   // Apply the loaded ANSI mapping
   if AnsiMappingDir = '' then
@@ -1455,10 +1547,17 @@ begin
   OnLoadEncoMapping := HandleLoadEncoMapping;
   // Prime the session password for a password-protected ACTIVE version from
   // the persisted per-file cache (never prompts), so SwitchEngine below can
-  // parse it on demand without user interaction.
-  if (AnsiMappingDir <> '') and (AnsiVersion <> '') then
+  // parse it on demand without user interaction. The exact companion is used
+  // when present; the legacy base-name resolver only covers an unmigrated
+  // setting and never primes a same-base sibling of an exact selection.
+  if AnsiMappingDir <> '' then
   begin
-    MappingPath := GetActiveEncoFilePath(AnsiVersion, AnsiMappingDir);
+    if AnsiVersionFileName <> '' then
+      MappingPath := GetExactEncoFilePath(AnsiVersionFileName, AnsiMappingDir)
+    else if AnsiVersion <> '' then
+      MappingPath := GetActiveEncoFilePath(AnsiVersion, AnsiMappingDir)
+    else
+      MappingPath := '';
     if (MappingPath <> '') and IsEncoFile(MappingPath) and (GetAvroEncoProtectionFlag(MappingPath) = AVROENCO_FLAG_USER_PASSWORD) then
       CachedEncoPassword := GetEncoCachedPassword(MappingPath);
   end;
@@ -1482,48 +1581,11 @@ begin
     statement, so the except is nested inside the finally. }
   try
     try
-      // DesiredVersion: migrate once when settings say Default / empty, or when
-      // the stored name no longer resolves to a file on disk.
-      DesiredVersion := AnsiVersion;
-      if (DesiredVersion = '') or SameText(DesiredVersion, 'Default') or (GetActiveEncoFilePath(DesiredVersion, AnsiMappingDir) = '') then
-        DesiredVersion := FirstAvailableMappingName;
-
-      if DesiredVersion <> '' then
-      begin
-        if not Application.Terminated then
-          if (not AnsiEngineManager.SwitchEngine(DesiredVersion)) and (not AnsiEngineManager.SwitchEngine(DesiredVersion)) then
-          begin
-            // Two attempts cover the first-run race (cache directory missing,
-            // container just installed and still being written).
-            Log('Startup: could not activate "' + DesiredVersion + '"');
-            DesiredVersion := '';
-          end;
-      end
-      else if (not Application.Terminated) and AnsiEngineManager.ActivateEmbeddedBaseline then
-      begin
-        // LAST RESORT, and only after the mapping folder came up empty: the
-        // compiled-in ANSI baseline that ships inside Avro Keyboard.exe.
-        //
-        // This is what makes a fresh, wiped or portable install type ANSI on
-        // the very first run with no download and no file on disk. It is a
-        // versioned fallback, not a pin: the moment a mapping file appears on
-        // disk it wins, because this branch is only reached with zero files.
-        //
-        // DesiredVersion must name the baseline too - the block below would
-        // otherwise blank AnsiVersion, discarding the name the activation just
-        // published and leaving the UI claiming no mapping while one is live.
-        DesiredVersion := AVRO_BASELINE_NAME;
-        Log('Startup: activated the embedded ANSI baseline (mapping folder is empty)');
-      end
-      else
-        Log('Startup: no ANSI mapping files - Unicode only');
-
-      if AnsiVersion <> DesiredVersion then
-      begin
-        AnsiVersion := DesiredVersion;
-        SaveAnsiVersionOnly;
-      end;
-      SyncActiveMappingTimestamp(AnsiVersion);
+      // Resolve and activate exactly what the settings name. The catalog was
+      // already scanned above, so the "completely empty" baseline decision is
+      // made against the real folder - locked or corrupt files still count.
+      ApplyPersistedAnsiSelection('Startup');
+      SyncActiveMappingTimestamp(AnsiVersionFileName);
       // Rotated-container auto-heal, started only now that the engine
       // decision above is settled. It is asynchronous and, when every
       // container still opens, it costs one directory scan and makes no
@@ -1591,10 +1653,110 @@ begin
   StartupLog('LoadApp: complete');
 end;
 
+{ Resolves and activates the persisted ANSI selection.
+
+  Shared by LoadApp and RefreshSettings so both obey exactly one rule set:
+  - a completely empty catalog is the ONLY case that may activate the embedded
+    baseline; a locked/corrupt file still counts as a catalog entry;
+  - an empty AnsiVersion (or the old unknown "Default" without a companion)
+    selects FirstAvailableMappingFileName;
+  - a companion that matches the base name is the exact selection, and a
+    missing exact file never falls back to a same-base sibling or another row;
+  - a legacy base-name value resolves once, is published and persisted before
+    activation, and is exact from then on. }
+function TAvroMainForm1.ApplyPersistedAnsiSelection(const AContext: string): Boolean;
+var
+  DesiredFile, DesiredBase, LoadedBase, LoadedFile: string;
+  MissingExact, SelectionChanged: Boolean;
+begin
+  Result := False;
+  LoadedBase := AnsiVersion;
+  LoadedFile := AnsiVersionFileName;
+  MissingExact := False;
+  DesiredFile := '';
+
+  if (not Assigned(AvroEncoFiles)) or (AvroEncoFiles.Count = 0) then
+  begin
+    // LAST RESORT, and only after the mapping folder came up empty: the
+    // compiled-in ANSI baseline that ships inside Avro Keyboard.exe. It is a
+    // versioned fallback, not a pin: the moment a mapping file appears on disk
+    // this branch is no longer reached.
+    if Application.Terminated then
+      Exit;
+    if AnsiEngineManager.ActivateEmbeddedBaseline then
+    begin
+      Result := True;
+      if ((not SameText(AnsiVersion, LoadedBase)) or (not SameText(AnsiVersionFileName, LoadedFile))) and Assigned(KeyLayout) then
+        KeyLayout.ResetAnsiTypingState;
+      Log(AContext + ': activated the embedded ANSI baseline (mapping folder is empty)');
+      if (not SameText(AnsiVersion, LoadedBase)) or (not SameText(AnsiVersionFileName, LoadedFile)) then
+        SaveAnsiVersionOnly;
+    end
+    else
+      Log(AContext + ': no ANSI mapping files - Unicode only');
+    Exit;
+  end;
+
+  if AnsiVersion = '' then
+    DesiredFile := FirstAvailableMappingFileName
+  else if SameText(AnsiVersion, 'Default') and (AnsiVersionFileName = '') then
+    // The old unknown value. A real Default.json is selectable by its exact
+    // companion, which is why only the companion-less form is treated this way.
+    DesiredFile := FirstAvailableMappingFileName
+  else
+  begin
+    DesiredFile := ResolveAnsiSelectionFile(AnsiVersion, AnsiVersionFileName, AnsiMappingDir, MissingExact);
+    if MissingExact then
+    begin
+      // Do not choose another file and do not activate the baseline - the
+      // non-empty catalog blocks it. The persisted values stay untouched.
+      Log(AContext + ': selected ANSI mapping file not found: ' + AnsiVersionFileName);
+      Exit;
+    end;
+  end;
+
+  if DesiredFile = '' then
+  begin
+    Log(AContext + ': stored ANSI selection does not resolve to an exact file - Unicode only');
+    Exit;
+  end;
+
+  SelectionChanged := not SameText(ExtractFileName(DesiredFile), LoadedFile);
+
+  // Publish/persist the exact pair BEFORE activation, so a legacy migration
+  // survives a crash during the switch. This also covers the first migration
+  // of an empty or old "Default" setting.
+  DesiredBase := ChangeFileExt(ExtractFileName(DesiredFile), '');
+  if (not SameText(AnsiVersion, DesiredBase)) or (not SameText(AnsiVersionFileName, ExtractFileName(DesiredFile))) then
+  begin
+    PublishActiveSelection(ExtractFileName(DesiredFile), DesiredBase);
+    SaveAnsiVersionOnly;
+  end;
+
+  if Application.Terminated then
+    Exit;
+
+  // Two attempts cover the first-run race (cache directory missing, container
+  // just installed and still being written). A failure leaves Unicode output
+  // (or the engine that was already live) - never a different file.
+  if not (AnsiEngineManager.SwitchEngine(DesiredFile) or AnsiEngineManager.SwitchEngine(DesiredFile)) then
+  begin
+    Log(AContext + ': could not activate "' + DesiredFile + '"');
+    Exit;
+  end;
+
+  Result := True;
+  if SelectionChanged and Assigned(KeyLayout) then
+    KeyLayout.ResetAnsiTypingState;
+  if (not SameText(AnsiVersion, LoadedBase)) or (not SameText(AnsiVersionFileName, LoadedFile)) then
+    SaveAnsiVersionOnly;
+end;
+
 procedure TAvroMainForm1.HandleLayoutDirectoryChanged(Sender: TObject);
 var
-  TargetPath: string;
-  Snap:       string;
+  TargetPath, ActiveFile: string;
+  MissingExact: Boolean;
+  Snap:         string;
 begin
   // The watcher only ever fires from CheckForChanges on the UI timer, but it
   // fires for whatever happens to the folder: a locked file, a vanished
@@ -1602,12 +1764,41 @@ begin
   // app down, so the body is contained and reported instead of escaping into
   // the timer's caller.
   try
+    FAnsiRootIconName := '';
     ScanAvroEncoFiles(AnsiMappingDir);
 
-    if (AnsiMappingDir <> '') and (AnsiVersion <> '') and (GetActiveEncoFilePath(AnsiVersion, AnsiMappingDir) <> '') then
+    ActiveFile := AnsiVersionFileName;
+    TargetPath := '';
+    if AnsiMappingDir <> '' then
     begin
-      TargetPath := GetActiveEncoFilePath(AnsiVersion, AnsiMappingDir);
-      if TargetPath <> '' then
+      if ActiveFile = '' then
+      begin
+        // One-time legacy migration: an old setting has only a base name. The
+        // resolved exact file is published and persisted BEFORE it is used.
+        if AnsiVersion <> '' then
+        begin
+          MissingExact := False;
+          TargetPath := ResolveAnsiSelectionFile(AnsiVersion, AnsiVersionFileName, AnsiMappingDir, MissingExact);
+          if MissingExact then
+            Log('ANSI mapping file not found: ' + AnsiVersionFileName)
+          else if TargetPath <> '' then
+          begin
+            ActiveFile := ExtractFileName(TargetPath);
+            PublishActiveSelection(ActiveFile, ChangeFileExt(ActiveFile, ''));
+            SaveAnsiVersionOnly;
+          end;
+        end;
+      end
+      else
+      begin
+        // Exact selection: only that file. A disappeared file must not fall
+        // back to the same-base sibling; the running engine stays untouched.
+        TargetPath := GetExactEncoFilePath(ActiveFile, AnsiMappingDir);
+        if TargetPath = '' then
+          Log('ANSI mapping file not found: ' + ActiveFile);
+      end;
+
+      if (ActiveFile <> '') and (TargetPath <> '') then
       begin
         // Default-key files (flag $00) reload transparently; password
         // protected files reload only when a usable password is cached. The
@@ -1616,10 +1807,10 @@ begin
         if IsEncoFile(TargetPath) then
         begin
           if (GetAvroEncoProtectionFlag(TargetPath) = AVROENCO_FLAG_DEFAULT_KEY) or (GetEncoCachedPassword(TargetPath) <> '') then
-            AnsiEngineManager.InvalidateEngine(AnsiVersion);
+            AnsiEngineManager.InvalidateEngine(ActiveFile);
         end
         else
-          AnsiEngineManager.InvalidateEngine(AnsiVersion);
+          AnsiEngineManager.InvalidateEngine(ActiveFile);
       end;
     end;
 
@@ -1662,50 +1853,83 @@ end;
   local folder change. }
 procedure TAvroMainForm1.HandleRemoteEncoRefresh;
 var
-  Persisted: string;
-  ErrorLog:  TStringList;
+  PersistedBase, PersistedFile, TargetPath: string;
+  MissingExact: Boolean;
+  ErrorLog:     TStringList;
+
+  procedure NotifySwitched;
+  begin
+    SyncActiveMappingTimestamp(AnsiVersionFileName);
+    UpdateAnsiVersionMenuChecks(AnsiVersionFileName);
+    ReplaceAnsiMenuParentIcon;
+    UpdateTrayIcon;
+    if ShowAnsiSwitchNotification = 'YES' then
+      ShowAnsiToastNotification('ANSI Encoding: ' + GetMappingDisplayLabel(AnsiVersionFileName));
+  end;
+
 begin
   try
     // Pick the freshly imported file into the shared list before anything
     // resolves paths against it.
     ScanAvroEncoFiles(AnsiMappingDir);
 
-    Persisted := ReadActiveAnsiVersion;
-    if (Persisted <> '') and (not SameText(Persisted, AnsiVersion)) then
+    if not ReadActiveAnsiSelection(PersistedBase, PersistedFile) then
+      Exit;
+
+    // Compare BOTH values: a same-base switch (one.AvroEnco -> one.json) must
+    // be detected even though AnsiVersion itself did not move.
+    if SameText(PersistedBase, AnsiVersion) and SameText(PersistedFile, AnsiVersionFileName) then
     begin
-      // Same two-step switch as the encoding menu click: instant path first,
-      // blocking on-demand repair parse as the fallback.
-      if AnsiEngineManager.TrySwitchCached(Persisted) then
-      begin
-        AnsiVersion := Persisted;
-        SyncActiveMappingTimestamp(Persisted);
-        UpdateAnsiVersionMenuChecks(Persisted);
-        ReplaceAnsiMenuParentIcon;
-        UpdateTrayIcon;
-        if ShowAnsiSwitchNotification = 'YES' then
-          ShowAnsiToastNotification('ANSI Encoding: ' + Persisted);
-      end
-      else
-      begin
-        Screen.Cursor := crHourGlass;
-        ErrorLog := TStringList.Create;
-        try
-          if AnsiEngineManager.SwitchEngine(Persisted, ErrorLog) then
-          begin
-            AnsiVersion := Persisted;
-            SyncActiveMappingTimestamp(Persisted);
-            UpdateAnsiVersionMenuChecks(Persisted);
-            ReplaceAnsiMenuParentIcon;
-            UpdateTrayIcon;
-            if ShowAnsiSwitchNotification = 'YES' then
-              ShowAnsiToastNotification('ANSI Encoding: ' + Persisted);
-          end
-          else
-            ShowAnsiToastNotification('ANSI encoding failed to load - try again');
-        finally
-          ErrorLog.Free;
-          Screen.Cursor := crDefault;
-        end;
+      HandleLayoutDirectoryChanged(nil);
+      Exit;
+    end;
+
+    if PersistedBase = '' then
+    begin
+      // The other process cleared the selection. Do not guess another file.
+      HandleLayoutDirectoryChanged(nil);
+      Exit;
+    end;
+
+    MissingExact := False;
+    TargetPath := ResolveAnsiSelectionFile(PersistedBase, PersistedFile, AnsiMappingDir, MissingExact);
+    if MissingExact then
+    begin
+      Log('refresh_enco: selected ANSI mapping file not found: ' + PersistedFile);
+      HandleLayoutDirectoryChanged(nil);
+      Exit;
+    end;
+    if TargetPath = '' then
+    begin
+      HandleLayoutDirectoryChanged(nil);
+      Exit;
+    end;
+
+    PersistedFile := ExtractFileName(TargetPath);
+    // Legacy value (no/mismatched companion): publish and persist the exact
+    // pair before activation, exactly like startup.
+    if (not SameText(PersistedFile, AnsiVersionFileName)) or (not SameText(PersistedBase, AnsiVersion)) then
+    begin
+      PublishActiveSelection(PersistedFile, ChangeFileExt(PersistedFile, ''));
+      SaveAnsiVersionOnly;
+    end;
+
+    // Same two-step switch as the encoding menu click: instant path first,
+    // blocking on-demand repair parse as the fallback.
+    if AnsiEngineManager.TrySwitchCached(PersistedFile) then
+      NotifySwitched
+    else
+    begin
+      Screen.Cursor := crHourGlass;
+      ErrorLog := TStringList.Create;
+      try
+        if AnsiEngineManager.SwitchEngine(PersistedFile, ErrorLog) then
+          NotifySwitched
+        else
+          ShowAnsiToastNotification('Mapping file not found: ' + PersistedFile);
+      finally
+        ErrorLog.Free;
+        Screen.Cursor := crDefault;
       end;
     end;
 
@@ -1728,6 +1952,12 @@ function TAvroMainForm1.BuildAnsiMappingFolderList: string;
 var
   NameList: TStringList;
   SR:       TSearchRec;
+
+  procedure AddFound;
+  begin
+    NameList.Add(Lowercase(SR.Name) + '|' + IntToStr(SR.Size) + '|' + FormatDateTime('yyyy-mm-dd hh:nn:ss', SR.TimeStamp));
+  end;
+
 begin
   Result := '';
   if (AnsiMappingDir = '') or (not DirectoryExists(AnsiMappingDir)) then
@@ -1740,7 +1970,7 @@ begin
       try
         repeat
           if (SR.Name <> '.') and (SR.Name <> '..') and IsAnsiMappingFileName(SR.Name) then
-            NameList.Add(Lowercase(SR.Name));
+            AddFound;
         until FindNext(SR) <> 0;
       finally
         FindClose(SR);
@@ -1752,7 +1982,7 @@ begin
       try
         repeat
           if (SR.Name <> '.') and (SR.Name <> '..') and IsAnsiMappingFileName(SR.Name) then
-            NameList.Add(Lowercase(SR.Name));
+            AddFound;
         until FindNext(SR) <> 0;
       finally
         FindClose(SR);
@@ -1767,14 +1997,22 @@ begin
 end;
 
 procedure TAvroMainForm1.RefreshAnsiMappingNames;
+var
+  I: Integer;
 begin
   if AnsiMappingNames = nil then
     AnsiMappingNames := TStringList.Create;
+  if AnsiMappingFileNames = nil then
+    AnsiMappingFileNames := TStringList.Create;
+
   // AvroEncoFiles is kept fresh by the watcher / periodic poll / import /
-  // delete flows, so this is pure memory work - no disk scan. The natural
-  // ordering lives in uAvroEncoManager, shared with the encoding menus, so
-  // this list and both menus can never disagree again.
-  GetSortedMappingDisplayNames(AnsiMappingNames);
+  // delete flows, so this is pure memory work - no disk scan. The exact list
+  // carries identity; the label list is filled in the same index order so the
+  // menus and the picker can never pair a caption with the wrong file.
+  GetSortedMappingFileNames(AnsiMappingFileNames);
+  AnsiMappingNames.Clear;
+  for I := 0 to AnsiMappingFileNames.Count - 1 do
+    AnsiMappingNames.Add(GetMappingDisplayLabel(AnsiMappingFileNames[I]));
 end;
 
 { Poll half of the mapping watcher/poll pair (the watcher handler is
@@ -1806,6 +2044,7 @@ begin
       Exit; // nothing new added / removed since the last refresh
 
     FAnsiMappingSnapshot := Snap;
+    FAnsiRootIconName := '';
     ScanAvroEncoFiles(AnsiMappingDir);
     BuildAnsiVersionMenus;
     Log('ANSI mapping folder changed - encoding list refreshed');
@@ -2063,18 +2302,25 @@ procedure TAvroMainForm1.OutputasANSIAreyousure1Click(Sender: TObject);
 begin
   if ShowOutputwarning <> 'NO' then
   begin
+    if PendingANSISwitch then
+      Exit;
+    BeginPendingANSISwitch(False);
     CheckCreateForm(TfrmEncodingWarning, frmEncodingWarning, 'frmEncodingWarning');
-    frmEncodingWarning.Show;
+    frmEncodingWarning.ShowModal;
   end
   else
+  begin
     OutputIsBijoy := 'YES';
+    SetCurrentWindowBanglaPreference(True);
+    RefreshSettings;
+  end;
 
-  RefreshSettings;
 end;
 
 procedure TAvroMainForm1.OutputasUnicodeRecommended1Click(Sender: TObject);
 begin
   OutputIsBijoy := 'NO';
+  SetCurrentWindowBanglaPreference(False);
   OptimizeMemoryUsage;
   RefreshSettings;
 end;
@@ -2084,8 +2330,6 @@ end;
 { =============================================================================== }
 
 procedure TAvroMainForm1.RefreshSettings;
-var
-  DesiredVersion: string;
 begin
   { Entered from the WH_KEYBOARD_LL callback: the mode/output hotkeys in
     KeyboardHook call us directly from the hook body, which must return within
@@ -2105,11 +2349,10 @@ begin
 
   { The scope of mode switching.  Leaving per-window records behind while
     GLOBAL is in force would resurrect them the moment the user switched back,
-    so they are dropped as soon as the scope is global; the two menus show the
-    active scope (the Options dialog reads the setting directly when it loads). }
+    so they are dropped as soon as the scope is global (the Options dialog
+    reads the setting directly when it loads). }
   if Assigned(WindowDict) and (SwitchingMode = SWITCHING_MODE_GLOBAL) then
     WindowDict.Clear;
-  SyncSwitchingModeMenus;
 
   // Mirror the Global Hotkeys settings onto every menu item that performs the
   // same action.  HotkeyStringToShortCut (not Vcl.Menus.TextToShortCut) reads
@@ -2450,24 +2693,15 @@ begin
     OutputasANSIAreyousure2.Checked := False;
   end;
 
-  // ANSI Encoding version (engines are already preloaded; this switch is O(1)).
-  // No compiled-in Default: migrate empty / Default / missing-file to the
-  // first usable file mapping, or stay on Unicode with none.
+  // ANSI Encoding version. Apply exactly the startup rules: an empty catalog
+  // is the only baseline case, an exact companion is authoritative, and a
+  // legacy base name migrates once. The scan makes the empty-catalog decision
+  // authoritative even when this runs after files were added outside the
+  // watcher's view.
   AnsiMappingDir := GetAvroDataDir + 'AnsiMapping\';
   ForceDirectories(AnsiMappingDir);
-  if (AnsiVersion = '') or SameText(AnsiVersion, 'Default') or (GetActiveEncoFilePath(AnsiVersion, AnsiMappingDir) = '') then
-  begin
-    DesiredVersion := FirstAvailableMappingName;
-    if DesiredVersion <> AnsiVersion then
-    begin
-      AnsiVersion := DesiredVersion;
-      SaveAnsiVersionOnly;
-    end;
-  end;
-  if AnsiVersion <> '' then
-    AnsiEngineManager.SwitchEngine(AnsiVersion)
-  else
-    Log('RefreshSettings: no ANSI mapping files - Unicode only');
+  ScanAvroEncoFiles(AnsiMappingDir);
+  ApplyPersistedAnsiSelection('RefreshSettings');
   BuildAnsiVersionMenus;
   Popup_Tools.OnPopup := PopupToolsPopup;
   Popup_Tray.OnPopup := PopupTrayPopup;
@@ -2569,7 +2803,7 @@ begin
   begin
     M := AMenu.Items[I];
     if M.GroupIndex = 10 then
-      M.Checked := SameText(M.Hint, AnsiVersion);
+      M.Checked := SameText(M.Hint, AnsiVersionFileName);
   end;
 end;
 
@@ -2581,25 +2815,12 @@ begin
   // Popup_Tools.OnPopup - RefreshSettings re-wires it).
   TrackedMenusPopup(Sender);
 
-  // The badges this menu is about to draw come from the mapping payloads.
-  // They are resolved on the FIRST popup rather than at startup, and again
-  // after an idle release dropped them (IdleTimerTimer) - the menu just opened
-  // is exactly the moment the work is wanted, so it is paid here.
-  // Each row resolves its OWN badge while it draws (see
-  // TStyledMenuBorderHook's badge), so opening this menu no longer pays for
-  // EnsureMappingIcons - the sweep that decodes every mapping's payload.  Only
-  // the active layout's badge is needed up front: it is what the parent item's
-  // gutter icon reads.
-  EnsureMappingIcon(AnsiVersion);
+  // Resolve only the active mapping's icon: it is shown on this menu's parent
+  // item. Unselected mapping rows remain icon-free.
+  EnsureMappingIcon(AnsiVersionFileName);
   // Only update checkmarks on existing items -- do NOT Clear/rebuild during popup
   SyncAnsiVersionChecks(AnsiVersionSubmenu1);
-  // Which of the two painters owns these rows depends on the look in force,
-  // and this is the moment that is known for sure (a theme change mid-session
-  // does not rebuild them).
-  SyncAnsiVersionRowPaintMode(AnsiVersionSubmenu1);
-  // The TopBar's tools menu holds its OWN "Select ANSI Encoding" parent item
-  // (AnsiVersionSubmenu1), so its left-gutter badge has to be refreshed here
-  // too - this popup used to sync only the checkmarks.
+  // Refresh this menu's own "Select ANSI Encoding" parent item too.
   ReplaceAnsiMenuParentIcon;
 end;
 
@@ -2626,123 +2847,15 @@ begin
   // re-wires it), so the count belongs here rather than in a second assignment.
   TrackedMenusPopup(Sender);
 
-  // See PopupToolsPopup: the icon bytes are resolved lazily, when a menu that
-  // draws badges is actually opened.
-  // See PopupToolsPopup: rows resolve their own badges while they draw, so only
-  // the active layout's badge has to be ready here.
-  EnsureMappingIcon(AnsiVersion);
+  // Resolve the active mapping icon for the tray menu's parent item.
+  EnsureMappingIcon(AnsiVersionFileName);
   SyncAnsiVersionChecks(mnuTraySelectAnsiEncoding);
-  SyncAnsiVersionRowPaintMode(mnuTraySelectAnsiEncoding);
   ReplaceAnsiMenuParentIcon;
 end;
 
 { =============================================================================== }
 { Per-layout icons (system tray + encoding menus) }
 { =============================================================================== }
-
-{ The ImageList1 slot holding AName's layout badge, adding it on first use and
-  overwriting it in place when the active layout changes.
-
-  -1 means "no badge for this name": an empty name, an unassigned
-  list, or a mapping that carries no icon (a legacy container, a plain .json, a
-  damaged one, or a password-protected container that has not been unlocked
-  yet). The caller then falls back to the built-in ANSI icon deliberately -
-  never by accident.
-
-  The frame is decoded at ImageList1's OWN metric, not at the tray's
-  SM_CXSMICON one. GetAnsiTrayIcon answers with a 20/24/32 px handle on a
-  scaled display, and ImageList1 is a 16x16 list: TImageList.AddIcon wants a
-  bitmap matching the list, so putting the tray handle in there returned -1,
-  FAnsiRootIconIndex stayed -1, and the parent item drew built-in slot 30 while
-  the very same layout's badge looked right in the submenu (DrawIconEx on the
-  raw HICON) and in the tray (handed to TIcon directly). CreateHIconAtSize
-  picks a frame the container really carries, so this is the authored artwork
-  at its own size rather than a rescaled copy.
-
-  An image-list entry rather than a per-item TBitmap for the same reason the
-  submenu rows use one: the renderer draws it with correct alpha, whereas a
-  TBitmap assigned to TMenuItem.Bitmap left a dark background behind the
-  transparent pixels.
-
-  Exactly one slot is appended, on first use, and reused from then on: the list
-  grows by one entry however often the user switches layouts, and slot 30 keeps
-  its meaning as the built-in ANSI icon. }
-function TAvroMainForm1.AnsiRootIconSlot(const AName: string): Integer;
-var
-  IconBytes:     TBytes;
-  H:             HICON;
-  Ico:           TIcon;
-  Cols, Rows, R: Integer;
-begin
-  Result := -1;
-  if AName = '' then
-    Exit;
-  if not Assigned(ImageList1) then
-    Exit;
-
-  Cols := ImageList1.Width;
-  Rows := ImageList1.Height;
-  if (Cols <= 0) or (Rows <= 0) then
-    Exit;
-
-  // A cached slot describes the layout that put it there, so it is only reused
-  // for that same name - and only while the list still holds it, because a
-  // recreated image-list handle drops the appended entry.
-  if SameText(AName, FAnsiRootIconName) and (FAnsiRootIconIndex >= 0) and (FAnsiRootIconIndex < ImageList1.Count) then
-  begin
-    Result := FAnsiRootIconIndex;
-    Exit;
-  end;
-
-  // The one lookup the submenu badges resolve through as well: the icon cache
-  // is keyed by the mapping's display name, which is what the menu item's Hint
-  // carries and what AnsiVersion holds.
-  IconBytes := GetMappingIconBytes(AName);
-  if Length(IconBytes) = 0 then
-    Exit;
-
-  H := CreateHIconAtSize(IconBytes, Cols, Rows);
-  if H = 0 then
-  begin
-    Log('AnsiRootIconSlot: could not decode a ' + IntToStr(Cols) + 'x' + IntToStr(Rows) + ' frame for the layout icon of "' + AName + '"');
-    Exit;
-  end;
-
-  Ico := TIcon.Create;
-  try
-    // TIcon adopts the handle, and the list copies the image into its own
-    // bitmap during AddIcon / ReplaceIcon, so freeing the wrapper is safe.
-    Ico.Handle := H;
-    H := 0;
-
-    if (FAnsiRootIconIndex >= 0) and (FAnsiRootIconIndex < ImageList1.Count) then
-    begin
-      if ImageList_ReplaceIcon(ImageList1.Handle, FAnsiRootIconIndex, Ico.Handle) >= 0 then
-        Result := FAnsiRootIconIndex
-      else
-        FAnsiRootIconIndex := -1;
-    end;
-
-    if (Result < 0) and (FAnsiRootIconIndex < 0) then
-    begin
-      R := ImageList1.AddIcon(Ico);
-      if R >= 0 then
-      begin
-        FAnsiRootIconIndex := R;
-        Result := R;
-      end;
-    end;
-  finally
-    Ico.Free;
-    if H <> 0 then
-      DestroyIcon(H);
-  end;
-
-  if Result >= 0 then
-    FAnsiRootIconName := AName
-  else
-    Log('AnsiRootIconSlot: ImageList1 refused the ' + IntToStr(Cols) + 'x' + IntToStr(Rows) + ' icon of "' + AName + '"');
-end;
 
 { A cached HICON for the tray at the CURRENT small-icon metric, or 0 when this
   layout has no icon.
@@ -2782,25 +2895,16 @@ begin
     AnsiIconHandles.AddOrSetValue(Key, Result);
 end;
 
-{ Frees every cached tray handle and invalidates the parent-badge slot. Called
-  when the mapping folders are re-scanned (the icons belong to files that may be
-  gone) and on the way out. The menu objects are left pointing at no image list,
-  so a rebuild cannot draw from a freed one. }
+{ Frees every cached tray handle. Called when the mapping folders are re-scanned
+  and on the way out. }
 procedure TAvroMainForm1.ReleaseAnsiIconCache;
 var
   H: HICON;
 begin
-  // The appended ImageList1 slot itself is kept - appending a fresh one per
-  // re-scan would grow the list without bound - but FAnsiRootIconName is
-  // cleared so the next resolve rewrites that slot: the icon bytes behind it
-  // are gone, and a renamed or deleted mapping must not keep drawing its old
-  // badge.
   FAnsiRootIconName := '';
-  // SubMenuImages, not Images: TMenuItem has no Images. VCL resolves an
-  // item's image list by walking its parents for SubMenuImages and only then
-  // falling back to the owning TMenu's Images, so setting it on these two
-  // items gives their version lists the icons without giving every unrelated
-  // item of Popup_Tools and Popup_Tray an image list they never had.
+
+  // Remove per-submenu image-list references; the owning PopupMenu.ImageList1
+  // remains responsible for the parent icons and the menus' standard artwork.
   if Assigned(AnsiVersionSubmenu1) then
     AnsiVersionSubmenu1.SubMenuImages := nil;
   if Assigned(mnuTraySelectAnsiEncoding) then
@@ -2815,20 +2919,60 @@ begin
   end;
 end;
 
-{ Gives BOTH "Select ANSI Encoding" parent items the badge of the active
-  layout, so the root item's gutter and the checked submenu row can never
-  disagree.
+{ Resolve the active mapping's menu-sized icon into one reusable ImageList slot.
+  The built-in ANSI image is the fallback when the mapping has no usable icon. }
+function TAvroMainForm1.AnsiRootIconSlot(const AName: string): Integer;
+var
+  IconBytes: TBytes;
+  H:         HICON;
+  Ico:       TIcon;
+begin
+  Result := -1;
+  if (AName = '') or not Assigned(ImageList1) or (ImageList1.Width <= 0) or (ImageList1.Height <= 0) then
+    Exit;
 
-  There are two items with that caption - mnuTraySelectAnsiEncoding in
-  Popup_Tray and AnsiVersionSubmenu1 in Popup_Tools - and only the tray one was
-  assigned here, so the TopBar's tools menu showed no badge at all. A single
-  slot serves both, because each popup carries Images = ImageList1.
+  if SameText(AName, FAnsiRootIconName) and (FAnsiRootIconIndex >= 0) and (FAnsiRootIconIndex < ImageList1.Count) then
+  begin
+    Result := FAnsiRootIconIndex;
+    Exit;
+  end;
 
-  The badge follows AnsiVersion alone, exactly like the checkmark
-  SyncAnsiVersionChecks draws: it identifies WHICH encoding is selected, not
-  whether ANSI output happens to be switched on right now. Slot 30, the
-  built-in ANSI icon, is the deliberate fallback when nothing is selected (an
-  empty name) or when the mapping carries no icon. }
+  IconBytes := GetMappingIconBytes(AName);
+  if Length(IconBytes) = 0 then
+    Exit;
+
+  H := CreateHIconAtSize(IconBytes, ImageList1.Width, ImageList1.Height);
+  if H = 0 then
+  begin
+    Log('AnsiRootIconSlot: could not decode a ' + IntToStr(ImageList1.Width) + 'x' + IntToStr(ImageList1.Height) +
+      ' frame for the layout icon of "' + AName + '"');
+    Exit;
+  end;
+
+  Ico := TIcon.Create;
+  try
+    Ico.Handle := H;
+    H := 0;
+    if (FAnsiRootIconIndex >= 0) and (FAnsiRootIconIndex < ImageList1.Count) then
+      ImageList1.ReplaceIcon(FAnsiRootIconIndex, Ico)
+    else
+      FAnsiRootIconIndex := ImageList1.AddIcon(Ico);
+  finally
+    Ico.Free;
+    if H <> 0 then
+      DestroyIcon(H);
+  end;
+
+  if (FAnsiRootIconIndex >= 0) and (FAnsiRootIconIndex < ImageList1.Count) then
+  begin
+    FAnsiRootIconName := AName;
+    Result := FAnsiRootIconIndex;
+  end
+  else
+    Log('AnsiRootIconSlot: ImageList1 refused the ' + IntToStr(ImageList1.Width) + 'x' + IntToStr(ImageList1.Height) +
+      ' icon of "' + AName + '"');
+end;
+
 procedure TAvroMainForm1.ReplaceAnsiMenuParentIcon;
 const
   ANSI_ROOT_IMAGE_INDEX = 30;
@@ -2838,12 +2982,8 @@ begin
   if not Assigned(ImageList1) then
     Exit;
 
-  // The active layout's own bytes: normally already cached by the parse that
-  // activated it, resolved on demand after an idle release cleared the cache.
-  // Guarded for '' (no active mapping), which carries no icon by design.
-  EnsureMappingIcon(AnsiVersion);
-
-  Slot := AnsiRootIconSlot(AnsiVersion);
+  EnsureMappingIcon(AnsiVersionFileName);
+  Slot := AnsiRootIconSlot(AnsiVersionFileName);
   if Slot < 0 then
     Slot := ANSI_ROOT_IMAGE_INDEX;
 
@@ -2854,262 +2994,68 @@ begin
 end;
 
 const
-  { The GroupIndex every ANSI version row of both menus carries: it is what marks
-    a row as an encoding rather than as one of the mapping actions below them (see
-    BuildAnsiVersionMenus and SyncAnsiVersionChecks).  The badge test below needs
-    it, because a Hint alone names no encoding - the Help menu puts the path of a
-    PDF into its items' Hint. }
+  { The GroupIndex every ANSI version row of both menus carries. }
   ANSI_VERSION_ROW_GROUP = 10;
-
-{ Stamps the cached icon of AItem's mapping on the right of its row.  That badge
-  is the one piece of drawing a version row has of its own - every other pixel of
-  the row is the painting the look in force gives every Avro menu row.
-
-  Two painters can call this, and SyncAnsiVersionRowPaintMode below decides which
-  one is in force:
-
-  * under every theme, the popup style hook (Units\uStyledMenuBorder.pas): it
-    paints the row with the active style and asks DrawAnsiMenuRowBadge below for
-    the trailing badge;
-  * in the plain native look - where there is no popup style hook at all -
-    AnsiVersionItemAdvancedDrawItem below: it paints the row the way Vcl.Menus
-    paints any other row and then calls here.
-
-  It lands in the room the painting already leaves free on a row's right edge (the
-  equivalent of a shortcut's column), and the row itself is measured wider by
-  AnsiVersionItemMeasureItem, so the caption never runs under it.
-
-  A row identifies itself with the mapping's display name in Hint plus the
-  version-row GroupIndex (ANSI_VERSION_ROW_GROUP below), and no other item of any
-  Avro menu carries both, so every other row keeps exactly what its painter made
-  of it. }
-procedure TAvroMainForm1.DrawAnsiRowBadge(ACanvas: TCanvas; const AItemRect: TRect;
-  AItem: TMenuItem);
-const
-  ICON_SZ  = 16;
-  ICON_PAD = 4;
-var
-  IconHandle: HICON;
-  X, Y: Integer;
-begin
-  if (AItem = nil) or (AItem.Hint = '') or (AItem.GroupIndex <> ANSI_VERSION_ROW_GROUP) then
-    Exit;
-
-  { Resolve THIS row's own badge on demand: the icon bytes are dropped whenever
-    the mapping folder is re-scanned (BuildAnsiVersionMenus ->
-    ReleaseAnsiIconCache), so a row must be able to restore its own artwork while
-    it draws instead of relying on a full sweep of every mapping when the menu
-    opens. }
-  EnsureMappingIcon(AItem.Hint);
-  IconHandle := GetAnsiTrayIcon(AItem.Hint);
-  if IconHandle = 0 then
-    Exit;
-
-  X := AItemRect.Right - ICON_SZ - ICON_PAD;
-  Y := AItemRect.Top + ((AItemRect.Bottom - AItemRect.Top - ICON_SZ) div 2);
-  DrawIconEx(ACanvas.Handle, X, Y, IconHandle, ICON_SZ, ICON_SZ, 0, 0, DI_NORMAL);
-end;
-
-{ The badge painter the popup hook calls while it paints a row.  It answers False
-  for every row that is not an ANSI version row - every row of every other Avro
-  menu - and the hook then leaves that row exactly as the native painting made
-  it.  The form is reached through the application's form variable because the
-  icon cache belongs to it; before the form exists the hook gets False and no
-  menu is up anyway. }
-function DrawAnsiMenuRowBadge(ACanvas: TCanvas; const AItemRect: TRect;
-  AItem: TMenuItem): Boolean;
-begin
-  Result := (AvroMainForm1 <> nil) and (AItem <> nil) and (AItem.Hint <> '') and
-    (AItem.GroupIndex = ANSI_VERSION_ROW_GROUP);
-  if Result then
-    AvroMainForm1.DrawAnsiRowBadge(ACanvas, AItemRect, AItem);
-end;
-
-{ ``TMenuItem.AdvancedDrawItem`` is protected; this local descendant only
-  re-exposes it (it adds no field and no behaviour of its own), so the owner-draw
-  handler below can hand a row back to Vcl.Menus and get the very painting the
-  native look gives every other Avro menu row. }
-type
-  TMenuItemNativePainter = class(TMenuItem)
-  public
-    procedure PaintAsVclWould(ACanvas: TCanvas; const ARect: TRect; AState: TOwnerDrawState);
-  end;
-
-procedure TMenuItemNativePainter.PaintAsVclWould(ACanvas: TCanvas; const ARect: TRect; AState: TOwnerDrawState);
-var
-  ParkedHandler: TAdvancedMenuDrawItemEvent;
-  ParkedSimple:  TMenuDrawItemEvent;
-begin
-  { Vcl.Menus takes its own themed path only while the item carries no
-    owner-draw event - TMenuItem.AdvancedDrawItem branches on
-    (Assigned(FOnAdvancedDrawItem) or Assigned(FOnDrawItem)) - so both events are
-    parked for the duration of this one call and put back afterwards, even if the
-    painting raises. }
-  ParkedHandler := OnAdvancedDrawItem;
-  ParkedSimple := OnDrawItem;
-  OnAdvancedDrawItem := nil;
-  OnDrawItem := nil;
-  try
-    AdvancedDrawItem(ACanvas, ARect, AState, False);
-  finally
-    OnDrawItem := ParkedSimple;
-    OnAdvancedDrawItem := ParkedHandler;
-  end;
-end;
-
-{ Owner-draw handler of a version row in the plain native look.
-
-  The native look has no popup style hook (uThemeManager
-  .PopupMenusPaintedNatively), so Vcl.Menus is the painter of these rows and asks
-  this event for the item's own drawing - but a handler of this event owns the
-  WHOLE row: TMenuItem.AdvancedDrawItem calls it instead of painting anything
-  itself.  Handing the row straight back to Vcl.Menus (PaintAsVclWould) is what
-  keeps a version row the painting every other Avro menu row gets in this look -
-  the hover band on a hot row, the gutter, the check glyph, the caption - and
-  this handler then adds the one thing Vcl.Menus cannot know: the layout badge on
-  the right. }
-procedure TAvroMainForm1.AnsiVersionItemAdvancedDrawItem(Sender: TObject; ACanvas: TCanvas; ARect: TRect; AState: TOwnerDrawState);
-var
-  Item: TMenuItem;
-begin
-  Item := Sender as TMenuItem;
-
-  TMenuItemNativePainter(Item).PaintAsVclWould(ACanvas, ARect, AState);
-
-  // ...and the badge last, so nothing painted above can cover it.
-  DrawAnsiRowBadge(ACanvas, ARect, Item);
-end;
-
-{ Puts the version rows of AMenu on the painter that is in force right now.
-
-  A version row is painted by exactly one of two owners, and the choice is made
-  here - right before the popup is shown - rather than when the rows are built,
-  because a theme change while the application runs switches the painter without
-  rebuilding them:
-
-  * the plain native look has no popup style hook, so Vcl.Menus paints the rows
-    and the rows carry the owner-draw handler that adds the badge
-    (AnsiVersionItemAdvancedDrawItem above);
-  * under every theme the application's popup hook (Units\uStyledMenuBorder.pas)
-    paints the row itself with the active style, and it hands a row to
-    TMenuItem's owner-draw event INSTEAD of drawing the row when one is assigned
-    - so a version row must carry no owner-draw handler then; the same hook
-    stamps the badge instead.
-
-  Everything else about a version row - the room AnsiVersionItemMeasureItem
-  reserves, the checkmark sync, the click handler - is set once when the row is
-  built and is not touched here. }
-procedure TAvroMainForm1.SyncAnsiVersionRowPaintMode(AMenu: TMenuItem);
-var
-  I:   Integer;
-  Row: TMenuItem;
-begin
-  if not Assigned(AMenu) then
-    Exit;
-
-  for I := 0 to AMenu.Count - 1 do
-  begin
-    Row := AMenu.Items[I];
-    if Row.GroupIndex <> ANSI_VERSION_ROW_GROUP then
-      Continue; // the separator and the mapping actions below keep their painting
-
-    if PopupMenusPaintedNatively then
-      Row.OnAdvancedDrawItem := AnsiVersionItemAdvancedDrawItem
-    else
-      Row.OnAdvancedDrawItem := nil;
-  end;
-end;
-
-{ Owner-draw measure handler: reserves the room for the trailing icon badge.
-
-  Vcl.Menus calls this event at the very end of TMenuItem.MeasureItem, so Width
-  and Height arrive as the size VCL itself computed for the row (text, glyph,
-  DPI scaling and all).  Both are therefore left exactly as they came in: an ANSI
-  version row keeps the very height of every other Avro menu row, which is what
-  makes this submenu match the native ones on screen.  Only the
-  badge's own width is added, and only for the rows that carry one; the height
-  must never be derived from the badge or the gutter, or the rows come out taller
-  than the rest of the application's menus. }
-procedure TAvroMainForm1.AnsiVersionItemMeasureItem(Sender: TObject; ACanvas: TCanvas; var Width, Height: Integer);
-const
-  ICON_SZ  = 16;
-  ICON_PAD = 4;
-var
-  Item: TMenuItem;
-begin
-  Item := Sender as TMenuItem;
-
-  if Item.Hint <> '' then
-    Inc(Width, ICON_SZ + ICON_PAD);
-end;
 
 procedure TAvroMainForm1.UpdateTrayIcon;
 var
   ICN:                 TIcon;
   AnsiHIcon, IconCopy: HICON;
+  IconBytes:           TBytes;
 begin
-  // Both parent "Select ANSI Encoding" items are refreshed here, ABOVE the tray
-  // / TopBar split: those menus are reachable while the TopBar is visible too,
-  // and that branch used to return without touching the badge at all.
+  // Both parent "Select ANSI Encoding" items are refreshed above the tray /
+  // TopBar split, so they stay in sync in either UI mode.
   ReplaceAnsiMenuParentIcon;
 
-  if IsFormVisible('TopBar') = False then
-  begin
-    // try/finally: this runs on every mode change and on startup, so a failure
-    // part-way through must not leak the TIcon.
-    ICN := TIcon.Create;
-    try
-      if KeyLayout.KeyboardMode = bangla then
+  ICN := TIcon.Create;
+  try
+    if KeyLayout.KeyboardMode = bangla then
+    begin
+      if OutputIsBijoy = 'YES' then
       begin
-        if IsWin2000 = True then
-          ImageList1.GetIcon(14, ICN)
-        else
+        AnsiHIcon := GetAnsiTrayIcon(AnsiVersionFileName);
+        IconCopy := 0;
+        if AnsiHIcon <> 0 then
+          IconCopy := CopyIcon(AnsiHIcon);
+        if IconCopy = 0 then
         begin
-          if OutputIsBijoy = 'YES' then
-          begin
-            // The active layout's own icon, so the tray shows WHICH ANSI
-            // encoding is running. CopyIcon is required: TIcon adopts and
-            // destroys whatever handle it is given, and the cached handle has
-            // to stay valid for the next tray update.
-            AnsiHIcon := GetAnsiTrayIcon(AnsiVersion);
-            IconCopy := 0;
-            if AnsiHIcon <> 0 then
-              IconCopy := CopyIcon(AnsiHIcon);
-            if IconCopy <> 0 then
-              ICN.Handle := IconCopy
-            else
-              ImageList1.GetIcon(30, ICN); // built-in ANSI icon
-          end
-          else
-            ImageList1.GetIcon(20, ICN);
+          IconBytes := GetMappingIconBytes(AnsiVersionFileName);
+          if (Length(IconBytes) > 0) and Assigned(ImageList1) and (ImageList1.Width > 0) and (ImageList1.Height > 0) then
+            IconCopy := CreateHIconAtSize(IconBytes, ImageList1.Width, ImageList1.Height);
         end;
 
-        if OutputIsBijoy = 'YES' then
-          Tray.Hint := 'Avro Keyboard.' + #13 + 'Running Bangla Keyboard Mode (ANSI Version).' + #13 + 'Press ' + ModeSwitchKey +
-            ' to switch to System default.'
+        if IconCopy <> 0 then
+          ICN.Handle := IconCopy
         else
-          Tray.Hint := 'Avro Keyboard.' + #13 + 'Running Bangla Keyboard Mode.' + #13 + 'Press ' + ModeSwitchKey + ' to switch to System default.';
+          ImageList1.GetIcon(30, ICN); // built-in ANSI icon
       end
-      else if KeyLayout.KeyboardMode = SysDefault then
-      begin
-        if IsWin2000 = True then
-          ImageList1.GetIcon(19, ICN)
-        else
-          ImageList1.GetIcon(21, ICN);
+      else if IsWin2000 = True then
+        ImageList1.GetIcon(14, ICN)
+      else
+        ImageList1.GetIcon(20, ICN);
 
-        Tray.Hint := 'Avro Keyboard.' + #13 + 'Running System default Keyboard Mode.' + #13 + 'Press ' + ModeSwitchKey + ' to switch to Bangla.';
-      end;
-      Tray.Icon := ICN;
-    finally
-      ICN.Free;
+      if OutputIsBijoy = 'YES' then
+        Tray.Hint := 'Avro Keyboard.' + #13 + 'Running Bangla Keyboard Mode (ANSI Version).' + #13 + 'Press ' + ModeSwitchKey +
+          ' to switch to System default.'
+      else
+        Tray.Hint := 'Avro Keyboard.' + #13 + 'Running Bangla Keyboard Mode.' + #13 + 'Press ' + ModeSwitchKey + ' to switch to System default.';
+    end
+    else if KeyLayout.KeyboardMode = SysDefault then
+    begin
+      if IsWin2000 = True then
+        ImageList1.GetIcon(19, ICN)
+      else
+        ImageList1.GetIcon(21, ICN);
+
+      Tray.Hint := 'Avro Keyboard.' + #13 + 'Running System default Keyboard Mode.' + #13 + 'Press ' + ModeSwitchKey + ' to switch to Bangla.';
     end;
-  end
-  else
+    Tray.Icon := ICN;
+  finally
+    ICN.Free;
+  end;
+
+  if IsFormVisible('TopBar') then
   begin
-    // The floating TopBar is visible, which means the tray icon is hidden
-    // (RestoreFromTray sets Tray.Visible := False before showing it), so there
-    // is no tray icon to refresh here. The per-layout icon swap is deliberately
-    // tray-only: the TopBar's own skinned "ANSI" badge stays its indicator.
     if KeyLayout.KeyboardMode = bangla then
       Topbar.SetButtonModeState(State2)
     else if KeyLayout.KeyboardMode = SysDefault then
@@ -3196,14 +3142,20 @@ begin
     if OutputIsBijoy = 'YES' then
     begin
       OutputIsBijoy := 'NO';
+      SetCurrentWindowBanglaPreference(False);
       OptimizeMemoryUsage;
       RefreshSettings;
+      Exit;
     end;
+    SetCurrentWindowBanglaPreference(False);
   end;
 end;
 
 procedure TAvroMainForm1.SetBengaliANSIMode;
 begin
+  if PendingANSISwitch then
+    Exit;
+
   if (KeyLayout.KeyboardMode = bangla) and (OutputIsBijoy = 'YES') then
   begin
     { Already in Bangla+ANSI: toggle off to English. No warning needed. }
@@ -3211,30 +3163,24 @@ begin
   end
   else
   begin
-    { Switching to Bangla+ANSI. Remember the previous mode so a cancelled
-      warning can restore it (English if the user was in English mode,
-      Bangla if they were already typing Bangla in Unicode). }
-    PreviousModeBeforeANSISwitch := KeyLayout.KeyboardMode;
-
-    if KeyLayout.KeyboardMode <> bangla then
-      KeyLayout.KeyboardMode := bangla;
-
     if ShowOutputwarning <> 'NO' then
     begin
-      { Show warning. The user's choice arrives asynchronously in
-        frmEncodingWarning.Button1Click / Button2Click / FormClose. }
-      PendingANSISwitch := True;
+      { Keep the warning modal until the user chooses or cancels it. }
+      BeginPendingANSISwitch(True);
+      if KeyLayout.KeyboardMode <> bangla then
+        KeyLayout.KeyboardMode := bangla;
       CheckCreateForm(TfrmEncodingWarning, frmEncodingWarning, 'frmEncodingWarning');
-      frmEncodingWarning.Show;
+      frmEncodingWarning.ShowModal;
     end
     else
     begin
       { No warning enabled; commit to ANSI directly. }
+      if KeyLayout.KeyboardMode <> bangla then
+        KeyLayout.KeyboardMode := bangla;
       if OutputIsBijoy <> 'YES' then
-      begin
         OutputIsBijoy := 'YES';
-        RefreshSettings;
-      end;
+      SetCurrentWindowBanglaPreference(True);
+      RefreshSettings;
     end;
   end;
 end;
@@ -3269,20 +3215,117 @@ end;
 { =============================================================================== }
 
 procedure TAvroMainForm1.ApplyPendingANSISwitchRevert;
+var
+  ActiveWindow: HWND;
+  WindowRecord: TWindowRecord;
+  OutputChanged: Boolean;
 begin
   if not PendingANSISwitch then
     Exit;
   PendingANSISwitch := False;
 
-  if KeyLayout.KeyboardMode <> PreviousModeBeforeANSISwitch then
-    KeyLayout.KeyboardMode := PreviousModeBeforeANSISwitch;
+  if (SwitchingMode <> SWITCHING_MODE_GLOBAL) and Assigned(WindowDict) and (PendingANSISwitchWindow <> 0) then
+  begin
+    if PendingANSISwitchHadRecord then
+      WindowDict.AddOrSetValue(PendingANSISwitchWindow, PendingANSISwitchRecord)
+    else
+      WindowDict.Remove(PendingANSISwitchWindow);
+  end;
+
+  ActiveWindow := GetModeWindow;
+  if (SwitchingMode = SWITCHING_MODE_GLOBAL) or (ActiveWindow = PendingANSISwitchWindow) then
+  begin
+    OutputChanged := OutputIsBijoy <> PreviousOutputBeforeANSISwitch;
+    FApplyingWindowMode := True;
+    try
+      OutputIsBijoy := PreviousOutputBeforeANSISwitch;
+      if KeyLayout.KeyboardMode <> PreviousModeBeforeANSISwitch then
+        KeyLayout.KeyboardMode := PreviousModeBeforeANSISwitch;
+      MyCurrentKeyboardMode := PreviousModeBeforeANSISwitch;
+    finally
+      FApplyingWindowMode := False;
+    end;
+    if OutputChanged then
+      RefreshSettings;
+  end
+  else if (ActiveWindow <> 0) and Assigned(WindowDict) then
+  begin
+    if not WindowDict.TryGetValue(ActiveWindow, WindowRecord) then
+    begin
+      WindowRecord.Mode := wimEnglish;
+      WindowRecord.LastBanglaMode := wbmUnicode;
+      WindowDict.AddOrSetValue(ActiveWindow, WindowRecord);
+    end;
+    ApplyWindowMode(ActiveWindow, WindowRecord);
+  end;
+
+  PendingANSISwitchWindow := 0;
+  PendingANSISwitchHadRecord := False;
 end;
 
 { =============================================================================== }
 
-procedure TAvroMainForm1.PendingANSISwitchClear;
+procedure TAvroMainForm1.CommitPendingANSISwitch;
+var
+  TargetWindow, ActiveWindow: HWND;
+  WindowRecord: TWindowRecord;
 begin
+  if not PendingANSISwitch then
+  begin
+    OutputIsBijoy := 'YES';
+    SetCurrentWindowBanglaPreference(True);
+    Exit;
+  end;
+
+  TargetWindow := PendingANSISwitchWindow;
   PendingANSISwitch := False;
+  OutputIsBijoy := 'YES';
+
+  if SwitchingMode = SWITCHING_MODE_GLOBAL then
+  begin
+    if PendingANSISwitchEnablesBangla and (KeyLayout.KeyboardMode <> bangla) then
+      KeyLayout.KeyboardMode := bangla;
+    RefreshSettings;
+  end
+  else
+  begin
+    if Assigned(WindowDict) and IsWindow(TargetWindow) then
+    begin
+      WindowRecord := PendingANSISwitchRecord;
+      WindowRecord.LastBanglaMode := wbmANSI;
+      if PendingANSISwitchEnablesBangla or (WindowRecord.Mode = wimBanglaUnicode) then
+        WindowRecord.Mode := wimBanglaANSI;
+      WindowDict.AddOrSetValue(TargetWindow, WindowRecord);
+    end;
+
+    ActiveWindow := GetModeWindow;
+    if (ActiveWindow = TargetWindow) and IsWindow(TargetWindow) then
+    begin
+      FApplyingWindowMode := True;
+      try
+        if PendingANSISwitchEnablesBangla and (KeyLayout.KeyboardMode <> bangla) then
+          KeyLayout.KeyboardMode := bangla;
+        MyCurrentKeyboardMode := KeyLayout.KeyboardMode;
+      finally
+        FApplyingWindowMode := False;
+      end;
+      SetCurrentWindowBanglaPreference(True);
+      RefreshSettings;
+    end
+    else if (ActiveWindow <> 0) and Assigned(WindowDict) then
+    begin
+      if not WindowDict.TryGetValue(ActiveWindow, WindowRecord) then
+      begin
+        WindowRecord.Mode := wimEnglish;
+        WindowRecord.LastBanglaMode := wbmUnicode;
+        WindowDict.AddOrSetValue(ActiveWindow, WindowRecord);
+      end;
+      ApplyWindowMode(ActiveWindow, WindowRecord);
+    end;
+  end;
+
+  PendingANSISwitchWindow := 0;
+  PendingANSISwitchHadRecord := False;
 end;
 
 { =============================================================================== }
@@ -3349,6 +3392,17 @@ function TAvroMainForm1.TransferKeyDown(const KeyCode: Integer; var Block: Boole
 begin
   Result := '';
   Block := False;
+
+  { A cold start can fail to activate the persisted mapping (a container still
+    locked by an updater or a scanner, a failed decrypt) while the hook is
+    installed anyway. The globals then hold the compiled-in canvas instead of
+    the user's version, and typing would silently render the built-in
+    Avro/V1 glyphs until the version is picked again by hand. Convert only
+    through a real engine: repair from the selected file here, on the first
+    keystroke, and leave the previous behaviour untouched otherwise. }
+  if (OutputIsBijoy = 'YES') and (not AnsiEngineManager.EnginePrepared) then
+    AnsiEngineManager.RepairSelectedEngine;
+
   if Assigned(KeyLayout) then
     Result := KeyLayout.ProcessVKeyDown(KeyCode, Block);
 end;
@@ -3552,21 +3606,26 @@ var
   MapPath:      string;    // cached: this path used to be rebuilt 3x per tick
   MapWriteTime: TDateTime; // one disk stat per throttled tick
 begin
-  if (AnsiMappingDir <> '') and (AnsiVersion <> '') and (GetActiveEncoFilePath(AnsiVersion, AnsiMappingDir) <> '') then
+  if (AnsiMappingDir <> '') and (AnsiVersionFileName <> '') then
   begin
     Dec(FMappingCheckCountdown);
     if FMappingCheckCountdown <= 0 then
     begin
       FMappingCheckCountdown := 10; // ~1 second at Interval = 100 ms
       try
-        MapPath := GetActiveEncoFilePath(AnsiVersion, AnsiMappingDir);
-        MapWriteTime := TFile.GetLastWriteTime(MapPath);
-        if (MapWriteTime <> 0) and (MapWriteTime <> FActiveMappingLastWriteTime) then
+        MapPath := GetExactEncoFilePath(AnsiVersionFileName, AnsiMappingDir);
+        if MapPath <> '' then
         begin
-          FActiveMappingLastWriteTime := MapWriteTime;
-          AnsiEngineManager.InvalidateEngine(AnsiVersion);
-          Log('ANSI Encoding Auto-Refreshed: ' + AnsiVersion);
+          MapWriteTime := TFile.GetLastWriteTime(MapPath);
+          if (MapWriteTime <> 0) and (MapWriteTime <> FActiveMappingLastWriteTime) then
+          begin
+            FActiveMappingLastWriteTime := MapWriteTime;
+            AnsiEngineManager.InvalidateEngine(AnsiVersionFileName);
+            Log('ANSI Encoding Auto-Refreshed: ' + AnsiVersionFileName);
+          end;
         end;
+        // MapPath = '': the selected exact file is gone. No sibling and no
+        // auto-refresh; the running engine stays live until the user chooses.
       except
         // file missing or locked - the next throttled tick simply retries
       end;
@@ -3631,16 +3690,11 @@ begin
   begin
     if not WindowDict.TryGetValue(hforewnd, WindoRecord) then
     begin
-      if KeyLayout.KeyboardMode <> SysDefault then
-        KeyLayout.KeyboardMode := SysDefault;
-    end
-    else
-    begin
-      if (WindoRecord.Mode = 'B') and (KeyLayout.KeyboardMode = SysDefault) then
-        KeyLayout.KeyboardMode := bangla;
-      if (WindoRecord.Mode = 'S') and (KeyLayout.KeyboardMode = bangla) then
-        KeyLayout.KeyboardMode := SysDefault;
+      WindoRecord.Mode := wimEnglish;
+      WindoRecord.LastBanglaMode := wbmUnicode;
+      WindowDict.AddOrSetValue(hforewnd, WindoRecord);
     end;
+    ApplyWindowMode(hforewnd, WindoRecord);
   end;
   KeyLayout.ResetDeadKey;
   LastWindow := hforewnd;
@@ -3657,6 +3711,11 @@ begin
     are on the message loop, where modal dialogs (the corrupt-database notice)
     and the engine reload are safe. }
   RefreshSettings;
+end;
+
+procedure TAvroMainForm1.WMSwitchToAnsiMode(var Msg: TMessage);
+begin
+  SetBengaliANSIMode;
 end;
 
 procedure TAvroMainForm1.WMCopyData(var Msg: TWMCopyData);
@@ -3735,39 +3794,37 @@ end;
 
 procedure TAvroMainForm1.AnsiVersionMenuClick(Sender: TObject);
 var
-  ClickedItem:                           TMenuItem;
-  SelectedVersion, ErrorMsg, TargetPath: string;
-  Password:                              AnsiString;
-  ErrorLog:                              TStringList;
+  ClickedItem:                         TMenuItem;
+  SelectedFile, ErrorMsg, TargetPath:  string;
+  Password:                            AnsiString;
+  ErrorLog:                            TStringList;
 begin
   if not(Sender is TMenuItem) then
     Exit;
   ClickedItem := TMenuItem(Sender);
 
-  SelectedVersion := ClickedItem.Hint;
-  if SelectedVersion = '' then
-  begin
-    SelectedVersion := ClickedItem.Caption;
-    SelectedVersion := StringReplace(SelectedVersion, '&', '', [rfReplaceAll]);
-  end;
+  // The row's identity is its Hint (the exact file name). A caption is a label
+  // only and is never parsed back into an identity.
+  SelectedFile := ClickedItem.Hint;
+  if SelectedFile = '' then
+    Exit;
 
-  // One path for every selection: resolve the file, prompt for a password if
-  // this container needs one and none is cached, then switch. There is no
-  // compiled-in Default row - a name only appears here when its file exists.
-  TargetPath := GetActiveEncoFilePath(SelectedVersion, AnsiMappingDir);
+  // One path for every selection: resolve only this exact file, prompt for a
+  // password if this container needs one and none is cached, then switch.
+  // There is no compiled-in Default row and no same-base fallback.
+  TargetPath := GetExactEncoFilePath(SelectedFile, AnsiMappingDir);
   if TargetPath = '' then
   begin
-    Application.MessageBox(PChar('Mapping file not found: ' + SelectedVersion), 'Error', MB_ICONWARNING or MB_OK or MB_TOPMOST or MB_SETFOREGROUND);
+    Application.MessageBox(PChar('Mapping file not found: ' + SelectedFile), 'Error', MB_ICONWARNING or MB_OK or MB_TOPMOST or MB_SETFOREGROUND);
     Exit;
   end;
 
   // For a password-protected encrypted file without a usable cached
-  // password, ask for the password once up front; TrySetAnsiVersion then
-  // reuses CachedEncoPassword and never prompts a second time.
+  // password, ask for the password once up front; SwitchEngine then reuses
+  // CachedEncoPassword and never prompts a second time.
   // Default-key files (flag $00) load transparently and never prompt.
-  // Ask only when THIS encoding was never unlocked on this computer; the
-  // per-file cache then unlocks every later switch silently (even after a
-  // full restart). Default-key files never prompt.
+  // Ask only when THIS file was never unlocked on this computer; the per-file
+  // cache then unlocks every later switch silently (even after a full restart).
   if IsEncoFile(TargetPath) and (GetEncoCachedPassword(TargetPath) = '') and (GetAvroEncoProtectionFlag(TargetPath) = AVROENCO_FLAG_USER_PASSWORD) then
   begin
     if not PromptForPasswordAndValidate(TargetPath, Password) then
@@ -3782,12 +3839,12 @@ begin
   // largest, Ansi V3 - can miss the startup preload after a full
   // %AppData% cache wipe, and without this fallback the menu fails forever).
   ErrorMsg := '';
-  if not AnsiEngineManager.TrySwitchCached(SelectedVersion) then
+  if not AnsiEngineManager.TrySwitchCached(SelectedFile) then
   begin
     Screen.Cursor := crHourGlass;
     ErrorLog := TStringList.Create;
     try
-      if not AnsiEngineManager.SwitchEngine(SelectedVersion, ErrorLog) then
+      if not AnsiEngineManager.SwitchEngine(SelectedFile, ErrorLog) then
         ErrorMsg := 'Encoding is still being prepared. Please select it again.';
     finally
       ErrorLog.Free;
@@ -3796,17 +3853,18 @@ begin
   end;
   if ErrorMsg = '' then
   begin
-    AnsiVersion := SelectedVersion;
-    SyncActiveMappingTimestamp(SelectedVersion);
+    if Assigned(KeyLayout) then
+      KeyLayout.ResetAnsiTypingState;
+
+    // The manager published both selection globals from the slot that became
+    // live; persist that exact pair and refresh what depends on it.
+    SyncActiveMappingTimestamp(AnsiVersionFileName);
     SaveAnsiVersionOnly;
-    UpdateAnsiVersionMenuChecks(SelectedVersion);
-    // AnsiVersion now holds the new selection, so the parent item's badge is
-    // re-resolved right here, and the tray shows the icon of the layout that
-    // is now in force.
+    UpdateAnsiVersionMenuChecks(AnsiVersionFileName);
     ReplaceAnsiMenuParentIcon;
     UpdateTrayIcon;
     if ShowAnsiSwitchNotification = 'YES' then
-      ShowAnsiToastNotification('ANSI Encoding: ' + SelectedVersion);
+      ShowAnsiToastNotification('ANSI Encoding: ' + GetMappingDisplayLabel(AnsiVersionFileName));
     Exit;
   end;
 
@@ -3821,14 +3879,14 @@ end;
 { View the description of a specific mapping }
 procedure TAvroMainForm1.ReadAnsiDescriptionClick(Sender: TObject);
 var
-  MapName: string;
+  MapFile: string;
 begin
   if not(Sender is TMenuItem) then
     Exit;
-  MapName := (Sender as TMenuItem).Hint;
-  if MapName = '' then
-    MapName := (Sender as TMenuItem).Caption;
-  ShowMappingDescription(MapName);
+  MapFile := (Sender as TMenuItem).Hint;
+  if MapFile = '' then
+    Exit;
+  ShowMappingDescription(MapFile);
 end;
 
 { =============================================================================== }
@@ -3836,14 +3894,14 @@ end;
 { Exporting specific mappings }
 procedure TAvroMainForm1.ExportSpecificMappingClick(Sender: TObject);
 var
-  MapName: string;
+  MapFile: string;
 begin
   if not(Sender is TMenuItem) then
     Exit;
-  MapName := (Sender as TMenuItem).Hint;
-  if MapName = '' then
-    MapName := (Sender as TMenuItem).Caption;
-  ExportMappingFile(MapName);
+  MapFile := (Sender as TMenuItem).Hint;
+  if MapFile = '' then
+    Exit;
+  ExportMappingFile(MapFile);
 end;
 
 { =============================================================================== }
@@ -3962,8 +4020,7 @@ begin
     balloon, which the menu route (Resources Management) completes. }
   if Assigned(Topbar) and Topbar.Visible then
   begin
-    Topbar.BalloonHint1.Title := Msg + sLineBreak + 'Choose "Tools" - "Resources Management" from the Avro menu.';
-    Topbar.BalloonHint1.ShowHint(Topbar.ImgButtonMode);
+    Topbar.ShowBalloon(Msg + sLineBreak + 'Choose "Tools" - "Resources Management" from the Avro menu.');
   end;
 end;
 
@@ -4017,8 +4074,7 @@ begin
     balloon, which the menu route (Resources Management) completes. }
   if Assigned(Topbar) and Topbar.Visible then
   begin
-    Topbar.BalloonHint1.Title := Msg + sLineBreak + 'Choose "Tools" - "Resources Management" from the Avro menu.';
-    Topbar.BalloonHint1.ShowHint(Topbar.ImgButtonMode);
+    Topbar.ShowBalloon(Msg + sLineBreak + 'Choose "Tools" - "Resources Management" from the Avro menu.');
   end;
 end;
 
@@ -4043,14 +4099,14 @@ end;
 
 procedure TAvroMainForm1.DeleteAnsiMappingClick(Sender: TObject);
 var
-  MapName: string;
+  MapFile: string;
 begin
   if Sender is TMenuItem then
   begin
-    MapName := (Sender as TMenuItem).Hint;
-    if MapName = '' then
-      MapName := (Sender as TMenuItem).Caption;
-    DeleteMappingFile(MapName);
+    MapFile := (Sender as TMenuItem).Hint;
+    if MapFile = '' then
+      Exit;
+    DeleteMappingFile(MapFile);
   end;
 end;
 
@@ -4071,77 +4127,18 @@ begin
   SaveSettings;
 end;
 
-procedure TAvroMainForm1.SwitchingModeGlobalClick(Sender: TObject);
-begin
-  SwitchingMode := SWITCHING_MODE_GLOBAL;
-  SaveSettings;
-  RefreshSettings;
-end;
-
-procedure TAvroMainForm1.SwitchingModeWindowClick(Sender: TObject);
-begin
-  SwitchingMode := SWITCHING_MODE_WINDOW;
-  SaveSettings;
-  RefreshSettings;
-end;
-
-{ Checks the radio item that matches SwitchingMode in both menus.  The setting
-  is the only source of truth, so this also corrects whatever check state a
-  click left behind before the handler ran.  Both menus are guarded: this is
-  called from RefreshSettings, which can run before Initmenu on a fresh start. }
-procedure TAvroMainForm1.SyncSwitchingModeMenus;
-
-  procedure SyncOne(ASub: TMenuItem);
-  begin
-    if (not Assigned(ASub)) or (ASub.Count <> 2) then
-      Exit;
-    ASub.Items[0].Checked := (SwitchingMode = SWITCHING_MODE_GLOBAL);
-    ASub.Items[1].Checked := (SwitchingMode <> SWITCHING_MODE_GLOBAL);
-  end;
-
-begin
-  SyncOne(mnuSwitchingModeTopBar);
-  SyncOne(mnuSwitchingModeTray);
-end;
-
-procedure TAvroMainForm1.CleanupDuplicateMappings;
-var
-  SearchRec: TSearchRec;
-  NameMap:   TDictionary<string, string>;
-  FileTitle: string;
-begin
-  if not DirectoryExists(AnsiMappingDir) then
-    Exit;
-  NameMap := TDictionary<string, string>.Create;
-  try
-    if FindFirst(AnsiMappingDir + '*.json', faAnyFile, SearchRec) = 0 then
-    begin
-      repeat
-        FileTitle := ChangeFileExt(SearchRec.Name, '');
-        if NameMap.ContainsKey(Lowercase(FileTitle)) then
-          DeleteFile(AnsiMappingDir + SearchRec.Name)
-        else
-          NameMap.Add(Lowercase(FileTitle), SearchRec.Name);
-      until FindNext(SearchRec) <> 0;
-      FindClose(SearchRec);
-    end;
-  finally
-    NameMap.Free;
-  end;
-end;
-
 { =============================================================================== }
 
 { Fast switch UI update: never scans the directory and never destroys/rebuilds
   menu objects. Full BuildAnsiVersionMenus remains reserved for file changes. }
-procedure TAvroMainForm1.SyncActiveMappingTimestamp(const AName: string);
+procedure TAvroMainForm1.SyncActiveMappingTimestamp(const AFileName: string);
 var
   P: string;
 begin
   FActiveMappingLastWriteTime := 0;
-  if (AName = '') or (AnsiMappingDir = '') then
+  if (AFileName = '') or (AnsiMappingDir = '') then
     Exit;
-  P := GetActiveEncoFilePath(AName, AnsiMappingDir);
+  P := GetExactEncoFilePath(AFileName, AnsiMappingDir);
   if P = '' then
     Exit;
   try
@@ -4151,7 +4148,7 @@ begin
   end;
 end;
 
-procedure TAvroMainForm1.UpdateAnsiVersionMenuChecks(const AName: string);
+procedure TAvroMainForm1.UpdateAnsiVersionMenuChecks(const AFileName: string);
   procedure UpdateOne(AMenu: TMenuItem);
   var
     I: Integer;
@@ -4162,8 +4159,10 @@ procedure TAvroMainForm1.UpdateAnsiVersionMenuChecks(const AName: string);
     for I := 0 to AMenu.Count - 1 do
     begin
       M := AMenu.Items[I];
-      if M.Hint <> '' then
-        M.Checked := SameText(M.Hint, AName);
+      // Only version rows: the "More Options" submenu parent also carries the
+      // exact file in its Hint and must not draw a checkmark.
+      if M.GroupIndex = 10 then
+        M.Checked := SameText(M.Hint, AFileName);
     end;
   end;
 
@@ -4178,16 +4177,16 @@ end;
 
 procedure TAvroMainForm1.BuildAnsiVersionMenus;
 var
-  Sep, MoreOptMenu, Item: TMenuItem;
+  Sep, Item: TMenuItem;
   Snap:                   string;
 
-  procedure AddDirectItem(ParentMenu: TMenuItem; const AName: string; AChecked: Boolean);
+  procedure AddDirectItem(ParentMenu: TMenuItem; const ALabel, AFileName: string; AChecked: Boolean);
   var
     MItem: TMenuItem;
   begin
     MItem := TMenuItem.Create(ParentMenu);
-    MItem.Caption := AName;
-    MItem.Hint := AName;
+    MItem.Caption := EscapeAmpersandsForMenu(ALabel);
+    MItem.Hint := AFileName; // exact identity; never parsed from the caption
     MItem.GroupIndex := ANSI_VERSION_ROW_GROUP;
     // RadioItem stays FALSE even though the version rows are a mutually
     // exclusive set: Vcl.Menus paints a radio item's bullet dot, while this row
@@ -4195,66 +4194,77 @@ var
     // and that glyph comes straight from the popup style hook (see
     // TStyledMenuBorderHook). The exclusivity itself is not VCL's
     // radio auto-uncheck but UpdateAnsiVersionMenuChecks/SyncAnsiVersionChecks,
-    // which re-derive every row's Checked from AnsiVersion on each popup and
-    // after each switch. GroupIndex = 10 is what marks a row as a version item.
+    // which re-derive every row's Checked from AnsiVersionFileName on each
+    // popup and after each switch. GroupIndex = 10 is what marks a row as a
+    // version item.
     MItem.RadioItem := False;
     MItem.Checked := AChecked;
-    // The row's own pixels come from whichever painter is in force - the popup
-    // style hook under every theme, Vcl.Menus in the plain native look (see
-    // SyncAnsiVersionRowPaintMode, called on every popup) - and it always
-    // reserves the room for the icon badge that painter stamps on the right: the
-    // row is measured wider by that badge's width and nothing else.
-    MItem.OnMeasureItem := AnsiVersionItemMeasureItem;
     MItem.OnClick := AnsiVersionMenuClick;
     ParentMenu.Add(MItem);
   end;
 
-  procedure AddMappingActionSubmenu(ParentMore: TMenuItem; const AName: string);
-  var
-    MSub, ActionItem: TMenuItem;
+  { The actions lead and each one opens the encoding list, so the submenu reads
+    action -> encoding instead of one submenu per encoding.  Every leaf carries
+    the exact file in Hint (the caption is never parsed back) and calls the same
+    handler the old per-mapping submenu used. }
+  procedure AddMappingActionMenus(AParent: TMenuItem);
+
+    procedure AddLeaves(ActionMenu: TMenuItem; AHandler: TNotifyEvent);
+    var
+      I:        Integer;
+      FileName: string;
+      Leaf:     TMenuItem;
+    begin
+      if not Assigned(AnsiMappingFileNames) then
+        Exit;
+
+      for I := 0 to AnsiMappingFileNames.Count - 1 do
+      begin
+        FileName := AnsiMappingFileNames[I];
+        Leaf := TMenuItem.Create(ActionMenu);
+        Leaf.Caption := EscapeAmpersandsForMenu(GetMappingDisplayLabel(FileName));
+        Leaf.Hint := FileName;
+        Leaf.OnClick := AHandler;
+        ActionMenu.Add(Leaf);
+      end;
+    end;
+
+    procedure AddAction(const ACaption: string; AHandler: TNotifyEvent);
+    var
+      ActionMenu: TMenuItem;
+    begin
+      ActionMenu := TMenuItem.Create(AParent);
+      ActionMenu.Caption := ACaption;
+      AParent.Add(ActionMenu);
+      AddLeaves(ActionMenu, AHandler);
+    end;
+
   begin
-    MSub := TMenuItem.Create(ParentMore);
-    MSub.Caption := AName;
-    MSub.Hint := AName;
-    ParentMore.Add(MSub);
-
-    ActionItem := TMenuItem.Create(MSub);
-    ActionItem.Caption := 'Information';
-    ActionItem.Hint := AName;
-    ActionItem.OnClick := ReadAnsiDescriptionClick;
-    MSub.Add(ActionItem);
-
-    ActionItem := TMenuItem.Create(MSub);
-    ActionItem.Caption := 'Export Mapping...';
-    ActionItem.Hint := AName;
-    ActionItem.OnClick := ExportSpecificMappingClick;
-    MSub.Add(ActionItem);
-
-    ActionItem := TMenuItem.Create(MSub);
-    ActionItem.Caption := 'Delete Mapping';
-    ActionItem.Hint := AName;
-    ActionItem.OnClick := DeleteAnsiMappingClick;
-    MSub.Add(ActionItem);
+    AddAction('Information', ReadAnsiDescriptionClick);
+    AddAction('Export Mapping...', ExportSpecificMappingClick);
+    AddAction('Delete Mapping', DeleteAnsiMappingClick);
   end;
 
   procedure BuildSingleMenu(AMenu: TMenuItem);
   var
-    I:           Integer;
-    DisplayName: string;
+    I:         Integer;
+    FileName:  string;
+    LabelText: string;
   begin
     if not Assigned(AMenu) then
       Exit;
     AMenu.Clear;
 
     // The full scanned catalog in shared natural order - no prepended
-    // "Default" row. AnsiMappingNames is sorted by
-    // RefreshAnsiMappingNames (called just before this) and is the very same
-    // list the version picker shows.
-    if Assigned(AnsiMappingNames) then
-      for I := 0 to AnsiMappingNames.Count - 1 do
+    // "Default" row. AnsiMappingFileNames carries every exact file, including
+    // both members of a same-base pair; AnsiMappingNames holds the matching
+    // labels and is filled in the same index order by RefreshAnsiMappingNames.
+    if Assigned(AnsiMappingFileNames) then
+      for I := 0 to AnsiMappingFileNames.Count - 1 do
       begin
-        DisplayName := AnsiMappingNames[I];
-        AddDirectItem(AMenu, DisplayName, SameText(AnsiVersion, DisplayName));
+        FileName := AnsiMappingFileNames[I];
+        LabelText := GetMappingDisplayLabel(FileName);
+        AddDirectItem(AMenu, LabelText, FileName, SameText(AnsiVersionFileName, FileName));
       end;
 
     // Separator
@@ -4262,33 +4272,24 @@ var
     Sep.Caption := '-';
     AMenu.Add(Sep);
 
-    // More Options
-    MoreOptMenu := TMenuItem.Create(AMenu);
-    MoreOptMenu.Caption := 'More Options';
-    AMenu.Add(MoreOptMenu);
-
-    // Same sorted order as the submenu above (and as the picker).
-    if Assigned(AnsiMappingNames) then
-      for I := 0 to AnsiMappingNames.Count - 1 do
-      begin
-        DisplayName := AnsiMappingNames[I];
-        AddMappingActionSubmenu(MoreOptMenu, DisplayName);
-      end;
+    // The actions live in this submenu itself, right below the version rows:
+    // there is no "More Options" parent left to open first.
+    AddMappingActionMenus(AMenu);
 
     // Separator
-    Sep := TMenuItem.Create(MoreOptMenu);
+    Sep := TMenuItem.Create(AMenu);
     Sep.Caption := '-';
-    MoreOptMenu.Add(Sep);
+    AMenu.Add(Sep);
 
-    Item := TMenuItem.Create(MoreOptMenu);
+    Item := TMenuItem.Create(AMenu);
     Item.Caption := 'Import Mapping...';
     Item.OnClick := ImportAnsiMappingClick;
-    MoreOptMenu.Add(Item);
+    AMenu.Add(Item);
 
-    Item := TMenuItem.Create(MoreOptMenu);
+    Item := TMenuItem.Create(AMenu);
     Item.Caption := 'Locate Mapping...';
     Item.OnClick := OpenAnsiMappingDirClick;
-    MoreOptMenu.Add(Item);
+    AMenu.Add(Item);
   end;
 
 begin
@@ -4300,9 +4301,8 @@ begin
   if Snap <> FAnsiMappingSnapshot then
   begin
     FAnsiMappingSnapshot := Snap;
-    CleanupDuplicateMappings;
     // ScanAvroEncoFiles drops the per-mapping icon bytes; the GDI handles and
-    // the parent-badge slot derived from them have to be invalidated with them,
+    // the parent-menu slot derived from them have to be invalidated with them,
     // or a renamed or deleted mapping would keep drawing its old icon.
     ReleaseAnsiIconCache;
     ScanAvroEncoFiles(AnsiMappingDir);
@@ -4311,18 +4311,9 @@ begin
   BuildSingleMenu(AnsiVersionSubmenu1);
   BuildSingleMenu(mnuTraySelectAnsiEncoding);
 
-  // Which painter adds a child item's trailing icon badge is decided per popup
-  // by SyncAnsiVersionRowPaintMode (the popup style hook under every theme, the
-  // row's own owner-draw handler in the plain native look), so SubMenuImages is
-  // not needed for them.  Both root parent items -
-  // mnuTraySelectAnsiEncoding and AnsiVersionSubmenu1 - get their left-gutter
-  // icon from ImageList1 in ReplaceAnsiMenuParentIcon.
+  // Child rows carry no artwork of their own. Both root parent items use the
+  // active mapping icon (or the built-in ANSI fallback) from ImageList1.
 end;
 
 initialization
-  { The popup-menu hook paints the rows; an ANSI version row additionally gets the
-    badge of the layout it activates, and the icons that badge is drawn from live
-    in this form.  Handing the painter over is all it takes - row painting itself
-    stays entirely in the hook. }
-  uStyledMenuBorder.MenuRowBadge := DrawAnsiMenuRowBadge;
 end.

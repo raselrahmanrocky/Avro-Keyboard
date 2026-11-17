@@ -1,4 +1,4 @@
-{$DEFINE BetaVersion}
+// {$DEFINE BetaVersion}
 // {$Define PortableOn}
 {
   DebugLog is OFF: no component writes a log file any more. DebugLog.Log()

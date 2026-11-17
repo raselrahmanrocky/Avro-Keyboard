@@ -548,7 +548,14 @@ function Invoke-GitHubApi {
     param([string]$Uri, [string]$Method = 'GET', $Body = $null, [string]$ContentType = 'application/vnd.github+json')
     $headers = @{ 'User-Agent' = 'avro-release-tooling'; 'Accept' = 'application/vnd.github+json'; 'Authorization' = "Bearer $token" }
     $params = @{ Method = $Method; Uri = $Uri; Headers = $headers }
-    if ($null -ne $Body) { $params['Body'] = $Body }
+    if ($null -ne $Body) {
+        # A JSON string handed to Invoke-RestMethod is sent in the console's
+        # ANSI code page, so every non-ASCII character in a release body (an
+        # arrow, an ellipsis, a Bangla title) arrives as '?'. Sending the
+        # encoded bytes instead keeps what the notes file actually said.
+        if ($Body -is [string]) { $params['Body'] = [System.Text.Encoding]::UTF8.GetBytes($Body) }
+        else { $params['Body'] = $Body }
+    }
     if ($ContentType) { $params['ContentType'] = $ContentType }
     try { return Invoke-RestMethod @params }
     catch {
@@ -683,6 +690,18 @@ if ($feedSkips.Count -gt 0) {
 }
 
 $feedFiles = @('updates/versioninfo.xml', 'updates/versioninfo_beta.xml')
+# gen_manifest.ps1 writes into THIS repository (its default OutDir is the repo
+# root that holds the script); the public clone is a different working tree.
+# Without the copy below the stage finds no change, the run reports that the
+# feeds "already match", and the published feeds keep pointing at the previous
+# release while dev moves on.
+$publicFeedDir = Join-Path $PublicDir 'updates'
+if (-not (Test-Path -LiteralPath $publicFeedDir)) {
+    New-Item -ItemType Directory -Path $publicFeedDir -Force | Out-Null
+}
+foreach ($f in $feedFiles) {
+    Copy-Item -LiteralPath (Join-Path $RepoRoot $f) -Destination (Join-Path $PublicDir $f) -Force
+}
 $publicAdd = Invoke-Git -RepoPath $PublicDir -GitArgs (@('add', '--') + $feedFiles)
 if ($publicAdd.Code -ne 0) { Write-Fail 'the feed files could not be staged in the public clone.'; exit 1 }
 $publicStaged = Invoke-Git -RepoPath $PublicDir -GitArgs @('diff', '--cached', '--quiet')

@@ -190,7 +190,7 @@ begin
     end);
 end;
 
-procedure PostRepairedAsync(const AName: string);
+procedure PostRepairedAsync(const AFileName: string);
 begin
   TThread.Queue(nil,
     procedure
@@ -198,10 +198,11 @@ begin
       if Application.Terminated then
         Exit;
       // Queued to the main thread, like every other engine mutation: the cache
-      // is guarded, but the UI reads it too.
-      AnsiEngineManager.InvalidateEngine(AName);
+      // is guarded, but the UI reads it too. The exact repaired file is the
+      // cache identity; a same-base sibling must never be invalidated.
+      AnsiEngineManager.InvalidateEngine(AFileName);
       AnsiEngineManager.RefreshFromDisk;
-      AvroMigrationPostNote('Repaired ' + AName + ' from the signed manifest.');
+      AvroMigrationPostNote('Repaired ' + AFileName + ' from the signed manifest.');
     end);
 end;
 
@@ -220,7 +221,7 @@ var
   Probe: TAvroContainerProbe;
   Plan: TAvroHealPlan;
   Pin: TAvroResource;
-  Reason, TargetPath, ItemKey, DisplayName, FileName: string;
+  Reason, TargetPath, ItemKey, FileName: string;
   ActiveName, ResourceType, AppVersion: string;
   AppEpoch: Integer;
   StaleFound: Boolean;
@@ -294,9 +295,11 @@ begin
           Continue;
 
         FileName := ExtractFileName(Files[I]);
-        DisplayName := ChangeFileExt(FileName, '');
 
-        if not AvroProbeFromManifest(Trust.Manifest, FileName, AppEpoch, SameText(DisplayName, ActiveName), True,
+        // CurrentEngineName reports the lowercase exact file name (or the
+        // baseline key), so the "this is the active file" flag must compare the
+        // exact name - never the shared base name.
+        if not AvroProbeFromManifest(Trust.Manifest, FileName, AppEpoch, SameText(FileName, ActiveName), True,
           ContainerOpens(Files[I]), False, Probe) then
           Continue; // not managed by the signer - not ours to repair
 
@@ -344,7 +347,9 @@ begin
         if DownloadAndInstallResource(Pin.Url, Pin.FileName, ResourceType, Pin.Sha256, nil, Err, TargetPath) then
         begin
           Log('Migration: repaired "' + FileName + '" from the signed manifest');
-          PostRepairedAsync(DisplayName);
+          // ATargetPath is the exact installed file; invalidate that identity
+          // rather than the manifest's source name.
+          PostRepairedAsync(ExtractFileName(TargetPath));
         end
         else
           Log('Migration: re-fetch of "' + FileName + '" failed - ' + Err);

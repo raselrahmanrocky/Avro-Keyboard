@@ -28,26 +28,25 @@ type
   TfrmEncodingWarning = class(TForm)
     Panel1: TPanel;
     Label1: TLabel;
-    Label2: TLabel;
     Image1: TImage;
-    Label3: TLabel;
-    Label5: TLabel;
-    Label6: TLabel;
     Label7: TLabel;
     Image2: TImage;
-    Image4: TImage;
-    Image5: TImage;
+    TextWarning1: TLabel;
+    TextWarning2: TLabel;
+    TextConverterWarning: TLabel;
     Button1: TButton;
     Button2: TButton;
     CheckBox_ShowWarning: TCheckBox;
     procedure FormCreate(Sender: TObject);
+    procedure FormShow(Sender: TObject);
     procedure Button1Click(Sender: TObject);
     procedure Button2Click(Sender: TObject);
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
-    private
-      { Private declarations }
-    public
-      { Public declarations }
+  private
+    FTopmostTimer: TTimer;
+    procedure KeepTopmost(Sender: TObject);
+  protected
+    procedure WndProc(var Message: TMessage); override;
   end;
 
 var
@@ -64,7 +63,6 @@ uses
 
 procedure TfrmEncodingWarning.Button1Click(Sender: TObject);
 begin
-  OutputIsBijoy := 'NO';
   if CheckBox_ShowWarning.Checked then
     ShowOutputwarning := 'YES'
   else
@@ -72,8 +70,7 @@ begin
 
   AvroMainForm1.RefreshSettings;
 
-  { If the user cancelled an ANSI switch initiated by a hotkey,
-    restore the previous keyboard mode. }
+  { Restore the prior per-window state when any pending ANSI change is cancelled. }
   AvroMainForm1.ApplyPendingANSISwitchRevert;
 
   Self.Close;
@@ -81,14 +78,13 @@ end;
 
 procedure TfrmEncodingWarning.Button2Click(Sender: TObject);
 begin
-  OutputIsBijoy := 'YES';
   if CheckBox_ShowWarning.Checked then
     ShowOutputwarning := 'YES'
   else
     ShowOutputwarning := 'NO';
 
   { Confirm the pending ANSI switch (no revert). }
-  AvroMainForm1.PendingANSISwitchClear;
+  AvroMainForm1.CommitPendingANSISwitch;
 
   AvroMainForm1.RefreshSettings;
   Self.Close;
@@ -96,6 +92,8 @@ end;
 
 procedure TfrmEncodingWarning.FormClose(Sender: TObject; var Action: TCloseAction);
 begin
+  FTopmostTimer.Enabled := False;
+
   { If the form is closed via X / Alt-F4 while a pending ANSI switch is
     in progress, treat it as a cancel and revert. }
   AvroMainForm1.ApplyPendingANSISwitchRevert;
@@ -106,8 +104,40 @@ end;
 
 procedure TfrmEncodingWarning.FormCreate(Sender: TObject);
 begin
-  DisableCloseButton(Self.Handle);
   TOPMOST(Self.Handle);
+
+  FTopmostTimer := TTimer.Create(Self);
+  FTopmostTimer.Interval := 100;
+  FTopmostTimer.Enabled := False;
+  FTopmostTimer.OnTimer := KeepTopmost;
+end;
+
+procedure TfrmEncodingWarning.FormShow(Sender: TObject);
+begin
+  TOPMOST(Self.Handle);
+  FTopmostTimer.Enabled := True;
+end;
+
+procedure TfrmEncodingWarning.WndProc(var Message: TMessage);
+var
+  WindowPos: PWindowPos;
+begin
+  if (Message.Msg = WM_WINDOWPOSCHANGING) and Visible then
+  begin
+    WindowPos := PWindowPos(Message.LParam);
+    if (WindowPos^.flags and SWP_NOZORDER) = 0 then
+      WindowPos^.hwndInsertAfter := HWND_TOPMOST;
+  end;
+
+  inherited WndProc(Message);
+  if (Message.Msg = WM_ACTIVATEAPP) and (Message.WParam = 0) and Visible then
+    TOPMOST(Handle);
+end;
+
+procedure TfrmEncodingWarning.KeepTopmost(Sender: TObject);
+begin
+  if Visible then
+    TOPMOST(Handle);
 end;
 
 end.

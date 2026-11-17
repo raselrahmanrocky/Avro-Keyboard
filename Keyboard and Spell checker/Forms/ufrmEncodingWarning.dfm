@@ -8,9 +8,10 @@ object frmEncodingWarning: TfrmEncodingWarning
   BorderIcons = [biSystemMenu]
   BorderStyle = bsSingle
   Caption = 'ANSI is not a recommended option!'
-  ClientHeight = 467
-  ClientWidth = 672
+  ClientHeight = 523
+  ClientWidth = 800
   Color = clBtnFace
+  FormStyle = fsStayOnTop
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
   Font.Height = -17
@@ -64,28 +65,30 @@ object frmEncodingWarning: TfrmEncodingWarning
   Position = poScreenCenter
   OnClose = FormClose
   OnCreate = FormCreate
+  OnShow = FormShow
   PixelsPerInch = 144
   TextHeight = 21
-  object Label2: TLabel
+  object TextWarning1: TLabel
     Left = 84
-    Top = 83
-    Width = 528
+    Top = 116
+    Width = 672
     Height = 63
     Margins.Left = 5
     Margins.Top = 5
     Margins.Right = 5
     Margins.Bottom = 5
+    AutoSize = False
     Caption =
-      'Avro will not be able to convert ANSI to Unicode, if you need th' +
-      'at later. You have to use a third party converter, which may or ' +
-      'may not be 100% accurate!'
+      'ANSI is an outdated technology for writing Bangla. Never use ANSI on' +
+      ' websites, in databases, or wherever you need to sort Bangla text. At' +
+      ' present Unicode is a much better choice for modern computing.'
     WordWrap = True
   end
   object Image1: TImage
-    Left = 38
-    Top = 83
-    Width = 37
-    Height = 37
+    Left = 44
+    Top = 120
+    Width = 26
+    Height = 26
     Margins.Left = 5
     Margins.Top = 5
     Margins.Right = 5
@@ -137,183 +140,85 @@ object frmEncodingWarning: TfrmEncodingWarning
       8001000080010000800100008001000080010000C0030000C0030000F00F0000
       FFFF0000}
   end
-  object Label3: TLabel
+  object TextWarning2: TLabel
     Left = 84
-    Top = 150
-    Width = 513
-    Height = 42
+    Top = 184
+    Width = 672
+    Height = 110
     Margins.Left = 5
     Margins.Top = 5
     Margins.Right = 5
     Margins.Bottom = 5
+    AutoSize = False
     Caption =
-      'Never ever use ANSI in web sites, databases and where you need t' +
-      'o sort Bangla text.'
+      'We have added support for ANSI encodings because this typing method ' +
+      'is still widely used in many areas. The respective copyright holders ' +
+      'and companies are responsible for their own encoding systems and we ' +
+      'do not take responsibility or provide support for any problems ' +
+      'related to their ANSI encoding.'
     WordWrap = True
   end
-  object Label5: TLabel
-    Left = 84
-    Top = 206
-    Width = 467
-    Height = 42
+  object PanelWarning: TPanel
+    Left = 44
+    Top = 299
+    Width = 712
+    Height = 112
     Margins.Left = 5
     Margins.Top = 5
     Margins.Right = 5
     Margins.Bottom = 5
-    Caption =
-      'This is an outdated technology for writing Bangla, kept in Avro ' +
-      'experimentally.'
-    WordWrap = True
-  end
-  object Label6: TLabel
-    Left = 84
-    Top = 254
-    Width = 487
-    Height = 42
-    Margins.Left = 5
-    Margins.Top = 5
-    Margins.Right = 5
-    Margins.Bottom = 5
-    Caption =
-      'We don'#39't provide any support regarding problems in this mode. If' +
-      ' your questions are left unanswered, don'#39't blame us.'
-    WordWrap = True
-  end
-  object Label7: TLabel
-    Left = 414
-    Top = 315
-    Width = 169
-    Height = 48
-    Margins.Left = 5
-    Margins.Top = 5
-    Margins.Right = 5
-    Margins.Bottom = 5
-    Caption = 'YOU HAVE BEEN WARNED!'
-    Font.Charset = DEFAULT_CHARSET
-    Font.Color = clWindowText
-    Font.Height = -20
-    Font.Name = 'Tahoma'
-    Font.Style = [fsBold]
-    ParentFont = False
-    WordWrap = True
+    BevelOuter = bvNone
+    Color = 14869246
+    ParentBackground = False
+    StyleElements = []
+    TabOrder = 4
+    object PanelWarningAccent: TPanel
+      Left = 0
+      Top = 0
+      Width = 6
+      Height = 112
+      Margins.Left = 5
+      Margins.Top = 5
+      Margins.Right = 5
+      Margins.Bottom = 5
+      Align = alLeft
+      BevelOuter = bvNone
+      Color = 1776537
+      ParentBackground = False
+      StyleElements = []
+      TabOrder = 0
+    end
+
+    object TextConverterWarning: TLabel
+      Left = 43
+      Top = 14
+      Width = 632
+      Height = 84
+      Margins.Left = 5
+      Margins.Top = 5
+      Margins.Right = 5
+      Margins.Bottom = 5
+      AutoSize = False
+      Caption =
+        'To convert text written using the "Avro Community" keyboard (ANSI) ' +
+        'encoding back to Unicode, you must use the "Avro Text Converter" ' +
+        'itself. Using other converters may cause problems or result in ' +
+        'incorrect text sometimes.'
+      Font.Charset = DEFAULT_CHARSET
+      Font.Color = clRed
+      Font.Height = -17
+      Font.Name = 'Tahoma'
+      Font.Style = [fsBold]
+      ParentFont = False
+      WordWrap = True
+      StyleElements = []
+    end
   end
   object Image2: TImage
-    Left = 38
-    Top = 150
-    Width = 37
-    Height = 38
-    Margins.Left = 5
-    Margins.Top = 5
-    Margins.Right = 5
-    Margins.Bottom = 5
-    Picture.Data = {
-      055449636F6E0000010001001010000001000800680500001600000028000000
-      1000000020000000010008000000000000010000000000000000000000010000
-      00010000000000000F3342001034430010354400103D4C0013566800135D6F00
-      15677900156D7F0017668500196885001B748D00177B8E001D729300177D9000
-      31748F0035768F00287A9100297C9600207D9B003379920035799100377F9500
-      0A7DA7000A7DA800178296002D859B003882960039869A000E87AE000E88AF00
-      098DBD001292B3001A9BB0001A9DB2001297B900169DBA00258BA40048869900
-      48889A006E93A1006E94A2006D96A4006E99A500799DA8000B96C5000E9FCB00
-      0EA0CC0016A3C00010A3CA0012A8CD001DB5CB000DA5D6000FA9D7000FAAD900
-      0EACDB000FAEDC0012ADD30016B0D1001AB5D1001DB9D00018B8D6001CBDD600
-      17BADC0019BEDB0013BAE40015C0E7001AC3E00019C6E7001DCAE5001FCFE600
-      15C1E80017C5EB0017C6EC001AC9E90018CAED001BCEEF001CD0EE001ACEF000
-      1CD2F2001CD5F4001ED9F6001EDAF8001EDDF90020D9F10020DFFB0020E0FB00
-      20E1FC0021E4FE0088A1A9008DA2AA008DA4AA00A1BBC100A2BDC200A7BDC200
-      A8BEC300A9BEC400ABC0C400BFD6D900C0D5D800000000000000000000000000
-      0000000000000000000000000000000000000000000000000000000000000000
-      0000000000000000000000000000000000000000000000000000000000000000
-      0000000000000000000000000000000000000000000000000000000000000000
-      0000000000000000000000000000000000000000000000000000000000000000
-      0000000000000000000000000000000000000000000000000000000000000000
-      0000000000000000000000000000000000000000000000000000000000000000
-      0000000000000000000000000000000000000000000000000000000000000000
-      0000000000000000000000000000000000000000000000000000000000000000
-      0000000000000000000000000000000000000000000000000000000000000000
-      0000000000000000000000000000000000000000000000000000000000000000
-      0000000000000000000000000000000000000000000000000000000000000000
-      0000000000000000000000000000000000000000000000000000000000000000
-      0000000000000000000000000000000000000000000000000000000000000000
-      0000000000000000000000000000000000000000000000000000000000000000
-      0000000000000000000000000000000000000000000000000000000000000000
-      0000000000000000000000000000000000000000000000000000000000000000
-      0000000000000000000000000000000000000000000000000000000000000000
-      0000000000000000000000000000000000000000000000000000000000000000
-      0000000000000000000000000000000000000000000000000000000000000000
-      FFFFFF0000000000000000000000000000000000000000006029150909102960
-      000000000000625A151E2F36342D17105A62000000005A132F4748484841361F
-      0D5A0000005C12394B50514D4D4E48361F105C000029234E5357572219455048
-      3618290000163F53573C330C03083C4E412D1000000B4D55570403010301063B
-      48340A00000B5055570403030303053B48360A00001B4357573C330C03073C53
-      482E1500002B3053585857220C465750411E2900005C1A43575858545457534D
-      2F155F0000005A254056575756514E32135A00000000625A1C233C4D433A2015
-      5A62000000000000612C271212262C6100000000000000000000000000000000
-      00000000FFFF0000F00F0000C0030000C0030000800100008001000080010000
-      8001000080010000800100008001000080010000C0030000C0030000F00F0000
-      FFFF0000}
-  end
-  object Image4: TImage
-    Left = 38
-    Top = 206
-    Width = 37
-    Height = 37
-    Margins.Left = 5
-    Margins.Top = 5
-    Margins.Right = 5
-    Margins.Bottom = 5
-    Picture.Data = {
-      055449636F6E0000010001001010000001000800680500001600000028000000
-      1000000020000000010008000000000000010000000000000000000000010000
-      00010000000000000F3342001034430010354400103D4C0013566800135D6F00
-      15677900156D7F0017668500196885001B748D00177B8E001D729300177D9000
-      31748F0035768F00287A9100297C9600207D9B003379920035799100377F9500
-      0A7DA7000A7DA800178296002D859B003882960039869A000E87AE000E88AF00
-      098DBD001292B3001A9BB0001A9DB2001297B900169DBA00258BA40048869900
-      48889A006E93A1006E94A2006D96A4006E99A500799DA8000B96C5000E9FCB00
-      0EA0CC0016A3C00010A3CA0012A8CD001DB5CB000DA5D6000FA9D7000FAAD900
-      0EACDB000FAEDC0012ADD30016B0D1001AB5D1001DB9D00018B8D6001CBDD600
-      17BADC0019BEDB0013BAE40015C0E7001AC3E00019C6E7001DCAE5001FCFE600
-      15C1E80017C5EB0017C6EC001AC9E90018CAED001BCEEF001CD0EE001ACEF000
-      1CD2F2001CD5F4001ED9F6001EDAF8001EDDF90020D9F10020DFFB0020E0FB00
-      20E1FC0021E4FE0088A1A9008DA2AA008DA4AA00A1BBC100A2BDC200A7BDC200
-      A8BEC300A9BEC400ABC0C400BFD6D900C0D5D800000000000000000000000000
-      0000000000000000000000000000000000000000000000000000000000000000
-      0000000000000000000000000000000000000000000000000000000000000000
-      0000000000000000000000000000000000000000000000000000000000000000
-      0000000000000000000000000000000000000000000000000000000000000000
-      0000000000000000000000000000000000000000000000000000000000000000
-      0000000000000000000000000000000000000000000000000000000000000000
-      0000000000000000000000000000000000000000000000000000000000000000
-      0000000000000000000000000000000000000000000000000000000000000000
-      0000000000000000000000000000000000000000000000000000000000000000
-      0000000000000000000000000000000000000000000000000000000000000000
-      0000000000000000000000000000000000000000000000000000000000000000
-      0000000000000000000000000000000000000000000000000000000000000000
-      0000000000000000000000000000000000000000000000000000000000000000
-      0000000000000000000000000000000000000000000000000000000000000000
-      0000000000000000000000000000000000000000000000000000000000000000
-      0000000000000000000000000000000000000000000000000000000000000000
-      0000000000000000000000000000000000000000000000000000000000000000
-      0000000000000000000000000000000000000000000000000000000000000000
-      0000000000000000000000000000000000000000000000000000000000000000
-      FFFFFF0000000000000000000000000000000000000000006029150909102960
-      000000000000625A151E2F36342D17105A62000000005A132F4748484841361F
-      0D5A0000005C12394B50514D4D4E48361F105C000029234E5357572219455048
-      3618290000163F53573C330C03083C4E412D1000000B4D55570403010301063B
-      48340A00000B5055570403030303053B48360A00001B4357573C330C03073C53
-      482E1500002B3053585857220C465750411E2900005C1A43575858545457534D
-      2F155F0000005A254056575756514E32135A00000000625A1C233C4D433A2015
-      5A62000000000000612C271212262C6100000000000000000000000000000000
-      00000000FFFF0000F00F0000C0030000C0030000800100008001000080010000
-      8001000080010000800100008001000080010000C0030000C0030000F00F0000
-      FFFF0000}
-  end
-  object Image5: TImage
-    Left = 38
-    Top = 254
-    Width = 37
-    Height = 37
+    Left = 44
+    Top = 188
+    Width = 26
+    Height = 26
     Margins.Left = 5
     Margins.Top = 5
     Margins.Right = 5
@@ -366,45 +271,48 @@ object frmEncodingWarning: TfrmEncodingWarning
       FFFF0000}
   end
   object Panel1: TPanel
-    Left = -12
-    Top = -12
-    Width = 734
-    Height = 86
+    Left = -1
+    Top = -1
+    Width = 802
+    Height = 96
     Margins.Left = 5
     Margins.Top = 5
     Margins.Right = 5
     Margins.Bottom = 5
-    Color = clWhite
+    BevelOuter = bvNone
+    Color = 1776537
     ParentBackground = False
+    StyleElements = []
     TabOrder = 3
     object Label1: TLabel
-      Left = 24
-      Top = 36
-      Width = 545
-      Height = 29
+      Left = 116
+      Top = 34
+      Width = 570
+      Height = 34
       Margins.Left = 5
       Margins.Top = 5
       Margins.Right = 5
       Margins.Bottom = 5
       Caption = 'Are you sure you want to type in ANSI mode?'
       Font.Charset = DEFAULT_CHARSET
-      Font.Color = clWindowText
+      Font.Color = clWhite
       Font.Height = -24
       Font.Name = 'Tahoma'
       Font.Style = [fsBold]
       ParentFont = False
+      StyleElements = []
     end
   end
   object Button1: TButton
-    Left = 240
-    Top = 363
-    Width = 420
-    Height = 38
+    Left = 44
+    Top = 465
+    Width = 348
+    Height = 42
     Margins.Left = 5
     Margins.Top = 5
     Margins.Right = 5
     Margins.Bottom = 5
-    Caption = 'Ok, I'#39'm convinced. Lets go back to Unicode'
+    Caption = 'Lets go back to Unicode'
     Default = True
     Font.Charset = DEFAULT_CHARSET
     Font.Color = clWindowText
@@ -416,10 +324,10 @@ object frmEncodingWarning: TfrmEncodingWarning
     OnClick = Button1Click
   end
   object Button2: TButton
-    Left = 240
-    Top = 410
-    Width = 420
-    Height = 37
+    Left = 408
+    Top = 465
+    Width = 348
+    Height = 42
     Margins.Left = 5
     Margins.Top = 5
     Margins.Right = 5
@@ -429,9 +337,9 @@ object frmEncodingWarning: TfrmEncodingWarning
     OnClick = Button2Click
   end
   object CheckBox_ShowWarning: TCheckBox
-    Left = 12
-    Top = 416
-    Width = 200
+    Left = 44
+    Top = 429
+    Width = 320
     Height = 25
     Margins.Left = 5
     Margins.Top = 5

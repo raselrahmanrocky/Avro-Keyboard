@@ -25,7 +25,8 @@ uses
   CategoryButtons,
   StdCtrls,
   ComCtrls,
-  ufrmPhoneticOptions;
+  ufrmPhoneticOptions,
+  uAvroHotKey;
 
 type
   { Interposer for every TLabel of this dialog. No .dfm edit is needed for it:
@@ -73,7 +74,6 @@ type
     CheckNumPadBangla: TCheckBox;
     KeyboardMode_Panel: TPanel;
     GroupBox4: TGroupBox;
-    Label7: TLabel;
     comboFunctionKeys: TComboBox;
     General_Panel: TPanel;
     Label3: TLabel;
@@ -136,10 +136,8 @@ type
     CheckShowMenuShortcuts: TCheckBox;
     LabelHideTimer: TTimer;
     GroupBox8: TGroupBox;
-    Label16: TLabel;
     comboFunctionKeys_OutputMode: TComboBox;
     GroupBox9: TGroupBox;
-    Label18: TLabel;
     comboFunctionKeys_SpellerLauncher: TComboBox;
     Label20: TLabel;
     LabelGlobalHotkeysLink: TLabel;
@@ -149,15 +147,14 @@ type
     CheckShowLayoutSwitchNotification: TCheckBox;
     GroupBox12: TGroupBox;
     GroupBox13: TGroupBox;
-    Label_SwitchingMode: TLabel;
     cboSwitchingMode: TComboBox;
 
-    edtModeSwitch: TEdit;
-    edtOutputMode: TEdit;
-    edtSpellerLauncher: TEdit;
-    edtConverterLauncher: TEdit;
-    edtLayoutSwitch: TEdit;
-    edtAnsiVersion: TEdit;
+    edtModeSwitch: TAvroHotKey;
+    edtOutputMode: TAvroHotKey;
+    edtSpellerLauncher: TAvroHotKey;
+    edtConverterLauncher: TAvroHotKey;
+    edtLayoutSwitch: TAvroHotKey;
+    edtAnsiVersion: TAvroHotKey;
     procedure FormCreate(Sender: TObject);
     procedure CategoryTreeClick(Sender: TObject);
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
@@ -178,7 +175,6 @@ type
     procedure optOutputANSIMouseUp(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
     procedure LabelHideTimerTimer(Sender: TObject);
     procedure LabelGlobalHotkeysLinkClick(Sender: TObject);
-    procedure ShortcutEditClick(Sender: TObject);
     private
       { Private declarations }
       { The Avro Phonetic page: created in FormCreate and embedded into
@@ -283,16 +279,6 @@ end;
 
 { =============================================================================== }
 
-function IsHotkeyNone(const Text: string): Boolean;
-var
-  U: string;
-begin
-  U := UpperCase(Trim(Text));
-  Result := (U = '') or (U = 'NONE') or (U = 'SET SHORTCUT') or (U = 'PRESS ANY KEY...');
-end;
-
-{ =============================================================================== }
-
 procedure TfrmOptions.butEditCustomDictClick(Sender: TObject);
 begin
   { TODO : Incomplete }
@@ -303,12 +289,15 @@ end;
 
 procedure TfrmOptions.Button_ApplyClick(Sender: TObject);
 begin
-  if Assigned(RecordingTargetEdit) then
-    RecordingTargetEdit.Color := clWindow;
-  IsRecordingHotkey := False;
-  RecordingFinalized := False;
-  RecordingTargetEdit := nil;
+  { The dialog may still be showing a hotkey field with focus; the capture
+    state belongs to the dialog, so it stops here instead of waiting for a
+    focus change that closing the dialog never makes. }
+  HotkeyCaptureActive := False;
+  HotkeyCaptureCommit := nil;
+  HotkeyCapturePreview := nil;
+  HotkeyCaptureCommitted := False;
   Self.SaveSettings;
+  AvroMainForm1.SyncCurrentWindowMode;
   AvroMainForm1.RefreshSettings;
   BroadcastAppThemeChanged;
 
@@ -324,14 +313,12 @@ end;
 
 procedure TfrmOptions.Button_CancelClick(Sender: TObject);
 begin
-  if IsRecordingHotkey and Assigned(RecordingTargetEdit) then
-  begin
-    RecordingTargetEdit.Text := RecordingOldText;
-    RecordingTargetEdit.Color := clWindow;
-  end;
-  IsRecordingHotkey := False;
-  RecordingFinalized := False;
-  RecordingTargetEdit := nil;
+  { Nothing is written to the settings variables until OK/Apply, so cancelling
+    simply drops whatever the fields show. }
+  HotkeyCaptureActive := False;
+  HotkeyCaptureCommit := nil;
+  HotkeyCapturePreview := nil;
+  HotkeyCaptureCommitted := False;
   Self.Close;
 end;
 
@@ -353,10 +340,12 @@ end;
 
 procedure TfrmOptions.Button_OKClick(Sender: TObject);
 begin
-  IsRecordingHotkey := False;
-  RecordingFinalized := False;
-  RecordingTargetEdit := nil;
+  HotkeyCaptureActive := False;
+  HotkeyCaptureCommit := nil;
+  HotkeyCapturePreview := nil;
+  HotkeyCaptureCommitted := False;
   Self.SaveSettings;
+  AvroMainForm1.SyncCurrentWindowMode;
   AvroMainForm1.RefreshSettings;
   BroadcastAppThemeChanged;
   Self.Close;
@@ -369,12 +358,11 @@ var
   Page: TPanel;
   ScrollPos: Integer;
 begin
-  { This handler is wired to three events in the .dfm (OnEnter, OnClick and
-    OnDblClick), so one click on a category runs it more than once: OnEnter
-    when the click moves the focus into the tree, then OnClick, then
-    OnDblClick on a double click. It is also what puts the first page on
-    screen when the dialog opens, because FormCreate leaves every panel
-    hidden and the tree takes the focus on activation. }
+  { Wired to OnClick and OnKeyUp only (OnEnter and OnDblClick were removed from
+    the .dfm): a click used to run this handler once for OnEnter, once for
+    OnClick and again for OnDblClick, and each pass hid and showed the panel.
+    The initial page is shown explicitly at the end of FormCreate instead of
+    relying on the tree's OnEnter. }
   if CategoryTree.Selected = nil then
     Exit;
 
@@ -445,11 +433,33 @@ begin
     SendMessage(ScrollBox2.Handle, WM_SETREDRAW, Ord(True), 0);
   end;
 
-  { The one repaint the switch is allowed to make. RDW_UPDATENOW so it is done
-    before this returns: a click must never leave the box on screen in a state
-    that is neither the old page nor the new one. }
-  RedrawWindow(ScrollBox2.Handle, nil, 0,
-    RDW_INVALIDATE or RDW_ERASE or RDW_ALLCHILDREN or RDW_UPDATENOW);
+  if ScrollBox2.HandleAllocated then
+  begin
+    { The one repaint the switch is allowed to make. RDW_UPDATENOW so it is
+      done before this returns: a click must never leave the box on screen in
+      a state that is neither the old page nor the new one. }
+    RedrawWindow(ScrollBox2.Handle, nil, 0,
+      RDW_INVALIDATE or RDW_ERASE or RDW_ALLCHILDREN or RDW_UPDATENOW);
+
+    { The styled vertical scrollbar is a SIBLING window, not a child of the
+      scroll box, so RedrawWindow above does not touch it. Its thumb is drawn
+      from the scroll range that has just changed, and until the scrolling
+      style hook's PaintScroll runs again it keeps the previous page's length -
+      which is what the user saw until the pointer moved over the scrollbar.
+
+      WM_NCPAINT is the trigger: TScrollingStyleHook.PaintNC -> UpdateScroll ->
+      PaintScroll repaints the scrollbar sibling from the current range. The
+      probe proved it is the missing step: with WM_NCPAINT blocked during a
+      switch the thumb stayed at the old 239-pixel length, and sending
+      WM_NCPAINT afterwards shortened it to the new 132-pixel length. A frame
+      pass alone (SetWindowPos) did not change it. The SetWindowPos stays
+      because it performs the same frame update the stock scroll hook does on
+      SB_ENDSCROLL, then the explicit NC paint makes the new thumb visible. }
+    SetWindowPos(ScrollBox2.Handle, 0, 0, 0, 0, 0,
+      SWP_FRAMECHANGED or SWP_NOACTIVATE or SWP_NOMOVE or SWP_NOSIZE or
+      SWP_NOZORDER);
+    SendMessage(ScrollBox2.Handle, WM_NCPAINT, 1, 0);
+  end;
 end;
 
 { =============================================================================== }
@@ -573,6 +583,13 @@ end;
 
 procedure TfrmOptions.FormClose(Sender: TObject; var Action: TCloseAction);
 begin
+  { Closing with the window button (or any path that does not go through
+    OK/Apply/Cancel) must also end a capture session: otherwise the hook would
+    keep swallowing keys for a field that is being destroyed. }
+  HotkeyCaptureActive := False;
+  HotkeyCaptureCommit := nil;
+  HotkeyCapturePreview := nil;
+  HotkeyCaptureCommitted := False;
   Action := caFree;
   frmOptions := nil;
 end;
@@ -581,10 +598,11 @@ end;
 
 procedure TfrmOptions.FormCreate(Sender: TObject);
 const
-  LEFT_MARGIN   = 24;
-  EDIT_WIDTH    = 180;
-  GROUP_HEIGHT  = 75;
-  GROUP_SPACING = 12;
+  LEFT_MARGIN      = 24;
+  EDIT_WIDTH       = 180;
+  HOTKEY_FIELD_TOP = 25;
+  GROUP_HEIGHT     = 60;
+  GROUP_SPACING    = 6;
 var
   I: Integer;
 begin
@@ -647,19 +665,16 @@ begin
   GroupBox13.Left := 24;
   GroupBox13.Top := optOutputANSI.Top + optOutputANSI.Height + GROUP_SPACING;
   GroupBox13.Width := GlobalOutput_Panel.Width - 60;
-  GroupBox13.Height := GROUP_HEIGHT;
+  GroupBox13.Height := 56;
   GroupBox13.Caption := 'Keyboard Mode Switching';
 
-  Label_SwitchingMode := TLabel.Create(GroupBox13);
-  Label_SwitchingMode.Parent := GroupBox13;
-  Label_SwitchingMode.Left := LEFT_MARGIN;
-  Label_SwitchingMode.Top := 16;
-  Label_SwitchingMode.Caption := 'Switching Mode:';
-
+  { The dropdown sits directly under the group caption; the redundant
+    "Switching Mode:" label has been removed to match the clean look of the
+    reference screenshot. }
   cboSwitchingMode := TComboBox.Create(GroupBox13);
   cboSwitchingMode.Parent := GroupBox13;
   cboSwitchingMode.Left := LEFT_MARGIN;
-  cboSwitchingMode.Top := 35;
+  cboSwitchingMode.Top := 22;
   cboSwitchingMode.Width := 220;
   cboSwitchingMode.Style := csDropDownList;
   cboSwitchingMode.Items.Add('Global (All Windows)');
@@ -751,43 +766,36 @@ begin
   GroupBox9.Top := GroupBox8.Top + GroupBox8.Height + GROUP_SPACING;
   GroupBox9.Height := GROUP_HEIGHT;
 
-  // Shift sub-labels upward within their GroupBoxes
-  Label7.Top := 16;
-  Label16.Top := 16;
-  Label18.Top := 16;
+  GroupBox4.ParentFont := False;
+  GroupBox4.Font.Assign(Self.Font);
+  GroupBox4.Font.Style := [fsBold];
+  GroupBox8.ParentFont := False;
+  GroupBox8.Font.Assign(Self.Font);
+  GroupBox8.Font.Style := [fsBold];
+  GroupBox9.ParentFont := False;
+  GroupBox9.Font.Assign(Self.Font);
+  GroupBox9.Font.Style := [fsBold];
 
-  // Create TEdit for Keyboard Mode Switch (in GroupBox4)
-  edtModeSwitch := TEdit.Create(GroupBox4);
+  // Create THotKey field for Keyboard Mode Switch (in GroupBox4)
+  edtModeSwitch := TAvroHotKey.Create(GroupBox4);
   edtModeSwitch.Parent := GroupBox4;
   edtModeSwitch.Left := LEFT_MARGIN;
-  edtModeSwitch.Top := 35;
+  edtModeSwitch.Top := HOTKEY_FIELD_TOP;
   edtModeSwitch.Width := EDIT_WIDTH;
-  edtModeSwitch.ReadOnly := True;
-  edtModeSwitch.Text := 'Set Shortcut';
-  edtModeSwitch.Color := clWindow;
-  edtModeSwitch.OnClick := ShortcutEditClick;
 
-  // Create TEdit for Output Mode Toggle (in GroupBox8)
-  edtOutputMode := TEdit.Create(GroupBox8);
+  // Create THotKey field for Output Mode Toggle (in GroupBox8)
+  edtOutputMode := TAvroHotKey.Create(GroupBox8);
   edtOutputMode.Parent := GroupBox8;
   edtOutputMode.Left := LEFT_MARGIN;
-  edtOutputMode.Top := 35;
+  edtOutputMode.Top := HOTKEY_FIELD_TOP;
   edtOutputMode.Width := EDIT_WIDTH;
-  edtOutputMode.ReadOnly := True;
-  edtOutputMode.Text := 'Set Shortcut';
-  edtOutputMode.Color := clWindow;
-  edtOutputMode.OnClick := ShortcutEditClick;
 
-  // Create TEdit for Speller Launcher (in GroupBox9)
-  edtSpellerLauncher := TEdit.Create(GroupBox9);
+  // Create THotKey field for Speller Launcher (in GroupBox9)
+  edtSpellerLauncher := TAvroHotKey.Create(GroupBox9);
   edtSpellerLauncher.Parent := GroupBox9;
   edtSpellerLauncher.Left := LEFT_MARGIN;
-  edtSpellerLauncher.Top := 35;
+  edtSpellerLauncher.Top := HOTKEY_FIELD_TOP;
   edtSpellerLauncher.Width := EDIT_WIDTH;
-  edtSpellerLauncher.ReadOnly := True;
-  edtSpellerLauncher.Text := 'Set Shortcut';
-  edtSpellerLauncher.Color := clWindow;
-  edtSpellerLauncher.OnClick := ShortcutEditClick;
 
   // =======================================================
   // Text Converter Launcher Hotkey UI (runtime-created)
@@ -798,17 +806,16 @@ begin
   GroupBox12.Top := GroupBox9.Top + GroupBox9.Height + GROUP_SPACING;
   GroupBox12.Height := GROUP_HEIGHT;
   GroupBox12.Caption := 'Text Converter Launcher';
+  GroupBox12.ParentFont := False;
+  GroupBox12.Font.Assign(Self.Font);
+  GroupBox12.Font.Style := [fsBold];
 
-  // Create TEdit for Text Converter Launcher (in GroupBox12)
-  edtConverterLauncher := TEdit.Create(GroupBox12);
+  // Create THotKey field for Text Converter Launcher (in GroupBox12)
+  edtConverterLauncher := TAvroHotKey.Create(GroupBox12);
   edtConverterLauncher.Parent := GroupBox12;
   edtConverterLauncher.Left := LEFT_MARGIN;
-  edtConverterLauncher.Top := 35;
+  edtConverterLauncher.Top := HOTKEY_FIELD_TOP;
   edtConverterLauncher.Width := EDIT_WIDTH;
-  edtConverterLauncher.ReadOnly := True;
-  edtConverterLauncher.Text := 'Set Shortcut';
-  edtConverterLauncher.Color := clWindow;
-  edtConverterLauncher.OnClick := ShortcutEditClick;
 
   // =======================================================
   // Layout Switcher Hotkey UI (runtime-created)
@@ -819,17 +826,16 @@ begin
   GroupBox11.Top := GroupBox12.Top + GroupBox12.Height + GROUP_SPACING;
   GroupBox11.Height := GROUP_HEIGHT;
   GroupBox11.Caption := 'Layout Switcher';
+  GroupBox11.ParentFont := False;
+  GroupBox11.Font.Assign(Self.Font);
+  GroupBox11.Font.Style := [fsBold];
 
-  // Create TEdit for Layout Switcher (in GroupBox11)
-  edtLayoutSwitch := TEdit.Create(GroupBox11);
+  // Create THotKey field for Layout Switcher (in GroupBox11)
+  edtLayoutSwitch := TAvroHotKey.Create(GroupBox11);
   edtLayoutSwitch.Parent := GroupBox11;
   edtLayoutSwitch.Left := LEFT_MARGIN;
-  edtLayoutSwitch.Top := 30;
+  edtLayoutSwitch.Top := HOTKEY_FIELD_TOP;
   edtLayoutSwitch.Width := EDIT_WIDTH;
-  edtLayoutSwitch.ReadOnly := True;
-  edtLayoutSwitch.Text := 'Set Shortcut';
-  edtLayoutSwitch.Color := clWindow;
-  edtLayoutSwitch.OnClick := ShortcutEditClick;
 
   CheckShowLayoutSwitchNotification := TCheckBox.Create(GroupBox11);
   CheckShowLayoutSwitchNotification.Parent := GroupBox11;
@@ -837,6 +843,8 @@ begin
   CheckShowLayoutSwitchNotification.Top := edtLayoutSwitch.Top + 1;
   CheckShowLayoutSwitchNotification.Caption := 'Show notification on switch';
   CheckShowLayoutSwitchNotification.Width := 150;
+  CheckShowLayoutSwitchNotification.ParentFont := False;
+  CheckShowLayoutSwitchNotification.Font.Assign(Self.Font);
 
   // =======================================================
   // ANSI Encoding Switcher Hotkey UI (runtime-created)
@@ -847,17 +855,16 @@ begin
   GroupBox10.Top := GroupBox11.Top + GroupBox11.Height + GROUP_SPACING;
   GroupBox10.Height := GROUP_HEIGHT;
   GroupBox10.Caption := 'ANSI Encoding Switcher';
+  GroupBox10.ParentFont := False;
+  GroupBox10.Font.Assign(Self.Font);
+  GroupBox10.Font.Style := [fsBold];
 
-  // Create TEdit for ANSI Encoding Switcher (in GroupBox10)
-  edtAnsiVersion := TEdit.Create(GroupBox10);
+  // Create THotKey field for ANSI Encoding Switcher (in GroupBox10)
+  edtAnsiVersion := TAvroHotKey.Create(GroupBox10);
   edtAnsiVersion.Parent := GroupBox10;
   edtAnsiVersion.Left := LEFT_MARGIN;
-  edtAnsiVersion.Top := 30;
+  edtAnsiVersion.Top := HOTKEY_FIELD_TOP;
   edtAnsiVersion.Width := EDIT_WIDTH;
-  edtAnsiVersion.ReadOnly := True;
-  edtAnsiVersion.Text := 'Set Shortcut';
-  edtAnsiVersion.Color := clWindow;
-  edtAnsiVersion.OnClick := ShortcutEditClick;
 
   CheckShowAnsiSwitchNotification := TCheckBox.Create(GroupBox10);
   CheckShowAnsiSwitchNotification.Parent := GroupBox10;
@@ -865,6 +872,8 @@ begin
   CheckShowAnsiSwitchNotification.Top := edtAnsiVersion.Top + 1;
   CheckShowAnsiSwitchNotification.Caption := 'Show notification on switch';
   CheckShowAnsiSwitchNotification.Width := 150;
+  CheckShowAnsiSwitchNotification.ParentFont := False;
+  CheckShowAnsiSwitchNotification.Font.Assign(Self.Font);
 
   KeyboardMode_Panel.Height := GroupBox10.Top + GroupBox10.Height + 16;
 
@@ -886,7 +895,11 @@ begin
   // Load Settings (AFTER controls are created)
   Self.LoadSettings;
 
-  // Register hotkeys for conflict detection
+  // Register hotkeys for conflict detection.  The registry list lives in
+  // uAvroHotKey and outlives this dialog, so it must be rebuilt from scratch
+  // every time the dialog is created: otherwise a second open would add six
+  // more entries whose Control pointers refer to the destroyed first dialog.
+  SetLength(HotkeyFeatures, 0);
   RegisterHotkeyFeature(@ModeSwitchKey, 'Keyboard Mode Switch', edtModeSwitch);
   RegisterHotkeyFeature(@ToggleOutputModeKey, 'Output Mode Toggle', edtOutputMode);
   RegisterHotkeyFeature(@SpellerLauncherKey, 'Spell Checker Launcher', edtSpellerLauncher);
@@ -901,6 +914,12 @@ begin
   // that already exist.
   ApplyStyledScrollFix(ScrollBox2);
   ApplyStyledScrollFix(ScrollBox1);
+
+  { Show the initial page explicitly. FormCreate leaves every panel hidden;
+    the tree's OnEnter used to put the selected page on screen when the dialog
+    activated, but that duplicate handler is gone. The tree's first item was
+    selected above, so this is the "General" page. }
+  CategoryTreeClick(nil);
 end;
 
 { =============================================================================== }
@@ -933,30 +952,6 @@ end;
 procedure TfrmOptions.LabelHideTimerTimer(Sender: TObject);
 begin
   LabelStatus.Visible := False;
-end;
-
-{ =============================================================================== }
-
-procedure TfrmOptions.ShortcutEditClick(Sender: TObject);
-begin
-  // If we were already recording on a different edit box, restore its original state first
-  if IsRecordingHotkey and Assigned(RecordingTargetEdit) and (RecordingTargetEdit <> TEdit(Sender)) then
-  begin
-    RecordingTargetEdit.Text := RecordingOldText;
-    RecordingTargetEdit.Color := clWindow;
-  end;
-
-  // Keep the existing text, treating placeholder/empty as "None"
-  if IsHotkeyNone(TEdit(Sender).Text) then
-    RecordingOldText := 'None'
-  else
-    RecordingOldText := TEdit(Sender).Text;
-  IsRecordingHotkey := True;
-  RecordingFinalized := False;
-  RecordingTargetEdit := TEdit(Sender);
-
-  // Highlight the background to show it is active for recording
-  TEdit(Sender).Color := clYellow;
 end;
 
 { =============================================================================== }
@@ -1084,38 +1079,16 @@ begin
   Skins.Free;
 
   // =======================================================
-  // Hotkeys Settings
-  if ModeSwitchKey <> '' then
-    edtModeSwitch.Text := ModeSwitchKey
-  else
-    edtModeSwitch.Text := 'None';
-
-  if ToggleOutputModeKey <> '' then
-    edtOutputMode.Text := ToggleOutputModeKey
-  else
-    edtOutputMode.Text := 'None';
-
-  if SpellerLauncherKey <> '' then
-    edtSpellerLauncher.Text := SpellerLauncherKey
-  else
-    edtSpellerLauncher.Text := 'None';
-
-  if ConverterLauncherKey <> '' then
-    edtConverterLauncher.Text := ConverterLauncherKey
-  else
-    edtConverterLauncher.Text := 'None';
-
-  if LayoutSwitchKey <> '' then
-    edtLayoutSwitch.Text := LayoutSwitchKey
-  else
-    edtLayoutSwitch.Text := 'None';
+  // Hotkeys Settings (an empty setting is painted as "None" by the field)
+  edtModeSwitch.Setting := ModeSwitchKey;
+  edtOutputMode.Setting := ToggleOutputModeKey;
+  edtSpellerLauncher.Setting := SpellerLauncherKey;
+  edtConverterLauncher.Setting := ConverterLauncherKey;
+  edtLayoutSwitch.Setting := LayoutSwitchKey;
 
   CheckShowLayoutSwitchNotification.Checked := (ShowLayoutSwitchNotification = 'YES');
 
-  if AnsiVersionSwitchKey <> '' then
-    edtAnsiVersion.Text := AnsiVersionSwitchKey
-  else
-    edtAnsiVersion.Text := 'None';
+  edtAnsiVersion.Setting := AnsiVersionSwitchKey;
 
   CheckShowAnsiSwitchNotification.Checked := (ShowAnsiSwitchNotification = 'YES');
 
@@ -1376,41 +1349,18 @@ begin
 
   // =======================================================
   // Hotkeys Settings
-
-  if IsHotkeyNone(edtModeSwitch.Text) then
-    ModeSwitchKey := ''
-  else
-    ModeSwitchKey := edtModeSwitch.Text;
-
-  if IsHotkeyNone(edtOutputMode.Text) then
-    ToggleOutputModeKey := ''
-  else
-    ToggleOutputModeKey := edtOutputMode.Text;
-
-  if IsHotkeyNone(edtSpellerLauncher.Text) then
-    SpellerLauncherKey := ''
-  else
-    SpellerLauncherKey := edtSpellerLauncher.Text;
-
-  if IsHotkeyNone(edtConverterLauncher.Text) then
-    ConverterLauncherKey := ''
-  else
-    ConverterLauncherKey := UpperCase(edtConverterLauncher.Text);
-
-  if IsHotkeyNone(edtLayoutSwitch.Text) then
-    LayoutSwitchKey := ''
-  else
-    LayoutSwitchKey := UpperCase(edtLayoutSwitch.Text);
+  ModeSwitchKey := edtModeSwitch.Setting;
+  ToggleOutputModeKey := edtOutputMode.Setting;
+  SpellerLauncherKey := edtSpellerLauncher.Setting;
+  ConverterLauncherKey := edtConverterLauncher.Setting;
+  LayoutSwitchKey := edtLayoutSwitch.Setting;
 
   if CheckShowLayoutSwitchNotification.Checked then
     ShowLayoutSwitchNotification := 'YES'
   else
     ShowLayoutSwitchNotification := 'NO';
 
-  if IsHotkeyNone(edtAnsiVersion.Text) then
-    AnsiVersionSwitchKey := ''
-  else
-    AnsiVersionSwitchKey := UpperCase(edtAnsiVersion.Text);
+  AnsiVersionSwitchKey := edtAnsiVersion.Setting;
 
   if CheckShowAnsiSwitchNotification.Checked then
     ShowAnsiSwitchNotification := 'YES'

@@ -544,11 +544,15 @@ begin
 
       if FileExists(GetAvroDataDir + 'Skin\' + FileName) then
       begin
-        if Application.MessageBox(PChar('Skin "' + FileName + '" is already installed.' + #10 + 'Do you want to overwrite it?'), 'Avro Keyboard',
-          MB_YESNO + MB_ICONQUESTION + MB_DEFBUTTON2 + MB_SYSTEMMODAL) = ID_YES then
-          Overwrite := true
+        case Application.MessageBox(PChar('Skin "' + FileName + '" is already installed.' + #10 + 'Do you want to overwrite it?'), 'Avro Keyboard',
+          MB_YESNOCANCEL + MB_ICONQUESTION + MB_DEFBUTTON2 + MB_SYSTEMMODAL) of
+          ID_YES:
+            Overwrite := true;
+          ID_NO, ID_CANCEL:
+            Exit;
         else
-          Overwrite := False;
+          Exit;
+        end;
       end;
 
       if MyCopyFile(SkinPath, GetAvroDataDir + 'Skin\' + FileName, Overwrite) then

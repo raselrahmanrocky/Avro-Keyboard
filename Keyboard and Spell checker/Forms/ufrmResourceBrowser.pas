@@ -123,6 +123,16 @@ type
       procedure ShowItemDescription(const AIndex: Integer);
       procedure UpdateItemStatus(const AIndex: Integer; const AInstalled: Boolean);
       procedure UpdateDestinationLabel;
+      { The two footer texts only set captions. The .dfm owns every band's
+        position, so a status that appears or a description that wraps leaves
+        the window exactly where it was - nothing here resizes the dialog. }
+      procedure SetStatus(const AText: string);
+      procedure SetItemDescription(const AText: string);
+      { The one piece of geometry still derived at run time: the Name column is
+        fitted into the fixed width of the list. The window itself is 676x450
+        from the .dfm and never changes size. }
+      procedure FitItemColumns;
+      procedure CenterDialog;
       function SelectedItemIndex: Integer;
       function CheckedItemIndexes: TArray<Integer>;
       function ColumnAtX(X: Integer): Integer;
@@ -139,6 +149,8 @@ type
     public
       constructor Create(AOwner: TComponent); override;
       destructor Destroy; override;
+    protected
+      procedure CreateParams(var Params: TCreateParams); override;
   end;
 
 var
@@ -169,6 +181,20 @@ uses
   uForm1,
   DebugLog;
 
+const
+  { Shown in the description line while no row is selected, so the footer has
+    content there instead of a reserved blank band. }
+  cItemDescPlaceholder = 'Select a file to see its description.';
+
+  { The dialog puts an "Avro Keyboard" button on the taskbar for as long as it is
+    open, the same way the options, auto-correct, mouse and layout dialogs do.
+    Without this the window is reachable only through the tray icon: the program
+    is a tray application (Application.MainFormOnTaskBar = False, and the hidden
+    application window carries WS_EX_TOOLWINDOW), and a window owned by that
+    window is never given a taskbar button of its own. }
+  Show_Window_in_Taskbar = True;
+
+
 procedure ShowResourceBrowser(const ACategoryId: string);
 begin
   CheckCreateForm(TfrmResourceBrowser, frmResourceBrowser, 'frmResourceBrowser');
@@ -182,6 +208,25 @@ end;
 { ---------------------------------------------------------------------------- }
 { Lifecycle }
 { ---------------------------------------------------------------------------- }
+
+{ WS_EX_APPWINDOW is what makes Windows put a visible top-level window on the
+  taskbar even though this one is owned by a hidden tool window; an unowned
+  window (the desktop as parent) is what keeps the button after the dialog has
+  been shown over another application. Both together are the arrangement the
+  other dialogs of this program already use, so the taskbar looks the same
+  whichever of them is open. The button disappears on its own when the dialog
+  hides - it exists only while the window is visible. }
+procedure TfrmResourceBrowser.CreateParams(var Params: TCreateParams);
+begin
+  inherited CreateParams(Params);
+  if Show_Window_in_Taskbar then
+  begin
+    Params.ExStyle := Params.ExStyle or WS_EX_APPWINDOW and not WS_EX_TOOLWINDOW;
+    Params.WndParent := GetDesktopWindow;
+  end
+  else
+    Params.ExStyle := Params.ExStyle and not WS_EX_APPWINDOW;
+end;
 
 constructor TfrmResourceBrowser.Create(AOwner: TComponent);
 begin
@@ -205,21 +250,27 @@ end;
 procedure TfrmResourceBrowser.FormCreate(Sender: TObject);
 begin
   TOPMOST(Handle);
-  lblStatus.Caption := '';
-  lblItemDesc.Caption := '';
+  SetStatus('');
+  SetItemDescription('');
   UpdateDestinationLabel;
 end;
 
 procedure TfrmResourceBrowser.FormShow(Sender: TObject);
 begin
-  // The select-all box is a real TCheckBox floated over the header's first
-  // cell, parented to the form so the native header can never cover it -
-  // Ensure creates it on first show and re-raises/heals it on every show.
+  // The window is fixed - 676x450 from the .dfm, never resized by any code -
+  // so showing it is only about the content: fit the Name column into the
+  // list's width, then (re)place the select-all box, a real TCheckBox floated
+  // over the header's first cell and parented to the form so the native header
+  // can never cover it. Ensure creates it on first show and re-raises/heals it
+  // on every show.
+  FitItemColumns;
   EnsureSelAllCheckBox;
   // Every show refreshes the catalog (it is one small HTTPS GET); a running
   // download keeps priority - reopening during a transfer must not restart it.
   if not FBusy then
     LoadCatalog;
+  // Centre on the monitor this dialog opened on.
+  CenterDialog;
 end;
 
 procedure TfrmResourceBrowser.FormClose(Sender: TObject; var Action: TCloseAction);
@@ -283,8 +334,8 @@ begin
           begin
             lstCategories.Items.Clear;
             lvItems.Items.Clear;
-            lblItemDesc.Caption := '';
-            lblStatus.Caption := Err;
+            SetItemDescription('');
+            SetStatus(Err);
             Log('Resource catalog fetch failed: ' + Err);
           end
           else
@@ -293,20 +344,20 @@ begin
             SelectCategoryById(FPendingCategory);
             FPendingCategory := '';
             if TrustOk then
-              lblStatus.Caption := Format('%d categories loaded. Downloads are verified against the signed manifest.',
-                [Length(Catalog.Categories)])
+              SetStatus(Format('%d categories loaded. Downloads are verified against the signed manifest.',
+                [Length(Catalog.Categories)]))
             else
               // Say it up front: the Download button still looks enabled (the
               // rows are browsable) but every install will be refused, so the
               // reason has to be visible before the click, not after it.
-              lblStatus.Caption := Format('%d categories loaded, but downloads are disabled: %s',
-                [Length(Catalog.Categories), TrustErr]);
+              SetStatus(Format('%d categories loaded, but downloads are disabled: %s',
+                [Length(Catalog.Categories), TrustErr]));
           end;
           SetBusy(lblStatus.Caption);
           // A repair the migration runner finished while the window was
           // open, or before it opened, is surfaced here rather than
           // happening silently in the background.
-          lblStatus.Caption := lblStatus.Caption + AvroMigrationNoteSuffix;
+          SetStatus(lblStatus.Caption + AvroMigrationNoteSuffix);
         end);
     end);
 end;
@@ -340,18 +391,17 @@ end;
 
 procedure TfrmResourceBrowser.SetBusy(const ACaption: string);
 begin
-  lblStatus.Caption := ACaption;
+  SetStatus(ACaption);
   btnDownload.Enabled := not FBusy;
   lstCategories.Enabled := not FBusy;
 end;
 
-{ The status label is a fixed 168x46 WordWrap box, so the TAIL of a refusal
-  reason is exactly what gets clipped - which is how "Downloads are disabled
-  because the signed resource manifest could not be verified. The resource
-  manifest could not be trusted: Signed with an unknown key (...)" reached a
-  user as "... The resour". The caption always carries the whole sentence, so
-  the hover hint re-publishes it uncut: one place, every message the label ever
-  shows, no second control to keep in step. }
+{ The status line is one full-width row, so it no longer has to wrap into a
+  168px column: it ellipsises at the end when a message is wider than the
+  window instead of clipping mid-word ("... The resour"). The caption always
+  carries the whole sentence, so the hover hint re-publishes it uncut - one
+  place, every message the label ever shows, no second control to keep in
+  step. }
 procedure TfrmResourceBrowser.lblStatusMouseEnter(Sender: TObject);
 begin
   lblStatus.Hint := lblStatus.Caption;
@@ -363,7 +413,7 @@ var
 begin
   lstCategories.Items.Clear;
   lvItems.Items.Clear;
-  lblItemDesc.Caption := '';
+  SetItemDescription('');
   for I := 0 to high(FCatalog.Categories) do
     lstCategories.Items.Add(FCatalog.Categories[I].Title);
   if lstCategories.Items.Count > 0 then
@@ -412,7 +462,7 @@ begin
   lvItems.Items.BeginUpdate;
   try
     lvItems.Items.Clear;
-    lblItemDesc.Caption := '';
+    SetItemDescription('');
     if (FCatalog = nil) or not FCatalog.Loaded then
       Exit;
     if (lstCategories.ItemIndex < 0) or (lstCategories.ItemIndex > high(FCatalog.Categories)) then
@@ -449,6 +499,9 @@ begin
     end;
     finally
       lvItems.Items.EndUpdate;
+      // The row set just changed: the Name column re-fits the fixed list
+      // width. Only that column moves - inside the window, never the window.
+      FitItemColumns;
       // Covers every exit above: a rebuilt or emptied list leaves the header's
       // select-all box in step with the rows (unchecked by default). Calling
       // Ensure - not just Sync - also rebuilds the box if it was ever lost to
@@ -630,8 +683,9 @@ procedure TfrmResourceBrowser.ShowItemDescription(const AIndex: Integer);
 var
   Cat:  TResourceCategory;
   Item: TResourceItem;
+  Text: string;
 begin
-  lblItemDesc.Caption := '';
+  SetItemDescription('');
   if (FCatalog = nil) or not FCatalog.Loaded then
     Exit;
   if (lstCategories.ItemIndex < 0) or (lstCategories.ItemIndex > high(FCatalog.Categories)) then
@@ -641,9 +695,15 @@ begin
     Exit;
 
   Item := Cat.Items[AIndex];
-  lblItemDesc.Caption := Item.Description;
+  Text := Item.Description;
   if Item.DescriptionBn <> '' then
-    lblItemDesc.Caption := lblItemDesc.Caption + sLineBreak + Item.DescriptionBn;
+  begin
+    if Text <> '' then
+      Text := Text + sLineBreak;
+    Text := Text + Item.DescriptionBn;
+  end;
+  // One call, so the fixed description band always carries the whole text.
+  SetItemDescription(Text);
 end;
 
 procedure TfrmResourceBrowser.UpdateItemStatus(const AIndex: Integer; const AInstalled: Boolean);
@@ -691,6 +751,81 @@ begin
     lblDestination.Caption := Edition + ' - files are installed into: ' + Folder;
 end;
 
+{ ============================================================================== }
+{ Fixed layout }
+{ ============================================================================== }
+
+{ The one piece of geometry still derived at run time: the Name column absorbs
+  the slack of the list's fixed width, so the last column ends flush with the
+  list's right edge instead of leaving a blank strip after 'Delete'.
+
+  Nothing else in this unit moves anything - the dialog's 676x450 client area
+  and every control position come from the .dfm and never change. }
+procedure TfrmResourceBrowser.FitItemColumns;
+var
+  NameWidth: Integer;
+begin
+  if not HandleAllocated then
+    Exit;
+  if lvItems.Columns.Count < 6 then
+    Exit;
+  NameWidth := lvItems.ClientWidth - (lvItems.Columns[0].Width + lvItems.Columns[2].Width +
+    lvItems.Columns[3].Width + lvItems.Columns[4].Width + lvItems.Columns[5].Width);
+  if NameWidth < 100 then
+    NameWidth := 100;
+  lvItems.Columns[1].Width := NameWidth;
+end;
+
+{ ============================================================================== }
+
+{ poScreenCenter centres the window at design time and CenterDialog re-centres
+  it on the monitor it opens on; the size never changes, so only the position
+  is ever computed here. }
+procedure TfrmResourceBrowser.CenterDialog;
+var
+  Area: TRect;
+  Mon:  TMonitor;
+begin
+  if not HandleAllocated then
+    Exit;
+  Mon := Screen.MonitorFromWindow(Handle);
+  if Assigned(Mon) then
+    Area := Mon.WorkareaRect
+  else
+    Area := Screen.WorkareaRect;
+  Left := Area.Left + ((Area.Right - Area.Left) - Width) div 2;
+  Top := Area.Top + ((Area.Bottom - Area.Top) - Height) div 2;
+end;
+
+{ ============================================================================== }
+
+procedure TfrmResourceBrowser.SetStatus(const AText: string);
+begin
+  // Caption only: the status band is a fixed 15px row from the .dfm, so the
+  // window stays put whether this line is empty, one sentence, or wider than
+  // the window - epEndEllipsis cuts it and the hover hint shows it whole.
+  lblStatus.Caption := AText;
+end;
+
+{ ============================================================================== }
+
+{ The description line always carries something: the item's own text when one
+  is selected, a muted prompt when not - which is what keeps that band from
+  reading as a gap. }
+procedure TfrmResourceBrowser.SetItemDescription(const AText: string);
+begin
+  if AText = '' then
+  begin
+    lblItemDesc.Font.Color := clGrayText;
+    lblItemDesc.Caption := cItemDescPlaceholder;
+  end
+  else
+  begin
+    lblItemDesc.Font.Color := clWindowText;
+    lblItemDesc.Caption := AText;
+  end;
+end;
+
 { ---------------------------------------------------------------------------- }
 { Download }
 { ---------------------------------------------------------------------------- }
@@ -708,7 +843,7 @@ begin
     Index := SelectedItemIndex;
     if Index < 0 then
     begin
-      lblStatus.Caption := 'Select a file first.';
+      SetStatus('Select a file first.');
       Exit;
     end;
     SetLength(Indexes, 1);
@@ -792,17 +927,17 @@ begin
     Exit;
   if (FCatalog = nil) or not FCatalog.Loaded then
   begin
-    lblStatus.Caption := 'The resource catalog is not loaded yet - try again in a moment.';
+    SetStatus('The resource catalog is not loaded yet - try again in a moment.');
     Exit;
   end;
   if (lstCategories.ItemIndex < 0) or (lstCategories.ItemIndex > high(FCatalog.Categories)) then
   begin
-    lblStatus.Caption := 'Select a category first.';
+    SetStatus('Select a category first.');
     Exit;
   end;
   if Length(AIndexes) = 0 then
   begin
-    lblStatus.Caption := 'Nothing to download in this category.';
+    SetStatus('Nothing to download in this category.');
     Exit;
   end;
 
@@ -818,7 +953,7 @@ begin
     begin
       FDownloadQueue := nil;
       FSkipCount := 0;
-      lblStatus.Caption := 'Invalid selection.';
+      SetStatus('Invalid selection.');
       Exit;
     end;
     Item := Cat.Items[AIndexes[I]];
@@ -867,11 +1002,11 @@ begin
     // file, or the user retries forever against a manifest that will keep
     // saying no.
     if FBlockedCount > 0 then
-      lblStatus.Caption := Format('%d of %d file(s) cannot be installed. %s', [FBlockedCount, Length(AIndexes), FLastBlockReason])
+      SetStatus(Format('%d of %d file(s) cannot be installed. %s', [FBlockedCount, Length(AIndexes), FLastBlockReason]))
     else if Length(AIndexes) = 1 then
-      lblStatus.Caption := 'Already installed.'
+      SetStatus('Already installed.')
     else
-      lblStatus.Caption := Format('All %d file(s) are already installed.', [FSkipCount]);
+      SetStatus(Format('All %d file(s) are already installed.', [FSkipCount]));
     FDownloadQueue := nil;
     FSkipCount := 0;
     FBlockedCount := 0;
@@ -907,12 +1042,12 @@ begin
     Exit;
   if (FCatalog = nil) or not FCatalog.Loaded then
   begin
-    lblStatus.Caption := 'The resource catalog is not loaded yet - try again in a moment.';
+    SetStatus('The resource catalog is not loaded yet - try again in a moment.');
     Exit;
   end;
   if (lstCategories.ItemIndex < 0) or (lstCategories.ItemIndex > high(FCatalog.Categories)) then
   begin
-    lblStatus.Caption := 'Select a category first.';
+    SetStatus('Select a category first.');
     Exit;
   end;
   if Length(AIndexes) = 0 then
@@ -973,16 +1108,16 @@ begin
 
   if FailedCount = 0 then
   begin
-    lblStatus.Caption := Format('Deleted %d file(s).', [DeletedCount]);
+    SetStatus(Format('Deleted %d file(s).', [DeletedCount]));
     if SkipCount > 0 then
-      lblStatus.Caption := lblStatus.Caption + Format(' %d not installed.', [SkipCount]);
+      SetStatus(lblStatus.Caption + Format(' %d not installed.', [SkipCount]));
   end
   else
   begin
-    lblStatus.Caption := Format('Deleted %d, failed %d.', [DeletedCount, FailedCount]);
+    SetStatus(Format('Deleted %d, failed %d.', [DeletedCount, FailedCount]));
     if SkipCount > 0 then
-      lblStatus.Caption := lblStatus.Caption + Format(' %d not installed.', [SkipCount]);
-    lblStatus.Caption := lblStatus.Caption + ' Last: ' + LastError;
+      SetStatus(lblStatus.Caption + Format(' %d not installed.', [SkipCount]));
+    SetStatus(lblStatus.Caption + ' Last: ' + LastError);
   end;
 end;
 
@@ -1085,7 +1220,7 @@ begin
             if Job.IsOnlyJob and SameText(Job.ResourceType, 'doc') then
             begin
               FinishQueue;
-              lblStatus.Caption := 'Downloaded: ' + Job.Name;
+              SetStatus('Downloaded: ' + Job.Name);
               Execute_Something(Target);
             end
             else

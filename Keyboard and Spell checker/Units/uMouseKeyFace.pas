@@ -5,7 +5,7 @@
   file, You can obtain one at https://mozilla.org/MPL/2.0/.
   =============================================================================
 
-  The face of one Bangla key on the mouse keyboard ("Avro Mouse - Click 'n' Type").
+  The face of one Bangla key on the mouse keyboard ("On Screen Keyboard").
 
   Those keys used to carry pre-baked glyph bitmaps: a Kalpurush outline was
   rasterized once with the theme's colours already inside the pixels. That made a

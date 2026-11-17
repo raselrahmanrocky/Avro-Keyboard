@@ -1,0 +1,28 @@
+/*
+  AssocIcons.rc - the two file-association icons, carried INSIDE Avro Keyboard.exe.
+
+  An .avrolayout or .avroskin file takes its Explorer icon from
+  Software\Classes\AvroKeyboardLayout\DefaultIcon (respectively
+  AvroKeyboardSkin\DefaultIcon), which the installer points at Avro
+  Keyboard.exe with a NEGATIVE index: the absolute value is the RT_GROUP_ICON
+  resource id below, not a position in the file.  A positive index would mean
+  "the nth icon group in the executable", and index 0 has to stay the
+  application's own icon - the .AvroEnco association and the uninstall entry
+  both use it.
+
+  The artwork is the same pair the installer used to drop into {app} as loose
+  .ico files (extracted from the original Avro Keyboard's own resources:
+  ZZKLICON = keyboard for .avrolayout, ZZSKICON = window skin for .avroskin).
+  The install folder is to carry no loose .ico files, so the icons are linked
+  into the binary instead - exactly how Layout\AvroBaseline.res, Layout\
+  Internal_Layout.res and Skin\Internal_Skin.res carry their payloads.
+
+  Compile from this folder with:
+    brcc32 -fo"AssocIcons.res" "AssocIcons.rc"
+
+  The path is relative to the compiler's working directory (this folder).  The
+  .res is a committed input, so a build links it without having to run brcc32.
+*/
+
+101 ICON "..\..\assets\icons\AssocLayout.ico"
+102 ICON "..\..\assets\icons\AssocSkin.ico"

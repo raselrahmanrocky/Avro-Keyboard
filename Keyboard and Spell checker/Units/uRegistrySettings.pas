@@ -124,12 +124,17 @@ procedure FillSafeDefaults;
 procedure SaveSettings;
 procedure SaveAnsiVersionOnly;
 
-{ Cross-process re-read of the persisted active ANSI mapping name. The
+{ Cross-process re-read of the persisted active ANSI mapping. The
   refresh_enco WM_COPYDATA command uses it: a second process (a double-clicked
   .AvroEnco import) may have activated a different mapping through
   SaveAnsiVersionOnly/SaveSettings, and the running instance must pick that up
-  without reloading every other setting. Returns '' when nothing is persisted
-  or the read fails. }
+  without reloading every other setting. Reads the legacy base name and the
+  exact-file companion from one store in one operation. Returns False when the
+  read fails. }
+function ReadActiveAnsiSelection(out ABaseName, AFileName: string): Boolean;
+
+{ Base-name wrapper kept for callers that only need the legacy value. Returns
+  '' when nothing is persisted or the read fails. }
 function ReadActiveAnsiVersion: string;
 
 procedure LoadSettingsFromFile;
@@ -305,6 +310,7 @@ begin
   ShowShortcutKeysOnMenu := UpperCase(XML.GetValue('ShowShortcutKeysOnMenu', 'YES'));
 
   clsUnicodeToBijoy2000.AnsiVersion := XML.GetValue('AnsiVersion', '');
+  uAvroEncoManager.AnsiVersionFileName := XML.GetValue('AnsiVersionFileName', '');
 
   // AvroEnco Settings
   CachedEncoPassword := AnsiString(XML.GetValue('CachedEncoPassword', ''));
@@ -399,6 +405,7 @@ begin
   XML.SetValue('IgnoreCapsLock', IgnoreCapsLock);
   XML.SetValue('ShowShortcutKeysOnMenu', ShowShortcutKeysOnMenu);
   XML.SetValue('AnsiVersion', clsUnicodeToBijoy2000.AnsiVersion);
+  XML.SetValue('AnsiVersionFileName', uAvroEncoManager.AnsiVersionFileName);
 
   // AvroEnco Settings
   XML.SetValue('CachedEncoPassword', string(CachedEncoPassword));
@@ -506,6 +513,7 @@ begin
         IgnoreCapsLock := UpperCase(Reg.ReadStringDef('IgnoreCapsLock', 'NO'));
         ShowShortcutKeysOnMenu := UpperCase(Reg.ReadStringDef('ShowShortcutKeysOnMenu', 'YES'));
         clsUnicodeToBijoy2000.AnsiVersion := Reg.ReadStringDef('AnsiVersion', '');
+        uAvroEncoManager.AnsiVersionFileName := Reg.ReadStringDef('AnsiVersionFileName', '');
 
         // AvroEnco Settings
         CachedEncoPassword := AnsiString(Reg.ReadStringDef('CachedEncoPassword', ''));
@@ -611,6 +619,7 @@ begin
     Reg.WriteString('IgnoreCapsLock', IgnoreCapsLock);
     Reg.WriteString('ShowShortcutKeysOnMenu', ShowShortcutKeysOnMenu);
     Reg.WriteString('AnsiVersion', clsUnicodeToBijoy2000.AnsiVersion);
+    Reg.WriteString('AnsiVersionFileName', uAvroEncoManager.AnsiVersionFileName);
 
     // AvroEnco Settings
     Reg.WriteString('CachedEncoPassword', string(CachedEncoPassword));
@@ -878,8 +887,8 @@ begin
   // duplicate a higher-priority one.
   DeduplicateHotkeys;
 
-  // ANSI Encoding Version: leave '' / 'Default' as-is (unknown). LoadApp
-  // migrates once to FirstAvailableMappingName and persists that name;
+  // ANSI Encoding Version: leave '' / 'Default' and the exact-file companion
+  // as-is. LoadApp migrates once to an exact file and persists both values;
   // never coerce empty back to a compiled-in Default version.
 end;
 
@@ -915,7 +924,10 @@ begin
   try
     Reg.RootKey := HKEY_CURRENT_USER;
     if Reg.OpenKey('Software\OmicronLab\Avro Keyboard', True) then
+    begin
       Reg.WriteString('AnsiVersion', clsUnicodeToBijoy2000.AnsiVersion);
+      Reg.WriteString('AnsiVersionFileName', uAvroEncoManager.AnsiVersionFileName);
+    end;
   finally
     Reg.Free;
   end;
@@ -924,7 +936,7 @@ end;
 
 { =============================================================================== }
 
-function ReadActiveAnsiVersion: string;
+function ReadActiveAnsiSelection(out ABaseName, AFileName: string): Boolean;
 {$IFDEF PortableOn}
 var
   XML: TXMLSetting;
@@ -933,13 +945,17 @@ var
   Reg: TMyRegistry;
   {$ENDIF}
 begin
-  Result := '';
+  Result := False;
+  ABaseName := '';
+  AFileName := '';
   try
     {$IFDEF PortableOn}
     XML := TXMLSetting.Create;
     try
       XML.LoadXMLData;
-      Result := XML.GetValue('AnsiVersion', '');
+      ABaseName := XML.GetValue('AnsiVersion', '');
+      AFileName := XML.GetValue('AnsiVersionFileName', '');
+      Result := True;
     finally
       XML.Free;
     end;
@@ -948,16 +964,32 @@ begin
     try
       Reg.RootKey := HKEY_CURRENT_USER;
       if Reg.OpenKey('Software\OmicronLab\Avro Keyboard', False) then
-        Result := Reg.ReadStringDef('AnsiVersion', '');
+      begin
+        ABaseName := Reg.ReadStringDef('AnsiVersion', '');
+        AFileName := Reg.ReadStringDef('AnsiVersionFileName', '');
+        Result := True;
+      end;
     finally
       Reg.Free;
     end;
     {$ENDIF}
   except
-    // A locked/removed settings store must never break the caller: '' simply
-    // means "cannot tell", and the caller keeps its current mapping.
-    Result := '';
+    // A locked/removed settings store must never break the caller: the caller
+    // keeps its current mapping when the read fails.
+    Result := False;
+    ABaseName := '';
+    AFileName := '';
   end;
+end;
+
+function ReadActiveAnsiVersion: string;
+var
+  BaseName, FileName: string;
+begin
+  if ReadActiveAnsiSelection(BaseName, FileName) then
+    Result := BaseName
+  else
+    Result := '';
 end;
 
 initialization

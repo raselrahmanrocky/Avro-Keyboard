@@ -22,15 +22,24 @@ uses
 
 type
   TAvroEncoFileInfo = record
-    FilePath: string;
-    DisplayName: string;
-    IsEncoFile: Boolean;
+    FileName:      string; // exact on-disk file name, e.g. 'one.AvroEnco'
+    BaseName:      string; // 'one'
+    DisplayName:   string; // menu label: 'one' or 'one.AvroEnco'
+    FilePath:      string;
+    IsEncoFile:    Boolean;
     LastWriteTime: TDateTime;
+    FileSize:      Int64;
   end;
 
 var
   CachedEncoPassword: AnsiString;
   AvroEncoFiles:      TDictionary<string, TAvroEncoFileInfo>;
+
+  { Exact file selected by the user, stored beside the legacy base-name
+    AnsiVersion. Empty for the embedded baseline and for a legacy selection
+    that has not migrated yet. Declared here, not in clsUnicodeToBijoy2000, so
+    the Converter source and build stay untouched. }
+  AnsiVersionFileName: string;
 
   { ============================================================================== }
   { Per-encoding password memory (key = lowercase full file path) }
@@ -74,47 +83,56 @@ function IsAnsiMappingFileName(const AFileName: string): Boolean;
 { ============================================================================== }
 
 { Caches the icon a container carries (see uAvroEncoIconSection: it is one
-  scalar Base64 member of the decrypted mapping JSON). Keyed by the same
-  lowercase display name AvroEncoFiles uses, so the menus and the version
-  picker can ask with the name they already hold. Empty bytes clear the entry.
+  scalar Base64 member of the decrypted mapping JSON). Keyed by the lowercase
+  exact file name AvroEncoFiles uses. Empty bytes clear the entry.
 
   Written from the startup preload worker as well as the UI thread and read by
   the UI thread while menus are being built, so it is guarded by its own lock
   instead of depending on call order. }
-procedure StoreMappingIcon(const ADisplayName: string; const AIconBytes: TBytes);
+procedure StoreMappingIcon(const AFileName: string; const AIconBytes: TBytes);
 
 { The cached icon, or nil when this mapping has none - a legacy container, a
   plain .json mapping, an icon that failed to decode, or a mapping that has not
   been decrypted yet. }
-function GetMappingIconBytes(const ADisplayName: string): TBytes;
+function GetMappingIconBytes(const AFileName: string): TBytes;
 
-{ True once this name has been looked at (icon found OR the file was read and
-  carries none), so callers can tell "no icon" from "not extracted yet". }
-function MappingIconResolved(const ADisplayName: string): Boolean;
+{ True once this exact file has been looked at (icon found OR the file was read
+  and carries none), so callers can tell "no icon" from "not extracted yet". }
+function MappingIconResolved(const AFileName: string): Boolean;
 
 { Drops every cached icon AND forgets which names were already resolved. The
   bytes are regenerable from the containers, so the idle-memory release uses
   this instead of keeping N decrypted icon blobs alive forever. Callers that
-  draw afterwards must call EnsureMappingIcons again. }
+  draw one icon afterwards must call EnsureMappingIcon; bulk consumers can use
+  EnsureMappingIcons. }
 procedure ClearMappingIcons;
 
-{ Resolves the icon of ONE mapping from its file (idempotent: a name that is
+{ Resolves the icon of ONE exact mapping file (idempotent: a name that is
   already resolved - icon or none - is skipped). Used by the switch path so the
-  ACTIVE layout's badge and tray icon always have their bytes without any of
-  the other mappings being touched. }
-procedure EnsureMappingIcon(const ADisplayName: string);
+  ACTIVE layout's tray and parent-menu icons always have their bytes without
+  touching any of the other mappings. }
+procedure EnsureMappingIcon(const AFileName: string);
 
-{ Resolves the icon of every mapping the scan knows about. This is what the
-  menus and the version picker call before they draw badges; it replaces the
-  eager sweep that used to run inside ScanAvroEncoFiles, so startup no longer
-  decrypts and JSON-parses every container just to cache its icon. }
+{ Resolves the icons of every mapping the scan knows about. Most UI paths should
+  use EnsureMappingIcon for the active mapping instead, so unrelated containers
+  are not decrypted just to populate the icon cache. }
 procedure EnsureMappingIcons;
 
 function LoadMappingFromEnco(const AFilePath: string; const APassword: AnsiString; ErrorLog: TStringList = nil): Boolean;
 function ExtractMetadataFromJSON(const AJSONContent: string; const AFilePath: string = ''): string;
 function GetJSONString(const AObj: TJSONValue; const AKey: string): string;
 function FindMetadataJsonPath(const ADisplayName: string; const ADirectory: string): string;
-function GetActiveEncoFilePath(const ADisplayName: string; const ADirectory: string): string;
+
+{ Exact-file resolvers and selection publication. }
+function IsBareMappingFileName(const AFileName: string): Boolean;
+function GetExactEncoFilePath(const AFileName, ADirectory: string): string;
+function GetActiveEncoFilePath(const AName, ADirectory: string): string;
+function ResolveAnsiSelectionFile(
+  const ABaseName, AFileName, ADirectory: string;
+  out AMissingExact: Boolean): string;
+procedure PublishActiveSelection(const AFileName, ABaseName: string);
+function GetMappingDisplayLabel(const AFileName: string): string;
+function EscapeAmpersandsForMenu(const ACaption: string): string;
 
 { ============================================================================== }
 { Mapping list order and picker shortcuts }
@@ -132,16 +150,25 @@ function CompareMappingDisplayNames(const ALeft, ARight: string): Integer;
   implementations without CustomSort (only TStringList has it). }
 procedure SortMappingDisplayNames(ANames: TStrings);
 
-{ Fills ANames with every mapping display name in the shared natural order.
-  This is the full catalog (no extra "Default" row) and the single source of
-  truth for menu and picker order. }
+{ Fills ANames with every distinct base name in the shared natural order.
+  This is the Converter-facing list; the Keyboard uses
+  GetSortedMappingFileNames so it can represent both members of a same-base
+  pair. }
 procedure GetSortedMappingDisplayNames(ANames: TStrings);
+
+{ Every exact mapping file name, ordered by its display label and then by the
+  exact file name. This is the Keyboard's menu/picker list. }
+procedure GetSortedMappingFileNames(ANames: TStrings);
 
 { Name of the first mapping that can be activated without a user prompt:
   natural-sorted from GetSortedMappingDisplayNames, skipping password-protected
   .AvroEnco containers that have no cached password on this computer. Returns
-  '' when nothing is usable (empty folder / only locked containers). }
+  '' when nothing is usable (empty folder / only locked containers). This keeps
+  the legacy base-name contract used by the Converter and its gates. }
 function FirstAvailableMappingName: string;
+
+{ Exact-file equivalent of FirstAvailableMappingName, used by the Keyboard. }
+function FirstAvailableMappingFileName: string;
 
 { Shortcut resolution used by the picker's key handlers (form-level and list
   box level share one implementation). Maps the 1-based number the picker draws
@@ -155,19 +182,12 @@ function MappingIndexForKey(const ANames: TStrings; AKey: Word): Integer;
   the key alone and fall through to the list box's own type-ahead). }
 function MappingIndexForChar(const ANames: TStrings; AChar: Char): Integer;
 
-{ True when a font family with this name is registered on this computer.
-  Matching is intentionally loose (case, spaces and punctuation ignored, with
-  either name allowed to be a prefix of the other) so that "Adarsh aLipi" finds
-  "AdarshaLipiNormal" and "SutonnyMJ" finds "Sutonny MJ". }
-function IsFontFamilyInstalled(const AFontName: string): Boolean;
-
 implementation
 
 uses
   uAvroEncoCrypto,
   clsUnicodeToBijoy2000,
   uFileFolderHandling,
-  System.Win.Registry,
   System.IOUtils,
   DebugLog;
 
@@ -259,54 +279,55 @@ begin
 end;
 
 var
-  { Keyed like AvroEncoFiles: Lowercase(DisplayName). Created in this unit's
-    initialization, so no caller has to remember to set it up first. }
+  { Keyed by Lowercase(FileName) - the exact mapping identity, never the base
+    name. Created in this unit's initialization, so no caller has to remember
+    to set it up first. }
   MappingIcons: TDictionary<string, TBytes>;
-  { Names whose icon has already been resolved - present in MappingIcons, or
-    read from the file and found to carry none. Without this, every menu
+  { File names whose icon has already been resolved - present in MappingIcons,
+    or read from the file and found to carry none. Without this, every menu
     rebuild would re-decrypt every icon-less container in the folder. Also
-    keyed by Lowercase(DisplayName). }
+    keyed by Lowercase(FileName). }
   MappingIconsResolved: TDictionary<string, Byte>;
   MappingIconsLock:     TCriticalSection;
 
-procedure StoreMappingIcon(const ADisplayName: string; const AIconBytes: TBytes);
+procedure StoreMappingIcon(const AFileName: string; const AIconBytes: TBytes);
 begin
-  if ADisplayName = '' then
+  if AFileName = '' then
     Exit;
   MappingIconsLock.Enter;
   try
     if Length(AIconBytes) = 0 then
-      MappingIcons.Remove(LowerCase(ADisplayName))
+      MappingIcons.Remove(LowerCase(AFileName))
     else
-      MappingIcons.AddOrSetValue(LowerCase(ADisplayName), AIconBytes);
+      MappingIcons.AddOrSetValue(LowerCase(AFileName), AIconBytes);
   finally
     MappingIconsLock.Leave;
   end;
 end;
 
-function GetMappingIconBytes(const ADisplayName: string): TBytes;
+function GetMappingIconBytes(const AFileName: string): TBytes;
 begin
   Result := nil;
-  if ADisplayName = '' then
+  if AFileName = '' then
     Exit;
   MappingIconsLock.Enter;
   try
-    MappingIcons.TryGetValue(LowerCase(ADisplayName), Result);
+    MappingIcons.TryGetValue(LowerCase(AFileName), Result);
   finally
     MappingIconsLock.Leave;
   end;
 end;
 
-function MappingIconResolved(const ADisplayName: string): Boolean;
+function MappingIconResolved(const AFileName: string): Boolean;
 var
   Dummy: Byte;
 begin
   Result := False;
-  if ADisplayName = '' then
+  if AFileName = '' then
     Exit;
   MappingIconsLock.Enter;
   try
-    Result := MappingIconsResolved.TryGetValue(LowerCase(ADisplayName), Dummy);
+    Result := MappingIconsResolved.TryGetValue(LowerCase(AFileName), Dummy);
   finally
     MappingIconsLock.Leave;
   end;
@@ -349,9 +370,25 @@ end;
 
 procedure ScanDirHelper(const ADir: string);
 var
-  SR:                     TSearchRec;
-  FoundPath, DisplayName: string;
-  Info:                   TAvroEncoFileInfo;
+  SR:       TSearchRec;
+  Info:     TAvroEncoFileInfo;
+  Counts:   TDictionary<string, Integer>;
+  Keys:     TList<string>;
+  Key, Base: string;
+  Count:    Integer;
+
+  procedure AddFile(const AName: string; AIsEnco: Boolean);
+  begin
+    Info.FileName := AName;
+    Info.BaseName := ChangeFileExt(AName, '');
+    Info.DisplayName := Info.BaseName; // replaced after all files are counted
+    Info.FilePath := ADir + AName;
+    Info.IsEncoFile := AIsEnco;
+    Info.LastWriteTime := SR.TimeStamp;
+    Info.FileSize := SR.Size;
+    AvroEncoFiles.AddOrSetValue(LowerCase(AName), Info);
+  end;
+
 begin
   if not DirectoryExists(ADir) then
     Exit;
@@ -362,43 +399,58 @@ begin
     try
       repeat
         if (SR.Name <> '.') and (SR.Name <> '..') and IsAnsiMappingFileName(SR.Name) then
-        begin
-          FoundPath := ADir + SR.Name;
-          DisplayName := ChangeFileExt(SR.Name, '');
-          Info.FilePath := FoundPath;
-          Info.DisplayName := DisplayName;
-          Info.IsEncoFile := True;
-          Info.LastWriteTime := SR.TimeStamp;
-          AvroEncoFiles.AddOrSetValue(LowerCase(DisplayName), Info);
-        end;
+          AddFile(SR.Name, True);
       until FindNext(SR) <> 0;
     finally
       FindClose(SR);
     end;
   end;
 
-  // Scan .json
+  // Scan .json. Every mapping file is added, including a .json that shares its
+  // base name with an .AvroEnco container.
   if FindFirst(ADir + '*.json', faAnyFile, SR) = 0 then
   begin
     try
       repeat
         if (SR.Name <> '.') and (SR.Name <> '..') and IsAnsiMappingFileName(SR.Name) then
-        begin
-          DisplayName := ChangeFileExt(SR.Name, '');
-          if not AvroEncoFiles.ContainsKey(LowerCase(DisplayName)) then
-          begin
-            FoundPath := ADir + SR.Name;
-            Info.FilePath := FoundPath;
-            Info.DisplayName := DisplayName;
-            Info.IsEncoFile := False;
-            Info.LastWriteTime := SR.TimeStamp;
-            AvroEncoFiles.AddOrSetValue(LowerCase(DisplayName), Info);
-          end;
-        end;
+          AddFile(SR.Name, False);
       until FindNext(SR) <> 0;
     finally
       FindClose(SR);
     end;
+  end;
+
+  // Count files per base name so a unique mapping keeps the short label.
+  Counts := TDictionary<string, Integer>.Create;
+  try
+    for Key in AvroEncoFiles.Keys do
+    begin
+      Base := LowerCase(AvroEncoFiles[Key].BaseName);
+      if Counts.TryGetValue(Base, Count) then
+        Counts[Base] := Count + 1
+      else
+        Counts.Add(Base, 1);
+    end;
+
+    Keys := TList<string>.Create;
+    try
+      for Key in AvroEncoFiles.Keys do
+        Keys.Add(Key);
+      for Key in Keys do
+      begin
+        Info := AvroEncoFiles[Key];
+        Count := 0;
+        if (Info.BaseName <> '') and Counts.TryGetValue(LowerCase(Info.BaseName), Count) and (Count = 1) then
+          Info.DisplayName := Info.BaseName
+        else
+          Info.DisplayName := Info.FileName;
+        AvroEncoFiles[Key] := Info;
+      end;
+    finally
+      Keys.Free;
+    end;
+  finally
+    Counts.Free;
   end;
 end;
 
@@ -423,7 +475,7 @@ begin
     ScanDirHelper(ADirectory);
 
     // Remove icon entries for files that no longer exist on disk (renamed or
-    // deleted).  This prevents stale icon badges lingering in the menu.
+    // deleted). This prevents the parent menu from retaining a stale mapping icon.
     for Key in OldKeys do
       if not AvroEncoFiles.ContainsKey(Key) then
         StoreMappingIcon(Key, nil);
@@ -433,9 +485,7 @@ begin
     // Icons are NOT extracted here any more. The sweep used to run inside the
     // scan - i.e. on the startup path AND after every folder change - and it
     // decrypted every container and parsed every mapping document just to
-    // cache a ~10 KB icon. Menus and the picker now call EnsureMappingIcons
-    // when they are about to draw badges, and the switch path calls
-    // EnsureMappingIcon for the active layout only.
+    // cache a ~10 KB icon. UI paths resolve only the active layout on demand.
   finally
     OldKeys.Free;
   end;
@@ -455,7 +505,7 @@ var
   JSONContent: string;
   Key:         string;
 begin
-  Key := LowerCase(AInfo.DisplayName);
+  Key := LowerCase(AInfo.FileName);
 
   // Mark the name resolved up front: converging through every exit below
   // (read error, corrupted container, no icon member) is what keeps a failing
@@ -472,7 +522,7 @@ begin
     try
       JSONContent := Trim(DecryptAvroEncoToString(AInfo.FilePath, ''));
       if (JSONContent <> '') and (JSONContent[1] = '{') then
-        StoreMappingIcon(AInfo.DisplayName, ExtractIconSection(JSONContent));
+        StoreMappingIcon(AInfo.FileName, ExtractIconSection(JSONContent));
     except
       // Corrupted or password-protected file - icon will appear on demand.
     end;
@@ -484,7 +534,7 @@ begin
       begin
         JSONContent := Trim(TFile.ReadAllText(AInfo.FilePath, TEncoding.UTF8));
         if (JSONContent <> '') and (JSONContent[1] = '{') then
-          StoreMappingIcon(AInfo.DisplayName, ExtractIconSection(JSONContent));
+          StoreMappingIcon(AInfo.FileName, ExtractIconSection(JSONContent));
       end;
     except
       // Read error - icon will appear on demand.
@@ -493,9 +543,7 @@ begin
 end;
 
 { Resolves the icons of every mapping that has not been looked at yet. This is
-  the deferred replacement for the sweep that used to live in
-  ScanAvroEncoFiles: the same work, paid when a badge is actually about to be
-  drawn instead of on the startup path. }
+  an explicit bulk operation; normal UI paths resolve only the active mapping. }
 procedure EnsureMappingIcons;
 var
   Info: TAvroEncoFileInfo;
@@ -503,24 +551,25 @@ begin
   if not Assigned(AvroEncoFiles) then
     Exit;
   for Info in AvroEncoFiles.Values do
-    if not MappingIconResolved(Info.DisplayName) then
+    if not MappingIconResolved(Info.FileName) then
       ExtractOneFileIcon(Info);
 end;
 
-{ Resolves ONE mapping's icon. The name must be a known mapping (the scan owns
-  that knowledge); anything else is ignored rather than guessed by building a
-  path here, because the caller's directory is not this unit's business. }
-procedure EnsureMappingIcon(const ADisplayName: string);
+{ Resolves ONE mapping's icon. The name must be an exact known mapping file
+  (the scan owns that knowledge); anything else is ignored rather than guessed
+  by building a path here, because the caller's directory is not this unit's
+  business. }
+procedure EnsureMappingIcon(const AFileName: string);
 var
   Info: TAvroEncoFileInfo;
 begin
-  if ADisplayName = '' then
+  if AFileName = '' then
     Exit;
   if not Assigned(AvroEncoFiles) then
     Exit;
-  if MappingIconResolved(ADisplayName) then
+  if MappingIconResolved(AFileName) then
     Exit;
-  if not AvroEncoFiles.TryGetValue(LowerCase(ADisplayName), Info) then
+  if not AvroEncoFiles.TryGetValue(LowerCase(AFileName), Info) then
     Exit;
   ExtractOneFileIcon(Info);
 end;
@@ -576,7 +625,7 @@ begin
     // it is covered by the same HMAC verdict and AES-GCM tag as the mapping.
     // A legacy container or a plain .json has no such member, which clears the
     // entry rather than serving a stale icon.
-    StoreMappingIcon(GetEncoDisplayName(AFilePath), ExtractIconSection(JSONContent));
+    StoreMappingIcon(ExtractFileName(AFilePath), ExtractIconSection(JSONContent));
 
     LoadAnsiMappingFromJSON(JSONContent, ErrorLog);
     Result := True;
@@ -660,85 +709,7 @@ begin
   if LModifiedBy <> '' then
     Result := Result + 'Modified By: ' + LModifiedBy + sLineBreak;
   if LFont <> '' then
-  begin
     Result := Result + sLineBreak + 'Suggested Font: ' + LFont + sLineBreak;
-    // The engine emits exactly the byte values the mapping asks for. Only this
-    // font renders those bytes as the intended Bangla; with any other ANSI font
-    // active the text looks jumbled - which is easily mistaken for a corrupt
-    // .AvroEnco file. Say so in the card instead of letting the file take the
-    // blame.
-    if not IsFontFamilyInstalled(LFont) then
-      Result := Result + 'Note: this font was not found on this computer - ' + 'text encoded with this mapping reads correctly only in ' + LFont + '.' +
-        sLineBreak;
-  end;
-  // Escape '&' for VCL display (MessageDlg treats '&' as accelerator prefix).
-  Result := StringReplace(Result, '&', '&&', [rfReplaceAll]);
-end;
-
-function NormalizeFontName(const S: string): string;
-var
-  I: Integer;
-  C: Char;
-begin
-  Result := '';
-  for I := 1 to Length(S) do
-  begin
-    C := S[I];
-    if CharInSet(C, ['A' .. 'Z', 'a' .. 'z', '0' .. '9']) then
-      Result := Result + LowerCase(C);
-  end;
-end;
-
-function FontNameMatches(const ARegistered, AWanted: string): Boolean;
-var
-  LRegistered, LWanted: string;
-begin
-  LRegistered := NormalizeFontName(ARegistered);
-  LWanted := NormalizeFontName(AWanted);
-  Result := (LRegistered <> '') and (LWanted <> '') and ((LRegistered = LWanted) or (Pos(LWanted, LRegistered) = 1) or (Pos(LRegistered, LWanted) = 1));
-end;
-
-const
-  FONT_REGISTRY_KEY = 'SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts';
-
-  // Windows registers every installed face as a value whose name is the font's
-  // display name ("Family (TrueType)" or "Family Style (TrueType)").
-function FontKeyHasFamily(ARoot: HKEY; const AWanted: string): Boolean;
-var
-  Reg:     TRegistry;
-  Names:   TStringList;
-  I, Cut:  Integer;
-  RegName: string;
-begin
-  Result := False;
-  Reg := TRegistry.Create(KEY_READ);
-  try
-    Reg.RootKey := ARoot;
-    if not Reg.OpenKeyReadOnly(FONT_REGISTRY_KEY) then
-      Exit;
-    Names := TStringList.Create;
-    try
-      Reg.GetValueNames(Names);
-      for I := 0 to Names.Count - 1 do
-      begin
-        RegName := Names[I];
-        Cut := Pos('(', RegName);
-        if Cut > 0 then
-          RegName := Trim(Copy(RegName, 1, Cut - 1));
-        if FontNameMatches(RegName, AWanted) then
-          Exit(True);
-      end;
-    finally
-      Names.Free;
-    end;
-  finally
-    Reg.Free;
-  end;
-end;
-
-function IsFontFamilyInstalled(const AFontName: string): Boolean;
-begin
-  Result := (Trim(AFontName) <> '') and (FontKeyHasFamily(HKEY_CURRENT_USER, AFontName) or FontKeyHasFamily(HKEY_LOCAL_MACHINE, AFontName));
 end;
 
 function GetJSONString(const AObj: TJSONValue; const AKey: string): string;
@@ -760,24 +731,93 @@ begin
   end;
 end;
 
-function GetActiveEncoFilePath(const ADisplayName: string; const ADirectory: string): string;
+function IsBareMappingFileName(const AFileName: string): Boolean;
+begin
+  Result := (AFileName <> '') and (ExtractFileName(AFileName) = AFileName) and (Pos(':', AFileName) = 0);
+end;
+
+function GetExactEncoFilePath(const AFileName, ADirectory: string): string;
 var
   Info: TAvroEncoFileInfo;
 begin
   Result := '';
-  // 1. Check dictionary cache first
-  if Assigned(AvroEncoFiles) and AvroEncoFiles.TryGetValue(LowerCase(ADisplayName), Info) then
+  if (not IsBareMappingFileName(AFileName)) or (not IsAnsiMappingFileName(AFileName)) then
+    Exit;
+
+  if Assigned(AvroEncoFiles) and AvroEncoFiles.TryGetValue(LowerCase(AFileName), Info) and FileExists(Info.FilePath) then
+    Exit(Info.FilePath);
+
+  // The catalog can be one scan behind (a file copied a moment ago). Check the
+  // configured directory only; never a sibling extension or another folder.
+  if (ADirectory <> '') and FileExists(ADirectory + AFileName) then
+    Exit(ADirectory + AFileName);
+end;
+
+function GetActiveEncoFilePath(const AName, ADirectory: string): string;
+begin
+  Result := '';
+  if not IsBareMappingFileName(AName) then
+    Exit;
+
+  // New exact-file form: used by Keyboard callers that pass a file name.
+  if IsAnsiMappingFileName(AName) then
+    Exit(GetExactEncoFilePath(AName, ADirectory));
+
+  // Legacy base-name form, still used by the Converter. Keep the old
+  // .AvroEnco -> .json priority and the configured-directory-only rule.
+  if FileExists(ADirectory + AName + '.AvroEnco') then
+    Exit(ADirectory + AName + '.AvroEnco');
+  if FileExists(ADirectory + AName + '.json') then
+    Exit(ADirectory + AName + '.json');
+end;
+
+function ResolveAnsiSelectionFile(const ABaseName, AFileName, ADirectory: string; out AMissingExact: Boolean): string;
+var
+  Companion, Base: string;
+begin
+  Result := '';
+  AMissingExact := False;
+  Base := Trim(ABaseName);
+  if Base = '' then
+    Exit;
+
+  Companion := ExtractFileName(Trim(AFileName));
+  if (Companion <> '') and (Pos(':', Companion) = 0) and IsAnsiMappingFileName(Companion) then
   begin
-    if FileExists(Info.FilePath) then
-      Exit(Info.FilePath);
+    if SameText(ChangeFileExt(Companion, ''), Base) then
+    begin
+      Result := GetExactEncoFilePath(Companion, ADirectory);
+      if Result = '' then
+        AMissingExact := True;
+      Exit;
+    end;
   end;
 
-  // 2. Fall back to the configured directory only. Mappings beside the
-  // executable must never override the user's copy.
-  if FileExists(ADirectory + ADisplayName + '.AvroEnco') then
-    Exit(ADirectory + ADisplayName + '.AvroEnco');
-  if FileExists(ADirectory + ADisplayName + '.json') then
-    Exit(ADirectory + ADisplayName + '.json');
+  // Companion absent/invalid/mismatched: a legacy base-name setting. Resolve
+  // once through the old priority, then the caller persists the exact result.
+  Result := GetActiveEncoFilePath(Base, ADirectory);
+end;
+
+procedure PublishActiveSelection(const AFileName, ABaseName: string);
+begin
+  AnsiVersion := ABaseName;
+  AnsiVersionFileName := AFileName;
+end;
+
+function GetMappingDisplayLabel(const AFileName: string): string;
+var
+  Info: TAvroEncoFileInfo;
+begin
+  Result := ChangeFileExt(ExtractFileName(AFileName), '');
+  if AFileName = '' then
+    Exit;
+  if Assigned(AvroEncoFiles) and AvroEncoFiles.TryGetValue(LowerCase(AFileName), Info) then
+    Result := Info.DisplayName;
+end;
+
+function EscapeAmpersandsForMenu(const ACaption: string): string;
+begin
+  Result := StringReplace(ACaption, '&', '&&', [rfReplaceAll]);
 end;
 
 { Returns the same-named .json in the configured mapping directory, used as a
@@ -862,17 +902,42 @@ end;
 
 procedure GetSortedMappingDisplayNames(ANames: TStrings);
 var
+  Key, Base: string;
+begin
+  if not Assigned(ANames) then
+    Exit;
+  ANames.Clear;
+  // Converter-facing list: each base name once, even when the folder contains
+  // both one.AvroEnco and one.json. The Keyboard uses the exact list below.
+  if Assigned(AvroEncoFiles) then
+    for Key in AvroEncoFiles.Keys do
+    begin
+      Base := AvroEncoFiles[Key].BaseName;
+      if ANames.IndexOf(Base) < 0 then
+        ANames.Add(Base);
+    end;
+  SortMappingDisplayNames(ANames);
+end;
+
+function CompareMappingFileNamesCallback(List: TStringList; Index1, Index2: Integer): Integer;
+begin
+  Result := CompareMappingDisplayNames(GetMappingDisplayLabel(List[Index1]), GetMappingDisplayLabel(List[Index2]));
+  if Result = 0 then
+    Result := CompareText(List[Index1], List[Index2]);
+end;
+
+procedure GetSortedMappingFileNames(ANames: TStrings);
+var
   Key: string;
 begin
   if not Assigned(ANames) then
     Exit;
   ANames.Clear;
-  // AvroEncoFiles is a hash table: enumerating its keys is exactly the
-  // unordered source the encoding menus used to build themselves from.
   if Assigned(AvroEncoFiles) then
     for Key in AvroEncoFiles.Keys do
-      ANames.Add(AvroEncoFiles[Key].DisplayName);
-  SortMappingDisplayNames(ANames);
+      ANames.Add(AvroEncoFiles[Key].FileName);
+  if ANames is TStringList then
+    TStringList(ANames).CustomSort(CompareMappingFileNamesCallback);
 end;
 
 function FirstAvailableMappingName: string;
@@ -888,6 +953,32 @@ begin
     for I := 0 to Names.Count - 1 do
     begin
       Path := GetActiveEncoFilePath(Names[I], AnsiMappingDir);
+      if Path = '' then
+        Continue;
+      // A password container with no cached password cannot be activated at
+      // startup without a prompt - skip it; the picker still lists it.
+      if IsEncoFile(Path) and (GetAvroEncoProtectionFlag(Path) = AVROENCO_FLAG_USER_PASSWORD) and (GetEncoCachedPassword(Path) = '') then
+        Continue;
+      Exit(Names[I]);
+    end;
+  finally
+    Names.Free;
+  end;
+end;
+
+function FirstAvailableMappingFileName: string;
+var
+  Names: TStringList;
+  I:     Integer;
+  Path:  string;
+begin
+  Result := '';
+  Names := TStringList.Create;
+  try
+    GetSortedMappingFileNames(Names);
+    for I := 0 to Names.Count - 1 do
+    begin
+      Path := GetExactEncoFilePath(Names[I], AnsiMappingDir);
       if Path = '' then
         Continue;
       // A password container with no cached password cannot be activated at

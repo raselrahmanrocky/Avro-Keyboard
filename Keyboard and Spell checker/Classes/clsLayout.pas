@@ -72,6 +72,7 @@ type
       function ProcessVKeyDown(const KeyCode: Integer; var Block: Boolean): string;
       procedure ProcessVKeyUP(const KeyCode: Integer; var Block: Boolean);
       procedure ResetDeadKey;
+      procedure ResetAnsiTypingState;
       procedure FlushEmit; // Deferred output: drains the old-style layout emit queue
       procedure ToggleMode;
       procedure BanglaMode;
@@ -208,8 +209,15 @@ end;
 procedure TLayout.ResetDeadKey;
 begin
   AvroPhonetic.ResetDeadKey;
-  GenericModernFixed.ResetDeadKey;
-  GenericOldFixed.ResetDeadKey;
+  ResetAnsiTypingState;
+end;
+
+procedure TLayout.ResetAnsiTypingState;
+begin
+  if Assigned(GenericModernFixed) then
+    GenericModernFixed.ResetAnsiTypingState;
+  if Assigned(GenericOldFixed) then
+    GenericOldFixed.ResetAnsiTypingState;
 end;
 
 { =============================================================================== }

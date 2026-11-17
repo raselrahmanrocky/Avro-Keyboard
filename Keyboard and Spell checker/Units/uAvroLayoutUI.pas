@@ -21,9 +21,9 @@ uses
   System.UITypes;
 
 procedure RebuildAnviVersionMenus;
-procedure ExportMappingFile(const AMapName: string);
-procedure ShowMappingDescription(const AMapName: string);
-procedure DeleteMappingFile(const AMapName: string);
+procedure ExportMappingFile(const AFileName: string);
+procedure ShowMappingDescription(const AFileName: string);
+procedure DeleteMappingFile(const AFileName: string);
 
 implementation
 
@@ -50,57 +50,54 @@ uses
 
 procedure RebuildAnviVersionMenus;
 
-  procedure BuildSingleMenu(AMenu: TMenuItem; const ASearchDir: string);
+  procedure BuildSingleMenu(AMenu: TMenuItem; AFileNames: TStringList);
   var
-    SR:                     TSearchRec;
-    FileTitle:              string;
     Sep, MoreOptMenu, Item: TMenuItem;
     I:                      Integer;
-    DisplayName:            string;
+    FileName, LabelText:    string;
     Checked:                Boolean;
 
-    procedure AddDirectItem(AParentMenu: TMenuItem; const AName: string; AChecked: Boolean);
+    procedure AddDirectItem(AParentMenu: TMenuItem; const ALabel, AFileName: string; AChecked: Boolean);
     var
       MItem: TMenuItemExtended;
     begin
       MItem := TMenuItemExtended.Create(AParentMenu);
-      MItem.Caption := AName;
-      MItem.Value := AName;
+      MItem.Caption := EscapeAmpersandsForMenu(ALabel);
+      MItem.Value := AFileName;
       MItem.Checked := AChecked;
       MItem.RadioItem := True;
       MItem.Tag := 9903;
-      // The mapping's display name: the measure handler reserves the badge's
-      // room from it and the popup style hook resolves the badge icon with it.
-      MItem.Hint := AName;
-      MItem.OnMeasureItem := AvroMainForm1.AnsiVersionItemMeasureItem;
+      // Exact identity for the click handler: a display label is never parsed
+      // back into a file name.
+      MItem.Hint := AFileName;
       MItem.OnClick := AvroMainForm1.AnsiVersionMenuClick;
       AParentMenu.Add(MItem);
     end;
 
-    procedure AddMappingActionSubmenu(ParentMore: TMenuItem; const AName: string);
+    procedure AddMappingActionSubmenu(ParentMore: TMenuItem; const ALabel, AFileName: string);
     var
       MSub, ActionItem: TMenuItem;
     begin
       MSub := TMenuItem.Create(ParentMore);
-      MSub.Caption := AName;
-      MSub.Hint := AName;
+      MSub.Caption := EscapeAmpersandsForMenu(ALabel);
+      MSub.Hint := AFileName;
       ParentMore.Add(MSub);
 
       ActionItem := TMenuItem.Create(MSub);
       ActionItem.Caption := 'Information';
-      ActionItem.Hint := AName;
+      ActionItem.Hint := AFileName;
       ActionItem.OnClick := AvroMainForm1.ReadAnsiDescriptionClick;
       MSub.Add(ActionItem);
 
       ActionItem := TMenuItem.Create(MSub);
       ActionItem.Caption := 'Export Mapping...';
-      ActionItem.Hint := AName;
+      ActionItem.Hint := AFileName;
       ActionItem.OnClick := AvroMainForm1.ExportSpecificMappingClick;
       MSub.Add(ActionItem);
 
       ActionItem := TMenuItem.Create(MSub);
       ActionItem.Caption := 'Delete Mapping';
-      ActionItem.Hint := AName;
+      ActionItem.Hint := AFileName;
       ActionItem.OnClick := AvroMainForm1.DeleteAnsiMappingClick;
       MSub.Add(ActionItem);
     end;
@@ -108,17 +105,16 @@ procedure RebuildAnviVersionMenus;
   begin
     AMenu.Clear;
 
-    // Full scanned catalog only - no prepended "Default" row.
-    // AnsiMappingNames is the shared, naturally sorted list of display names
-    // that TAvroMainForm1.BuildAnsiVersionMenus and the version picker both
-    // use. Enumerating AvroEncoFiles.Keys here read a hash table, whose bucket
-    // order could list V4 between V1 and V2.
-    if Assigned(AvroMainForm1.AnsiMappingNames) then
-      for I := 0 to AvroMainForm1.AnsiMappingNames.Count - 1 do
+    // Full scanned catalog only - no prepended "Default" row. The caller hands
+    // in the exact-file list for this rebuild; labels are derived from the same
+    // index so a caption can never be paired with a sibling file.
+    if Assigned(AFileNames) then
+      for I := 0 to AFileNames.Count - 1 do
       begin
-        DisplayName := AvroMainForm1.AnsiMappingNames[I];
-        Checked := SameText(AnsiVersion, DisplayName);
-        AddDirectItem(AMenu, DisplayName, Checked);
+        FileName := AFileNames[I];
+        LabelText := GetMappingDisplayLabel(FileName);
+        Checked := SameText(AnsiVersionFileName, FileName);
+        AddDirectItem(AMenu, LabelText, FileName, Checked);
       end;
 
     Sep := TMenuItem.Create(AMenu);
@@ -129,11 +125,11 @@ procedure RebuildAnviVersionMenus;
     MoreOptMenu.Caption := 'More Options';
     AMenu.Add(MoreOptMenu);
 
-    if Assigned(AvroMainForm1.AnsiMappingNames) then
-      for I := 0 to AvroMainForm1.AnsiMappingNames.Count - 1 do
+    if Assigned(AFileNames) then
+      for I := 0 to AFileNames.Count - 1 do
       begin
-        DisplayName := AvroMainForm1.AnsiMappingNames[I];
-        AddMappingActionSubmenu(MoreOptMenu, DisplayName);
+        FileName := AFileNames[I];
+        AddMappingActionSubmenu(MoreOptMenu, GetMappingDisplayLabel(FileName), FileName);
       end;
 
     Sep := TMenuItem.Create(MoreOptMenu);
@@ -152,33 +148,49 @@ procedure RebuildAnviVersionMenus;
   end;
 
 var
-  AnsiDir: string;
+  AnsiDir:   string;
+  FileNames: TStringList;
 begin
   AnsiDir := GetAvroDataDir + 'AnsiMapping\';
   ForceDirectories(AnsiDir);
   ScanAvroEncoFiles(AnsiDir);
 
-  if Assigned(AvroMainForm1.AnsiVersionSubmenu1) then
-    BuildSingleMenu(AvroMainForm1.AnsiVersionSubmenu1, AnsiDir);
-  if Assigned(AvroMainForm1.mnuTraySelectAnsiEncoding) then
-    BuildSingleMenu(AvroMainForm1.mnuTraySelectAnsiEncoding, AnsiDir);
+  // Local exact-filename list for THIS rebuild. The shared lists may be one
+  // folder change behind, and the spec forbids relying on a stale label list.
+  // Captions are derived from the same index, so a label can never be paired
+  // with the wrong file.
+  FileNames := TStringList.Create;
+  try
+    GetSortedMappingFileNames(FileNames);
+
+    if Assigned(AvroMainForm1.AnsiVersionSubmenu1) then
+      BuildSingleMenu(AvroMainForm1.AnsiVersionSubmenu1, FileNames);
+    if Assigned(AvroMainForm1.mnuTraySelectAnsiEncoding) then
+      BuildSingleMenu(AvroMainForm1.mnuTraySelectAnsiEncoding, FileNames);
+  finally
+    FileNames.Free;
+  end;
 end;
 
 { =============================================================================== }
 { Export Mapping }
 { =============================================================================== }
 
-procedure ExportMappingFile(const AMapName: string);
+procedure ExportMappingFile(const AFileName: string);
 var
   SaveDialog: TSaveDialog;
   SourcePath: string;
+  LabelText:  string;
 begin
-  SourcePath := GetActiveEncoFilePath(AMapName, GetAvroDataDir + 'AnsiMapping\');
+  if not IsBareMappingFileName(AFileName) then
+    Exit;
+  SourcePath := GetExactEncoFilePath(AFileName, GetAvroDataDir + 'AnsiMapping\');
   if SourcePath = '' then
   begin
-    MessageDlg('Mapping file not found: ' + AMapName, mtError, [mbOK], 0);
+    MessageDlg('Mapping file not found: ' + AFileName, mtError, [mbOK], 0);
     Exit;
   end;
+  LabelText := GetMappingDisplayLabel(AFileName);
 
   SaveDialog := TSaveDialog.Create(nil);
   try
@@ -195,8 +207,10 @@ begin
       SaveDialog.Filter := 'ANSI Encoding JSON|*.json';
       SaveDialog.DefaultExt := 'json';
     end;
-    SaveDialog.Title := 'Export ' + AMapName + ' Mapping';
-    SaveDialog.FileName := AMapName + ExtractFileExt(SourcePath);
+    SaveDialog.Title := 'Export ' + LabelText + ' Mapping';
+    // The exact file name, extension included. Building the base name plus an
+    // extension would turn an exact one.json into one.json.json.
+    SaveDialog.FileName := ExtractFileName(SourcePath);
 
     if SaveDialog.Execute then
     begin
@@ -214,17 +228,19 @@ end;
 { Information }
 { =============================================================================== }
 
-procedure ShowMappingDescription(const AMapName: string);
+procedure ShowMappingDescription(const AFileName: string);
 var
   AnsiMappingDir, SourcePath, JsonPath, JSONContent, MetaText, DescText: string;
   Password:                                                              AnsiString;
   IsProtected:                                                           Boolean;
 begin
+  if not IsBareMappingFileName(AFileName) then
+    Exit;
   AnsiMappingDir := GetAvroDataDir + 'AnsiMapping\';
-  SourcePath := GetActiveEncoFilePath(AMapName, AnsiMappingDir);
+  SourcePath := GetExactEncoFilePath(AFileName, AnsiMappingDir);
   if SourcePath = '' then
   begin
-    MessageDlg('Mapping file not found: ' + AMapName, mtError, [mbOK], 0);
+    MessageDlg('Mapping file not found: ' + AFileName, mtError, [mbOK], 0);
     Exit;
   end;
 
@@ -273,15 +289,15 @@ begin
   if (MetaText = '') and IsEncoFile(SourcePath) then
   begin
     // .AvroEnco files created before Metadata existed decrypt to JSON without
-    // one; fall back to the same-named .json in the mapping directory so the
-    // description card still shows the Metadata from the JSON file.
-    JsonPath := FindMetadataJsonPath(AMapName, AnsiMappingDir);
+    // one; fall back to the same-base .json in the mapping directory so the
+    // description card still shows the Metadata from the JSON file. This is a
+    // READ-ONLY metadata source: the exact selected file stays the identity,
+    // nothing is activated and the card's Name line still names SourcePath.
+    JsonPath := FindMetadataJsonPath(ChangeFileExt(AFileName, ''), AnsiMappingDir);
     if JsonPath <> '' then
     begin
       JSONContent := TFile.ReadAllText(JsonPath, TEncoding.UTF8);
-      MetaText := ExtractMetadataFromJSON(JSONContent, JsonPath);
-      if MetaText <> '' then
-        SourcePath := JsonPath; // Location shows the file the card came from
+      MetaText := ExtractMetadataFromJSON(JSONContent, SourcePath);
     end;
   end;
   if MetaText = '' then
@@ -300,52 +316,94 @@ begin
       DescText := DescText + sLineBreak + sLineBreak + 'Encrypted Avro ANSI Encoding';
   end;
 
-  // Show the description with the standard info dialog. This is the reliable
-  // presentation under the app's Windows10 Dark VCL style (a hand-built TForm
-  // gets repainted by the style hook and its text can end up invisible); on a
-  // light Windows theme the same call renders as the white Picture-3 card.
-  MessageDlg(DescText, mtInformation, [mbOK], 0);
+  // Use the native information dialog so MB_TOPMOST keeps it visible above
+  // other applications until the user dismisses it.
+  Application.MessageBox(PChar(DescText), 'Information',
+    MB_OK or MB_ICONINFORMATION or MB_TOPMOST);
 end;
 
 { =============================================================================== }
 { Delete Mapping }
 { =============================================================================== }
 
-procedure DeleteMappingFile(const AMapName: string);
+procedure DeleteMappingFile(const AFileName: string);
 var
-  AnsiDir, EncPath, JsonPath: string;
+  AnsiDir, TargetPath, Replacement: string;
+  WasActive:                        Boolean;
 begin
-  if MessageDlg('Are you sure you want to delete the mapping "' + AMapName + '"?', mtConfirmation, [mbYes, mbNo], 0) <> mrYes then
+  // The row's exact file name is the only accepted identity. A path-bearing or
+  // empty value is rejected before any confirmation dialog.
+  if not IsBareMappingFileName(AFileName) then
     Exit;
 
   AnsiDir := GetAvroDataDir + 'AnsiMapping\';
-  EncPath := AnsiDir + AMapName + '.AvroEnco';
-  JsonPath := AnsiDir + AMapName + '.json';
-
-  if FileExists(EncPath) then
-    DeleteFile(EncPath);
-  if FileExists(JsonPath) then
-    DeleteFile(JsonPath);
-
-  // Drop the deleted engine from the cache so it cannot be restored.
-  AnsiEngineManager.RemoveEngine(AMapName);
-
-  // Active mapping deleted: migrate to the next remaining file, or clear
-  // AnsiVersion and stay on Unicode. Never fall back to a compiled-in Default.
-  if SameText(AnsiVersion, AMapName) then
+  TargetPath := GetExactEncoFilePath(AFileName, AnsiDir);
+  if TargetPath = '' then
   begin
-    AnsiVersion := FirstAvailableMappingName;
-    SaveSettings;
-    if AnsiVersion <> '' then
-      AnsiEngineManager.SwitchEngine(AnsiVersion);
+    MessageDlg('Mapping file not found: ' + AFileName, mtError, [mbOK], 0);
+    Exit;
   end;
 
+  if MessageDlg('Are you sure you want to delete the mapping "' + AFileName + '"?', mtConfirmation, [mbYes, mbNo], 0) <> mrYes then
+    Exit;
+
+  WasActive := SameText(AnsiVersionFileName, AFileName);
+
+  // Only the selected exact file. A same-base sibling is a different mapping
+  // and stays in the catalog.
+  if not DeleteFile(TargetPath) then
+  begin
+    MessageDlg('Failed to delete mapping: ' + SysErrorMessage(GetLastError), mtError, [mbOK], 0);
+    Exit;
+  end;
+
+  // The catalog must be rescanned BEFORE choosing a replacement, so the
+  // deleted file can never be selected again.
   ScanAvroEncoFiles(AnsiDir);
+
+  if not WasActive then
+  begin
+    // Not live: dropping its parked engine is safe immediately.
+    AnsiEngineManager.RemoveEngine(AFileName);
+    AvroMainForm1.BuildAnsiVersionMenus;
+    AvroMainForm1.UpdateAnsiVersionMenuChecks(AnsiVersionFileName);
+    AvroMainForm1.UpdateTrayIcon;
+    ShowAnsiToastNotification('Mapping deleted: ' + GetMappingDisplayLabel(AFileName));
+    Log('Deleted mapping: ' + AFileName);
+    Exit;
+  end;
+
+  // Active file deleted: this is the one explicit action allowed to move the
+  // user to another mapping. Switch away FIRST (the switch publishes the new
+  // exact pair), then remove the old cache key; RemoveEngine refuses the active
+  // key, so the ordering is enforced by the manager as well.
+  Replacement := FirstAvailableMappingFileName;
+  if Replacement <> '' then
+  begin
+    if not AnsiEngineManager.SwitchEngine(Replacement) then
+      Log('Delete: could not activate replacement "' + Replacement + '"');
+  end
+  else
+  begin
+    PublishActiveSelection('', '');
+    SaveAnsiVersionOnly;
+    AvroMainForm1.SyncActiveMappingTimestamp('');
+    Log('Delete: no mapping files left - Unicode only');
+  end;
+
+  // Only now is the old exact key guaranteed not to be the live engine.
+  AnsiEngineManager.RemoveEngine(AFileName);
+
+  if Replacement <> '' then
+  begin
+    SaveAnsiVersionOnly;
+    AvroMainForm1.SyncActiveMappingTimestamp(AnsiVersionFileName);
+  end;
   AvroMainForm1.BuildAnsiVersionMenus;
-  AvroMainForm1.UpdateAnsiVersionMenuChecks(AnsiVersion);
+  AvroMainForm1.UpdateAnsiVersionMenuChecks(AnsiVersionFileName);
   AvroMainForm1.UpdateTrayIcon;
-  ShowAnsiToastNotification('Mapping deleted: ' + AMapName);
-  Log('Deleted mapping: ' + AMapName);
+  ShowAnsiToastNotification('Mapping deleted: ' + AFileName);
+  Log('Deleted active mapping: ' + AFileName);
 end;
 
 end.

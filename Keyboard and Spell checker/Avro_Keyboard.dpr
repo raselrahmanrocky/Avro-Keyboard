@@ -92,6 +92,7 @@ uses
       Vcl.Styles.Utils.SysControls in '..\third_party\vcl-styles-utils\Common\Vcl.Styles.Utils.SysControls.pas',
   }
   uKeyboardMacro in 'Units\uKeyboardMacro.pas',
+  uAvroHotKey in 'Units\uAvroHotKey.pas',
   uPickerSupport in 'Units\uPickerSupport.pas',
   Avro.Types in 'Units\Avro.Types.pas',
   uAvroCryptoUtils in 'Units\uAvroCryptoUtils.pas',
@@ -130,6 +131,15 @@ var
   Mutex: THandle;
 
   {$R *.res}
+
+  // The file-association icons (.avrolayout = 101, .avroskin = 102) travel
+  // INSIDE this executable: the installer's DefaultIcon values address them by
+  // resource id, so {app} carries no loose .ico files.  Source and the brcc32
+  // command that produces it: Icons\AssocIcons.rc / Icons\AssocIcons.res.
+  {$R 'Icons\AssocIcons.res'}
+  {$R 'Forms\AvroAboutArtwork.res'}
+  {$R 'Forms\AvroSplashArtwork.res'}
+  {$R 'Forms\AvroAboutIcon.res'}
 
 begin
   /// ////////////////////////////////////////////////////////////////////////////

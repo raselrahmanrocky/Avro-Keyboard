@@ -283,8 +283,6 @@ object frmOptions: TfrmOptions
     RowSelect = True
     TabOrder = 0
     OnClick = CategoryTreeClick
-    OnDblClick = CategoryTreeClick
-    OnEnter = CategoryTreeClick
     OnKeyUp = CategoryTreeKeyUp
     Items.NodeData = {
       070600000009540054007200650065004E006F00640065002D00000000000000
@@ -371,7 +369,7 @@ object frmOptions: TfrmOptions
       end
       object LabelGlobalHotkeysLink: TLabel
         Left = 27
-        Top = 365
+        Top = 370
         Width = 166
         Height = 21
         Cursor = crHandPoint
@@ -507,25 +505,8 @@ object frmOptions: TfrmOptions
         Margins.Top = 5
         Margins.Right = 5
         Margins.Bottom = 5
-        Caption = 'Keyboard Mode Settings'
+        Caption = 'Keyboard mode switcing key:'
         TabOrder = 0
-        object Label7: TLabel
-          Left = 24
-          Top = 38
-          Width = 253
-          Height = 21
-          Margins.Left = 5
-          Margins.Top = 5
-          Margins.Right = 5
-          Margins.Bottom = 5
-          Caption = 'Keyboard mode switcing key:'
-          Font.Charset = DEFAULT_CHARSET
-          Font.Color = clWindowText
-          Font.Height = -17
-          Font.Name = 'Tahoma'
-          Font.Style = [fsBold]
-          ParentFont = False
-        end
         object comboFunctionKeys: TComboBox
           Left = 287
           Top = 35
@@ -548,25 +529,8 @@ object frmOptions: TfrmOptions
         Margins.Top = 5
         Margins.Right = 5
         Margins.Bottom = 5
-        Caption = 'Global output settings'
+        Caption = 'Toggle between Unicode/ANSI output mode:'
         TabOrder = 1
-        object Label16: TLabel
-          Left = 24
-          Top = 38
-          Width = 388
-          Height = 21
-          Margins.Left = 5
-          Margins.Top = 5
-          Margins.Right = 5
-          Margins.Bottom = 5
-          Caption = 'Toggle between Unicode/ANSI output mode:'
-          Font.Charset = DEFAULT_CHARSET
-          Font.Color = clWindowText
-          Font.Height = -17
-          Font.Name = 'Tahoma'
-          Font.Style = [fsBold]
-          ParentFont = False
-        end
         object comboFunctionKeys_OutputMode: TComboBox
           Left = 293
           Top = 69
@@ -589,25 +553,8 @@ object frmOptions: TfrmOptions
         Margins.Top = 5
         Margins.Right = 5
         Margins.Bottom = 5
-        Caption = 'Spell checker settings'
+        Caption = 'Avro Bangla spell checker launcher key:'
         TabOrder = 2
-        object Label18: TLabel
-          Left = 24
-          Top = 38
-          Width = 340
-          Height = 21
-          Margins.Left = 5
-          Margins.Top = 5
-          Margins.Right = 5
-          Margins.Bottom = 5
-          Caption = 'Avro Bangla spell checker launcher key:'
-          Font.Charset = DEFAULT_CHARSET
-          Font.Color = clWindowText
-          Font.Height = -17
-          Font.Name = 'Tahoma'
-          Font.Style = [fsBold]
-          ParentFont = False
-        end
         object comboFunctionKeys_SpellerLauncher: TComboBox
           Left = 293
           Top = 69

@@ -27,33 +27,27 @@ type
 var
   UserHotkeys: TUserHotkeyArray;
 
-  // Hotkey Recording State
-  IsRecordingHotkey:   Boolean;
-  RecordingTargetEdit: TEdit;
+  // Hotkey capture state: owned by the focused TAvroHotKey (Units\uAvroHotKey.pas)
+  HotkeyCaptureActive: Boolean;
+  // True once the current gesture produced a main key.  Modifier-only input must
+  // end on "None" (THotKey behaviour), but the modifier key-ups that follow a
+  // real combination must not clear it again.
+  HotkeyCaptureCommitted: Boolean;
+  // The keyboard hook commits a finished combination here; '' reverts, 'None'
+  // clears.  The dialog answers with validation, the conflict dialog and the
+  // revert, so this unit stays free of the field's class.
+  HotkeyCaptureCommit: procedure(const Text: string) of object;
+  // Live "pressed" state, e.g. 'Ctrl + Alt + ', painted by the focused field
+  // while the keys are still held.  '' restores the committed value.
+  HotkeyCapturePreview: procedure(const Text: string) of object;
 
-type
-  THotkeyFeature = record
-    VariablePtr: PString;
-    DisplayName: string;
-    EditRef: TEdit;
-  end;
-
-var
-  HotkeyFeatures:     array of THotkeyFeature;
-  RecordingOldText:   string;
-  RecordingFinalized: Boolean;
-
-procedure RegisterHotkeyFeature(VarPtr: PString; const Name: string; Edit: TEdit);
-function FindConflictingFeature(const Hotkey: string; SourceEdit: TEdit): Integer;
-function ResolveHotkeyConflict(const NewHotkey: string; ConflictingIndex: Integer): Boolean;
 function HotkeysEqual(const A, B: string): Boolean;
-procedure ClearConflictByIndex(Idx: Integer);
-function GetConflictDisplayName(Idx: Integer): string;
 
 procedure AddUserHotkey(Mods: Byte; Key: Byte; const Text: string);
 procedure RemoveUserHotkey(Index: Integer);
 procedure ClearUserHotkeys;
 function MatchUserHotkey(vkCode: Integer; var OutText: string): Boolean;
+function MatchUserHotkeyWithMods(vkCode: Integer; Mods: Byte; var OutText: string): Boolean;
 function ModifierMaskFromState: Byte;
 function UserHotkeyToString(Index: Integer): string;
 procedure SaveUserHotkeysToXML;
@@ -64,8 +58,26 @@ function HotkeyStringToModifiers(const S: string): Byte;
 function HotkeyStringToKey(const S: string): Integer;
 function KeyToHotkeyString(Mods: Byte; VK: Integer): string;
 function MatchesHotkeySetting(const Setting: string; vkCode: Integer): Boolean;
+function HotkeySettingMatchesVk(const Setting: string; AKey: Integer; Mods: Byte): Boolean;
+function NormalizeHotkeyVk(AKey, ScanCode: Integer; Extended: Boolean): Integer;
 function HotkeyStringToShortCut(const Setting: string): TShortCut;
 function VirtualKeyToStr(VK: Byte): string;
+
+{ True when the comctl32 hot-key control would paint a different name than the
+  setting means.  Its renderer maps the virtual key to a scan code without the
+  extended-key bit, so a dedicated arrow is painted with the name of the numpad
+  key that shares its scan code ("Up" -> "Num 8"); the keypad decimal, divide
+  and separator keys lose their "Num" prefix the same way.  Such values are
+  painted by TAvroHotKey itself. }
+function HotkeyKeyNeedsOwnPaint(VK: Integer): Boolean;
+
+{ True for the keys that may be recorded as a hotkey with no modifier held.
+  The field is a THotKey whose InvalidKeys is empty, so the native control
+  accepts a bare key; F-keys, the navigation block and the numeric keypad are
+  the ones that are safe to give away.  Letters and the top-row digits are
+  deliberately absent: a global hotkey that swallows ordinary typing would
+  make the keyboard unusable everywhere, not just in Avro. }
+function IsBareHotkeyKey(VK: Integer): Boolean;
 
 implementation
 
@@ -130,17 +142,22 @@ end;
 { =============================================================================== }
 
 function MatchUserHotkey(vkCode: Integer; var OutText: string): Boolean;
+begin
+  Result := MatchUserHotkeyWithMods(vkCode, ModifierMaskFromState, OutText);
+end;
+
+{ =============================================================================== }
+
+function MatchUserHotkeyWithMods(vkCode: Integer; Mods: Byte; var OutText: string): Boolean;
 var
-  I:           Integer;
-  CurrentMods: Byte;
+  I: Integer;
 begin
   Result := False;
   OutText := '';
-  CurrentMods := ModifierMaskFromState;
 
   for I := 0 to Length(UserHotkeys) - 1 do
   begin
-    if (UserHotkeys[I].VirtualKey = vkCode) and (UserHotkeys[I].ModifierMask = CurrentMods) then
+    if (UserHotkeys[I].VirtualKey = vkCode) and (UserHotkeys[I].ModifierMask = Mods) then
     begin
       OutText := UserHotkeys[I].ReplacementText;
       Result := True;
@@ -247,6 +264,25 @@ begin
       Result := 'Left';
     $27:
       Result := 'Right';
+    { The numeric keypad.  A digit there is VK_NUMPAD0..VK_NUMPAD9, not
+      VK_0..VK_9, so it needs its own names or the setting cannot be parsed
+      back (it used to be stored as "VK97", which StrToVirtualKey read as
+      Space).  "+" is the modifier delimiter of the setting string, hence
+      "Num Plus" instead of "Num +". }
+    $60 .. $69:
+      Result := 'Num ' + Chr(VK - $60 + Ord('0'));
+    $6A:
+      Result := 'Num *';
+    $6B:
+      Result := 'Num Plus';
+    $6C:
+      Result := 'Num Sep';
+    $6D:
+      Result := 'Num -';
+    $6E:
+      Result := 'Num .';
+    $6F:
+      Result := 'Num /';
     $BA:
       Result := ';';
     $BB:
@@ -315,6 +351,20 @@ begin
     Result := $25
   else if Upper = 'RIGHT' then
     Result := $27
+  else if (Length(Upper) = 5) and (Copy(Upper, 1, 4) = 'NUM ') and (Upper[5] in ['0' .. '9']) then
+    Result := $60 + Ord(Upper[5]) - Ord('0')
+  else if Upper = 'NUM *' then
+    Result := $6A
+  else if (Upper = 'NUM PLUS') or (Upper = 'NUM +') then
+    Result := $6B
+  else if (Upper = 'NUM SEP') or (Upper = 'NUM SEPARATOR') then
+    Result := $6C
+  else if (Upper = 'NUM -') or (Upper = 'NUM SUBTRACT') then
+    Result := $6D
+  else if (Upper = 'NUM .') or (Upper = 'NUM DECIMAL') then
+    Result := $6E
+  else if (Upper = 'NUM /') or (Upper = 'NUM DIVIDE') then
+    Result := $6F
   else if (Length(Upper) = 1) and (Upper[1] in ['0' .. '9']) then
     Result := Ord(Upper[1])
   else if (Length(Upper) = 1) and (Upper[1] in ['A' .. 'Z']) then
@@ -366,7 +416,10 @@ begin
   else if Upper = '''' then
     Result := $DE
   else
-    Result := $20;
+    { Unknown text is not Space: that fallback used to make any unparseable
+      setting ("VK97", a typo) match the space bar.  Zero never equals a real
+      key code, so an unreadable setting simply never fires. }
+    Result := 0;
 end;
 
 { =============================================================================== }
@@ -548,10 +601,14 @@ end;
 
 // Check if current key state matches a hotkey setting string
 function MatchesHotkeySetting(const Setting: string; vkCode: Integer): Boolean;
+begin
+  Result := HotkeySettingMatchesVk(Setting, vkCode, ModifierMaskFromState);
+end;
+
+function HotkeySettingMatchesVk(const Setting: string; AKey: Integer; Mods: Byte): Boolean;
 var
-  NeedMods:    Byte;
-  NeedKey:     Integer;
-  CurrentMods: Byte;
+  NeedMods: Byte;
+  NeedKey:  Integer;
 begin
   Result := False;
   if (Setting = '') or (Setting = 'NONE') then
@@ -559,9 +616,49 @@ begin
 
   NeedMods := HotkeyStringToModifiers(Setting);
   NeedKey := HotkeyStringToKey(Setting);
-  CurrentMods := ModifierMaskFromState;
+  Result := (NeedKey <> 0) and (NeedMods = Mods) and (NeedKey = AKey);
+end;
 
-  Result := (NeedMods = CurrentMods) and (NeedKey = vkCode);
+function NormalizeHotkeyVk(AKey, ScanCode: Integer; Extended: Boolean): Integer;
+begin
+  Result := AKey;
+
+  { A keypad key always reports a non-extended scan code, while every dedicated
+    arrow/navigation key is extended.  Windows turns the keypad into the shared
+    navigation VKs whenever NumLock is off - and also while Shift is held, even
+    though GetKeyState still reports NumLock as on (Shift overrides NumLock).
+    The scan code is therefore the only reliable way to tell "Num 8" from "Up";
+    do not consult the NumLock toggle here. }
+  if Extended then
+    Exit;
+
+  // Already a keypad VK: Windows already reported the keypad key itself.
+  if (AKey >= VK_NUMPAD0) and (AKey <= VK_DIVIDE) then
+    Exit;
+
+  case ScanCode of
+    $47: Result := VK_NUMPAD7;
+    $48: Result := VK_NUMPAD8;
+    $49: Result := VK_NUMPAD9;
+    $4B: Result := VK_NUMPAD4;
+    $4C: Result := VK_NUMPAD5;
+    $4D: Result := VK_NUMPAD6;
+    $4F: Result := VK_NUMPAD1;
+    $50: Result := VK_NUMPAD2;
+    $51: Result := VK_NUMPAD3;
+    $52: Result := VK_NUMPAD0;
+    $53: Result := VK_DECIMAL;
+  end;
+end;
+
+{ =============================================================================== }
+
+function HotkeyKeyNeedsOwnPaint(VK: Integer): Boolean;
+begin
+  Result := VK in [
+    VK_INSERT, VK_DELETE, VK_HOME, VK_END, VK_PRIOR, VK_NEXT,
+    VK_LEFT, VK_UP, VK_RIGHT, VK_DOWN,
+    VK_SEPARATOR, VK_DECIMAL, VK_DIVIDE];
 end;
 
 { =============================================================================== }
@@ -573,104 +670,12 @@ end;
 
 { =============================================================================== }
 
-procedure RegisterHotkeyFeature(VarPtr: PString; const Name: string; Edit: TEdit);
-var
-  Len: Integer;
+function IsBareHotkeyKey(VK: Integer): Boolean;
 begin
-  Len := Length(HotkeyFeatures);
-  SetLength(HotkeyFeatures, Len + 1);
-  HotkeyFeatures[Len].VariablePtr := VarPtr;
-  HotkeyFeatures[Len].DisplayName := name;
-  HotkeyFeatures[Len].EditRef := Edit;
+  Result := ((VK >= VK_F1) and (VK <= VK_F12)) or { F1..F12 }
+    ((VK >= VK_PRIOR) and (VK <= VK_DOWN)) or { PgUp, PgDn, End, Home, arrows }
+    (VK = VK_INSERT) or
+    ((VK >= VK_NUMPAD0) and (VK <= VK_DIVIDE)); { the numeric keypad }
 end;
-
-{ =============================================================================== }
-
-function FindConflictingFeature(const Hotkey: string; SourceEdit: TEdit): Integer;
-var
-  I:           Integer;
-  UpperHotkey: string;
-  EditTxt:     string;
-begin
-  Result := -1;
-  if (Hotkey = '') or (Hotkey = 'NONE') then
-    Exit;
-  UpperHotkey := UpperCase(Hotkey);
-  // Check all registered features — compare against TEdit.Text, not VariablePtr^
-  for I := 0 to Length(HotkeyFeatures) - 1 do
-  begin
-    if HotkeyFeatures[I].EditRef = SourceEdit then
-      Continue;
-    EditTxt := UpperCase(HotkeyFeatures[I].EditRef.Text);
-    if (EditTxt <> '') and (EditTxt <> 'NONE') and (EditTxt <> 'PRESS ANY KEY...') and HotkeysEqual(UpperHotkey, EditTxt) then
-    begin
-      Result := I;
-      Exit;
-    end;
-  end;
-  // Also check UserHotkeys array
-  for I := 0 to Length(UserHotkeys) - 1 do
-  begin
-    if HotkeysEqual(UpperHotkey, UpperCase(KeyToHotkeyString(UserHotkeys[I].ModifierMask, UserHotkeys[I].VirtualKey))) then
-    begin
-      Result := Length(HotkeyFeatures) + I;
-      Exit;
-    end;
-  end;
-end;
-
-{ =============================================================================== }
-
-function ResolveHotkeyConflict(const NewHotkey: string; ConflictingIndex: Integer): Boolean;
-var
-  Msg:         string;
-  Ret:         Integer;
-  FeatureName: string;
-begin
-  Result := False;
-  FeatureName := GetConflictDisplayName(ConflictingIndex);
-  Msg := 'The hotkey "' + NewHotkey + '" conflicts with the hotkey selected for "' + FeatureName + '". ' + 'If you continue, the hotkey for "' + FeatureName +
-    '" will be cleared. Continue?';
-  Ret := Application.MessageBox(PChar(Msg), 'Hotkey Conflict', MB_YESNOCANCEL or MB_ICONWARNING or MB_DEFBUTTON3);
-  if Ret = IDYES then
-    Result := True;
-end;
-
-{ =============================================================================== }
-
-function GetConflictDisplayName(Idx: Integer): string;
-var
-  FeatureCount: Integer;
-begin
-  FeatureCount := Length(HotkeyFeatures);
-  if Idx < FeatureCount then
-    Result := HotkeyFeatures[Idx].DisplayName
-  else
-    Result := 'Custom Macro';
-end;
-
-{ =============================================================================== }
-
-procedure ClearConflictByIndex(Idx: Integer);
-var
-  FeatureCount: Integer;
-begin
-  FeatureCount := Length(HotkeyFeatures);
-  if Idx < FeatureCount then
-  begin
-    // Only update the UI — actual variable cleared by SaveSettings on OK/Apply
-    if Assigned(HotkeyFeatures[Idx].EditRef) then
-    begin
-      HotkeyFeatures[Idx].EditRef.Text := 'None';
-      HotkeyFeatures[Idx].EditRef.Color := clWindow;
-    end;
-  end
-  else
-  begin
-    RemoveUserHotkey(Idx - FeatureCount);
-  end;
-end;
-
-{ =============================================================================== }
 
 end.

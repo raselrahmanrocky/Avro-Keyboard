@@ -21,7 +21,6 @@ uses
   Controls,
   Forms,
   Dialogs,
-  jpeg,
   ExtCtrls;
 
 type
@@ -47,7 +46,8 @@ var
 implementation
 
 uses
-  DebugLog;
+  DebugLog,
+  Vcl.Imaging.pngimage;
 
 {$R *.dfm}
 
@@ -62,7 +62,23 @@ begin
 end;
 
 procedure TfrmSplash.FormCreate(Sender: TObject);
+var
+  ArtworkStream: TResourceStream;
+  Artwork: TPngImage;
 begin
+  ArtworkStream := TResourceStream.Create(HInstance, 'AVRO_SPLASH_SCREEN',
+    RT_RCDATA);
+  Artwork := TPngImage.Create;
+  try
+    Artwork.LoadFromStream(ArtworkStream);
+    Image1.Picture.Assign(Artwork);
+  finally
+    Artwork.Free;
+    ArtworkStream.Free;
+  end;
+  Image1.Stretch := True;
+  Image1.Proportional := True;
+  Image1.Center := True;
   Self.ClientWidth := Image1.Width;
   Self.ClientHeight := Image1.Height;
   Log('Splash created');

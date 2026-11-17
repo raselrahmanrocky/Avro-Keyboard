@@ -266,15 +266,21 @@ begin
 
     if FileExists(TargetPath) then
     begin
-      if Application.MessageBox(PChar('A mapping named "' + DisplayName + '" already exists.' + sLineBreak + 'Overwrite the existing file?'),
-        'Confirm Overwrite', MB_ICONQUESTION or MB_YESNO or MB_DEFBUTTON2) <> ID_YES then
-      begin
-        TargetPath := GenerateUniqueFileName(TargetDir, ExtractFileName(ASourcePath));
-        if TargetPath = '' then
-        begin
-          AErrorMessage := 'Could not generate unique file name.';
-          Exit;
-        end;
+      case Application.MessageBox(PChar('A mapping named "' + DisplayName + '" already exists.' + sLineBreak + 'Overwrite the existing file?'),
+        'Confirm Overwrite', MB_ICONQUESTION or MB_YESNOCANCEL or MB_DEFBUTTON2) of
+        ID_YES:
+          ; // overwrite the existing file
+        ID_NO:
+          begin
+            TargetPath := GenerateUniqueFileName(TargetDir, ExtractFileName(ASourcePath));
+            if TargetPath = '' then
+            begin
+              AErrorMessage := 'Could not generate unique file name.';
+              Exit;
+            end;
+          end;
+      else
+        Exit; // Cancel: abort cleanly, before any file is created
       end;
     end;
 
@@ -285,7 +291,10 @@ begin
       Exit;
     end;
 
-    ImportedName := GetEncoDisplayName(TargetPath);
+    // The copied target's exact file name is the activation identity. The base
+    // name below is for messages and the legacy AnsiVersion the manager
+    // publishes; it is never used to resolve a file.
+    ImportedName := ExtractFileName(TargetPath);
 
     // --- 7. Remember the valid password (password protected only) ---------------
     // Stored per encoding, so switching to this mapping later never asks for the
@@ -300,13 +309,14 @@ begin
     ScanAvroEncoFiles(TargetDir);
 
     Log('Imported AvroEnco file: ' + ImportedName);
-    ShowAnsiToastNotification('Mapping imported: ' + ImportedName);
+    ShowAnsiToastNotification('Mapping imported: ' + GetMappingDisplayLabel(ImportedName));
     Result := True;
 
     // --- 9. Activate the new mapping (password-protected imports only) ---------
     // Default-key imports are silent and never change the active mapping.
-    // InvalidateEngine first: when the imported name was already cached, the
-    // freshly copied file must replace the stale parked engine.
+    // InvalidateEngine first: when the imported exact file was already cached,
+    // the freshly copied file must replace the stale parked engine. A same-base
+    // sibling is a different key and is untouched.
     if Password <> '' then
     begin
       AnsiEngineManager.InvalidateEngine(ImportedName);
@@ -382,15 +392,21 @@ begin
 
     if FileExists(TargetPath) then
     begin
-      if Application.MessageBox(PChar('A mapping named "' + ChangeFileExt(ExtractFileName(ASourcePath), '') + '" already exists.' + sLineBreak +
-            'Overwrite the existing file?'), 'Confirm Overwrite', MB_ICONQUESTION or MB_YESNO or MB_DEFBUTTON2) <> ID_YES then
-      begin
-        TargetPath := GenerateUniqueFileName(AnsiMappingDir, ExtractFileName(ASourcePath));
-        if TargetPath = '' then
-        begin
-          AErrorMessage := 'Could not generate unique file name.';
-          Exit;
-        end;
+      case Application.MessageBox(PChar('A mapping named "' + ChangeFileExt(ExtractFileName(ASourcePath), '') + '" already exists.' + sLineBreak +
+            'Overwrite the existing file?'), 'Confirm Overwrite', MB_ICONQUESTION or MB_YESNOCANCEL or MB_DEFBUTTON2) of
+        ID_YES:
+          ; // overwrite the existing file
+        ID_NO:
+          begin
+            TargetPath := GenerateUniqueFileName(AnsiMappingDir, ExtractFileName(ASourcePath));
+            if TargetPath = '' then
+            begin
+              AErrorMessage := 'Could not generate unique file name.';
+              Exit;
+            end;
+          end;
+      else
+        Exit; // Cancel: abort cleanly, before any file is created
       end;
     end;
 
@@ -401,7 +417,9 @@ begin
       Exit;
     end;
 
-    ImportedName := ChangeFileExt(ExtractFileName(TargetPath), '');
+    // The exact copied file name is the activation identity; nothing here
+    // rebuilds an extension from a base name.
+    ImportedName := ExtractFileName(TargetPath);
     Result := True;
 
     // --- 6. Scan / refresh -----------------------------------------------------
@@ -409,16 +427,17 @@ begin
 
     // --- 7. Activate the new mapping ------------------------------------------
     // Plain JSON mappings are unprotected: import activates them, exactly like
-    // the pre-container behaviour. InvalidateEngine first - when the name was
-    // already cached, the freshly copied file must replace the stale parked
-    // engine. A failed activation leaves the previous mapping live and is only
-    // logged: the file itself imported fine.
+    // the pre-container behaviour. InvalidateEngine first - when the exact file
+    // was already cached, the freshly copied file must replace the stale parked
+    // engine. A same-base .AvroEnco sibling is a different key and is untouched.
+    // A failed activation leaves the previous mapping live and is only logged:
+    // the file itself imported fine.
     AnsiEngineManager.InvalidateEngine(ImportedName);
     ErrorLog := TStringList.Create;
     try
       if AnsiEngineManager.SwitchEngine(ImportedName, ErrorLog) then
       begin
-        SaveSettings; // persist the active AnsiVersion
+        SaveSettings; // persist the active AnsiVersion + AnsiVersionFileName
         Log('Imported and activated json mapping: ' + ImportedName);
       end
       else
@@ -428,7 +447,7 @@ begin
     end;
 
     Log('Imported json mapping file: ' + ImportedName);
-    ShowAnsiToastNotification('Mapping imported: ' + ImportedName);
+    ShowAnsiToastNotification('Mapping imported: ' + GetMappingDisplayLabel(ImportedName));
   except
     on E: Exception do
     begin
